@@ -35,7 +35,7 @@
 ;;;; Configuration options:
 
 (defgroup neron-light nil
-  "neron-light theme options.
+  "\"neron-light\" theme options.
 
 The theme has to be reloaded after changing anything in this group."
   :group 'faces)
@@ -134,7 +134,7 @@ read it before opening a new issue about your will.")
 ;; invisible fg: #868787
 ;; or from vimco-bluloco-light comment face: Foreground: #a0a1a7
 
-;; neron reasigned: # 666 x 2 = 
+;; neron reasigned: # 666 x 2 =
 ;; fg: #2d3124
 ;; bg: #ffffff
 ;; bg-616: #f6f6f6
@@ -261,7 +261,6 @@ read it before opening a new issue about your will.")
                (corfu-current :inherit vertico-current)
                ;; (corfu-annotations)
                ;; (corfu-deprecated)
-co
                ;; org
                (org-block :background ,c/bg-616)
                (org-block-begin-line :inherit org-block :foreground ,c/invisible-fg)

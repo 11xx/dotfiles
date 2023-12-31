@@ -36,7 +36,7 @@
 ;;;; Configuration options:
 
 (defgroup neron-dark nil
-  "neron-dark theme options.
+  "\"neron-dark\" theme options.
 
 The theme has to be reloaded after changing anything in this group."
   :group 'faces)
@@ -209,7 +209,6 @@ read it before opening a new issue about your will.")
                (corfu-current :inherit vertico-current)
                ;; (corfu-annotations)
                ;; (corfu-deprecated)
-co
                ;; org
                (org-block :background ,c/bg-616)
                (org-block-begin-line :inherit org-block :foreground ,c/invisible-fg)
