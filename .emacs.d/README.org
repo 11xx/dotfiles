@@ -10,6 +10,8 @@
 # Export as HTML
 #+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
 
+#+OPTIONS: toc:2
+
 This is a +mainly+ Linux config that I made for Arch Linux, it's about 2
 years old after a few rewrites. Some Windows compatibility have been
 included recently.
