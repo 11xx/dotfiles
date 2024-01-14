@@ -352,7 +352,7 @@ It uses `make-directory' PARENTS argument 't'."
     (insert-file-contents file-path)
     (buffer-string)))
 
-    ;;; Stefan Monnier <foo at acm.org>. It is the opposite of fill-paragraph
+;;; Stefan Monnier <foo at acm.org>. It is the opposite of fill-paragraph
 (defun unfill-paragraph (&optional region)
   "Takes a multi-line paragraph and makes it into a single line of text."
   (interactive (progn (barf-if-buffer-read-only) '(t)))
@@ -433,7 +433,7 @@ It uses `make-directory' PARENTS argument 't'."
    tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
    tab-always-indent t ; when using the TAB key
    org-edit-src-content-indentation 0
-   org-src-preserve-indentation t
+   org-src-preserve-indentation nil  ; default is nil
    ;; Emacs 28: Hide commands in M-x which do not work in the
    ;; current mode.
    ;; Vertico commands are hidden in normal buffers.
@@ -1394,6 +1394,8 @@ The app is chosen from your OS's preference."
 
 (setup (:package pkgbuild-mode))
 
+(setup (:package powershell))
+
 (setup (:package (kbd-mode :type git :host github :repo "kmonad/kbd-mode")))
 
 (setup (:package (sxhkd-mode :type git :host github :repo "xFA25E/sxhkd-mode"))
@@ -1681,4 +1683,4 @@ using the function `compile' build a command like:
 (with-system windows-nt
   (setenv "LANG" "en_US")
 
-  )
+)

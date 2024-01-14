@@ -1355,8 +1355,11 @@ org-edit-src-content-indentation 0
 Keep indentation when tangling src code blocks, see [[https://emacs.stackexchange.com/questions/62602/how-do-i-keep-the-indentation-on-org-babel-tangle/62613#62613][org mode - How do
 I keep the indentation on org-babel-tangle? - Emacs Stack Exchange]].
 #+begin_src emacs-lisp
-org-src-preserve-indentation t
+org-src-preserve-indentation nil  ; default is nil
 #+end_src
+Changed back to the default (nil) because it was useful only in
+specific cases and it can be enabled buffer-only, with local
+variables.
 
 #+begin_src emacs-lisp
 ;; Emacs 28: Hide commands in M-x which do not work in the
@@ -2661,7 +2664,6 @@ NOTE: =dired-async= is provided by the =async= package.
 #+end_src
 
 * Modes
-
 ** Add =modes= directory to Emacs path
 Custom mode files should sit here.
 # [2022-04-27 Wed 07:19:42]
@@ -2700,6 +2702,12 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 ** PKGBUILD
 #+begin_src emacs-lisp
 (setup (:package pkgbuild-mode))
+#+end_src
+
+** PowerShell
+# [2024-01-14 Sun 13:58:20 -03:00] @winr58
+#+begin_src emacs-lisp
+(setup (:package powershell))
 #+end_src
 
 * Special modes
