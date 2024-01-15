@@ -310,13 +310,17 @@ with =package-list-packages=.
 :header-args:emacs-lisp: :tangle early-init.el
 :END:
 #+begin_src emacs-lisp
-(straight-use-package 'use-package)
 (setq straight-use-package-by-default t)
 #+end_src
 If the variable =straight-use-package-by-default= is not defined or =nil=,
 to use =straight.el= to install packages, use the keyword =:straight t= in
 =use-package= declarations.
 - See [[https://github.com/radian-software/straight.el#integration-with-use-package=][radian-software/straight.el#Integration with use-package]].
+
+- Removed install of =use-package= with =straight= because now it is built
+  into Emacs, since 29.1.
+  # [2024-01-15 Mon 17:50:22 -03:00] @winr58
+
 
 * Org Mode
 *NOTE*: Moved Org mode setup up because of:
@@ -2328,7 +2332,7 @@ disable the darkman =(setup)=
 
 **** (Windows-NT) load theme based on Dark or Light system theme
 - Note:
-  #+INCLUDE: "c:/org/windows.org::*Check if using light or dark theme on Windows command-line" :only-contents t
+  #+INCLUDE: "~/org/windows.org::*Check if using light or dark theme on Windows command-line" :only-contents t
 #+begin_src emacs-lisp
 (when (eq system-type 'windows-nt)
   (let ((islight (shell-command-to-string "reg query \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\" /V \"SystemUsesLightTheme\"")))
@@ -2752,7 +2756,8 @@ Additional Tree-Sitter content
 - [[https://siraben.dev/2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
   # [2022-04-28 Thu 16:46:45]
 #+begin_src emacs-lisp
-(setup (:package tree-sitter tree-sitter-langs tree-sitter-indent)
+(setup tree-sitter
+       (:package tree-sitter-langs tree-sitter-indent)
   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
                ;; org-mode.
                c-mode-common-hook
@@ -2998,12 +3003,6 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 #+end_src
 
 **** (Windows-NT): LF vs CRLF
-After =git add= the warning can be given
-: warning: in the working copy of '.emacs.d/init.el', LF will be replaced by CRLF the next time Git touches it
-Simply set =git config --global core.autocrlf true= and it will convert
-CRLF to LF when checking out on Linux or from LF to CRLF when on
-Windows, commits uses LF regardless.
-
 For using a specific coding system inside Emacs, set
 =(setq-default buffer-file-coding-system 'utf-8-unix)= to prefer LF over
 CRLF, for example.
@@ -3019,7 +3018,8 @@ Check if the current file is using CRLF and change it to LF.
 
 ;; (add-hook 'find-file-hook 'f/check-and-convert-line-endings)
 #+end_src
-
+- Note:
+  #+INCLUDE: "~/org/windows.org::*Git newline characters warning / LF vs CRLF"
 
 ** TODO Rust
 [[https://github.crookster.org/my-emacs-rust-language-config/][My Emacs Rust Language Config | David Crook]]
@@ -3251,16 +3251,6 @@ creation with the configuration already-loaded.
 (call-interactively 'consult-line)
 #+end_src
 
-* TODO TRAMP
-testing, turned out to be zsh itself
-#+begin_src emacs-lisp :tangle no
-(setup tramp
-  (:load-after emacs)
-  (add-to-list 'tramp-connection-properties
-               (list ".*" "locale" "LC_ALL=C")))
-
-#+end_src
-
 * DONE Edit with Emacs browser extension
 [[https://github.com/stsquad/emacs_chrome][GitHub - stsquad/emacs_chrome]]
 #+begin_src emacs-lisp :tangle no :noweb-ref dummy
@@ -3337,27 +3327,6 @@ retrieve the password.
 
 * (Windows-NT) specific settings
 
-** TODO Configure spell-check
-# not working # [2023-12-30 Sat 03:24:31 -03:00] @winr58
-Install =hunspell=:
-: choco install hunspell.portable
-[[https://community.chocolatey.org/packages/hunspell.portable][Chocolatey Software | Hunspell (Portable) 1.7.0]]
-
-After installing it probably won't work right away:
-: Hunspell error (is $LANG unset?): Can't open affix or dictionary files for dictionary named "default".
-
-So set =LANG=:
-#+begin_src emacs-lisp
-(with-system windows-nt
-  (setenv "LANG" "en_US")
-#+end_src
-now hunspell can't find dictionaries, throwing the error:
-: ispell-find-hunspell-dictionaries: Can’t find Hunspell dictionary with a .aff affix file
-#+begin_src emacs-lisp
-  )
-#+end_src
-See [[https://community.chocolatey.org/packages/hunspell.portable#comment-1680313531][Chocolatey Software | Hunspell (Portable) 1.7.0#comment-1680313531]].
-
 ** Change Emacs $HOME / Where to put init files
 - See
   + [[https://emacs.stackexchange.com/questions/75902/emacs-recognizes-as-home-instead-of-appdata-roaming-when-ssh-to-window/75934#75934][init file - Emacs Recognizes “~/” As HOME Instead of “~/AppData/Roaming/” When SSH to Windows - Emacs Stack Exchange]]
@@ -3372,34 +3341,6 @@ For changing where =.emacs.d= is read from.
     * Add or edit the =HOME= environment variable under =User variables for xxx=
 - Restart =explorer.exe= or relogin.
 # [2023-12-30 Sat 15:02:21 -03:00] @winr58
-
-* TODO Emoji display
-PS apparently windows emacs won't show emoji wtf # [2023-12-30 Sat 04:04:22 -03:00] @winr58
-
-Install noto-emoji on arch or something
-on Windows
-- [[https://fonts.google.com/noto/specimen/Noto+Color+Emoji][Noto Color Emoji - Google Fonts]]
-
-See [[https://superuser.com/questions/1764256/missing-emoji-in-emacs-and-firefox/1766066#1766066][macos - Missing Emoji in Emacs and Firefox - Super User]]
-: (set-fontset-font t '(#x1f000 . #x1faff) (font-spec :family "Segoe UI Emoji Regular"))
-
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(when (member "Segoe UI Emoji" (font-family-list))
-  (set-fontset-font
-    t 'symbol (font-spec :family "Segoe UI Emoji") nil 'prepend))
-#+end_src
-
-[[https://ianyepan.github.io/posts/emacs-emojis/][Native Emojis in Emacs | Ian Y.E. Pan]]
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(use-package emojify
-  :config
-  (when (member "Segoe UI Emoji" (font-family-list))
-    (set-fontset-font
-     t 'symbol (font-spec :family "Segoe UI Emoji") nil 'prepend))
-  (setq emojify-display-style 'unicode)
-  (setq emojify-emoji-styles '(unicode))
-  (bind-key* (kbd "C-c .") #'emojify-insert-emoji)) ; override binding in any mode
-#+end_src
 
 * Local variables
 [[https://www.youtube.com/watch?v=tw2-rI2bxSg][Emacs Tips - How to Use File and Directory Local Variables]]

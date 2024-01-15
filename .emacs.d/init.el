@@ -1403,7 +1403,8 @@ The app is chosen from your OS's preference."
 
 (setup (:package yuck-mode))
 
-(setup (:package tree-sitter tree-sitter-langs tree-sitter-indent)
+(setup tree-sitter
+       (:package tree-sitter-langs tree-sitter-indent)
   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
                ;; org-mode.
                c-mode-common-hook
@@ -1679,8 +1680,3 @@ using the function `compile' build a command like:
                          ; and straght load before it.
   (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
            gptel-default-mode 'org-mode))
-
-(with-system windows-nt
-  (setenv "LANG" "en_US")
-
-)

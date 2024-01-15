@@ -128,7 +128,6 @@ current mode."
   :repeatable t
   :after-loaded t)
 
-(straight-use-package 'use-package)
 (setq straight-use-package-by-default t)
 
 (add-hook 'emacs-startup-hook
