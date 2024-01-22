@@ -8,9 +8,9 @@
   `(when (eq system-type ',type)
      ,@body))
 
-(setq gc-cons-threshold (* 1000 1000 1000 10) ; because not used ram is wasted ram
-      gc-cons-percentage 0.6)
-(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.1)))
+(setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
+
+(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 
 ;; Disable package.el in favor of straight.el
 (setq package-enable-at-startup nil)
@@ -135,15 +135,3 @@ current mode."
        (message "*** Emacs loaded in %s seconds with %d garbage collections."
                 (emacs-init-time "%.2f")
                 gcs-done)))
-
-(if (executable-find "lightordark")
-    (pcase (shell-command-to-string "lightordark | tr -d '\n'")
-      ("light"
-       (add-to-list 'default-frame-alist `(background-color . "#ffffff"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#333333")))
-      ("dark"
-       (add-to-list 'default-frame-alist `(background-color . "#222222"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))
-      (_
-       (add-to-list 'default-frame-alist '(background-color . "#222222"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))))

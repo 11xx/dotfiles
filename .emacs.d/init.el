@@ -1,10 +1,5 @@
 ;; -*- lexical-binding: t; -*-
 
-(setup (:package gcmh)
-  (setq gcmh-idle-delay 30)
-  (gcmh-mode 1)
-  (:hide-mode))
-
 (defun org-babel-repeat-previous-src-block ()
   "Copy previous src block excluding the content."
   (interactive)
@@ -1136,30 +1131,10 @@ With argument ARG, do this that many times."
     (set-face-background 'default "unspecified-bg" frame)))
 (add-hook 'after-make-frame-functions #'on-frame-open)
 
-(setup (:package darkman)
-  (:only-if (executable-find "darkman"))
-  (setq darkman-themes '(:light neron-light :dark neron-dark))
-  (add-hook 'after-init-hook #'darkman-mode)
-
-  (when (daemonp)
-    (add-hook 'server-after-make-frame-hook #'darkman-mode)
-    (advice-add 'darkman-mode
-                :after
-                (lambda ()
-                  (remove-hook 'server-after-make-frame-hook
-                               #'darkman-mode))))
-
-  ;; This wasn't working, so idk :c
-  ;; https://darkman.grtcdr.tn/MANUAL.html#:~:text=disabling%20existing%20themes
-  (defadvice darkman-set (before no-theme-stacking activate)
-    "Disable the previous theme before loading a new one."
-    (mapc #'disable-theme custom-enabled-themes)))
-
-(when (eq system-type 'windows-nt)
-  (let ((islight (shell-command-to-string "reg query \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\" /V \"SystemUsesLightTheme\"")))
-    (if (string-match-p "0x1" islight)
-        (load-theme 'neron-light)
-      (load-theme 'neron-dark))))
+(use-package auto-dark
+  :init (auto-dark-mode t)
+  :custom ((auto-dark-dark-theme 'neron-dark)
+           (auto-dark-light-theme 'neron-light)))
 
 (setup ibuffer
   (:option ibuffer-show-empty-filter-groups nil
@@ -1549,19 +1524,37 @@ Null prefix argument turns off the mode."
 With prefix ARG, prompt for additional arguments to pass to the command."
     (interactive "P")
     (let* ((files (dired-get-marked-files nil arg))
-          (git-cmd-list (append '("git")
-                                (list
-                                 v/magit-git-global-arguments--bare-git-dir-dotfiles
-                                 v/magit-git-global-arguments--bare-work-tree-dotfiles)))
-          (git-cmd (mapconcat #'concat git-cmd-list " "))
-          (output (mapconcat (lambda (file)
-                               (shell-command-to-string
-                                (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                             files
-                             "\n")))
+           (git-cmd-list (append '("git")
+                                 (list
+                                  v/magit-git-global-arguments--bare-git-dir-dotfiles
+                                  v/magit-git-global-arguments--bare-work-tree-dotfiles)))
+           (git-cmd (mapconcat #'concat git-cmd-list " "))
+           (output (mapconcat (lambda (file)
+                                (shell-command-to-string
+                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                              files
+                              "\n")))
       (message "Git add command completed:\n%s" output)))
 
-  (define-key dired-mode-map (kbd "C-c C-a") #'f/dired-bare-git-add-dotfiles))
+  (define-key dired-mode-map (kbd "C-c d a") #'f/dired-bare-git-add-dotfiles)
+
+  ;; for normal git actions
+  ;; **** Git add to bare repo from dired
+  (defun f/dired-git-add (&optional arg)
+    "Execute 'git add' command for current or marked files in Dired mode.
+With prefix ARG, prompt for additional arguments to pass to the command."
+    (interactive "P")
+    (let* ((files (dired-get-marked-files nil arg))
+           (git-cmd "git")
+           (output (mapconcat (lambda (file)
+                                (shell-command-to-string
+                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                              files
+                              "\n")))
+      (message "Git add command completed:\n%s" output)))
+
+  (define-key dired-mode-map (kbd "C-c g a") #'f/dired-git-add)
+  )
 
 (defun f/check-and-convert-line-endings ()
   "Check and convert line endings to LF if necessary."
@@ -1680,3 +1673,9 @@ using the function `compile' build a command like:
                          ; and straght load before it.
   (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
            gptel-default-mode 'org-mode))
+
+(with-system windows-nt
+  (setq browse-url-browser-function 'browse-url-default-windows-browser))
+
+(setq browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "~/scoop/apps/firefox/current/firefox.exe")

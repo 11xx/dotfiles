@@ -49,7 +49,7 @@ Enable global [[https://www.emacswiki.org/emacs/LexicalBinding][Lexical Binding]
 :END:
 Define macro for checking if =system-type= is =type=, if so, evaluate
 body.
-[[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
+- [[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
 #+begin_src emacs-lisp
 (defmacro with-system (type &rest body)
   "Evaluate BODY if `system-type' equals TYPE."
@@ -66,22 +66,47 @@ Usage
 #+end_example
 
 * Garbage colletion
-Increase Garbage Collection threshold for gcmh to clean up later:
-src [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
-[[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
+Increase Garbage Collection threshold:
+- [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
+- [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
 #+begin_src emacs-lisp :tangle early-init.el
-(setq gc-cons-threshold (* 1000 1000 1000 10) ; because not used ram is wasted ram
-      gc-cons-percentage 0.6)
-(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.1)))
-#+end_src
-*NOTE*: Higher GC settings can greatly improve even text cursor movement
-speed! Increase it when stutters and sluggishness are common.
-# [2023-07-06 Thu 15:13:04 -03]
+(setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
 
+(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
+#+end_src
+# *NOTE*: Higher GC settings can greatly improve even text cursor movement
+# speed! Increase it when stutters and sluggishness are common.
+# #PS maybe this was due to gcmh?? # [2024-01-19 Fri 16:07:00 -03:00] @winr58
+# [2023-07-06 Thu 15:13:04 -03]
+#
+# removed very high RAM setting, seeking fine tuning.. # [2024-01-19 Fri 15:49:05 -03:00] @winr58
+
+#+NAME: Note about limiting gc improving performance
+- Note: It seems that lower limiting GC's threashold seems to actually
+  improve performance more than letting it loose.
+  + See
+    * [in special the Q&A's for]: [[https://emacsconf.org/2023/talks/gc/][EmacsConf - 2023 - talks - emacs-gc-stats: Does garbage collection actually slow down Emacs?]]
+      - In the answer about =gcmh= they said that it
+        #+begin_quote
+        Ironically it uses too many timers, creating garbage of its
+        own. [...]
+
+        -- [[https://emacsconf.org/2023/talks/gc/#:~:text=Ironically%20it%20uses%20too%20many%20timers%2C%20creating%20garbage%20of%20its%20own.][EmacsConf - 2023 - talks - emacs-gc-stats: Does garbage collection actually slow down Emacs?]]
+        #+end_quote
+        and
+        #+begin_quote
+        the problem is it ends up consuming a ton of memory,
+        increasing GC time, [...]
+
+        -- [[https://emacsconf.org/2023/talks/gc/#:~:text=the%20problem%20is%20it%20ends%20up%20consuming%20a%20ton%20of%20memory%2C%20increasing%20GC%20time][EmacsConf - 2023 - talks - emacs-gc-stats: Does garbage collection actually slow down Emacs?]]
+        #+end_quote
+    * "1GB threshold is way too high": [[https://www.reddit.com/r/emacs/comments/bg85qm/comment/eln27qh/?context=3][Garbage Collector Magic Hack : emacs]]
+
+# #FIXME deprecate gcmh? See "[[Note about limiting gc improving performance]]"
 [[https://github.com/emacsmirror/gcmh][GCMH - the Garbage Collector Magic Hack]]
 [[https://github.com/joseph8th/literatemacs#increase-garbage-collector][Inscrease garbage collector]]
 [[https://youtu.be/9i_9hse_Y08?t=2879][How to Cut Emacs Start Up Time in Half! - Emacs From Scratch #12]]
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :noweb-ref dummy :tangle no
 (setup (:package gcmh)
   (setq gcmh-idle-delay 30)
   (gcmh-mode 1)
@@ -2185,39 +2210,6 @@ see [[help:cursor-type][help]]
 ** Theme
 [[https://emacs.stackexchange.com/questions/2797/emacs-wont-load-theme-on-startup/19271#19271][src]] | [[https://stackoverflow.com/questions/22977387/setting-the-emacs-theme-on-startup-without-the-interactive-mode][load without confirmationc]] | [[https://stackoverflow.com/questions/18904529/after-emacs-deamon-i-can-not-see-new-theme-in-emacsclient-frame-it-works-fr][load theme when daemon]]
 
-*** Prevent white flash on startup
-src [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]].
-
-When starting a fresh Emacs instance the frame may display a white background
-for a few moments. To fix this simply change the default =background-color=
-from the =early-init.el= file, just so it loads before the frame is created:
-# "#17191a"
-#+begin_example
-(add-to-list 'default-frame-alist '(background-color . "#222222"))
-#+end_example
-# [2022-12-02 Fri 21:23:24 -03]
-
-*** Set background color based on system's color scheme
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle early-init.el
-:END:
-# pcase example from [[https://www.reddit.com/r/emacs/comments/108kwyl/comment/j3w5j88/?context=3][New package: Darkman integration with Emacs. : emacs]]
-Before loading the theme
-#+begin_src emacs-lisp
-(if (executable-find "lightordark")
-    (pcase (shell-command-to-string "lightordark | tr -d '\n'")
-      ("light"
-       (add-to-list 'default-frame-alist `(background-color . "#ffffff"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#333333")))
-      ("dark"
-       (add-to-list 'default-frame-alist `(background-color . "#222222"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))
-      (_
-       (add-to-list 'default-frame-alist '(background-color . "#222222"))
-       (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))))
-
-#+end_src
-
 *** Load theme path
 *NOTE:* Make sure to save a custom theme with the =-theme= suffix,
 otherwise Emacs will ignore the file.
@@ -2246,99 +2238,16 @@ Remove background face when on terminal
 #+end_src
 # [2022-12-03 Sat 00:26:02 -03]
 
-*** DONE Load theme
-load theme relatively later in the config because some settings within
-require the rest of init.el loading before it.
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(load-theme 'neron-dark t)
-#+end_src
-Alternatively, for using dark and light themes based on time of the
-day, see [[*Day/Night theme switch][Day/Night theme switch]].
-
 *** Day/Night theme switch
+Load theme based on Dark or Light system theme:
 
-**** darkman support
-[[https://gitlab.com/WhyNotHugo/darkman][WhyNotHugo / darkman · GitLab]]
+- =auto-dark= Supports Linux/Mac/Windows
+  + See [[https://github.com/LionyxML/auto-dark-emacs][GitHub - LionyxML/auto-dark-emacs: Auto-Dark-Emacs is an auto changer between 2 themes, dark/light, following MacOS, Linux or Windows Dark Mode settings]]
 #+begin_src emacs-lisp
-(setup (:package darkman)
-  (:only-if (executable-find "darkman"))
-  (setq darkman-themes '(:light neron-light :dark neron-dark))
-  (add-hook 'after-init-hook #'darkman-mode)
-
-  (when (daemonp)
-    (add-hook 'server-after-make-frame-hook #'darkman-mode)
-    (advice-add 'darkman-mode
-                :after
-                (lambda ()
-                  (remove-hook 'server-after-make-frame-hook
-                               #'darkman-mode))))
-
-  ;; This wasn't working, so idk :c
-  ;; https://darkman.grtcdr.tn/MANUAL.html#:~:text=disabling%20existing%20themes
-  (defadvice darkman-set (before no-theme-stacking activate)
-    "Disable the previous theme before loading a new one."
-    (mapc #'disable-theme custom-enabled-themes)))
-#+end_src
-
-***** error =Invalid theme name ‘nil’=
-disable the darkman =(setup)=
-
-**** Custom time-based function
-- See
-  Key function: ~run-at-time~
-  wizard [[https://cyberchris.xyz/posts/doom-emacs-custom/][Day/Night Theme Switching on Doom Emacs (+ Bonus Config)]]
-  [[https://stackoverflow.com/questions/14760567/emacs-auto-load-color-theme-by-time][Emacs Auto Load Color Theme by Time]]
-  [[https://www.reddit.com/r/emacs/comments/jqeskb/how_can_i_set_themes_depending_on_time_of_the_day/][How can I set themes depending on time of the day on Doom Emacs?]]
-  [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Timers.html][40.11 Timers for Delayed Execution]]
-
-# #--DISABLED
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-;; Be awere that the function that sets the theme is with the `t' options set
-;; e.g. (load-theme 'THEME t). If you want to prevent the theme code to be
-;; runned without confirmation, trusted or not, remove the `t' from the
-;; "(day-night-load-theme)" function.
-(defvar v/theme-light 'dol-doom-one-light-edit)
-(defvar v/theme-dark 'neron-dark)
-
-
-(setq hour
-      (string-to-number
-       (substring (current-time-string) 11 13))) ;; gets the hour
-(if (member hour (number-sequence 6 17)) ;; if between 06:00-17:59
-    (setq current-theme v/theme-light) ;; then light theme
-  (setq current-theme v/theme-dark)) ;; else dark theme from 6pm
-;; (if (equal current-theme ) ;; only switches to the correct theme if needed
-;;     nil
-;;   (load-theme current-theme t))
-(load-theme current-theme t)
-
-
-(defun day-night-load-theme()
-  "Checks current hour of the day and changes theme to the a dark or light variant."
-  (setq hour
-        (string-to-number
-         (substring (current-time-string) 11 13))) ;; gets the hour
-  (if (member hour (number-sequence 6 17)) ;; if between 06:00-16:59
-      (setq current-theme v/theme-light) ;; then light theme
-    (setq current-theme v/theme-dark)) ;; else dark theme from 5pm
-  (load-theme current-theme t))
-
-(run-at-time "17:59" nil (lambda() (day-night-load-theme)))
-(run-at-time "06:00" nil (lambda() (day-night-load-theme)))
-
-(if (daemonp) ;; Load theme after daemon frame is created
-    (add-hook 'after-make-frame-functions (load-theme current-theme t)))
-#+end_src
-
-**** (Windows-NT) load theme based on Dark or Light system theme
-- Note:
-  #+INCLUDE: "~/org/windows.org::*Check if using light or dark theme on Windows command-line" :only-contents t
-#+begin_src emacs-lisp
-(when (eq system-type 'windows-nt)
-  (let ((islight (shell-command-to-string "reg query \"HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\" /V \"SystemUsesLightTheme\"")))
-    (if (string-match-p "0x1" islight)
-        (load-theme 'neron-light)
-      (load-theme 'neron-dark))))
+(use-package auto-dark
+  :init (auto-dark-mode t)
+  :custom ((auto-dark-dark-theme 'neron-dark)
+           (auto-dark-light-theme 'neron-light)))
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
 
@@ -2987,19 +2896,37 @@ Javascript related packages
 With prefix ARG, prompt for additional arguments to pass to the command."
     (interactive "P")
     (let* ((files (dired-get-marked-files nil arg))
-          (git-cmd-list (append '("git")
-                                (list
-                                 v/magit-git-global-arguments--bare-git-dir-dotfiles
-                                 v/magit-git-global-arguments--bare-work-tree-dotfiles)))
-          (git-cmd (mapconcat #'concat git-cmd-list " "))
-          (output (mapconcat (lambda (file)
-                               (shell-command-to-string
-                                (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                             files
-                             "\n")))
+           (git-cmd-list (append '("git")
+                                 (list
+                                  v/magit-git-global-arguments--bare-git-dir-dotfiles
+                                  v/magit-git-global-arguments--bare-work-tree-dotfiles)))
+           (git-cmd (mapconcat #'concat git-cmd-list " "))
+           (output (mapconcat (lambda (file)
+                                (shell-command-to-string
+                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                              files
+                              "\n")))
       (message "Git add command completed:\n%s" output)))
 
-  (define-key dired-mode-map (kbd "C-c C-a") #'f/dired-bare-git-add-dotfiles))
+  (define-key dired-mode-map (kbd "C-c d a") #'f/dired-bare-git-add-dotfiles)
+
+  ;; for normal git actions
+  ;; **** Git add to bare repo from dired
+  (defun f/dired-git-add (&optional arg)
+    "Execute 'git add' command for current or marked files in Dired mode.
+With prefix ARG, prompt for additional arguments to pass to the command."
+    (interactive "P")
+    (let* ((files (dired-get-marked-files nil arg))
+           (git-cmd "git")
+           (output (mapconcat (lambda (file)
+                                (shell-command-to-string
+                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                              files
+                              "\n")))
+      (message "Git add command completed:\n%s" output)))
+
+  (define-key dired-mode-map (kbd "C-c g a") #'f/dired-git-add)
+  )
 #+end_src
 
 **** (Windows-NT): LF vs CRLF
@@ -3342,27 +3269,22 @@ For changing where =.emacs.d= is read from.
 - Restart =explorer.exe= or relogin.
 # [2023-12-30 Sat 15:02:21 -03:00] @winr58
 
+** TODO Open links with Windows browser
+By default when trying to open a link on Emacs for Windows the error is given:
+: (error "ShellExecute failed: No application is associated ...")
+
+#+begin_src emacs-lisp
+(with-system windows-nt
+  (setq browse-url-browser-function 'browse-url-default-windows-browser))
+
+(setq browse-url-browser-function 'browse-url-generic
+      browse-url-generic-program "~/scoop/apps/firefox/current/firefox.exe")
+#+end_src
+# ;; browse-url-generic-program "~/scoop/apps/vivaldi/current/Application/vivaldi.exe")
+
 * Local variables
 [[https://www.youtube.com/watch?v=tw2-rI2bxSg][Emacs Tips - How to Use File and Directory Local Variables]]
 Safe variables: =safe-local-variable-values=
 # Local Variables:
 # coding: utf-8
 # End:
-
-# some file meta
-# Created at [2021-10-21 Thu 11:18].
-# Rewrite at [2021-12-08 Wed 16:51]
-# Rewrite almost done in [2021-12-10 Fri 13:08]
-# Rewrite done in [2021-12-10 Fri 17:55]
-#
-# Dumping noweb, cool but can get complex for not reason.
-# go for structured literate instead # # [2022-05-26 Thu 00:04:01]
-#
-# rewriting setup [2022-08-05 Fri 02:45]
-# Didn't neet to rewrite. The problem ended up being a conflict between a
-# change in Org + isearch and consult. See [[*Org mode heading folding/expanding on =consult-line= search not working][Org mode heading folding/expanding on =consult-line= search not working]]
-
-# preparing git # [2023-05-26 Fri 02:36:45 -03]
-# lul ^ well get there eventually [2023-10-30 Mon 20:44:16 -03]
-# getting there ? clueless # [2023-12-30 Sat 03:02:08 -03:00] @winr58
-# just sendit # [2023-12-30 Sat 04:55:12 -03:00] @winr58
