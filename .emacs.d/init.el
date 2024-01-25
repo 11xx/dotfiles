@@ -573,7 +573,7 @@ It uses `make-directory' PARENTS argument 't'."
         ;; "Consolas"
         ;; "Literation Mono Nerd Font" on Linux or "LiterationMono Nerd Font" on (Windows-NT)
         "LiterationMono Nerd Font"
-      "Liberation Mono")
+      "Literation Mono Nerd Font")
     "Sets the default font based on the system type.
 To be used with `f/set-font'.")
 
@@ -1021,21 +1021,22 @@ With argument ARG, do this that many times."
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
   )
 
+;; #FIXME-ERROR-20240122 cape-capf-predicate void function
 ;; Super CAPF for emacs-lisp modes: See [[https://github.com/minad/corfu/wiki#using-cape-to-tweak-and-combine-capfs][Home · minad/corfu Wiki]]
-(defun my/ignore-elisp-keywords (cand)
-   (or (not (keywordp cand))
-  (eq (char-after (car completion-in-region--data)) ?:)))
+;; (defun my/ignore-elisp-keywords (cand)
+;;    (or (not (keywordp cand))
+;;   (eq (char-after (car completion-in-region--data)) ?:)))
 
- (defun my/setup-elisp ()
-   (setq-local completion-at-point-functions
-    `(,(cape-super-capf
-        (cape-capf-predicate
-         #'elisp-completion-at-point
-         #'my/ignore-elisp-keywords)
-        #'cape-dabbrev)
-      cape-file)
-    cape-dabbrev-min-length 5))
-(add-hook 'emacs-lisp-mode-hook #'my/setup-elisp)
+;;  (defun my/setup-elisp ()
+;;    (setq-local completion-at-point-functions
+;;     `(,(cape-super-capf
+;;         (cape-capf-predicate
+;;          #'elisp-completion-at-point
+;;          #'my/ignore-elisp-keywords)
+;;         #'cape-dabbrev)
+;;       cape-file)
+;;     cape-dabbrev-min-length 5))
+;; (add-hook 'emacs-lisp-mode-hook #'my/setup-elisp)
 
 (setup (:package yasnippet)
   ;; (:disabled)
