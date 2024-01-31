@@ -10,7 +10,7 @@
 # Export as HTML
 #+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
 
-#+OPTIONS: toc:2
+#+OPTIONS: toc:1
 
 This is a +mainly+ Linux config that I made for Arch Linux, it's about 2
 years old after a few rewrites. Some Windows compatibility have been
@@ -19,6 +19,13 @@ included recently.
 
 # - TODO
 #   [ ] Restructure some org headings
+
+* Dependencies
+- Arch
+  + emacs-nativecomp
+  + ttf-liberation-mono-nerd
+  + otf-fira-code-symbol [AUR]
+  + ispell
 
 * References
 Here are some complete configuration examples:
@@ -81,7 +88,6 @@ Increase Garbage Collection threshold:
 #
 # removed very high RAM setting, seeking fine tuning.. # [2024-01-19 Fri 15:49:05 -03:00] @winr58
 
-#+NAME: Note about limiting gc improving performance
 - Note: It seems that lower limiting GC's threashold seems to actually
   improve performance more than letting it loose.
   + See
@@ -102,7 +108,7 @@ Increase Garbage Collection threshold:
         #+end_quote
     * "1GB threshold is way too high": [[https://www.reddit.com/r/emacs/comments/bg85qm/comment/eln27qh/?context=3][Garbage Collector Magic Hack : emacs]]
 
-# #FIXME deprecate gcmh? See "[[Note about limiting gc improving performance]]"
+# #FIXME deprecate gcmh? See the note above
 [[https://github.com/emacsmirror/gcmh][GCMH - the Garbage Collector Magic Hack]]
 [[https://github.com/joseph8th/literatemacs#increase-garbage-collector][Inscrease garbage collector]]
 [[https://youtu.be/9i_9hse_Y08?t=2879][How to Cut Emacs Start Up Time in Half! - Emacs From Scratch #12]]
@@ -979,7 +985,7 @@ and if inconclusive, use current `indent-tabs-mode'."
   "Query shell for the current time in the YYYY-mm-dd ShortWeekDay HH-MM-SS format."
   (insert (concat "# ["
                   (shell-command-to-string "printf '%s' \"$(date +'%Y-%m-%d %a %T %Z')\"")
-                  "]")))
+                  "]" " @" (shell-command-to-string "printf '%s' \"$(cat /etc/hostname)\""))))
 
 ;; (Windows-NT)
 (defun f-windows-nt/current-timestamp ()
@@ -2579,7 +2585,7 @@ NOTE: =dired-async= is provided by the =async= package.
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
 #+end_src
 
-* Modes
+* Edit Modes
 ** Add =modes= directory to Emacs path
 Custom mode files should sit here.
 # [2022-04-27 Wed 07:19:42]
@@ -2855,12 +2861,12 @@ Javascript related packages
 (setup (:package magit)
 
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
-    (concat "--git-dir=" (expand-file-name "~/.dotfiles/"))
-    "Location of the bare git repository to track dotfiles.")
+    (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
+    "Git command argument pointing to the location of the bare git repository to track dotfiles.")
 
   (defvar v/magit-git-global-arguments--bare-work-tree-dotfiles
     (concat "--work-tree=" (expand-file-name "~"))
-    "Location of the bare git repository's work directory to watch for files.")
+    "Git command argument location of the git repository's work directory to track files.")
 
   ;; use maggit on git bare repos like dotfiles repos, don't forget to
   ;; change `v/magit-git-global-arguments--bare-git-dir-dotfiles' and `v/magit-git-global-arguments--bare-work-tree-dotfiles' to your needs
@@ -3170,25 +3176,6 @@ creation with the configuration already-loaded.
   (:hook-into after-init))
 #+end_src
 
-* DONE Open this file at startup
-# [2022-11-18 Fri 19:21:47 -03]
-[[https://stackoverflow.com/questions/999708/how-to-open-files-automatically-when-starting-emacs/999715#999715][How to open files automatically when starting emacs? - Stack Overflow]]
-
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(find-file "~/org/arch-linux.org")
-(call-interactively 'consult-line)
-#+end_src
-
-* DONE Edit with Emacs browser extension
-[[https://github.com/stsquad/emacs_chrome][GitHub - stsquad/emacs_chrome]]
-#+begin_src emacs-lisp :tangle no :noweb-ref dummy
-(setup (:package edit-server)
-  (:option edit-server-port "54544"
-           ;; make sure to change the port on the extension configuration tab
-           )
-  (edit-server-start))
-#+end_src
-
 * ChatGPT
 API keys can be generated from https://platform.openai.com/account/api-keys
 
@@ -3239,20 +3226,6 @@ Remember to consider the security implications of using a wildcard
 character for the username, as it allows any username to match and
 retrieve the password.
 
-
-* DONE Help find better GC defaults
-[[https://www.reddit.com/r/emacs/comments/14dej62/please_help_collecting_statistics_to_optimize/][Please help collecting statistics to optimize Emacs GC defaults : emacs]]
-# [2023-06-19 Mon 19:26:03 -03]
-# sent [2023-07-05 Wed 23:57:08 -03]
-- December 6th 2023
-  [[https://emacsconf.org/2023/talks/gc/][EmacsConf - 2023 - talks - emacs-gc-stats: Does garbage collection actually slow down Emacs?]]
-#+begin_src emacs-lisp :tangle no :noweb-ref dummy
-(straight-use-package 'emacs-gc-stats)
-(require 'emacs-gc-stats)
-(setq emacs-gc-stats-gc-defaults 'emacs-defaults) ; optional
-(emacs-gc-stats-mode +1)
-#+end_src
-
 * (Windows-NT) specific settings
 
 ** Change Emacs $HOME / Where to put init files
@@ -3270,19 +3243,16 @@ For changing where =.emacs.d= is read from.
 - Restart =explorer.exe= or relogin.
 # [2023-12-30 Sat 15:02:21 -03:00] @winr58
 
-** TODO Open links with Windows browser
-By default when trying to open a link on Emacs for Windows the error is given:
-: (error "ShellExecute failed: No application is associated ...")
-
-#+begin_src emacs-lisp
-(with-system windows-nt
-  (setq browse-url-browser-function 'browse-url-default-windows-browser))
-
-(setq browse-url-browser-function 'browse-url-generic
-      browse-url-generic-program "~/scoop/apps/firefox/current/firefox.exe")
-#+end_src
-# ;; browse-url-generic-program "~/scoop/apps/vivaldi/current/Application/vivaldi.exe")
-
+* Troubleshooting
+# - NOTE: setting too high of a limit gives the error
+#   : Re-entering top level after C stack overflow
+#   See [[https://github.com/doomemacs/doomemacs/issues/1407#issuecomment-491931901][Debugging 'Re-entering top level after C stack overflow' · Issue #1407 · doomemacs/doomemacs · GitHub]]
+- NOTE: a python code block was causing the error "=Re-entering top
+  level after C stack overflow=" during tangle, troubleshooting pointed
+  to =undo-limit= but changing that wasn't necessary, disabling tangle
+  of that python code block (or I would guess disabling indent
+  guessing specifically) fixed it.
+  # #TODO ANNOTATE # [2024-01-26 Fri 21:47:06 -03] @arch
 * Local variables
 [[https://www.youtube.com/watch?v=tw2-rI2bxSg][Emacs Tips - How to Use File and Directory Local Variables]]
 Safe variables: =safe-local-variable-values=

@@ -283,7 +283,7 @@ and if inconclusive, use current `indent-tabs-mode'."
   "Query shell for the current time in the YYYY-mm-dd ShortWeekDay HH-MM-SS format."
   (insert (concat "# ["
                   (shell-command-to-string "printf '%s' \"$(date +'%Y-%m-%d %a %T %Z')\"")
-                  "]")))
+                  "]" " @" (shell-command-to-string "printf '%s' \"$(cat /etc/hostname)\""))))
 
 ;; (Windows-NT)
 (defun f-windows-nt/current-timestamp ()
@@ -1483,12 +1483,12 @@ Null prefix argument turns off the mode."
 (setup (:package magit)
 
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
-    (concat "--git-dir=" (expand-file-name "~/.dotfiles/"))
-    "Location of the bare git repository to track dotfiles.")
+    (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
+    "Git command argument pointing to the location of the bare git repository to track dotfiles.")
 
   (defvar v/magit-git-global-arguments--bare-work-tree-dotfiles
     (concat "--work-tree=" (expand-file-name "~"))
-    "Location of the bare git repository's work directory to watch for files.")
+    "Git command argument location of the git repository's work directory to track files.")
 
   ;; use maggit on git bare repos like dotfiles repos, don't forget to
   ;; change `v/magit-git-global-arguments--bare-git-dir-dotfiles' and `v/magit-git-global-arguments--bare-work-tree-dotfiles' to your needs
@@ -1674,9 +1674,3 @@ using the function `compile' build a command like:
                          ; and straght load before it.
   (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
            gptel-default-mode 'org-mode))
-
-(with-system windows-nt
-  (setq browse-url-browser-function 'browse-url-default-windows-browser))
-
-(setq browse-url-browser-function 'browse-url-generic
-      browse-url-generic-program "~/scoop/apps/firefox/current/firefox.exe")
