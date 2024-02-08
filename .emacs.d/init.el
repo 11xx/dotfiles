@@ -466,6 +466,7 @@ It uses `make-directory' PARENTS argument 't'."
    undo-limit 1000000000
    undo-strong-limit 1000000000
    undo-outer-limit 1010000000
+   ring-bell-function 'ignore
    )
 
   ;; use of forward-same-syntax: [[https://stackoverflow.com/questions/1771102/changing-emacs-forward-word-behaviour/2565961#2565961][emacs23 - Changing Emacs Forward-Word Behaviour - Stack Overflow]]

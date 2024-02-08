@@ -1,10 +1,10 @@
 {
     "$help": "https://aka.ms/terminal-documentation",
     "$schema": "https://aka.ms/terminal-profiles-schema",
-    "actions":
+    "actions": 
     [
         {
-            "command":
+            "command": 
             {
                 "action": "copy",
                 "singleLine": false
@@ -12,18 +12,26 @@
             "keys": "alt+w"
         },
         {
+            "command": "unbound",
+            "keys": "ctrl+s"
+        },
+        {
+            "command": "unbound",
+            "keys": "ctrl+shift+m"
+        },
+        {
             "command": "paste",
             "keys": "ctrl+y"
         },
         {
-            "command":
+            "command": 
             {
                 "action": "scrollDown"
             },
             "keys": "ctrl+shift+v"
         },
         {
-            "command":
+            "command": 
             {
                 "action": "splitPane",
                 "split": "auto",
@@ -36,11 +44,11 @@
             "keys": "ctrl+alt+s"
         },
         {
-            "command": "unbound",
-            "keys": "ctrl+s"
+            "command": "markMode",
+            "keys": "ctrl+space"
         },
         {
-            "command":
+            "command": 
             {
                 "action": "scrollUp"
             },
@@ -53,25 +61,26 @@
     "disableAnimations": false,
     "experimental.rendering.forceFullRepaint": false,
     "firstWindowPreference": "defaultProfile",
-    "newTabMenu":
+    "newTabMenu": 
     [
         {
             "type": "remainingProfiles"
         }
     ],
-    "profiles":
+    "profiles": 
     {
-        "defaults":
+        "defaults": 
         {
             "adjustIndistinguishableColors": "never",
-            "colorScheme":
+            "bellStyle": "none",
+            "colorScheme": 
             {
                 "dark": "Neron Dark",
                 "light": "Neron Light"
             },
             "cursorShape": "filledBox",
             "experimental.retroTerminalEffect": false,
-            "font":
+            "font": 
             {
                 "face": "LiterationMono Nerd Font",
                 "size": 11.0
@@ -80,7 +89,7 @@
             "useAcrylic": true,
             "useAtlasEngine": true
         },
-        "list":
+        "list": 
         [
             {
                 "commandline": "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -126,7 +135,7 @@
             }
         ]
     },
-    "schemes":
+    "schemes": 
     [
         {
             "background": "#0C0C0C",

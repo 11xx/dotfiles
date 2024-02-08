@@ -1466,6 +1466,13 @@ undo-strong-limit 1000000000
 undo-outer-limit 1010000000
 #+end_src
 
+Turn off sounds
+- [[https://emacs.stackexchange.com/questions/28906/how-to-switch-off-the-sounds][bell - How to switch off the sounds? - Emacs Stack Exchange]]
+#+begin_src emacs-lisp
+ring-bell-function 'ignore
+#+end_src
+# [2024-02-03 Sat 23:36:30 -03:00] @winr58
+
 ** Narrowing
 [[https://youtu.be/pZzDayi5lRo?t=259][thanks]] | [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Narrowing.html][src]] enable narrowing.
 Narrow subtree
@@ -2173,12 +2180,18 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 # [2022-05-27 Fri 11:00:30 -03]
 
 *** TODO lsp-bridge
-To sandbox the pip dependencies do:
-: ❯ python -m venv ./python-venv
-: ❯ ./python-venv/bin/pip install epc orjson sexpdata six paramiko rapidfuzz
-then source the venv before launching Emacs:
-: ❯ source ./python-venv/bin/activate
-: ❯ emacs
+- To sandbox the pip dependencies do:
+  + On Linux
+    : ❯ python -m venv ./.python-venv
+    : ❯ ./python-venv/bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
+    # then source the venv before launching Emacs:
+    # : ❯ source ./python-venv/bin/activate
+    # : ❯ emacs
+  # + On Windows (#TODO does it work on windows-nt?)
+  #   : python -m venv .\.python-venv
+  #   : .\.python-venv\Scripts\pip.exe install epc orjson sexpdata six setuptools paramiko rapidfuzz
+  + Now set the python venv root inside Emacs:
+    : (setq python-shell-virtualenv-root "./.python-env")
 
 [[https://github.com/manateelazycat/lsp-bridge#installation][manateelazycat/lsp-bridge: A blazingly fast LSP client for Emacs]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
