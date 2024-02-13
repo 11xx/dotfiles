@@ -26,6 +26,7 @@ included recently.
   + ttf-liberation-mono-nerd
   + otf-fira-code-symbol [AUR]
   + ispell
+  + xdg-desktop-portal: See [[*Day/Night theme switch][Day/Night theme switch]].
 
 * References
 Here are some complete configuration examples:
@@ -1891,7 +1892,7 @@ it that caused errors at startup, simply deleting it fixed it 😭
            "C-c o s" consult-org-heading
            )
 
-  (:option register-preview-delay 0
+  (:option register-preview-delay 1
            register-preview-function #'consult-register-format
            ;; org-fold-core-style 'overlays ; fix consult-line not expanding org
                                         ; headings to show the results # [2022-08-11 Thu 06:08:58 -03]
@@ -2260,6 +2261,10 @@ Remove background face when on terminal
 
 *** Day/Night theme switch
 Load theme based on Dark or Light system theme:
+- Dependencies:
+  + =xdg-desktop-portal=, there are multiple providers targeted for
+    different Desktop Environments and Window Managers, install one
+    and it should provide the dbus that =auto-dark= depends on.
 
 - =auto-dark= Supports Linux/Mac/Windows
   + See [[https://github.com/LionyxML/auto-dark-emacs][GitHub - LionyxML/auto-dark-emacs: Auto-Dark-Emacs is an auto changer between 2 themes, dark/light, following MacOS, Linux or Windows Dark Mode settings]]

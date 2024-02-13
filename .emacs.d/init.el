@@ -898,7 +898,7 @@ With argument ARG, do this that many times."
            "C-c o s" consult-org-heading
            )
 
-  (:option register-preview-delay 0
+  (:option register-preview-delay 1
            register-preview-function #'consult-register-format
            ;; org-fold-core-style 'overlays ; fix consult-line not expanding org
                                         ; headings to show the results # [2022-08-11 Thu 06:08:58 -03]
