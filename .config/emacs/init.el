@@ -179,27 +179,21 @@ If the property is not found, use the base directory of the current buffer conca
 (advice-add 'org-export--dispatch-action
             :before #'f/org-export-dispatch-disable-whitespace-mode)
 
-(setup (:package org-appear)
+(setup (:package (org-appear :type git
+                             :host github
+                             :repo "awth13/org-appear"
+                             :files ("*"
+                                     (:exclude ".git*" "demo.git"))))
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (:option org-appear-autolinks 'just-brackets) ; nil is default
-  (:hook-into org-mode-hook))
+  (:hook-into org-mode))
 
 (setup (:package visual-fill-column)
   (:load-after org)
   (:option visual-fill-column-width 120 ; use with `display-fill-column-indicator-mode'
            visual-fill-column-center-text t)
   (:hook-into org-mode))
-
-(setup (:package (org-src-emph :type git :host github
-                               :repo "TobiasZawada/org-src-emph"))
-  ;; (:option ;; make this ':emph' header argument default in shell code blocks.
-  ;;  org-babel-default-header-args:shell '((:emph . "'(\"<<\" \">>\")"))
-  ;;  ;; See https://github.com/TobiasZawada/org-src-emph/#shell-avoid-highlighting-of-noweb-references-as-infile-documents=
-  ;;  )
-
-  (:with-hook org-mode-hook
-    (:hook (lambda() (require 'org-src-emph)))))
 
 ;; override the default
 (defun org-babel-noweb-wrap (&optional regexp)
@@ -359,10 +353,11 @@ It uses `make-directory' PARENTS argument 't'."
 ;; Handy key definition
 (define-key global-map "\M-Q" 'unfill-paragraph)
 
-(setq-default debug-on-error t) ;; Send errors to *Backtrace*
+;; (setq-default debug-on-error t) ;; Send errors to *Backtrace*, only set to true while debugging
 (setq comp-deferred-compilation t) ;; native compile everything
 ;; Silence compiler warnings
 (setq native-comp-async-report-warnings-errors 'silent)
+
 
 ;; Set the right directory to store the native comp cache
 ;; NOTE: Comment this if not using native compilation [2022-04-05 Tue 20:39:06]
@@ -467,6 +462,7 @@ It uses `make-directory' PARENTS argument 't'."
    undo-strong-limit 1000000000
    undo-outer-limit 1010000000
    ring-bell-function 'ignore
+   create-lockfiles nil
    )
 
   ;; use of forward-same-syntax: [[https://stackoverflow.com/questions/1771102/changing-emacs-forward-word-behaviour/2565961#2565961][emacs23 - Changing Emacs Forward-Word Behaviour - Stack Overflow]]
@@ -581,7 +577,7 @@ To be used with `f/set-font'.")
   (defvar v/get-default-font-size
     (if (eq system-type 'windows-nt)
         11
-      10)
+      11)
     "Sets the default font size based on the system type.
 To be used with `f/set-font'.")
 
@@ -589,7 +585,7 @@ To be used with `f/set-font'.")
     "Set font face using `set-face-attribute' and keywords.
 Available keywords are:
 
-`:font' = a string with the font name like \"Liberation Mono\" or
+`:name' = a string with the font name like \"Liberation Mono\" or
 \"DejaVu Sans Mono\". It defaults to the value from the helper
 function `f/get-default-font' that returns a string.
 
@@ -597,7 +593,7 @@ function `f/get-default-font' that returns a string.
 \":height\" to `set-face-attribute'. It defaults to the value
 from the helper function `f/get-default-font-size' that returns a
 number."
-    (let* ((font (or (plist-get args :font) v/get-default-font))
+    (let* ((font (or (plist-get args :name) v/get-default-font))
            (size (or (plist-get args :size) v/get-default-font-size)))
       (set-face-attribute 'default nil
                           :font font
@@ -896,13 +892,6 @@ With argument ARG, do this that many times."
            "C-x b" consult-buffer ;; Was switch-to-buffer
            "C-r" consult-history ;; #TODO-ithink was isearch-backward
            "C-c o s" consult-org-heading
-           )
-
-  (:option register-preview-delay 1
-           register-preview-function #'consult-register-format
-           ;; org-fold-core-style 'overlays ; fix consult-line not expanding org
-                                        ; headings to show the results # [2022-08-11 Thu 06:08:58 -03]
-           ;; org-fold-core-style 'text-properties
            ))
 ;; note: consult-outline & consult-org-heading
 
@@ -937,7 +926,7 @@ With argument ARG, do this that many times."
              ))
   (:option corfu-cycle t
            corfu-auto t
-           corfu-auto-delay 0.8
+           corfu-auto-delay 0.01
            corfu-auto-prefix 1
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]

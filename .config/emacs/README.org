@@ -594,12 +594,25 @@ with =C-c C-e=.
 Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
 #+begin_src emacs-lisp
-(setup (:package org-appear)
+(setup (:package (org-appear :type git
+                             :host github
+                             :repo "awth13/org-appear"
+                             :files ("*"
+                                     (:exclude ".git*" "demo.git"))))
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (:option org-appear-autolinks 'just-brackets) ; nil is default
-  (:hook-into org-mode-hook))
+  (:hook-into org-mode))
 #+end_src
+- NOTE: setting =org-fold-core-style= to ='text-properties= in
+  =early-init.el= to make sure it is defined before Org Mode is loaded
+  (a requirement of the variable) since when it's set to ='overlays= it
+  conflicts with =org-appear='s ability to toggle visibility of links.
+  # #BUG # [2024-02-18 Sun 23:56:32 -03] @ak
+  + See [[https://github.com/awth13/org-appear/issues/53][Issue #53 · awth13/org-appear]].
+  #+begin_src emacs-lisp :tangle early-init.el
+  (setq org-fold-core-style 'text-properties)
+  #+end_src
 
 ** Org Mode notes
 *** Code blocks editing
@@ -674,7 +687,6 @@ open(filename, "w").write(output)
 *** Org Publish Tutorial
 [[https://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html][Publishing Org-mode files to HTML]] [2022-04-22 Fri 05:37:30]
 
-
 ** Visual Fill Column
 [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
 #+begin_src emacs-lisp
@@ -719,26 +731,16 @@ on a desktop without any other window open.
           ))
 #+end_src
 
-** Fix substrings display in code blocks
-Fix syntax highlighting for things like noweb references in shell code blocks
-[[https://github.com/TobiasZawada/org-src-emph/][TobiasZawada/org-src-emph: Custom emphasis of substrings of Org source blocks]]
-# [2022-05-20 Fri 18:08:31]
-# asof # [2023-09-13 Wed 14:15:33 -03] this package broke so resort to the solution after:
-#+begin_src emacs-lisp
-(setup (:package (org-src-emph :type git :host github
-                               :repo "TobiasZawada/org-src-emph"))
-  ;; (:option ;; make this ':emph' header argument default in shell code blocks.
-  ;;  org-babel-default-header-args:shell '((:emph . "'(\"<<\" \">>\")"))
-  ;;  ;; See https://github.com/TobiasZawada/org-src-emph/#shell-avoid-highlighting-of-noweb-references-as-infile-documents=
-  ;;  )
+** Fix noweb substring syntax highlighting display in code blocks
+Use either =<<= & =>>= (the default) or =«= & =»=, when syntax highlighting
+breaks such as shell code blocks that interpret =<<nowebname>>= as
+heredocs.
+# The latter preserves syntax highlighting in sh-mode.
+- [[https://emacs.stackexchange.com/questions/63643/noweb-references-in-sh-blocks-breaks-the-syntax-highlighting/73720#73720][org mode - Noweb references in sh blocks breaks the syntax highlighting - Emacs Stack Exchange]]
+  # #wizard
+  + original =org-babel-noweb-wrap= function:
+    * [[https://git.savannah.gnu.org/cgit/emacs/org-mode.git/tree/lisp/ob-core.el#n195][ob-core.el\lisp - emacs/org-mode.git - Emacs Org mode]]
 
-  (:with-hook org-mode-hook
-    (:hook (lambda() (require 'org-src-emph)))))
-#+end_src
-
-Use either =<<= & =>>= or =«= & =»=.
-# #wiz [[https://emacs.stackexchange.com/questions/63643/noweb-references-in-sh-blocks-breaks-the-syntax-highlighting/73720#73720][org mode - Noweb references in sh blocks breaks the syntax highlighting - Emacs Stack Exchange]]
-The second alternative preserves syntax highlighting in sh-mode.
 # [2023-09-13 Wed 14:18:13 -03]
 #+begin_src emacs-lisp
 ;; override the default
@@ -761,7 +763,6 @@ When matching, reference is stored in match group 1."
   (insert "«»")
   (backward-char))
 #+end_src
-
 
 ** TODO Cool hacks
 
@@ -1104,10 +1105,11 @@ It uses `make-directory' PARENTS argument 't'."
     config was tested and caused problems when not using it.
 
 #+begin_src emacs-lisp :noweb yes
-(setq-default debug-on-error t) ;; Send errors to *Backtrace*
+;; (setq-default debug-on-error t) ;; Send errors to *Backtrace*, only set to true while debugging
 (setq comp-deferred-compilation t) ;; native compile everything
 ;; Silence compiler warnings
 (setq native-comp-async-report-warnings-errors 'silent)
+
 
 ;; Set the right directory to store the native comp cache
 ;; NOTE: Comment this if not using native compilation [2022-04-05 Tue 20:39:06]
@@ -1282,7 +1284,7 @@ To be used with `f/set-font'.")
   (defvar v/get-default-font-size
     (if (eq system-type 'windows-nt)
         11
-      10)
+      11)
     "Sets the default font size based on the system type.
 To be used with `f/set-font'.")
 
@@ -1290,7 +1292,7 @@ To be used with `f/set-font'.")
     "Set font face using `set-face-attribute' and keywords.
 Available keywords are:
 
-`:font' = a string with the font name like \"Liberation Mono\" or
+`:name' = a string with the font name like \"Liberation Mono\" or
 \"DejaVu Sans Mono\". It defaults to the value from the helper
 function `f/get-default-font' that returns a string.
 
@@ -1298,7 +1300,7 @@ function `f/get-default-font' that returns a string.
 \":height\" to `set-face-attribute'. It defaults to the value
 from the helper function `f/get-default-font-size' that returns a
 number."
-    (let* ((font (or (plist-get args :font) v/get-default-font))
+    (let* ((font (or (plist-get args :name) v/get-default-font))
            (size (or (plist-get args :size) v/get-default-font-size)))
       (set-face-attribute 'default nil
                           :font font
@@ -1473,6 +1475,14 @@ Turn off sounds
 ring-bell-function 'ignore
 #+end_src
 # [2024-02-03 Sat 23:36:30 -03:00] @winr58
+
+Disable lock files (=.#file@=). See https://emacs.stackexchange.com/a/78802.
+#+begin_src emacs-lisp
+create-lockfiles nil
+#+end_src
+Is this legacy stuff from the ancient times of shared terminals?
+# [2024-02-14 Wed 11:00:23 -03] @ak
+
 
 ** Narrowing
 [[https://youtu.be/pZzDayi5lRo?t=259][thanks]] | [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Narrowing.html][src]] enable narrowing.
@@ -1890,13 +1900,6 @@ it that caused errors at startup, simply deleting it fixed it 😭
            "C-x b" consult-buffer ;; Was switch-to-buffer
            "C-r" consult-history ;; #TODO-ithink was isearch-backward
            "C-c o s" consult-org-heading
-           )
-
-  (:option register-preview-delay 1
-           register-preview-function #'consult-register-format
-           ;; org-fold-core-style 'overlays ; fix consult-line not expanding org
-                                        ; headings to show the results # [2022-08-11 Thu 06:08:58 -03]
-           ;; org-fold-core-style 'text-properties
            ))
 ;; note: consult-outline & consult-org-heading
 #+end_src
@@ -1961,7 +1964,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
              ))
   (:option corfu-cycle t
            corfu-auto t
-           corfu-auto-delay 0.8
+           corfu-auto-delay 0.01
            corfu-auto-prefix 1
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]

@@ -130,6 +130,8 @@ current mode."
 
 (setq straight-use-package-by-default t)
 
+(setq org-fold-core-style 'text-properties)
+
 (add-hook 'emacs-startup-hook
      (lambda ()
        (message "*** Emacs loaded in %s seconds with %d garbage collections."
