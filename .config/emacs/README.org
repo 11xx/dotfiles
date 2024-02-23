@@ -1324,6 +1324,7 @@ number."
                     (f/set-font))))
     (add-hook 'after-init-hook
               (lambda () (f/set-font))))
+  ;; end set font
 
   ;; disable line numbers for some modes
   (:with-mode display-line-numbers-mode
@@ -1548,6 +1549,7 @@ Narrow subtree
 This don't work well in the terminal.
 # (ALARM-EMACS27-conflict)
 
+[[https://github.com/io12/good-scroll.el?tab=readme-ov-file#why-is-performance-sometimes-bad][io12/good-scroll.el: Attempt at good pixel-based smooth scrolling in Emacs]]
 # (EMACSPGTK-Wayland-performance) # [2023-05-05 Fri 16:59:01 -03]
 #+begin_src emacs-lisp
 (setup (:package good-scroll)
@@ -1561,9 +1563,10 @@ This don't work well in the terminal.
            ;; [remap scroll-up-command] pixel-scroll-up
            ;; [remap scroll-down-command] pixel-scroll-down
            )
-  (:option scroll-step            1 ; emacs native var
-           scroll-conservatively  10000 ; emacs native var
-           good-scroll-duration 0.1))
+  (:option good-scroll-step 500
+           ;; scroll-step            1 ; emacs native var
+           ;; scroll-conservatively  10000 ; emacs native var
+           good-scroll-duration 0.15))
 #+end_src
 
 ** Half-page scrolling
@@ -3387,6 +3390,7 @@ opt_check() {
 
 unset nw
 unset t
+unset tOpt __tOpt __tArg
 
 while :
 do case $1 in
@@ -3402,15 +3406,23 @@ do case $1 in
            ;;
        -t|--title)
            opt_check "$@" &&
-               tOpt=--title &&
-               t="$2" &&
+               __tOpt=--title &&
+               __tArg="$2" &&
+               tOpt=${__tOpt}=${__tArg} &&
                shift
            ;;
-       *)
+       --float)
+           # alias for --title=floatWMRULE
+           tOpt=--title=floatWMRULE
+           ;;
+       ,*)
            break
        esac; shift; done
 
-emacs $tOpt $t $nw --quick \
-      --eval "(load \"${minimalPath}\")" "$@"
+emacs $tOpt $nw --quick -l "${minimalPath}" "$@"
 #+end_src
 
+* TODOs
+- Separate config into modules that can then be selected individually,
+  e.g. for using on the minimal config?
+  # [2024-02-23 Fri 15:05:30 -03] @ak

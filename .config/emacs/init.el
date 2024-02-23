@@ -617,6 +617,7 @@ number."
                     (f/set-font))))
     (add-hook 'after-init-hook
               (lambda () (f/set-font))))
+  ;; end set font
 
   ;; disable line numbers for some modes
   (:with-mode display-line-numbers-mode
