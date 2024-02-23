@@ -40,7 +40,18 @@ If the property is not found, use the base directory of the current buffer conca
 ;; (straight-use-package 'org)
 (setup (:package org)
   (:load-after startup)
+
   (:package org-auto-tangle)
+  ;; Note about auto tangle: Since it uses async.el that spawns a new
+  ;; Emacs instance, if for example :tangle is used containing a
+  ;; function that is not the default it may throw the error:
+  ;; > error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
+  ;; See https://stackoverflow.com/a/22843310
+  ;;
+  ;; Two options are available: Use only default functions and paths
+  ;; for tangling or include the desired functions to be passed in the
+  ;; async Emacs by customizing auto-tangle's async-start function
+  ;; (which idk how to do).
 
   ;; #+BEGIN_/#+END_ templates.
   (:option

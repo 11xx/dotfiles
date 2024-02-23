@@ -443,7 +443,18 @@ If the property is not found, use the base directory of the current buffer conca
 ;; (straight-use-package 'org)
 (setup (:package org)
   (:load-after startup)
+
   (:package org-auto-tangle)
+  ;; Note about auto tangle: Since it uses async.el that spawns a new
+  ;; Emacs instance, if for example :tangle is used containing a
+  ;; function that is not the default it may throw the error:
+  ;; > error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
+  ;; See https://stackoverflow.com/a/22843310
+  ;;
+  ;; Two options are available: Use only default functions and paths
+  ;; for tangling or include the desired functions to be passed in the
+  ;; async Emacs by customizing auto-tangle's async-start function
+  ;; (which idk how to do).
 
   ;; #+BEGIN_/#+END_ templates.
   (:option
@@ -2271,11 +2282,22 @@ Load theme based on Dark or Light system theme:
 
 - =auto-dark= Supports Linux/Mac/Windows
   + See [[https://github.com/LionyxML/auto-dark-emacs][GitHub - LionyxML/auto-dark-emacs: Auto-Dark-Emacs is an auto changer between 2 themes, dark/light, following MacOS, Linux or Windows Dark Mode settings]]
+  + NOTE: for this package to work with =darkman= the file
+    =~/.config/xdg-desktop-portal/portals.conf= has to override
+    =org.freedesktop.impl.portal.Settings= to use darkman's
+    implementation, e.g.:
+    See [[file:~/.config/darkman/README.org::*Making Darkman portal implementation work on minimal setups][Making Darkman portal implementation work on minimal setups]].
+    #+begin_example
+    [preferred]
+    org.freedesktop.impl.portal.Settings=darkman
+    #+end_example
+
 #+begin_src emacs-lisp
 (use-package auto-dark
   :init (auto-dark-mode t)
   :custom ((auto-dark-dark-theme 'neron-dark)
            (auto-dark-light-theme 'neron-light)))
+
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
 
@@ -2323,30 +2345,6 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
            doom-modeline-icon nil
            ))
 #+end_src
-
-*** DONE NΛNO modeline
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle no :noweb-ref dummy
-:END:
-#+begin_src emacs-lisp
-(setup (:package nano-modeline)
-  ;; (add-hook 'prog-mode-hook            #'nano-modeline-prog-mode)
-  ;; (add-hook 'text-mode-hook            #'nano-modeline-text-mode)
-  ;; (add-hook 'org-mode-hook             #'nano-modeline-org-mode)
-  ;; (add-hook 'pdf-view-mode-hook        #'nano-modeline-pdf-mode)
-  ;; (add-hook 'mu4e-headers-mode-hook    #'nano-modeline-mu4e-headers-mode)
-  ;; (add-hook 'mu4e-view-mode-hook       #'nano-modeline-mu4e-message-mode)
-  ;; (add-hook 'elfeed-show-mode-hook     #'nano-modeline-elfeed-entry-mode)
-  ;; (add-hook 'elfeed-search-mode-hook   #'nano-modeline-elfeed-search-mode)
-  ;; (add-hook 'term-mode-hook            #'nano-modeline-term-mode)
-  ;; (add-hook 'xwidget-webkit-mode-hook  #'nano-modeline-xwidget-mode)
-  ;; (add-hook 'messages-buffer-mode-hook #'nano-modeline-message-mode)
-  ;; (add-hook 'org-capture-mode-hook     #'nano-modeline-org-capture-mode)
-  ;; (add-hook 'org-agenda-mode-hook      #'nano-modeline-org-agenda-mode)
-  (setq nano-modeline-position 'bottom)
-  (:hook-into after-init))
-#+end_src
-
 
 *** Window margin/padding
 #+begin_src emacs-lisp
@@ -3280,3 +3278,139 @@ Safe variables: =safe-local-variable-values=
 # Local Variables:
 # coding: utf-8
 # End:
+
+* Emacs launch script helper
+
+** emacs-launcher: Emacsclient or minimal config loader
+:PROPERTIES:
+:header-args: :tangle ~/.local/bin/emacs-launcher :shebang #!/usr/bin/env sh
+:END:
+
+#+begin_src shell
+# This script is to fix the Environment Variable expansion to commands with
+#  flags. Terminal launcher
+
+unset nw
+# unset ALTERNATE_EDITOR
+unset minimal
+unset tOpt t
+
+show_help() {
+    cat <<EOF
+Usage: ${0##*/} ARG [ARGNAME(s)]
+
+Options:
+[...]
+--                                    End of all options.
+-h, --help                            Display this help and exit
+-v, --verbose                         Verbose mode. Enables shell built-in 'set -x'. For debugging.
+EOF
+}
+
+opt_check() {
+    [ -n "$2" ] && return 0
+
+    printf 'ERROR: "%s" cannot be empty.\n' "$1"; exit 1
+    # usage: opt_check "$@" && shift && cmd $1
+}
+
+while :
+do case $1 in
+       -v|--verbose)
+           set -x
+           ;;
+       -nw|--no-window)
+           nw=t
+           ;;
+       -m|--minimal)
+           minimal=t
+           ;;
+       -h|--help)
+           show_help
+           ;;
+       -t|--title)
+           opt_check "$@" &&
+               tOpt=--title &&
+               t="$2" &&
+               shift
+           ;;
+       --) # End of all options.
+           shift; break
+           ;;
+       -?*)
+           printf 'ERROR: Unrecognized option "%s". Aborting...\n\n' "$1" >&2
+           show_help
+           exit 1
+           ;;
+       *) break
+   esac; shift; done
+
+export LSP_USE_PLISTS=true
+
+if [ -n "$nw" ] && [ -n "$minimal" ]; then
+    emacsclient -nw --alternate-editor='emacs-minimal -nw' "$@"
+    exit 0
+elif [ -n "$minimal" ]; then
+    emacsclient --no-wait \
+                --create-frame \
+                --alternate-editor='emacs-minimal' "$@"
+    exit 0
+fi
+
+if [ "$nw" = t ]; then
+    emacsclient -nw --alternate-editor='emacs -nw' "$@"
+    exit 0
+else
+    emacsclient --no-wait \
+                --create-frame \
+                --alternate-editor='emacs' "$@"
+    exit 0
+fi
+#+end_src
+
+** emacs-minimal: Enhanced =emacs -Q= alternative
+:PROPERTIES:
+:header-args: :tangle ~/.local/bin/emacs-minimal :shebang #!/usr/bin/env sh
+:END:
+
+#+begin_src shell
+minimalPath=~/.config/emacs/minimal.el
+
+opt_check() {
+    if [ -n "$2" ]; then
+        return 0
+    else
+        printf 'The option "%s" cannot be empty, exiting... \n' "$1" 1>&2 &&
+            exit 1
+    fi
+}
+
+unset nw
+unset t
+
+while :
+do case $1 in
+       -nw|--no-window)
+           nw=-nw
+           ;;
+       -c|--config)
+           [ -z "$2" ] &&
+               printf 'The option $1 cannot be empty, aborting...' "$1" &&
+               exit 1
+           minimalfPath=$2
+           shift
+           ;;
+       -t|--title)
+           opt_check "$@" &&
+               tOpt=--title &&
+               t="$2" &&
+               shift
+           ;;
+       *)
+           break
+       esac; shift; done
+
+emacs $tOpt $t $nw --quick \
+      --eval "(load \"${minimalPath}\")" "$@"
+#+end_src
+
