@@ -331,16 +331,18 @@ With =package.el= disabled this will only be used when exploring packages
 with =package-list-packages=.
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
 (setup package
-  ;; When using `list-packages' add melpa to `package-archives'.
-  (:with-hook package-menu-mode-hook
-    (:hook (lambda() (add-to-list 'package-archives
-                        '("melpa" . "https://melpa.org/packages/"))))))
+  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t))
 #+end_src
+# ;; When using `list-packages' add melpa to `package-archives'.
+# (:with-hook package-menu-mode-hook
+# (:hook (lambda() (add-to-list 'package-archives
+# '("melpa" . "https://melpa.org/packages/")))))
 
-** =use-package=: integrated with =straight.el=
+** DONE =use-package=: integrated with =straight.el=
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle early-init.el
+:header-args:emacs-lisp: :tangle no :noweb-ref dummy
 :END:
+Disable, prepare for rewrite dropping straight, using new Emacs 29 features (TODO)
 #+begin_src emacs-lisp
 (setq straight-use-package-by-default t)
 #+end_src
@@ -353,6 +355,21 @@ to use =straight.el= to install packages, use the keyword =:straight t= in
   into Emacs, since 29.1.
   # [2024-01-15 Mon 17:50:22 -03:00] @winr58
 
+* no-littering Keep user-emacs-directory clean
+# [2024-02-25 Sun 17:26:22 -03] @ak
+#+begin_src emacs-lisp
+(when (fboundp 'startup-redirect-eln-cache)
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+
+;; (add-to-list 'native-comp-eln-load-path
+;;              (expand-file-name "var/eln-cache/" user-emacs-directory))
+
+
+(use-package no-littering
+  :straight t)
+#+end_src
 
 * Org Mode
 *NOTE*: Moved Org mode setup up because of:
@@ -900,7 +917,7 @@ Note that by default =dired= don't provide the full path to the =dtach= command.
 The full path is required.
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
 (use-package detached
-  ;; :straight t
+  :straight t
   :init
   (detached-init)
   :bind (;; Replace `async-shell-command' with `detached-shell-command'
@@ -1120,13 +1137,6 @@ It uses `make-directory' PARENTS argument 't'."
 (setq comp-deferred-compilation t) ;; native compile everything
 ;; Silence compiler warnings
 (setq native-comp-async-report-warnings-errors 'silent)
-
-
-;; Set the right directory to store the native comp cache
-;; NOTE: Comment this if not using native compilation [2022-04-05 Tue 20:39:06]
-;; (ALARM-EMACS27-conflict)
-(add-to-list 'native-comp-eln-load-path
-             (expand-file-name "eln-cache/" user-emacs-directory))
 
 (setup emacs
   (:load-after startup)
@@ -2033,6 +2043,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 # [2022-12-01 Thu 01:46:10 -03]
 #+begin_src emacs-lisp
 (use-package cape
+  :straight t
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
   :bind (("C-c p p" . completion-at-point) ;; capf
@@ -2297,6 +2308,7 @@ Load theme based on Dark or Light system theme:
 
 #+begin_src emacs-lisp
 (use-package auto-dark
+  :straight t
   :init (auto-dark-mode t)
   :custom ((auto-dark-dark-theme 'neron-dark)
            (auto-dark-light-theme 'neron-light)))

@@ -1,5 +1,17 @@
 ;; -*- lexical-binding: t; -*-
 
+(when (fboundp 'startup-redirect-eln-cache)
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+
+;; (add-to-list 'native-comp-eln-load-path
+;;              (expand-file-name "var/eln-cache/" user-emacs-directory))
+
+
+(use-package no-littering
+  :straight t)
+
 (defun org-babel-repeat-previous-src-block ()
   "Copy previous src block excluding the content."
   (interactive)
@@ -368,13 +380,6 @@ It uses `make-directory' PARENTS argument 't'."
 (setq comp-deferred-compilation t) ;; native compile everything
 ;; Silence compiler warnings
 (setq native-comp-async-report-warnings-errors 'silent)
-
-
-;; Set the right directory to store the native comp cache
-;; NOTE: Comment this if not using native compilation [2022-04-05 Tue 20:39:06]
-;; (ALARM-EMACS27-conflict)
-(add-to-list 'native-comp-eln-load-path
-             (expand-file-name "eln-cache/" user-emacs-directory))
 
 (setup emacs
   (:load-after startup)
@@ -988,6 +993,7 @@ With argument ARG, do this that many times."
   (:option prescient-persist-mode t))
 
 (use-package cape
+  :straight t
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
   :bind (("C-c p p" . completion-at-point) ;; capf
@@ -1135,6 +1141,7 @@ With argument ARG, do this that many times."
 (add-hook 'after-make-frame-functions #'on-frame-open)
 
 (use-package auto-dark
+  :straight t
   :init (auto-dark-mode t)
   :custom ((auto-dark-dark-theme 'neron-dark)
            (auto-dark-light-theme 'neron-light)))

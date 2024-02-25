@@ -128,8 +128,6 @@ current mode."
   :repeatable t
   :after-loaded t)
 
-(setq straight-use-package-by-default t)
-
 (setq org-fold-core-style 'text-properties)
 
 (add-hook 'emacs-startup-hook
