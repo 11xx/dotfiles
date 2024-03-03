@@ -1,4 +1,4 @@
-;; ~/.config/emacs/templates
+;; ~/.config/emacs/etc/tempel-templates.eld
 
 fundamental-mode ;; Available everywhere
 

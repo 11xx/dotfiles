@@ -1,0 +1,118 @@
+(defun f/mark-whole-word (&optional arg allow-extend)
+  "Like `mark-word', but select whole words and skips over whitespace.
+If you use a negative prefix ARG then select words backward.
+Otherwise select them forward.
+
+If cursor starts in the middle of word then select that whole word.
+
+If there is whitespace between the initial cursor position and the
+first word (in the selection direction), it is skipped (not selected).
+
+If the command is repeated or the mark is active, select the next NUM
+words, where NUM is the numeric prefix argument ARG.  (Negative NUM
+selects backward.)
+
+If second argument ALLOW-EXTEND is nil don't expand selection across words.
+See `mark-word' for more."
+  (interactive "P\np")
+  (let ((num  (prefix-numeric-value arg)))
+    (unless (eq last-command this-command)
+      (if (natnump num)
+          (skip-syntax-forward "\\s-")
+        (skip-syntax-backward "\\s-")))
+    (unless (or (eq last-command this-command)
+                (if (natnump num)
+                    (looking-at "\\b")
+                  (looking-back "\\b")))
+      (if (natnump num)
+          (left-word)
+        (right-word)))
+    (mark-word arg allow-extend)))
+(defun f/infer-indentation-style ()
+  "Compare number of spaces and tabs and define `indent-tabs-mode' to t or nil.
+
+If the current buffer or file has more tabs than spaces,
+set `indent-tabs-mode' to t; if it has more spaces than tabs, set it to nil;
+and if inconclusive, use current `indent-tabs-mode'."
+  (interactive)
+  (let ((space-count (how-many "^  " (point-min) (point-max)))
+        (tab-count (how-many "^\t" (point-min) (point-max))))
+    (if (> space-count tab-count) (setq indent-tabs-mode nil))
+    (if (> tab-count space-count) (setq indent-tabs-mode t))))
+(add-hook 'prog-mode-hook #'f/infer-indentation-style)
+(defun f-posix/current-timestamp ()
+  "Query shell for the current time in the YYYY-mm-dd ShortWeekDay HH-MM-SS format."
+  (insert (concat "# ["
+                  (shell-command-to-string "printf '%s' \"$(date +'%Y-%m-%d %a %T %Z')\"")
+                  "]" " @" (shell-command-to-string "printf '%s' \"$(cat /etc/hostname)\""))))
+
+;; (Windows-NT)
+(defun f-windows-nt/current-timestamp ()
+  "Print ISO formatted date as '#' comment."
+  (let ((timestamp (s-trim (shell-command-to-string "cmd /c echo.|powershell -Command Get-Date -Format 'yyyy-MM-dd ddd HH:mm:ss K'")))
+        (hostname (s-trim (shell-command-to-string "hostname"))))
+    (insert (format "# [%s] @%s" timestamp hostname))))
+
+;;;###autoload
+(defun f/current-timestamp ()
+  "Check `system-type' and use either `f-posix/current-timestamp' or `f-windows-nt/current-timestamp'."
+  (interactive)
+  (if (not (eq system-type 'windows-nt))
+      (f-posix/current-timestamp)
+    (f-windows-nt/current-timestamp)))
+;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
+(defun f/kill-matching-lines (regexp &optional rstart rend interactive)
+  "Kill lines containing matches for REGEXP.
+
+Second and third arg RSTART and REND specify the region to operate on.
+When calling this function from Lisp, you can pretend that it was
+called interactively by passing a non-nil INTERACTIVE argument.
+See `flush-lines' or `keep-lines' for behavior of this command.
+
+If the buffer is read-only, Emacs will beep and refrain from deleting
+the line, but put the line in the kill ring anyway.  This means that
+you can use this command to copy text from a read-only buffer.
+\(If the variable `kill-read-only-ok' is non-nil, then this won't
+even beep.)"
+  (interactive
+   (keep-lines-read-args "Kill lines containing match for regexp"))
+  (let ((buffer-file-name nil)) ;; HACK for `clone-buffer'
+    (with-current-buffer (clone-buffer nil nil)
+      (let ((inhibit-read-only t))
+        (keep-lines regexp rstart rend interactive)
+        (kill-region (or rstart (line-beginning-position))
+                     (or rend (point-max))))
+      (kill-buffer)))
+  (unless (and buffer-read-only kill-read-only-ok)
+    ;; Delete lines or make the "Buffer is read-only" error.
+    (flush-lines regexp rstart rend interactive)))
+(defun f/check-make-directory (dir)
+  "Check if DIR exists and create it if it doesn't.
+
+It uses `make-directory' PARENTS argument 't'."
+  (if (not (file-exists-p dir))
+      (make-directory dir t)))
+(defun xdg-bin-home ()
+  "Return the base directory for user specific executable files."
+  (xdg--dir-home "XDG_BIN_HOME" "~/.local/bin"))
+(defun xdg-state-home ()
+  "Return the base directory for user specific log files."
+  (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
+(defun f/read-file-contents (file-path)
+  "Read the contents of the file at FILE-PATH and return it as a string."
+  (with-temp-buffer
+    (insert-file-contents file-path)
+    (buffer-string)))
+    ;;; Stefan Monnier <foo at acm.org>. It is the opposite of fill-paragraph
+(defun unfill-paragraph (&optional region)
+  "Takes a multi-line paragraph and makes it into a single line of text."
+  (interactive (progn (barf-if-buffer-read-only) '(t)))
+  (let ((fill-column (point-max))
+        ;; This would override `fill-column' if it's an integer.
+        (emacs-lisp-docstring-fill-column t))
+    (fill-paragraph nil region)))
+
+;; Handy key definition
+(define-key global-map "\M-Q" 'unfill-paragraph)
+
+(provide '11xx-functions)
