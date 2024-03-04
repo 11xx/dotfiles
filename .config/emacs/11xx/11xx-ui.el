@@ -65,8 +65,7 @@ number."
 (setup display-line-numbers
   ;; disable line numbers for some modes
   (:hook-into prog-mode text-mode html-mode)
-  (:with-hook (org-mode-hook
-               term-mode-hook
+  (:with-hook (term-mode-hook
                shell-mode-hook
                eshell-mode-hook)
     (:hook (lambda() (display-line-numbers-mode -1)))))
@@ -94,7 +93,8 @@ number."
   :ensure t
   :init (auto-dark-mode t)
   :custom ((auto-dark-dark-theme 'neron-dark)
-           (auto-dark-light-theme 'neron-light)))
+           (auto-dark-light-theme 'neron-light))
+  :delight)
 (setup ibuffer
   (:option ibuffer-show-empty-filter-groups nil
            ibuffer-saved-filter-groups (quote

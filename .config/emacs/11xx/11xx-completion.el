@@ -1,20 +1,17 @@
 (require '11xx-setup)
 
-;;;###autoload
 (defun f/minibuffer-backward-delete-word (arg)
   "Delete characters backward until encountering the beginning of a word.
 With argument ARG, do this that many times."
   (interactive "p")
   (delete-region (point) (progn (backward-word arg) (point))))
 
-;;;###autoload
 (defun f/minibuffer-delete-word (arg)
   "Delete characters forward until the end of a word.
 Like `kill-word' but doesn't add deleted words to kill ring."
   (interactive "p")
   (delete-region (point) (progn (forward-word arg) (point))))
 
-;;;###autoload
 (defun f/minibuffer-delete-line (arg)
   "Delete characters forward until the end of the line.
 Like `kill-line' but doesn't add deleted characters to kill ring."
