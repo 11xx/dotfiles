@@ -24,24 +24,26 @@
   :ensure t)
 
 ;; **** Backup directory variable
-(defvar v/backup-directory (concat user-emacs-directory ".backups"))
-;; #TODO-function to test if dir exists and create it # [2022-11-15 Tue 10:49:35 -03]
+(defvar v/backup-directory
+  (expand-file-name "backups" no-littering-var-directory)
+  "Custom backup-files directory.")
 (f/check-make-directory v/backup-directory)
 
 ;; Auto-save directory variable
-(defvar v/auto-save-directory (concat user-emacs-directory ".auto-save"))
+(defvar v/auto-save-directory
+  (expand-file-name "auto-save" no-littering-var-directory)
+  "Custom auto-save files directory.")
 (f/check-make-directory v/auto-save-directory)
 
-;; add random number to auto save file list
+;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
 ;;   (let ((basename (concat v/auto-save-directory "/auto-save-list-"))
 ;;         (random-number (number-to-string (random))))
 ;;     (concat basename (substring random-number 0 8) "~")))
-
 ;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
 
 (setopt backup-directory-alist `((".*" . ,v/backup-directory))
-        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t)) ; got the regex from [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files - Super User]]
+        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t))
         auto-save-list-file-prefix v/auto-save-directory
         auto-save-list-file-name (concat v/auto-save-directory "/auto-save-list")
         make-backup-files t    ; backup of a file the first time it is saved.

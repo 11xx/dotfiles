@@ -72,32 +72,35 @@ Here are some complete configuration examples:
 
 *** Move back-up and auto-save files
 Backup & auto-save
-[[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
-[[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][backup files config example]]
-[[https://emacs.stackexchange.com/questions/60970/how-to-replace-focus-out-hook-with-after-focus-change-function-in-emacs-27/60971#60971][replacing focus-out-hook]]
-
-See [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files - Super User]].
+- See
+  + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
+  + [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][backup files config example]]
+  + [[https://emacs.stackexchange.com/questions/60970/how-to-replace-focus-out-hook-with-after-focus-change-function-in-emacs-27/60971#60971][replacing focus-out-hook]]
+  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files#437563]]
+  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
 
 #+begin_src emacs-lisp
 ;; **** Backup directory variable
-(defvar v/backup-directory (concat user-emacs-directory ".backups"))
-;; #TODO-function to test if dir exists and create it # [2022-11-15 Tue 10:49:35 -03]
+(defvar v/backup-directory
+  (expand-file-name "backups" no-littering-var-directory)
+  "Custom backup-files directory.")
 (f/check-make-directory v/backup-directory)
 
 ;; Auto-save directory variable
-(defvar v/auto-save-directory (concat user-emacs-directory ".auto-save"))
+(defvar v/auto-save-directory
+  (expand-file-name "auto-save" no-littering-var-directory)
+  "Custom auto-save files directory.")
 (f/check-make-directory v/auto-save-directory)
 
-;; add random number to auto save file list
+;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
 ;;   (let ((basename (concat v/auto-save-directory "/auto-save-list-"))
 ;;         (random-number (number-to-string (random))))
 ;;     (concat basename (substring random-number 0 8) "~")))
-
 ;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
 
 (setopt backup-directory-alist `((".*" . ,v/backup-directory))
-        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t)) ; got the regex from [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files - Super User]]
+        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t))
         auto-save-list-file-prefix v/auto-save-directory
         auto-save-list-file-name (concat v/auto-save-directory "/auto-save-list")
         make-backup-files t    ; backup of a file the first time it is saved.
@@ -110,11 +113,11 @@ See [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto
         auto-save-timeout 1   ; number of seconds idle time before auto-save (default: 30)
         auto-save-interval 200) ; number of keystrokes between auto-saves (default: 300)
 #+end_src
-- *NOTE* about =.#filename@= files: They're lock files and are meant to be
+- *NOTE* about =.#filename@=: They're lock files and are meant to be
   alongside the file being edited until a save occurs.
 
-  Instead, disable lock files (=.#file@=). See
-  https://emacs.stackexchange.com/a/78802.
+  Instead, disable lock files (=.#file@=).
+  + See https://emacs.stackexchange.com/a/78802.
   #+begin_src emacs-lisp
   (setopt create-lockfiles nil)
   #+end_src
