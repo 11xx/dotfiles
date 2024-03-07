@@ -418,8 +418,8 @@ current mode."
     config was tested and caused problems when not using it.
 
 #+begin_src emacs-lisp :noweb yes
+(require 'utf8-default)
 (setup emacs
-  (require 'utf8-default)
   ;; Keybindings
   (:global
    "C-c C-/"          comment-region
@@ -451,38 +451,42 @@ current mode."
    "M-D"   backward-kill-word
    ;; "M-h"          backward-delete-char ; was `mark-paragraph' global
    ;; "M-H"          backward-kill-word ; was `mark-paragraph' global, separate override may be necessary for local maps
-   ))
-
-(use-package emacs
-  :bind (("M-." . forward-list)
-         ("M-," . backward-list)
-         ("C-M-." . down-list) ; up-list
-         ("C-M-," . backward-up-list))
-  :init
-  (setopt
-   <<emacs-setup-options>>
+   "M-." forward-list
+   "M-," backward-list
+   "C-M-." down-list ; up-list
+   "C-M-," backward-up-list
    )
-  :config
-  (add-function :after after-focus-change-function
-                (lambda() (save-some-buffers t)))
 
   ;; Enable disabled 'advanced' commands
-  (put 'narrow-to-region 'disabled nil)
-  (put 'narrow-to-page   'disabled nil)
-  (put 'narrow-to-defun  'disabled nil)
-  (put 'widen            'disabled nil)
-  (put 'downcase-region  'disabled nil)
+  (:put-enable narrow-to-region
+               narrow-to-page
+               narrow-to-defun
+               widen
+               downcase-region)
+
+  (add-function :after after-focus-change-function
+                (lambda() (save-some-buffers t)))
 
   ;;; Minor modes
   ;; (:also-load mouse)
   ;; (xterm-mouse-mode 1) ;; xterm mouse support
   (save-place-mode 1)
   (delete-selection-mode 1) ; delete marked region with backspace
-  (electric-pair-mode 1)
-  (electric-indent-mode 1))
 
+  ;; #manual-smartparens
+  ;; (electric-pair-mode 1)
+  ;; (electric-indent-mode 1)
+  )
+
+(setopt
+ <<emacs-setup-options>>
+ )
+
+;; #manual-smartparens
 (use-package smartparens
-  :disabled)
+  :ensure t
+  :config
+  (smartparens-global-mode 1))
 #+end_src
 
 - Show whitespace but disable in some modes
@@ -494,8 +498,7 @@ current mode."
   (setopt whitespace-style '(face tabs missing-newline-at-eof)
           show-trailing-whitespace t)
   :hook
-  (prog text) ; enable everywhere
-  ;; But disable `show-trailing-whitespace' in some modes:
+  (prog text) ; enable everywhere, but disable in some modes:
   ((special-mode-hook
     term-mode-hook
     vterm-mode-hook
@@ -562,12 +565,9 @@ current mode."
 #+end_src
 
 #+begin_src emacs-lisp
-(use-package ace-window
-  :ensure t
-  ;; disabled. "M-r" window-split-toggle ; was `move-to-window-line-top-bottom'
-  ;; Prefixed with C-u swaps, see 'M-h f ace-window' "M-S-o" ace-swap-window
-  :bind (("M-o" . ace-window)))
-;; Buffer & UI movement
+(setup (:package ace-window)
+  ;; Prefixed with C-u swaps, see 'M-h f ace-window'
+  (:global "M-o" ace-window))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
 (use-package helpful
@@ -643,16 +643,19 @@ Again the emacs default is too low 4k considering that the some of
 the language server responses are in 800k - 3M range."
 [[https://emacs-lsp.github.io/lsp-mode/page/performance/][emacs-lsp - Performance Guide]]
 
-Indentation options
+- Indentation options
+  + See
+    * [[https://www.emacswiki.org/emacs/NoTabs#h5o-1][So How Do I Insert a Tab If I Really Have To?]]
+    * [[https://kb.iu.edu/d/abde][Set tab size]]
+    * [[https://www.emacswiki.org/emacs/NoTabs][No Tabs]]
+
+Disable tabs for spaces.
 #+begin_src emacs-lisp
 indent-tabs-mode nil ; disable tabs
 tab-width 2
 tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
 tab-always-indent t ; when using the TAB key
 #+end_src
-[[https://www.emacswiki.org/emacs/NoTabs#h5o-1][So How Do I Insert a Tab If I Really Have To?]]
-[[https://kb.iu.edu/d/abde][Set tab size]] | Disable tabs
-Disable tabs for spaces. See [[https://www.emacswiki.org/emacs/NoTabs][No Tabs]]
 
 Remove leading padding indentation for content inside code blocks
 #+begin_src emacs-lisp
@@ -667,17 +670,6 @@ org-src-preserve-indentation nil  ; default is nil
 Changed back to the default (nil) because it was useful only in
 specific cases and it can be enabled buffer-only, with local
 variables.
-
-#+begin_src emacs-lisp
-;; Emacs 28: Hide commands in M-x which do not work in the
-;; current mode.
-;; Vertico commands are hidden in normal buffers.
-read-extended-command-predicate #'command-completion-default-include-p
-;; Enable recursive minibuffers
-enable-recursive-minibuffers t
-;; TAB cycle if there are only few candidates
-completion-cycle-threshold 3
-#+end_src
 
 start up behavior
 See [[https://tychoish.com/post/towards-faster-emacs-start-times/][Towards Faster Emacs Start Times#Helpful Settings]]
@@ -765,26 +757,47 @@ The full path is required.
   (detached-init))
 #+end_src
 
-** utf8-default.el
+** utf8-default.el: Use UTF-8 for all character encoding
 Encoding, pretty much anything other than strictly english ascii
 writing requires a different encoding. So use UTF-8 as the
 default encoding.
 - See
   + [[http://xahlee.info/emacs/emacs/emacs_file_encoding.html][Emacs: Set Default File Encoding]]
   + [[https://stackoverflow.com/questions/20212703/problems-saving-file-with-unicode-characters/20564324#20564324][emacs - Problems saving file with Unicode characters - Stack Overflow]]
+  + [[https://www.emacswiki.org/emacs/ChangingEncodings][EmacsWiki: Changing Encodings]]
+  + [[https://emacs.stackexchange.com/questions/68647/automatically-change-encoding-of-process-buffers/68649#68649][shell - Automatically change encoding of process buffers - Emacs Stack Exchange]]
+  + [[https://emacs.stackexchange.com/questions/19641/emacs-is-asking-me-for-a-coding-system-on-each-save][org mode - Emacs is asking me for a coding system on each save - Emacs Stack Exchange]]
+  + [[https://stackoverflow.com/questions/20723229/how-to-reset-emacs-to-save-files-in-utf-8-unix-character-encoding/26401113#26401113][linux - How to reset emacs to save files in utf-8-unix character encoding? - Stack Overflow]]
 # do this especially on Windows, else python output problem
+
 #+begin_src emacs-lisp :tangle lisp/utf8-default.el
-(prefer-coding-system 'utf-8)
-(setq-default x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
-              buffer-file-coding-system 'utf-8-unix) ; specifically for prefering LF over CRLF
-(set-language-environment "UTF-8")
-(set-default-coding-systems 'utf-8)
+(prefer-coding-system 'utf-8-unix)
+(setopt x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
+        default-process-coding-system '(utf-8-unix . utf-8-unix))
+
+;; other than setting this one setting the others may be redundant.
+(set-default-coding-systems 'utf-8-unix)
+
+(set-buffer-file-coding-system 'utf-8-unix)
+(set-clipboard-coding-system 'utf-8-unix)
+(set-file-name-coding-system 'utf-8-unix)
 (set-keyboard-coding-system 'utf-8-unix)
+(set-selection-coding-system 'utf-8-unix)
 (set-terminal-coding-system 'utf-8-unix)
+
+(set-locale-environment "en.UTF-8")
 
 (provide 'utf8-default)
 #+end_src
-To force UTF-8 on specific files, add a file local variable with:
+# ;; (set-language-environment "UTF-8") ; maybe this is not for coding system :p
+#
+# ;; v-- maybe this is too much? keep cjk encoding by having this disabled.
+# ;; (setq utf-translate-cjk-mode nil) ; disable CJK coding/encoding
+
+To force UTF-8 on specific files, add a buffer or file local variable
+with:
+: M-: (setq-local buffer-file-coding-system 'utf-8-unix) RET
+or
 : M-x add-file-local-variable-prop-line RET coding RET utf-8 RET
 or
 : M-x add-file-local-variable RET coding RET utf-8 RET
@@ -859,11 +872,12 @@ Special major modes are for specific config files and stuff
 
 **** Minor modes
 
-***** Syntax Highlighting
+***** TODO Tree-Sitter Syntax Highlighting
 [[https://emacs-tree-sitter.github.io/syntax-highlighting/][Tree-sitter Syntax Highlighting]]
 
-Tree-Sitter supports Org-Mode code blocks since: [[https://github.com/nvim-orgmode/orgmode/pull/139][Pull Request #139]].
-Thanks [[https://github.com/nvim-orgmode/orgmode/issues/31][would it be possible to use treesitter in this · Issue #31 · nvim-orgmode/orgmode]]
+- Tree-Sitter supports Org-Mode code blocks since:
+  + [[https://github.com/nvim-orgmode/orgmode/pull/139][Pull Request #139]].
+  + [[https://github.com/nvim-orgmode/orgmode/issues/31][would it be possible to use treesitter in this · Issue #31 · nvim-orgmode/orgmode]]
 
 *NOTE*: =htmlize= uses different CSS selectors for =tree-sitter-hl-mode=
 code highlighting, prefixed by something like
@@ -876,15 +890,16 @@ Additional Tree-Sitter content
 - [[https://siraben.dev/2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
   # [2022-04-28 Thu 16:46:45]
 #+begin_src emacs-lisp
-(setup tree-sitter
-       (:package tree-sitter-langs tree-sitter-indent)
-  (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
-               ;; org-mode.
-               c-mode-common-hook
-               ;; sh-mode-hook
-               python-mode-hook
-               haskell-mode-hook)
-    (:hook tree-sitter-hl-mode)))
+;; #TODO use builtin tree-sitter
+;; (setup tree-sitter
+;;        (:package tree-sitter-langs tree-sitter-indent)
+;;   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
+;;                ;; org-mode.
+;;                c-mode-common-hook
+;;                ;; sh-mode-hook
+;;                python-mode-hook
+;;                haskell-mode-hook)
+;;     (:hook tree-sitter-hl-mode)))
 #+end_src
 
 ***** Colour highlighting
@@ -958,10 +973,10 @@ or use a list:
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
 (setup eshell (:package eshell-git-prompt eshell-syntax-highlighting)
-       (:option eshell-hist-ignoredups t
-                eshell-scroll-to-bottom-on-input t
-                eshell-history-size 10000
-                eshell-buffer-maximum-lines 2048)
+       (setopt eshell-hist-ignoredups t
+               eshell-scroll-to-bottom-on-input t
+               eshell-history-size 10000
+               eshell-buffer-maximum-lines 2048)
        (:with-hook eshell-first-time-mode-hook
          (:hook (lambda() (add-hook 'eshell-pre-command-hook 'eshell-save-some-history)
                   (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
@@ -1058,11 +1073,12 @@ Javascript related packages
 
 
 **** TODO Languages
-***** C
+***** DONE C
 #+begin_src emacs-lisp
 (setup cc-mode
-  (electric-pair-local-mode -1) ;; #manual-smartparens
-  (smartparens-mode) ;; #manual-smartparens
+  (:disabled)
+  ;; (electric-pair-local-mode -1) ;; #manual-smartparens
+  ;; (smartparens-mode) ;; #manual-smartparens
   )
 #+end_src
 
@@ -1458,9 +1474,9 @@ buffer concatenated with the provided PATH."
   + Functions can be used in the =:tangle= header argument of a src code
     block, e.g. =:tangle (tdir "filename")=.
 
-**** Additional electric pairs for Org Mode
-
-#+begin_src emacs-lisp
+**** DONE Additional electric pairs for Org Mode
+Disabled in favour of smartparens #manual-smartparens
+#+begin_src emacs-lisp :noweb-ref dummy :tangle no
 (defvar org-additional-electric-pairs '((?= . ?=) (?' . ?'))
   "Additional electric pairs for Org Mode.")
 
@@ -1477,6 +1493,9 @@ buffer concatenated with the provided PATH."
 
 (add-hook 'org-mode-hook #'f/org-electric-pairs-add-local)
 #+end_src
+also was being used after =org-babel-noweb-wrap= and
+=f/org-babel-noweb-wrap-insert-chars=:
+: (f/org-electric-pairs-add '(?« . ?»))
 
 **** Fix noweb substring syntax highlighting display in code blocks
 Use either =<<= & =>>= (the default) or =«= & =»= (=0000AB= & =0000BB=), when
@@ -1509,9 +1528,7 @@ When matching, reference is stored in match group 1."
     "Insert \"«\" and \"»\" "
     (interactive)
     (insert "«»")
-    (backward-char))
-
-  (f/org-electric-pairs-add '(?« . ?»)))
+    (backward-char)))
 #+end_src
 
 *** Org setup
@@ -1524,6 +1541,12 @@ When matching, reference is stored in match group 1."
 [[https://emacs.stackexchange.com/questions/50216/org-mode-code-block-parentheses-mismatch/68321#68321][org babel - org-mode code block parentheses mismatch - Emacs Stack Exchange]]
 # [2022-05-14 Sat 20:54:33]
 #+begin_src emacs-lisp
+;; (setup org
+;;   ;; Disable angle bracket syntax highlighting/matching
+;;   (:hook (lambda()
+;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
+;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
+
 (use-package org
   :bind (:map org-mode-map
    ("C-c C-;" . org-babel-repeat-previous-src-block)
@@ -1558,12 +1581,11 @@ When matching, reference is stored in match group 1."
              ;; (async   . t) ; from ob-async
              (shell   . t)
              (C       . t))))
-
   ;; Disable angle bracket syntax highlighting/matching
-  (modify-syntax-entry ?< "." org-mode-syntax-table)
-  (modify-syntax-entry ?> "." org-mode-syntax-table)
-
-
+  (add-hook 'org-mode-hook
+            (lambda()
+              (modify-syntax-entry ?< "." org-mode-syntax-table)
+              (modify-syntax-entry ?> "." org-mode-syntax-table)))
   ;; Additional templates for `org-insert-structure-template'
   (dolist (begin
            '(("sh" . "src shell")
@@ -1617,7 +1639,7 @@ When matching, reference is stored in match group 1."
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
-   org-src-window-setup 'current-window)) ; "(setup org..." ends here
+   org-src-window-setup 'current-window))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
@@ -2029,21 +2051,23 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 #+end_src
 
 **** (Windows-NT): LF vs CRLF
-For using a specific coding system inside Emacs, set
+For using a specific coding system for the current file, set
 =(setq-default buffer-file-coding-system 'utf-8-unix)= to prefer LF over
 CRLF, for example.
 
-Check if the current file is using CRLF and change it to LF.
-#+begin_src emacs-lisp
-(defun f/check-and-convert-line-endings ()
-  "Check and convert line endings to LF if necessary."
-  (interactive)
-  (when (memq buffer-file-coding-system '(utf-8-dos utf-16-dos))
-    (set-buffer-file-coding-system 'utf-8-unix t)
-    (save-buffer)))
+# Check if the current file is using CRLF and change it to LF.
+# #+begin_src emacs-lisp
+# (defun f/check-and-convert-line-endings ()
+#   "Check and convert line endings to LF if necessary."
+#   (interactive)
+#   (when (memq buffer-file-coding-system '(utf-8-dos utf-16-dos))
+#     (set-buffer-file-coding-system 'utf-8-unix t)
+#     (save-buffer)))
 
-;; (add-hook 'find-file-hook 'f/check-and-convert-line-endings)
-#+end_src
+# ;; (add-hook 'find-file-hook 'f/check-and-convert-line-endings)
+# #+end_src
+# Actually ignore this function for now # [2024-03-06 Wed 20:20:08 -03] @ak
+
 - Note:
   #+INCLUDE: "~/org/windows.org::*Git newline characters warning / LF vs CRLF"
 
@@ -2072,26 +2096,25 @@ Check if the current file is using CRLF and change it to LF.
   + https://systemcrafters.cc/live-streams/may-21-2021/
   # [2022-02-24 Thu 00:01:03]
 
-#+begin_src emacs-lisp
-(defun f/minibuffer-backward-delete-word (arg)
-  "Delete characters backward until encountering the beginning of a word.
-With argument ARG, do this that many times."
-  (interactive "p")
-  (delete-region (point) (progn (backward-word arg) (point))))
-
-(defun f/minibuffer-delete-word (arg)
-  "Delete characters forward until the end of a word.
-Like `kill-word' but doesn't add deleted words to kill ring."
-  (interactive "p")
-  (delete-region (point) (progn (forward-word arg) (point))))
-
-(defun f/minibuffer-delete-line (arg)
-  "Delete characters forward until the end of the line.
-Like `kill-line' but doesn't add deleted characters to kill ring."
-  (interactive "p")
-  (delete-region (point) (progn (end-of-line arg) (point))))
-
+#+begin_src emacs-lisp :noweb yes
 (setup (:package vertico)
+  (defun f/minibuffer-backward-delete-word (arg)
+    "Delete characters backward until encountering the beginning of a word.
+With argument ARG, do this that many times."
+    (interactive "p")
+    (delete-region (point) (progn (backward-word arg) (point))))
+
+  (defun f/minibuffer-delete-word (arg)
+    "Delete characters forward until the end of a word.
+Like `kill-word' but doesn't add deleted words to kill ring."
+    (interactive "p")
+    (delete-region (point) (progn (forward-word arg) (point))))
+
+  (defun f/minibuffer-delete-line (arg)
+    "Delete characters forward until the end of the line.
+Like `kill-line' but doesn't add deleted characters to kill ring."
+    (interactive "p")
+    (delete-region (point) (progn (end-of-line arg) (point))))
 
   ;; prevent cursor on minibuffer
   (:with-hook minibuffer-setup-hook
@@ -2119,19 +2142,27 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;;;; Grow and shrink the Vertico minibuffer
            ;; vertico-resize t
            ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
-           vertico-cycle t
+           vertico-cycle t)
 
-           ;; Do not allow the cursor in the minibuffer prompt
-           minibuffer-prompt-properties '(read-only
-                                          t
-                                          cursor-intangible
-                                          t face minibuffer-prompt)
-           )
+  <<vertico-minibuffer-settings>>
+
   (:with-hook after-init-hook
-    (:hook vertico-mode))
-  ;; vertico-reverse-mode
-  ;; (:hook-into after-init)
-  )
+    (:hook vertico-mode)))
+#+end_src
+
+- Hide commands in M-x which do not work in the current mode.
+  # Emacs 28
+- Vertico commands are hidden in normal buffers.
+#+NAME: vertico-minibuffer-settings
+#+begin_src emacs-lisp
+(setopt read-extended-command-predicate #'command-completion-default-include-p
+        enable-recursive-minibuffers t
+        completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
+        ;; Do not allow the cursor in the minibuffer prompt
+        minibuffer-prompt-properties '(read-only
+                                       t
+                                       cursor-intangible
+                                       t face minibuffer-prompt))
 #+end_src
 
 **** Savehist

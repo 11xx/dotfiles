@@ -13,15 +13,16 @@
 (setup (:package pkgbuild-mode))
 (setup (:package powershell))
 (setup (:package yuck-mode))
-(setup tree-sitter
-       (:package tree-sitter-langs tree-sitter-indent)
-  (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
-               ;; org-mode.
-               c-mode-common-hook
-               ;; sh-mode-hook
-               python-mode-hook
-               haskell-mode-hook)
-    (:hook tree-sitter-hl-mode)))
+;; #TODO use builtin tree-sitter
+;; (setup tree-sitter
+;;        (:package tree-sitter-langs tree-sitter-indent)
+;;   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
+;;                ;; org-mode.
+;;                c-mode-common-hook
+;;                ;; sh-mode-hook
+;;                python-mode-hook
+;;                haskell-mode-hook)
+;;     (:hook tree-sitter-hl-mode)))
 (setup (:package rainbow-mode)
   (:hook-into css-mode))
 (define-minor-mode sensitive-mode
@@ -57,10 +58,10 @@ Null prefix argument turns off the mode."
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
 (setup eshell (:package eshell-git-prompt eshell-syntax-highlighting)
-       (:option eshell-hist-ignoredups t
-                eshell-scroll-to-bottom-on-input t
-                eshell-history-size 10000
-                eshell-buffer-maximum-lines 2048)
+       (setopt eshell-hist-ignoredups t
+               eshell-scroll-to-bottom-on-input t
+               eshell-history-size 10000
+               eshell-buffer-maximum-lines 2048)
        (:with-hook eshell-first-time-mode-hook
          (:hook (lambda() (add-hook 'eshell-pre-command-hook 'eshell-save-some-history)
                   (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
@@ -103,8 +104,9 @@ Null prefix argument turns off the mode."
   (:option typescript-indent-level 2)
   (:hook-into js-mode-hook))
 (setup cc-mode
-  (electric-pair-local-mode -1) ;; #manual-smartparens
-  (smartparens-mode) ;; #manual-smartparens
+  (:disabled)
+  ;; (electric-pair-local-mode -1) ;; #manual-smartparens
+  ;; (smartparens-mode) ;; #manual-smartparens
   )
 (defun f/gcc-compile-current-file ()
   "Compile current file with gcc.

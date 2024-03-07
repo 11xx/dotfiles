@@ -49,21 +49,6 @@ buffer concatenated with the provided PATH."
       (error
        "tdir failed in getting a directory. Aborting tangle from '%s'."
        (buffer-file-name)))))
-(defvar org-additional-electric-pairs '((?= . ?=) (?' . ?'))
-  "Additional electric pairs for Org Mode.")
-
-(defun f/org-electric-pairs-add-local ()
-  "Append list `org-additional-electric-pairs' to `electric-pair-pairs'."
-  (setq-local electric-pair-pairs
-              (append electric-pair-pairs org-additional-electric-pairs))
-  (setq-local electric-pair-text-pairs electric-pair-pairs))
-
-(defun f/org-electric-pairs-add (pair)
-  "Add an electric PAIR to `org-additional-electric-pairs` and update `electric-pair-pairs`."
-  (add-to-list 'org-additional-electric-pairs pair)
-  (f/org-electric-pairs-add-local))
-
-(add-hook 'org-mode-hook #'f/org-electric-pairs-add-local)
 ;; override the default
 (with-eval-after-load 'org
   (defun org-babel-noweb-wrap (&optional regexp)
@@ -83,9 +68,13 @@ When matching, reference is stored in match group 1."
     "Insert \"«\" and \"»\" "
     (interactive)
     (insert "«»")
-    (backward-char))
+    (backward-char)))
+;; (setup org
+;;   ;; Disable angle bracket syntax highlighting/matching
+;;   (:hook (lambda()
+;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
+;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-  (f/org-electric-pairs-add '(?« . ?»)))
 (use-package org
   :bind (:map org-mode-map
    ("C-c C-;" . org-babel-repeat-previous-src-block)
@@ -120,12 +109,11 @@ When matching, reference is stored in match group 1."
              ;; (async   . t) ; from ob-async
              (shell   . t)
              (C       . t))))
-
   ;; Disable angle bracket syntax highlighting/matching
-  (modify-syntax-entry ?< "." org-mode-syntax-table)
-  (modify-syntax-entry ?> "." org-mode-syntax-table)
-
-
+  (add-hook 'org-mode-hook
+            (lambda()
+              (modify-syntax-entry ?< "." org-mode-syntax-table)
+              (modify-syntax-entry ?> "." org-mode-syntax-table)))
   ;; Additional templates for `org-insert-structure-template'
   (dolist (begin
            '(("sh" . "src shell")
@@ -179,7 +167,7 @@ When matching, reference is stored in match group 1."
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
-   org-src-window-setup 'current-window)) ; "(setup org..." ends here
+   org-src-window-setup 'current-window))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].

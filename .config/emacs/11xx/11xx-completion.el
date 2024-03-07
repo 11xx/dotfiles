@@ -1,24 +1,23 @@
 (require '11xx-setup)
 
-(defun f/minibuffer-backward-delete-word (arg)
-  "Delete characters backward until encountering the beginning of a word.
-With argument ARG, do this that many times."
-  (interactive "p")
-  (delete-region (point) (progn (backward-word arg) (point))))
-
-(defun f/minibuffer-delete-word (arg)
-  "Delete characters forward until the end of a word.
-Like `kill-word' but doesn't add deleted words to kill ring."
-  (interactive "p")
-  (delete-region (point) (progn (forward-word arg) (point))))
-
-(defun f/minibuffer-delete-line (arg)
-  "Delete characters forward until the end of the line.
-Like `kill-line' but doesn't add deleted characters to kill ring."
-  (interactive "p")
-  (delete-region (point) (progn (end-of-line arg) (point))))
-
 (setup (:package vertico)
+  (defun f/minibuffer-backward-delete-word (arg)
+    "Delete characters backward until encountering the beginning of a word.
+With argument ARG, do this that many times."
+    (interactive "p")
+    (delete-region (point) (progn (backward-word arg) (point))))
+
+  (defun f/minibuffer-delete-word (arg)
+    "Delete characters forward until the end of a word.
+Like `kill-word' but doesn't add deleted words to kill ring."
+    (interactive "p")
+    (delete-region (point) (progn (forward-word arg) (point))))
+
+  (defun f/minibuffer-delete-line (arg)
+    "Delete characters forward until the end of the line.
+Like `kill-line' but doesn't add deleted characters to kill ring."
+    (interactive "p")
+    (delete-region (point) (progn (end-of-line arg) (point))))
 
   ;; prevent cursor on minibuffer
   (:with-hook minibuffer-setup-hook
@@ -46,19 +45,28 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;;;; Grow and shrink the Vertico minibuffer
            ;; vertico-resize t
            ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
-           vertico-cycle t
-
-           ;; Do not allow the cursor in the minibuffer prompt
-           minibuffer-prompt-properties '(read-only
-                                          t
-                                          cursor-intangible
-                                          t face minibuffer-prompt)
-           )
+           vertico-cycle t)
+  (setopt read-extended-command-predicate #'command-completion-default-include-p
+          enable-recursive-minibuffers t
+          completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
+          ;; Do not allow the cursor in the minibuffer prompt
+          minibuffer-prompt-properties '(read-only
+                                         t
+                                         cursor-intangible
+                                         t face minibuffer-prompt))
   (:with-hook after-init-hook
     (:hook vertico-mode))
   ;; vertico-reverse-mode
   ;; (:hook-into after-init)
   )
+(setopt read-extended-command-predicate #'command-completion-default-include-p
+        enable-recursive-minibuffers t
+        completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
+        ;; Do not allow the cursor in the minibuffer prompt
+        minibuffer-prompt-properties '(read-only
+                                       t
+                                       cursor-intangible
+                                       t face minibuffer-prompt))
 ;; Persist history over Emacs restarts. Vertico sorts by history position.
 (setup savehist
   (:option savehist-additional-variables '(kill-ring

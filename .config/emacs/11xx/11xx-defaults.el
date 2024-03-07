@@ -2,8 +2,8 @@
 (require '11xx-setup)
 (require '11xx-functions)
 
+(require 'utf8-default)
 (setup emacs
-  (require 'utf8-default)
   ;; Keybindings
   (:global
    "C-c C-/"          comment-region
@@ -35,61 +35,57 @@
    "M-D"   backward-kill-word
    ;; "M-h"          backward-delete-char ; was `mark-paragraph' global
    ;; "M-H"          backward-kill-word ; was `mark-paragraph' global, separate override may be necessary for local maps
-   ))
-
-(use-package emacs
-  :bind (("M-." . forward-list)
-         ("M-," . backward-list)
-         ("C-M-." . down-list) ; up-list
-         ("C-M-," . backward-up-list))
-  :init
-  (setopt
-   read-process-output-max (* 3 (* 1024 1024)) ;; 3M
-   indent-tabs-mode nil ; disable tabs
-   tab-width 2
-   tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
-   tab-always-indent t ; when using the TAB key
-   org-edit-src-content-indentation 0
-   org-src-preserve-indentation nil  ; default is nil
-   ;; Emacs 28: Hide commands in M-x which do not work in the
-   ;; current mode.
-   ;; Vertico commands are hidden in normal buffers.
-   read-extended-command-predicate #'command-completion-default-include-p
-   ;; Enable recursive minibuffers
-   enable-recursive-minibuffers t
-   ;; TAB cycle if there are only few candidates
-   completion-cycle-threshold 3
-   ;; inhibit-startup-echo-area-message "lobster"
-   inhibit-startup-message 't
-   ;; initial-major-mode 'fundamental-mode
-   ;; initial-scratch-message 'nil
-   undo-limit 1000000000
-   undo-strong-limit 1000000000
-   undo-outer-limit 1010000000
-   ring-bell-function 'ignore
-   auto-window-vscroll nil
+   "M-." forward-list
+   "M-," backward-list
+   "C-M-." down-list ; up-list
+   "C-M-," backward-up-list
    )
-  :config
-  (add-function :after after-focus-change-function
-                (lambda() (save-some-buffers t)))
 
   ;; Enable disabled 'advanced' commands
-  (put 'narrow-to-region 'disabled nil)
-  (put 'narrow-to-page   'disabled nil)
-  (put 'narrow-to-defun  'disabled nil)
-  (put 'widen            'disabled nil)
-  (put 'downcase-region  'disabled nil)
+  (:put-enable narrow-to-region
+               narrow-to-page
+               narrow-to-defun
+               widen
+               downcase-region)
+
+  (add-function :after after-focus-change-function
+                (lambda() (save-some-buffers t)))
 
   ;;; Minor modes
   ;; (:also-load mouse)
   ;; (xterm-mouse-mode 1) ;; xterm mouse support
   (save-place-mode 1)
   (delete-selection-mode 1) ; delete marked region with backspace
-  (electric-pair-mode 1)
-  (electric-indent-mode 1))
 
+  ;; #manual-smartparens
+  ;; (electric-pair-mode 1)
+  ;; (electric-indent-mode 1)
+  )
+
+(setopt
+ read-process-output-max (* 3 (* 1024 1024)) ;; 3M
+ indent-tabs-mode nil ; disable tabs
+ tab-width 2
+ tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
+ tab-always-indent t ; when using the TAB key
+ org-edit-src-content-indentation 0
+ org-src-preserve-indentation nil  ; default is nil
+ ;; inhibit-startup-echo-area-message "lobster"
+ inhibit-startup-message 't
+ ;; initial-major-mode 'fundamental-mode
+ ;; initial-scratch-message 'nil
+ undo-limit 1000000000
+ undo-strong-limit 1000000000
+ undo-outer-limit 1010000000
+ ring-bell-function 'ignore
+ auto-window-vscroll nil
+ )
+
+;; #manual-smartparens
 (use-package smartparens
-  :disabled)
+  :ensure t
+  :config
+  (smartparens-global-mode 1))
 (setup whitespace
   (:hide-mode)
   (:hook-into prog-mode text-mode)
@@ -119,12 +115,9 @@
 ;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
 ;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
 ;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
-(use-package ace-window
-  :ensure t
-  ;; disabled. "M-r" window-split-toggle ; was `move-to-window-line-top-bottom'
-  ;; Prefixed with C-u swaps, see 'M-h f ace-window' "M-S-o" ace-swap-window
-  :bind (("M-o" . ace-window)))
-;; Buffer & UI movement
+(setup (:package ace-window)
+  ;; Prefixed with C-u swaps, see 'M-h f ace-window'
+  (:global "M-o" ace-window))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
 (use-package helpful

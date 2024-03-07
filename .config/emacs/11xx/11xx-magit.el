@@ -74,13 +74,5 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 
   (define-key dired-mode-map (kbd "C-c g a") #'f/dired-git-add)
   )
-(defun f/check-and-convert-line-endings ()
-  "Check and convert line endings to LF if necessary."
-  (interactive)
-  (when (memq buffer-file-coding-system '(utf-8-dos utf-16-dos))
-    (set-buffer-file-coding-system 'utf-8-unix t)
-    (save-buffer)))
-
-;; (add-hook 'find-file-hook 'f/check-and-convert-line-endings)
 
 (provide '11xx-magit)
