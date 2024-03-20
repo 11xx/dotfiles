@@ -19,9 +19,6 @@ Send errors to *Backtrace*, only set to true while debugging
   + ttf-liberation-mono-nerd
   + otf-fira-code-symbol [AUR]
   + aspell + aspell-* # ispell
-    though an error ofter appears with Emacs30
-    # #TODO-FIXME
-    : Error running timer ‘corfu--auto-complete-deferred’: (error "ispell-lookup-words: No plain word-list found at systemdefault locations.  Customize ‘ispell-alternate-dictionary’ to set yours.") [2 times]
   + xdg-desktop-portal: See [[*Day/Night theme switch][Day/Night theme switch]].
 
 * References
