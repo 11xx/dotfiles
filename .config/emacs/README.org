@@ -1752,7 +1752,7 @@ Wrapper for `org-get-full-outline-path'."
 
 **** Insert CUSTOM_ID
 :PROPERTIES:
-:CUSTOM_ID: zkupvqgrwtp
+:CUSTOM_ID: orgid-mqhvkq
 :END:
 
 - See
@@ -1762,7 +1762,7 @@ Wrapper for `org-get-full-outline-path'."
 #+begin_src emacs-lisp
 (defun org-custom-id--create ()
   "Create and store CUSTOM_ID for current heading path."
-  (let ((id (random-string-g-z 11)))
+  (let ((id (concat "orgid-" (random-string-g-z 6))))
     (org-entry-put nil "CUSTOM_ID" id)
     (org-id-add-location id (buffer-file-name (buffer-base-buffer)))
     id))
@@ -1823,7 +1823,7 @@ a limit of 530, more than that and lisp nesting will overflow."
 - Number of possibilities
   #+begin_example
   (let ((number-of-characters 21)
-        (length-of-string 11))
+        (length-of-string 6))
     (expt number-of-characters length-of-string))
   #+end_example
 

@@ -86,7 +86,7 @@ Wrapper for `org-get-full-outline-path'."
   (kill-new (org-get-full-outline-path)))
 (defun org-custom-id--create ()
   "Create and store CUSTOM_ID for current heading path."
-  (let ((id (random-string-g-z 11)))
+  (let ((id (concat "orgid-" (random-string-g-z 6))))
     (org-entry-put nil "CUSTOM_ID" id)
     (org-id-add-location id (buffer-file-name (buffer-base-buffer)))
     id))
