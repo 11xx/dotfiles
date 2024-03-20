@@ -8,6 +8,20 @@
 
 (unless (package-installed-p 'setup)
   (package-install 'setup))
+(defun my-protect-setup (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+                                          (pp (quote ,expansion))))
+                         :error)))))
+
+(advice-add 'setup :filter-return #'my-protect-setup)
 (setup-define :package
   (lambda (package)
     (if (consp package)

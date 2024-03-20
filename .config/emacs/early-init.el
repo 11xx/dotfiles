@@ -1,4 +1,4 @@
-(setq org-fold-core-style 'text-properties)
+(setopt org-fold-core-style 'text-properties)
 
 (add-hook 'emacs-startup-hook
      (lambda ()

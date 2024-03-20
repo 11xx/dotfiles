@@ -1,7 +1,7 @@
 #+title: Emacs "init" config file
 #+author: 11xx
 #+PROPERTY: header-args :export both :mkdirp yes :results drawer
-# removed  :comments link # [2022-11-01 Tue 21:28:29 -03]
+
 # #+STARTUP: hidestars
 
 # #+auto_tangle: t
@@ -9,9 +9,7 @@
 # Export as HTML
 #+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
 
-# #+OPTIONS: toc:4
-
-# rewriting config for Emacs30+ # [2024-02-26 Mon 11:24:57 -03] @ak
+#+OPTIONS: toc:2
 
 Send errors to *Backtrace*, only set to true while debugging
 : (setq debug-on-error t)
@@ -35,28 +33,32 @@ Here are some complete configuration examples:
 * init.el
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle init.el :export tangle
+:CUSTOM_ID: vwgsovkxqln
 :END:
 
+Add subdirectory to load path containing custom modules.
 #+begin_src emacs-lisp
-;; -*- lexical-binding: t; -*-
-(setq-default lexical-binding t)
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
-** Package initialize
+** Package initialize & setup.el
 #+begin_src emacs-lisp
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
 (unless package-archive-contents
   (package-refresh-contents))
-
-(add-to-list 'load-path (expand-file-name "11xx" user-emacs-directory))
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
-** no-littering: Keep user-emacs-directory clean
+** init-no-littering: Keep user-emacs-directory clean
 #+begin_src emacs-lisp
-(require '11xx-functions (expand-file-name "11xx/11xx-functions.el" user-emacs-directory))
+(require 'init-no-littering)
+(require 'init-backup-auto-save)
+#+end_src
+
+#+NAME: no-littering-def
+#+begin_src emacs-lisp :tangle lisp/init-no-littering.el
+(require '11xx-setup)
 
 (when (fboundp 'startup-redirect-eln-cache)
   (startup-redirect-eln-cache
@@ -64,13 +66,19 @@ Here are some complete configuration examples:
     (expand-file-name  "var/eln-cache/" user-emacs-directory))))
 
 (add-to-list 'native-comp-eln-load-path
-             (expand-file-name "var/eln-cache/" user-emacs-directory))
+             (convert-standard-filename
+              (expand-file-name "var/eln-cache/" user-emacs-directory)))
 
-(use-package no-littering
-  :ensure t)
+(setup (:package no-littering)
+  (:require no-littering))
+
+(provide 'init-no-littering)
 #+end_src
 
-*** Move back-up and auto-save files
+** init-backup-auto-save.el: Move back-up and auto-save files
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/init-backup-auto-save.el
+:END:
 Backup & auto-save
 - See
   + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
@@ -80,15 +88,18 @@ Backup & auto-save
   + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
 
 #+begin_src emacs-lisp
-;; **** Backup directory variable
+(require '11xx-functions)
+
 (defvar v/backup-directory
-  (expand-file-name "backups" no-littering-var-directory)
+  (expand-file-name "backups"
+                    (expand-file-name "var" user-emacs-directory))
   "Custom backup-files directory.")
 (f/check-make-directory v/backup-directory)
 
 ;; Auto-save directory variable
 (defvar v/auto-save-directory
-  (expand-file-name "auto-save" no-littering-var-directory)
+  (expand-file-name "auto-save"
+                    (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
 (f/check-make-directory v/auto-save-directory)
 
@@ -124,6 +135,10 @@ Backup & auto-save
   +Is this legacy stuff from the ancient times of shared terminals?+
   # [2024-02-14 Wed 11:00:23 -03] @ak
 
+#+begin_src emacs-lisp
+(provide 'init-backup-auto-save)
+#+end_src
+
 
 ** Native compilation settings
 #+begin_src emacs-lisp
@@ -134,7 +149,6 @@ Backup & auto-save
 
 ** Load custom config
 #+begin_src emacs-lisp
-(use-package 11xx-setup)
 (use-package 11xx-defaults)
 (use-package 11xx-completion)
 
@@ -161,11 +175,10 @@ Backup & auto-save
 #+end_src
 
 ** Startup report
-
-Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
-This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
-# ;; https://blog.d46.us/advanced-emacs-startup/
-
+- https://blog.d46.us/advanced-emacs-startup/
+  Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
+  # This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
+  # #TODO-Remove old? # [2024-03-18 Mon 20:12:21 -03] @ak
 #+begin_src emacs-lisp
 (add-hook 'emacs-startup-hook
   (lambda ()
@@ -173,7 +186,6 @@ This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
              (emacs-init-time "%.2f")
              gcs-done)))
 #+end_src
-https://blog.d46.us/advanced-emacs-startup/
 
 
 * 11xx config
@@ -187,7 +199,7 @@ Personal config modularized into "pseudo-packages"
 Increase Garbage Collection threshold:
 - [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
 - [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
-#+begin_src emacs-lisp :tangle 11xx/11xx-gc.el
+#+begin_src emacs-lisp :tangle lisp/11xx-gc.el
 ;; -*- lexical-binding: t; -*-
 (setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
 (add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
@@ -196,7 +208,7 @@ Increase Garbage Collection threshold:
 #+end_src
 
 ** 11xx-setup.el
-#+begin_src emacs-lisp :tangle 11xx/11xx-setup.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-setup.el :noweb yes
 ;; -*- lexical-binding: t; -*-
 ;; (require '11xx-package)
 
@@ -218,13 +230,32 @@ Install =setup.el=.
   (package-install 'setup))
 #+end_src
 
+- [[https://www.emacswiki.org/emacs/SetupEl#h5o-26][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
+#+begin_src emacs-lisp :noweb-ref setup-el-install
+(defun my-protect-setup (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+                                          (pp (quote ,expansion))))
+                         :error)))))
+
+(advice-add 'setup :filter-return #'my-protect-setup)
+#+end_src
+
+
 *** =setup.el=
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref setup-el-def
 :END:
 - See:
   + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
-  + [[file:straight/repos/setup/setup.el::let (bodies][setup.el file]]
+  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
 
 **** =setup.el= additional macros
 
@@ -360,43 +391,11 @@ current mode."
   :signature '(FUNC ...))
 #+end_src
 
-** TODO 11xx-use-package.el
-#+begin_src emacs-lisp
-(require 'use-package)
-
-;; Step 1: Add the keyword
-(add-to-list 'use-package-keywords :put-enable t)
-
-;; Step 2: Create a normalizer
-(defun use-package-normalize/:put-enable (name-symbol keyword args)
-  (use-package-only-one (symbol-name keyword) args
-    (lambda (label arg)
-      (mapcar #'intern arg))))
-
-;; Step 3: Create a handler
-(defun use-package-handler/:put-enable (name-symbol _archive-name commands _rest _state)
-  (let ((forms (mapcar (lambda (command)
-                         `(put ',command 'disabled nil))
-                       commands)))
-    `(progn ,@forms)))
-
-;; Step 4: Test it
-;; Example usage:
-(use-package example-package
-  :put-enable (narrow-to-region
-               narrow-to-page
-               narrow-to-defun
-               widen
-               downcase-region))
-
-#+end_src
-
 ** 11xx-defaults.el: New defaults
-
-#+begin_src emacs-lisp :tangle 11xx/11xx-defaults.el :noweb yes
-;; (require '11xx-package)
+#+begin_src emacs-lisp :tangle lisp/11xx-defaults.el :noweb yes
 (require '11xx-setup)
 (require '11xx-functions)
+(require 'init-no-littering)
 
 <<new-defaults-def>>
 
@@ -418,7 +417,7 @@ current mode."
     config was tested and caused problems when not using it.
 
 #+begin_src emacs-lisp :noweb yes
-(require 'utf8-default)
+(require 'utf-8-default)
 (setup emacs
   ;; Keybindings
   (:global
@@ -553,16 +552,13 @@ current mode."
   =camelCase= cursor movement):
   + [[https://github.com/jpkotta/syntax-subword/blob/master/syntax-subword.el][syntax-subword/syntax-subword.el at master · jpkotta/syntax-subword]]
 #+begin_src emacs-lisp
-(use-package syntax-subword
-  :disabled
-  :ensure t)
-;; (:with-mode global-subword-mode
-;;   (:hide-mode global-subword-mode)
-;;   (:hook-into after-init))
-;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
-;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
-;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
+(setup (:package syntax-subword)
+  (:hide-mode global-subword-mode)
+  (add-hook 'after-init-hook #'global-syntax-subword-mode))
 #+end_src
+# ;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
+# ;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
+# ;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
 
 #+begin_src emacs-lisp
 (setup (:package ace-window)
@@ -718,18 +714,15 @@ Defined in Emacs setup
 #+begin_src emacs-lisp
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
-;;; Disabling this, uncomment if necessary
-
-;; (defun f/check-file-touch (file)
-;;   "Check if FILE exists and create it if it doesn't.
-
-;; It uses `make-empty-file' PARENTS argument 't'."
-;;   (if (not (file-exists-p file))
-;;       (make-empty-file file)))
-
-;; (f/check-file-touch custom-file)
 (load custom-file 'noerror 'nomessage)
 #+end_src
+# ;;; Disabling this, uncomment if necessary
+# ;; (defun f/check-file-touch (file)
+# ;;   "Check if FILE exists and create it if it doesn't.
+# ;; It uses `make-empty-file' PARENTS argument 't'."
+# ;;   (if (not (file-exists-p file))
+# ;;       (make-empty-file file)))
+# ;; (f/check-file-touch custom-file)
 
 **** Async
 [[https://github.com/jwiegley/emacs-async][jwiegley/emacs-async: Simple library for asynchronous processing in Emacs]]
@@ -757,7 +750,7 @@ The full path is required.
   (detached-init))
 #+end_src
 
-** utf8-default.el: Use UTF-8 for all character encoding
+** utf-8-default.el: Use UTF-8 for all character encoding
 Encoding, pretty much anything other than strictly english ascii
 writing requires a different encoding. So use UTF-8 as the
 default encoding.
@@ -768,9 +761,10 @@ default encoding.
   + [[https://emacs.stackexchange.com/questions/68647/automatically-change-encoding-of-process-buffers/68649#68649][shell - Automatically change encoding of process buffers - Emacs Stack Exchange]]
   + [[https://emacs.stackexchange.com/questions/19641/emacs-is-asking-me-for-a-coding-system-on-each-save][org mode - Emacs is asking me for a coding system on each save - Emacs Stack Exchange]]
   + [[https://stackoverflow.com/questions/20723229/how-to-reset-emacs-to-save-files-in-utf-8-unix-character-encoding/26401113#26401113][linux - How to reset emacs to save files in utf-8-unix character encoding? - Stack Overflow]]
+  + [[https://skybert.net/craftsmanship/utf-8-for-the-impatient/][UTF-8 for the Impatient | skybert.net]]
 # do this especially on Windows, else python output problem
 
-#+begin_src emacs-lisp :tangle lisp/utf8-default.el
+#+begin_src emacs-lisp :tangle lisp/utf-8-default.el
 (prefer-coding-system 'utf-8-unix)
 (setopt x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
         default-process-coding-system '(utf-8-unix . utf-8-unix))
@@ -787,7 +781,7 @@ default encoding.
 
 (set-locale-environment "en.UTF-8")
 
-(provide 'utf8-default)
+(provide 'utf-8-default)
 #+end_src
 # ;; (set-language-environment "UTF-8") ; maybe this is not for coding system :p
 #
@@ -805,7 +799,7 @@ or
 
 ** TODO 11xx-modes.el
 # #TODO-modularize more
-#+begin_src emacs-lisp :tangle 11xx/11xx-modes.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-modes.el :noweb yes
 <<11xx-modes-def>>
 
 (provide '11xx-modes)
@@ -875,9 +869,25 @@ Special major modes are for specific config files and stuff
 ***** TODO Tree-Sitter Syntax Highlighting
 [[https://emacs-tree-sitter.github.io/syntax-highlighting/][Tree-sitter Syntax Highlighting]]
 
+- Emacs 29+, using =treesit=
+  + [[https://git.savannah.gnu.org/cgit/emacs.git/tree/admin/notes/tree-sitter/starter-guide?h=feature/tree-sitter][starter-guide\tree-sitter\notes\admin - emacs.git - Emacs source repository]]
+  + [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
+  + [[https://emacs.stackexchange.com/questions/78605/language-specific-tree-sitter-major-mode-wont-show-up][language specific tree-sitter major mode wont show up - Emacs Stack Exchange]]
+  + use =treesit= instead of the third-party =tree-sitter= and:
+    #+begin_quote
+    Note that, just because you have installed a grammar, does /not/
+    mean Emacs supports it. Someone still has to write the –
+    admittedly, /way/ easier – syntax and indentation logic and all that
+    good stuff.
+
+    ----- [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
+    #+end_quote
+    # (Retrieved at # [2024-03-16 Sat 07:03:10 -03] @ak
+
 - Tree-Sitter supports Org-Mode code blocks since:
   + [[https://github.com/nvim-orgmode/orgmode/pull/139][Pull Request #139]].
   + [[https://github.com/nvim-orgmode/orgmode/issues/31][would it be possible to use treesitter in this · Issue #31 · nvim-orgmode/orgmode]]
+  + [[https://www.masteringemacs.org/article/lets-write-a-treesitter-major-mode][Let's Write a Tree-Sitter Major Mode - Mastering Emacs]]
 
 *NOTE*: =htmlize= uses different CSS selectors for =tree-sitter-hl-mode=
 code highlighting, prefixed by something like
@@ -889,17 +899,11 @@ colored by the stylesheet on the HTML file.
 Additional Tree-Sitter content
 - [[https://siraben.dev/2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
   # [2022-04-28 Thu 16:46:45]
+
+# #TODO moving to built-in `treesit' package
 #+begin_src emacs-lisp
-;; #TODO use builtin tree-sitter
-;; (setup tree-sitter
-;;        (:package tree-sitter-langs tree-sitter-indent)
-;;   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
-;;                ;; org-mode.
-;;                c-mode-common-hook
-;;                ;; sh-mode-hook
-;;                python-mode-hook
-;;                haskell-mode-hook)
-;;     (:hook tree-sitter-hl-mode)))
+(add-to-list 'treesit-extra-load-path
+             (expand-file-name "tree-sitter" user-emacs-directory))
 #+end_src
 
 ***** Colour highlighting
@@ -1071,7 +1075,6 @@ Javascript related packages
 # :header-args:emacs-lisp: :noweb-ref export-preview
 # :END:
 
-
 **** TODO Languages
 ***** DONE C
 #+begin_src emacs-lisp
@@ -1082,7 +1085,8 @@ Javascript related packages
   )
 #+end_src
 
-****** Compile helper functions
+****** TODO Compile helper functions
+# #TODO update # [2024-03-18 Mon 22:34:43 -03] @ak
 ******* Compile current C file
 The =(compile)= function already defines the workin directory as the same
 as the buffer's file location.
@@ -1155,9 +1159,9 @@ It continues open as =*compilation*=
 
 ****** C mode keybindings
 [[https://tr.wikibooks.org/wiki/Emacs/Windows_%C4%B0%C3%A7in_Emacs_Dosyas%C4%B1][Emacs/Windows İçin Emacs Dosyası - Vikikitap: Özgür kütüphane]]
-;; keybindings for all supported languages.  We can put these in
-;; c-mode-base-map because c-mode-map, c++-mode-map, objc-mode-map,
-;; java-mode-map, and idl-mode-map inherit from it.
+# ;; keybindings for all supported languages.  We can put these in
+# ;; c-mode-base-map because c-mode-map, c++-mode-map, objc-mode-map,
+# ;; java-mode-map, and idl-mode-map inherit from it.
 
 [[https://stackoverflow.com/questions/34067495/binding-a-key-in-c-c-mode-only][emacs - Binding a key in C/C++ mode only? - Stack Overflow]]
 # [2022-04-23 Sat 19:08:13]
@@ -1171,26 +1175,20 @@ to conflict with it.
 #+end_src
 
 ***** TODO Rust
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+#+begin_src emacs-lisp
 (setup (:package rust-mode))
 ;; rustic
 #+end_src
 
 Install Org Babel rust library:
-
 *NOTE*: this requires the program =rust-script= (available in standard
 Arch repos).
 #+begin_src emacs-lisp
 (setup (:package ob-rust)
-  (:load-after org)
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   (append org-babel-load-languages
-           '((haskell . t)
-             ;; (async   . t) ; from ob-async
-             (shell   . t)
-             (C       . t))))
-  )
+  (:load-after org))
 #+end_src
 
 ***** Lua
@@ -1210,7 +1208,7 @@ Configuration for obscure scripting languages and such
 ** 11xx-functions.el: Utility functions
 
 *** Provide
-#+begin_src emacs-lisp :noweb yes :tangle 11xx/11xx-functions.el
+#+begin_src emacs-lisp :tangle lisp/11xx-functions.el :noweb yes
 <<11xx-functions-el>>
 
 (provide '11xx-functions)
@@ -1395,140 +1393,14 @@ It uses `make-directory' PARENTS argument 't'."
 - Reffs:
   + [[https://www.youtube.com/watch?v=VcgjTEa0kU4][Emacs From Scratch #5 - Org Mode Basics]]
 
-#+begin_src emacs-lisp :tangle 11xx/11xx-org.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-org.el :noweb yes
 ;; -*- lexical-binding: t; -*-
 
-<<org-def-functions>>
+(require '11xx-org-functions)
+
 <<org-def-setup>>
 
 (provide '11xx-org)
-#+end_src
-
-*** Org functions
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref org-def-functions
-:END:
-
-**** Copy previous source-block with header arguments
-[[https://emacs.stackexchange.com/questions/55890/is-it-possible-to-repeat-the-last-org-mode-source-blocks-headers/55894#55894][wizard src]] | and add keybindig to specific mode [[https://stackoverflow.com/questions/5500035/set-custom-keybinding-for-specific-emacs-mode/14230685#14230685][src]]
-#+begin_src emacs-lisp
-(defun org-babel-repeat-previous-src-block ()
-  "Copy previous src block excluding the content."
-  (interactive)
-  (let (result)
-    (save-excursion
-      (org-babel-previous-src-block)
-      (let ((element (org-element-at-point)))
-        (when (eq (car element) 'src-block)
-          (let* ((pl (cadr element))
-                 (lang (plist-get pl :language))
-                 (switches (plist-get pl :switches))
-                 (parms (plist-get pl :parameters)))
-            (setq result
-                  (format
-                   (concat "\n#+begin_src %s\n"
-                           "\n"
-                           "#+end_src\n")
-                   (mapconcat #'identity
-                              (delq nil (list lang switches parms))
-                              " ")))))))
-    (and result (insert result))
-    (forward-line -2))
-  (recenter-top-bottom))
-#+end_src
-
-**** tangle-dir with expand
-- See
-  + [[https://emacs.stackexchange.com/questions/19877/how-to-evaluate-elisp-code-contained-in-a-string/19878#19878][read - How to evaluate Elisp code contained in a string? - Emacs Stack Exchange]]
-  + [[https://emacs.stackexchange.com/questions/46479/how-to-set-a-tangled-parent-directory-for-each-subtree-in-org-mode/55859#55859][How to set a tangled parent directory for each subtree in org mode?]]
-# [2023-05-19 Fri 23:48:32 -03]
-#+begin_src emacs-lisp
-(defun f/eval-string (string)
-  "Read STRING and evaluate its lisp expression.
-
-Returns STRING if it doesn't start with \"(\"."
-  (if (string-match-p "^(" string)
-      (eval (read string))
-    string))
-
-(defun tdir (&optional path)
-  "Expand PATH given to \"tangle-dir\" property.
-
-If the \"tangle-dir\" property exists and is a directory, return the
-expanded directory path concatenated with the provided PATH.
-
-If the property exists and is an expression, evaluate it and return the
-expanded result.
-
-If the property is not found, use the base directory of the current
-buffer concatenated with the provided PATH."
-  (let ((dir (string-trim (f/eval-string (org-entry-get nil "tangle-dir" t)) nil "/"))
-        (file (if path (string-trim path "/" nil))))
-    (if dir
-        (expand-file-name file dir)
-      (error
-       "tdir failed in getting a directory. Aborting tangle from '%s'."
-       (buffer-file-name)))))
-#+end_src
-- Usage:
-  + Functions can be used in the =:tangle= header argument of a src code
-    block, e.g. =:tangle (tdir "filename")=.
-
-**** DONE Additional electric pairs for Org Mode
-Disabled in favour of smartparens #manual-smartparens
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(defvar org-additional-electric-pairs '((?= . ?=) (?' . ?'))
-  "Additional electric pairs for Org Mode.")
-
-(defun f/org-electric-pairs-add-local ()
-  "Append list `org-additional-electric-pairs' to `electric-pair-pairs'."
-  (setq-local electric-pair-pairs
-              (append electric-pair-pairs org-additional-electric-pairs))
-  (setq-local electric-pair-text-pairs electric-pair-pairs))
-
-(defun f/org-electric-pairs-add (pair)
-  "Add an electric PAIR to `org-additional-electric-pairs` and update `electric-pair-pairs`."
-  (add-to-list 'org-additional-electric-pairs pair)
-  (f/org-electric-pairs-add-local))
-
-(add-hook 'org-mode-hook #'f/org-electric-pairs-add-local)
-#+end_src
-also was being used after =org-babel-noweb-wrap= and
-=f/org-babel-noweb-wrap-insert-chars=:
-: (f/org-electric-pairs-add '(?« . ?»))
-
-**** Fix noweb substring syntax highlighting display in code blocks
-Use either =<<= & =>>= (the default) or =«= & =»= (=0000AB= & =0000BB=), when
-syntax highlighting breaks such as shell code blocks that interpret
-=<<nowebname>>= as heredocs.
-# The latter preserves syntax highlighting in sh-mode.
-- [[https://emacs.stackexchange.com/questions/63643/noweb-references-in-sh-blocks-breaks-the-syntax-highlighting/73720#73720][org mode - Noweb references in sh blocks breaks the syntax highlighting - Emacs Stack Exchange]]
-  # #wizard
-  + original =org-babel-noweb-wrap= function:
-    * [[https://git.savannah.gnu.org/cgit/emacs/org-mode.git/tree/lisp/ob-core.el#n195][ob-core.el\lisp - emacs/org-mode.git - Emacs Org mode]]
-
-# [2023-09-13 Wed 14:18:13 -03]
-#+begin_src emacs-lisp
-;; override the default
-(with-eval-after-load 'org
-  (defun org-babel-noweb-wrap (&optional regexp)
-    "Return regexp matching a Noweb reference.
-
-Match any reference, or only those matching REGEXP, if non-nil.
-
-When matching, reference is stored in match group 1."
-    (rx-to-string
-     `(and (or "<<" "«")
-           (group
-            (not (or " " "\t" "\n"))
-            (? (*? any) (not (or " " "\t" "\n"))))
-           (or ">>" "»"))))
-
-  (defun f/org-babel-noweb-wrap-insert-chars ()
-    "Insert \"«\" and \"»\" "
-    (interactive)
-    (insert "«»")
-    (backward-char)))
 #+end_src
 
 *** Org setup
@@ -1546,6 +1418,8 @@ When matching, reference is stored in match group 1."
 ;;   (:hook (lambda()
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
+
+;; (setup (:package org-contrib))
 
 (use-package org
   :bind (:map org-mode-map
@@ -1565,7 +1439,7 @@ When matching, reference is stored in match group 1."
    ("M-D" . backward-kill-word)
    ;; "M-h"   backward-delete-char ; was `org-mark-element'
    ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
-   )
+   ("C-c o p" . org-kill-full-outline-path))
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
@@ -1574,13 +1448,14 @@ When matching, reference is stored in match group 1."
          ("C-c o c" . org-capture))
 
   :config
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   (append org-babel-load-languages
-           '((haskell . t)
-             ;; (async   . t) ; from ob-async
-             (shell   . t)
-             (C       . t))))
+  ;; Move this to file local
+  ;; (org-babel-do-load-languages
+  ;;  'org-babel-load-languages
+  ;;  (append org-babel-load-languages
+  ;;          '((haskell . t)
+  ;;            ;; (async   . t) ; from ob-async
+  ;;            (shell   . t)
+  ;;            (C       . t))))
   ;; Disable angle bracket syntax highlighting/matching
   (add-hook 'org-mode-hook
             (lambda()
@@ -1678,9 +1553,10 @@ When matching, reference is stored in match group 1."
 ;; (which idk how to do).
 #+end_src
 
-;; (:with-mode org-num-mode
-;;   (:load-after org)
-;;   (:hook-into org-mode))
+# ;; (:with-mode org-num-mode
+# ;;   (:load-after org)
+# ;;   (:hook-into org-mode))
+
 
 **** Disable show-trailing-whitespace on Org Export Dispatcher
 Hack for customizing the "Org Export Dispatch" buffer, the one triggered
@@ -1705,13 +1581,6 @@ with =C-c C-e=.
 **** org-appear
 Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
-
-# straight recipe
-# (org-appear :type git
-# :host github
-# :repo "awth13/org-appear"
-# :files ("*"
-# (:exclude ".git*" "demo.git")))
 #+begin_src emacs-lisp
 (use-package org-appear
   :ensure t
@@ -1727,12 +1596,246 @@ appear when hovered.
   # #BUG # [2024-02-18 Sun 23:56:32 -03] @ak
   + See [[https://github.com/awth13/org-appear/issues/53][Issue #53 · awth13/org-appear]].
   #+begin_src emacs-lisp :tangle early-init.el
-  (setq org-fold-core-style 'text-properties)
+  (setopt org-fold-core-style 'text-properties)
   #+end_src
 
+*** Exporting
+**** htmlize
+- See
+  + [[https://github.com/hniksic/emacs-htmlize][GitHub - hniksic/emacs-htmlize: Convert buffer text and decorations to HTML.]]
+  + [[https://emacs.stackexchange.com/questions/3374/set-the-background-of-org-exported-code-blocks-according-to-theme/3512#3512][org mode - Set the background of org-exported <code> blocks according to theme - Emacs Stack Exchange]]
+  + [[https://melpa.org/#/htmlize][htmlize - MELPA]]
+#+begin_src emacs-lisp
+(setup (:package htmlize)
+  (setopt org-html-htmlize-output-type 'css ; 'inline-css
+           htmlize-html-charset "UTF-8"))
+#+end_src
+- For supported html charsets see
+  + [[https://help.hcltechsw.com/dom_designer/9.0.1/appdev/LSAZ_APPENDIX_E_MIME_CHARSET_NAMES.html][MIME Charset Names]]
+  + [[https://www.w3schools.com/charsets/][HTML Character Sets]]
+  + [[https://en.wikipedia.org/wiki/Character_encodings_in_HTML][Character encodings in HTML - Wikipedia]]
+- Note: the package =htmlize= is also capable of exporting normal
+  buffers as HTML, but here it's mostly used for Org Mode exports.
+
+** 11xx-org-functions.el
+
+#+begin_src emacs-lisp :tangle lisp/11xx-org-functions.el :noweb yes
+;; -*- lexical-binding: t; -*-
+
+<<org-def-functions>>
+
+(provide '11xx-org-functions)
+#+end_src
+
+*** Org functions
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref org-def-functions
+:END:
+
+**** Copy previous source-block with header arguments
+- [[https://emacs.stackexchange.com/questions/55890/is-it-possible-to-repeat-the-last-org-mode-source-blocks-headers/55894#55894][yasnippet - Is it possible to repeat the last org-mode source block's headers - Emacs Stack Exchange]]
+  # #wizard
+- tip: [[https://stackoverflow.com/questions/5500035/set-custom-keybinding-for-specific-emacs-mode/14230685#14230685][How to add keybindig to specific mode]].
+#+begin_src emacs-lisp
+(defun org-babel-repeat-previous-src-block ()
+  "Copy previous src block excluding the content."
+  (interactive)
+  (let (result)
+    (save-excursion
+      (org-babel-previous-src-block)
+      (let ((element (org-element-at-point)))
+        (when (eq (car element) 'src-block)
+          (let* ((pl (cadr element))
+                 (lang (plist-get pl :language))
+                 (switches (plist-get pl :switches))
+                 (parms (plist-get pl :parameters)))
+            (setq result
+                  (format
+                   (concat "\n#+begin_src %s\n"
+                           "\n"
+                           "#+end_src\n")
+                   (mapconcat #'identity
+                              (delq nil (list lang switches parms))
+                              " ")))))))
+    (and result (insert result))
+    (forward-line -2))
+  (recenter-top-bottom))
+#+end_src
+
+**** tangle-dir with expand
+- See
+  + [[https://emacs.stackexchange.com/questions/19877/how-to-evaluate-elisp-code-contained-in-a-string/19878#19878][read - How to evaluate Elisp code contained in a string? - Emacs Stack Exchange]]
+  + [[https://emacs.stackexchange.com/questions/46479/how-to-set-a-tangled-parent-directory-for-each-subtree-in-org-mode/55859#55859][How to set a tangled parent directory for each subtree in org mode?]]
+# [2023-05-19 Fri 23:48:32 -03]
+#+begin_src emacs-lisp
+(defun f/eval-string (string)
+  "Read STRING and evaluate its lisp expression.
+
+Returns STRING if it doesn't start with \"(\"."
+  (if (string-match-p "^(" string)
+      (eval (read string))
+    string))
+
+(defun tdir (&optional path)
+  "Expand PATH given to \"tangle-dir\" property.
+
+If the \"tangle-dir\" property exists and is a directory, return the
+expanded directory path concatenated with the provided PATH.
+
+If the property exists and is an expression, evaluate it and return the
+expanded result.
+
+If the property is not found, use the base directory of the current
+buffer concatenated with the provided PATH."
+  (let ((dir (string-trim (f/eval-string (org-entry-get nil "tangle-dir" t)) nil "/"))
+        (file (if path (string-trim path "/" nil))))
+    (if dir
+        (expand-file-name file dir)
+      (error
+       "tdir failed in getting a directory. Aborting tangle from '%s'."
+       (buffer-file-name)))))
+#+end_src
+- Usage:
+  + Functions can be used in the =:tangle= header argument of a src code
+    block, e.g. =:tangle (tdir "filename")=.
+
+**** Fix noweb substring syntax highlighting display in code blocks
+Use either =<<= & =>>= (the default) or =«= & =»= (=0000AB= & =0000BB=), when
+syntax highlighting breaks such as shell code blocks that interpret
+=<<nowebname>>= as heredocs.
+# The latter preserves syntax highlighting in sh-mode.
+- [[https://emacs.stackexchange.com/questions/63643/noweb-references-in-sh-blocks-breaks-the-syntax-highlighting/73720#73720][org mode - Noweb references in sh blocks breaks the syntax highlighting - Emacs Stack Exchange]]
+  # #wizard
+  + original =org-babel-noweb-wrap= function:
+    * [[https://git.savannah.gnu.org/cgit/emacs/org-mode.git/tree/lisp/ob-core.el#n195][ob-core.el\lisp - emacs/org-mode.git - Emacs Org mode]]
+
+# [2023-09-13 Wed 14:18:13 -03]
+#+begin_src emacs-lisp
+;; override the default
+(with-eval-after-load 'org
+  (defun org-babel-noweb-wrap (&optional regexp)
+    "Return regexp matching a Noweb reference.
+
+Match any reference, or only those matching REGEXP, if non-nil.
+
+When matching, reference is stored in match group 1."
+    (rx-to-string
+     `(and (or "<<" "«")
+           (group
+            (not (or " " "\t" "\n"))
+            (? (*? any) (not (or " " "\t" "\n"))))
+           (or ">>" "»"))))
+
+  (defun f/org-babel-noweb-wrap-insert-chars ()
+    "Insert \"«\" and \"»\" "
+    (interactive)
+    (insert "«»")
+    (backward-char)))
+#+end_src
+
+**** Get full path of headings
+# NVM there's (org-format-outline-path (org-get-outline-path t t) nil nil "/")
+#+begin_src emacs-lisp
+(defun org-get-full-outline-path ()
+  "Retrieve the full heading path of the current heading."
+  (interactive)
+  (let ((path (org-get-outline-path t t)))
+    (if path
+        (mapconcat 'identity path "/")
+      ;; (message (concat "Killed current Org outline path: " (mapconcat 'identity path "/")))
+      (message "Not in an Org mode heading"))))
+
+(defun org-kill-full-outline-path ()
+  "Adds the full heading path of the current heading to kill-ring.
+
+Wrapper for `org-get-full-outline-path'."
+  (interactive)
+  (kill-new (org-get-full-outline-path)))
+#+end_src
+
+**** Insert CUSTOM_ID
+:PROPERTIES:
+:CUSTOM_ID: zkupvqgrwtp
+:END:
+
+- See
+  + [[https://zzamboni.org/post/how-to-easily-create-and-use-human-readable-ids-in-org-mode-and-doom-emacs/][zzamboni.org | How to easily create and use human-readable IDs in Org mode and Doom Emacs]]
+    # #wizard
+  + [[https://emacs.stackexchange.com/questions/46176/confused-by-property-id-versus-custom-id][org mode - Confused by property :ID: versus :CUSTOM_ID: - Emacs Stack Exchange]]
+#+begin_src emacs-lisp
+(defun org-custom-id--create ()
+  "Create and store CUSTOM_ID for current heading path."
+  (let ((id (random-string-g-z 11)))
+    (org-entry-put nil "CUSTOM_ID" id)
+    (org-id-add-location id (buffer-file-name (buffer-base-buffer)))
+    id))
+
+(defun org-custom-id--get-create (&optional force where)
+  "Get or create CUSTOM_ID for heading at WHERE.
+
+If FORCE is t, always recreate the property."
+  (org-with-point-at where
+    (let ((old-id (org-entry-get nil "CUSTOM_ID")))
+      ;; If CUSTOM_ID exists and FORCE is false, return it
+      (if (and (not force) old-id (stringp old-id))
+          (progn
+            (org-id-add-location old-id
+                                 (buffer-file-name (buffer-base-buffer)))
+            old-id)
+        ;; otherwise, create it
+        (org-custom-id--create)))))
+
+(defun org-custom-id (&optional arg)
+  "Get or create CUSTOM_ID for heading at point.
+
+If a `\\[universal-argument]' prefix is present FORCE is set to t."
+  (interactive "P")
+  (let ((force (not (null current-prefix-arg))))  ;; Check if C-u prefix is used
+    (org-custom-id--get-create force nil)))
+
+(keymap-global-set "C-c o i" #'org-custom-id)
+#+end_src
+- NOTE: The default =org-store-link= supports CUSTOM_IDs, then it can be
+  inserted with =org-insert-link=.
+  # [2024-03-19 Tue 23:19:34 -03] @ak
+
+**** Random characters string
+:PROPERTIES:
+:CUSTOM_ID: kpshvwuiigm
+:END:
+
+- source https://stackoverflow.com/a/60790863
+#+begin_src emacs-lisp
+(defun random-string-g-z (n)
+  "Generate N random characters from G to Z.
+
+The reason for using G to Z is to differentiate from MD5/HEX
+strings that use A-F and 0-9. Also this is meant for simple
+\"ID-fication\" of certain components like creating anchor links.
+
+Inefficient implementation; don't use for large N. Testing showed
+a limit of 530, more than that and lisp nesting will overflow."
+
+  (let* ((alpha "ghijklmnopqrstuvwxyz")
+         (i (% (abs (random)) (length alpha))))
+    (if (= 0 n) ""
+      (concat (substring alpha i (1+ i))
+              (random-string-g-z (1- n))))))
+#+end_src
+
+- Number of possibilities
+  #+begin_example
+  (let ((number-of-characters 21)
+        (length-of-string 11))
+    (expt number-of-characters length-of-string))
+  #+end_example
+
 ** 11xx-dired.el
+:PROPERTIES:
+:CUSTOM_ID: lzvlgsmyjux
+:END:
 *** Provide
-#+begin_src emacs-lisp :tangle 11xx/11xx-dired.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-dired.el :noweb yes
 (require '11xx-setup)
 
 <<11xx-dired-def>>
@@ -1754,15 +1857,12 @@ Or the later =(setq dired-kill-when-opening-new-dired-buffer t)= in Emacs 28.1+.
 
 ***** Dired up directory without opening new buffer
 #+begin_src emacs-lisp
-;; (lambda () (interactive) (find-alternate-file ".."))
 (defun dired-find-alternate-file-up ()
   "Sames as `dired-find-alternate-file' but go up one directory instead."
   (interactive)
   (find-alternate-file ".."))
 #+end_src
 
-***** dired-open
-[[https://github.com/Fuco1/dired-hacks#dired-open][src]]
 
 ***** dired open with external app
 [[https://emacs.stackexchange.com/questions/21796/dired-alternative-to-openwith-how-to-open-file-per-extension/21808#21808][wizard]]
@@ -1778,11 +1878,9 @@ The app is chosen from your OS's preference."
     (mapc
      (lambda (file-path)
        (let ((process-connection-type nil))
-         (start-process "" nil "launch" file-path))) file-list)))
+         (start-process "" nil "launch" file-path)))
+     file-list)))
 #+end_src
-
-***** dired hide dotfiles
-[[https://emacs.stackexchange.com/questions/59254/how-to-bind-key-in-use-package/59270#59270][how to bind a key in use-package]]
 
 ***** Open Terminal here
 [[https://truongtx.me/2013/09/13/emacs-dired-new-terminal-window-at-current-directory-on-macos][wizard src]]
@@ -1806,15 +1904,12 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
 #+end_src
 
-***** Tree directory display
-[[https://youtu.be/pZzDayi5lRo?t=137][Thanks src]]
-
 **** Dired setup
 
-[[https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html][Using Dired as a file manager]]
-[[https://www.youtube.com/watch?v=PMWwM8QJAtU][Emacs From Scratch #10 - Effortless File Management with Dired]]
-[[https://github.com/Fuco1/dired-hacks#dired-rainbow][Dired-Rainbow]]
-[[help:dired-compress-files-alist][Add compression]]
+- [[https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html][Using Dired as a file manager]]
+- [[https://www.youtube.com/watch?v=PMWwM8QJAtU][Emacs From Scratch #10 - Effortless File Management with Dired]]
+- [[https://github.com/Fuco1/dired-hacks#dired-rainbow][Dired-Rainbow]]
+- [[help:dired-compress-files-alist][Add compression]]
 
 NOTE: =dired-async= is provided by the =async= package.
 #+begin_src emacs-lisp
@@ -1952,7 +2047,7 @@ NOTE: =dired-async= is provided by the =async= package.
 
 ** 11xx-magit.el
 
-#+begin_src emacs-lisp :noweb yes :tangle 11xx/11xx-magit.el
+#+begin_src emacs-lisp :tangle lisp/11xx-magit.el :noweb yes
 <<11xx-magit-def>>
 
 (provide '11xx-magit)
@@ -2050,29 +2145,8 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   )
 #+end_src
 
-**** (Windows-NT): LF vs CRLF
-For using a specific coding system for the current file, set
-=(setq-default buffer-file-coding-system 'utf-8-unix)= to prefer LF over
-CRLF, for example.
-
-# Check if the current file is using CRLF and change it to LF.
-# #+begin_src emacs-lisp
-# (defun f/check-and-convert-line-endings ()
-#   "Check and convert line endings to LF if necessary."
-#   (interactive)
-#   (when (memq buffer-file-coding-system '(utf-8-dos utf-16-dos))
-#     (set-buffer-file-coding-system 'utf-8-unix t)
-#     (save-buffer)))
-
-# ;; (add-hook 'find-file-hook 'f/check-and-convert-line-endings)
-# #+end_src
-# Actually ignore this function for now # [2024-03-06 Wed 20:20:08 -03] @ak
-
-- Note:
-  #+INCLUDE: "~/org/windows.org::*Git newline characters warning / LF vs CRLF"
-
 ** 11xx-completion.el: Completion frakework, Minibuffer
-#+begin_src emacs-lisp :tangle 11xx/11xx-completion.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-completion.el :noweb yes
 (require '11xx-setup)
 
 <<11xx-completion-def>>
@@ -2084,6 +2158,8 @@ CRLF, for example.
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref 11xx-completion-def
 :END:
+
+- [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6mfh7/?utm_source=share&utm_medium=web2x&context=3][what are Vertico, Consult, Marginalia, Embark]]
 
 **** VERTico
 
@@ -2230,7 +2306,7 @@ Have =M-x= commands history across sessions
 #+end_src
 
 **** Marginalia
-[[https://github.com/minad/marginalia/][marginalia github]] | [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6mfh7/?utm_source=share&utm_medium=web2x&context=3][what are Vertico, Consult, Marginalia, Embark]].
+- [[https://github.com/minad/marginalia/][marginalia github]]
 #+begin_src emacs-lisp
 ;; Enable richer annotations using the Marginalia package
 (setup (:package marginalia)
@@ -2266,17 +2342,6 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 (advice-add 'consult-org-heading :around #'consult--grep)
 #+end_example
 
-***** DONE Org mode heading folding/expanding on =consult-line= search not working
-*NOTE*: After liretal fckin months without clue. On a proper 3 focking minute
-search, the problem of =consult-line= not expanding org headings to show the
-matching line can be fixed with: =(setq org-fold-core-style 'overlays)=
-# [2022-08-11 Thu 06:07:42 -03]
-See [[https://github.com/minad/consult/issues/563][Issue #563 · minad/consult · GitHub]].
-
-PS: A few weeks ago, adjusting the loading of org appear to outside of
-=setup org= fixed it without changing =org-fold-core-style=, further testing.
-# [2022-11-27 Sun 13:33:37 -03]
-
 **** Embark
 [[https://github.com/oantolin/embark#quick-start][Embark#Quick start]]
 #+begin_src emacs-lisp
@@ -2299,33 +2364,26 @@ PS: A few weeks ago, adjusting the loading of org appear to outside of
 
 **** Corfu
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
-
-disable in org
-(use-package corfu
-  :config
-  (add-hook 'org-mode-hook (lambda() (corfu-mode -1))))
 #+begin_src emacs-lisp
 (setup (:package corfu
                  corfu-terminal)
 
   (:with-map corfu-map
-    (:bind "S-SPC" corfu-insert-separator ; was `self-insert-command'
-           )
+    (:bind "C-SPC" corfu-insert-separator)
     (:unbind "C-n"
-             "C-p"
-             ))
+             "C-p"))
   (:option corfu-cycle t
            corfu-auto t
-           corfu-auto-delay 0.01
-           corfu-auto-prefix 1
+           corfu-auto-delay 0.1
+           corfu-auto-prefix 2
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
-           lsp-completion-provider :none ; this otherwise conflicts with corfu
-           corfu-preview-current nil
-           )
+           ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
+           corfu-preview-current nil)
 
-  (:with-hook after-init-hook
-    (:hook global-corfu-mode))
+  ;; (:with-hook after-init-hook
+  ;;   (:hook global-corfu-mode))
+  (global-corfu-mode 1)
 
 
   ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
@@ -2340,25 +2398,10 @@ disable in org
       (setq-local corfu-echo-delay nil ;; Disable automatic echo and popup
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
-  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
+  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
+#+end_src
 
-  ;; move to minibuffer - #TODO void-variable corfu-map on startup
-  ;; (defun corfu-move-to-minibuffer ()
-  ;;   (interactive)
-  ;;   (when completion-in-region--data
-  ;;     (let ((completion-extra-properties corfu--extra)
-  ;;           completion-cycle-threshold completion-cycling)
-  ;;       (apply #'consult-completion-in-region completion-in-region--data))))
-  ;; (keymap-set corfu-map "M-m" #'corfu-move-to-minibuffer)
-  ;; (add-to-list 'corfu-continue-commands #'corfu-move-to-minibuffer)
-
-  ;; (defun my/lsp-mode-setup-completion ()
-  ;;   (setf (alist-get 'styles (alist-get 'lsp-capf completion-category-defaults))
-  ;;         '(orderless))) ;; Configure orderless
-  ;; (:with-mode lsp-completion-mode
-  ;;   (:hook my/lsp-mode-setup-completion))
-  )
-
+#+begin_src emacs-lisp
 (setup (:package prescient corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
@@ -2366,11 +2409,14 @@ disable in org
   (:option prescient-persist-mode t))
 #+end_src
 
-**** TODO Cape: Completion extensions!
-#wizard src [[https://github.com/minad/cape][minad/cape: 🦸cape.el - Completion At Point Extensions]] | thanks [[https://kisaragi-hiu.com/switching-to-corfu.html][Switching to Corfu - Kisaragi Hiu]].
+**** Cape: Completion extensions!
+- [[https://github.com/minad/cape][minad/cape: 🦸cape.el - Completion At Point Extensions]]
+- [[https://kisaragi-hiu.com/switching-to-corfu.html][Switching to Corfu - Kisaragi Hiu]].
 # [2022-12-01 Thu 01:46:10 -03]
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
+#+begin_src emacs-lisp
+;; Add extensions
 (use-package cape
+  :ensure t
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
   :bind (("C-c p p" . completion-at-point) ;; capf
@@ -2379,19 +2425,22 @@ disable in org
          ("C-c p h" . cape-history)
          ("C-c p f" . cape-file)
          ("C-c p k" . cape-keyword)
-         ("C-c p s" . cape-symbol)
+         ("C-c p s" . cape-elisp-symbol)
+         ("C-c p e" . cape-elisp-block)
          ("C-c p a" . cape-abbrev)
-         ("C-c p i" . cape-ispell)
          ("C-c p l" . cape-line)
          ("C-c p w" . cape-dict)
+         ("C-c p :" . cape-emoji)
          ("C-c p \\" . cape-tex)
          ("C-c p _" . cape-tex)
          ("C-c p ^" . cape-tex)
          ("C-c p &" . cape-sgml)
          ("C-c p r" . cape-rfc1345))
-
   :init
-  ;; Add `completion-at-point-functions', used by `completion-at-point'.
+  ;; Add to the global default value of `completion-at-point-functions' which is
+  ;; used by `completion-at-point'.  The order of the functions matters, the
+  ;; first function returning a result wins.  Note that the list of buffer-local
+  ;; completion functions takes precedence over the global list.
   (add-to-list 'completion-at-point-functions #'cape-dabbrev)
   (add-to-list 'completion-at-point-functions #'cape-file)
   (add-to-list 'completion-at-point-functions #'cape-elisp-block)
@@ -2402,60 +2451,37 @@ disable in org
   ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
   ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
   ;;(add-to-list 'completion-at-point-functions #'cape-dict)
-  ;;(add-to-list 'completion-at-point-functions #'cape-symbol)
+  ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
-  )
-
-;; #FIXME-ERROR-20240122 cape-capf-predicate void function
-;; Super CAPF for emacs-lisp modes: See [[https://github.com/minad/corfu/wiki#using-cape-to-tweak-and-combine-capfs][Home · minad/corfu Wiki]]
-;; (defun my/ignore-elisp-keywords (cand)
-;;    (or (not (keywordp cand))
-;;   (eq (char-after (car completion-in-region--data)) ?:)))
-
-;;  (defun my/setup-elisp ()
-;;    (setq-local completion-at-point-functions
-;;     `(,(cape-super-capf
-;;         (cape-capf-predicate
-;;          #'elisp-completion-at-point
-;;          #'my/ignore-elisp-keywords)
-;;         #'cape-dabbrev)
-;;       cape-file)
-;;     cape-dabbrev-min-length 5))
-;; (add-hook 'emacs-lisp-mode-hook #'my/setup-elisp)
+)
 #+end_src
 
 **** YASnippet
-[[https://github.com/joaotavora/yasnippet][joaotavora/yasnippet: A template system for Emacs]].
-[[https://joaotavora.github.io/yasnippet/snippet-development.html][Writing snippets]]
+- [[https://github.com/joaotavora/yasnippet][joaotavora/yasnippet: A template system for Emacs]].
+- [[https://joaotavora.github.io/yasnippet/snippet-development.html][Writing snippets]]
 #+begin_src emacs-lisp
 (setup (:package yasnippet)
-  ;; (:disabled)
   (:hide-mode yas-minor-mode)
-
-  ;; Haskell
   (:package haskell-snippets)
-  ;; Provided snippets are:
-  ;;       new  - newtype
-  ;;       mod  - module [simple, exports]
-  ;;       main - main module and function
-  ;;       let  - let bindings
-  ;;       lang - language extension pragmas
-  ;;       opt  - GHC options pragmas
-  ;;       \    - lambda function
-  ;;       inst - instance declairation
-  ;;       imp  - import modules [simple, qualified]
-  ;;       if   - if conditional [inline, block]
-  ;;       <-   - monadic get
-  ;;       fn   - top level function [simple, guarded, clauses]
-  ;;       data - data type definition [inline, record]
-  ;;       =>   - type constraint
-  ;;       {-   - block comment
-  ;;       case - case statement
-
-  ;; (:global "C-M-i" )
-  (yas-global-mode)
-  )
+  (yas-global-mode))
 #+end_src
+- Haskell provided snippets are:
+  + new  - newtype
+  + mod  - module [simple, exports]
+  + main - main module and function
+  + let  - let bindings
+  + lang - language extension pragmas
+  + opt  - GHC options pragmas
+  + \    - lambda function
+  + inst - instance declairation
+  + imp  - import modules [simple, qualified]
+  + if   - if conditional [inline, block]
+  + <-   - monadic get
+  + fn   - top level function [simple, guarded, clauses]
+  + data - data type definition [inline, record]
+  + =>   - type constraint
+  + {-   - block comment
+  + case - case statement
 **** TempEl
 [[https://github.com/minad/tempel][minad/tempel: TempEl - Simple templates for Emacs]].
 See the example template file: [[https://github.com/minad/tempel#template-file-format][minad/tempel: TempEl - Simple templates for Emacs]].
@@ -2577,7 +2603,7 @@ See [[*Corfu][Corfu]].
 #+end_src
 ** 11xx-ui.el: User Interface settings
 
-#+begin_src emacs-lisp :tangle 11xx/11xx-ui.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-ui.el :noweb yes
 <<11xx-ui-def>>
 
 (provide '11xx-ui)
@@ -2732,7 +2758,8 @@ Load theme based on Dark or Light system theme:
     =~/.config/xdg-desktop-portal/portals.conf= has to override
     =org.freedesktop.impl.portal.Settings= to use darkman's
     implementation, e.g.:
-    See [[file:~/.config/darkman/README.org::*Making Darkman portal implementation work on minimal setups][Making Darkman portal implementation work on minimal setups]].
+    See [[file:~/.config/darkman/README.org::#mikqkqvzuui][Making Darkman portal implementation work on minimal setups]].
+
     #+begin_example
     [preferred]
     org.freedesktop.impl.portal.Settings=darkman
@@ -2832,7 +2859,7 @@ Fira Code Symbol externally.
 
 ** 11xx-half-scroll.el
 Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswiki.org/Half Scrolling]]
-#+begin_src emacs-lisp :tangle 11xx/11xx-half-scroll.el
+#+begin_src emacs-lisp :tangle lisp/11xx-half-scroll.el
 ;; source https://www.emacswiki.org/emacs/HalfScrolling
 (defun window-half-height ()
   (max 1 (/ (1- (window-height (selected-window))) 2)))
@@ -2878,7 +2905,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
   + [[https://www.emacswiki.org/emacs/SmoothScrolling#h5o-1][EmacsWiki: Smooth Scrolling]]
   + [[https://stackoverflow.com/questions/1128927/how-to-scroll-line-by-line-in-gnu-emacs/1128948#1128948][How to scroll line by line in GNU Emacs? - Stack Overflow]]
 
-#+begin_src emacs-lisp :tangle 11xx/11xx-pixel-scroll.el
+#+begin_src emacs-lisp :tangle lisp/11xx-pixel-scroll.el
 (setup pixel-scroll
   ;; (:only-if (display-graphic-p))
   (pixel-scroll-precision-mode)
@@ -2894,7 +2921,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 
 ** 11xx-navigation.el: Controlling Emacs
 
-#+begin_src emacs-lisp :tangle 11xx/11xx-navigation.el :noweb yes
+#+begin_src emacs-lisp :tangle lisp/11xx-navigation.el :noweb yes
 <<11xx-navigation-def>>
 
 (provide '11xx-navigation)
@@ -2989,24 +3016,6 @@ This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
 #+end_src
 https://blog.d46.us/advanced-emacs-startup/
 
-*** Exporting
-**** htmlize
-[[https://emacs.stackexchange.com/questions/3374/set-the-background-of-org-exported-code-blocks-according-to-theme/3512#3512][wizard src]]
-#+begin_src emacs-lisp
-(setup (:package htmlize)
-  (:option org-html-htmlize-output-type 'css ; 'inline-css
-           htmlize-html-charset "utf-8"))
-#+end_src
-# ;; (defun my-org-inline-css-hook (exporter)
-# ;;   "Insert custom inline css"
-# ;;   (when (eq exporter 'html)
-# ;;     (let ((my-pre-bg (face-background 'default)))
-# ;;       (setq org-html-head-include-default-style nil)
-# ;;       (setq org-html-head
-# ;;             (format "<style type=\"text/css\">\n pre.src { background-color: %s;}</style>\n" my-pre-bg)))))
-
-# ;; ;; (add-hook 'org-export-before-processing-hook 'my-org-inline-css-hook)
-
 *** LaTeX
 For math and chemestry equations and notations.
 # [2022-12-07 Wed 09:15:05 -03]
@@ -3088,4 +3097,17 @@ Remember to consider the security implications of using a wildcard
 character for the username, as it allows any username to match and
 retrieve the password.
 
+* File Local Variables                                             :noexport:
+# Local Variables:
+# End:
+#+begin_src emacs-lisp :tangle no :noweb-ref dummy
+;; setting this as buffer local doesn't work for tangling
+(add-hook 'org-babel-post-tangle-hook
+          (lambda nil
+            (add-file-local-variable-prop-line 'lexical-binding t)
+            (save-buffer))
+          nil nil)
 
+(setq org-babel-post-tangle-hook nil)
+;; (makunbound 'org-babel-post-tangle-hook)
+#+end_src

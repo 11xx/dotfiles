@@ -13,16 +13,8 @@
 (setup (:package pkgbuild-mode))
 (setup (:package powershell))
 (setup (:package yuck-mode))
-;; #TODO use builtin tree-sitter
-;; (setup tree-sitter
-;;        (:package tree-sitter-langs tree-sitter-indent)
-;;   (:with-hook (;; after adding a new hook, reboot Emacs for it to work on
-;;                ;; org-mode.
-;;                c-mode-common-hook
-;;                ;; sh-mode-hook
-;;                python-mode-hook
-;;                haskell-mode-hook)
-;;     (:hook tree-sitter-hl-mode)))
+(add-to-list 'treesit-extra-load-path
+             (expand-file-name "tree-sitter" user-emacs-directory))
 (setup (:package rainbow-mode)
   (:hook-into css-mode))
 (define-minor-mode sensitive-mode
@@ -158,16 +150,6 @@ using the function `compile' build a command like:
 (with-eval-after-load 'cc-mode
   (define-key c-mode-base-map (kbd "C-c '") #'f/c-comp-and-run)
   (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
-(setup (:package ob-rust)
-  (:load-after org)
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   (append org-babel-load-languages
-           '((haskell . t)
-             ;; (async   . t) ; from ob-async
-             (shell   . t)
-             (C       . t))))
-  )
 (setup (:package lua-mode))
 (setup picard-mode)
 

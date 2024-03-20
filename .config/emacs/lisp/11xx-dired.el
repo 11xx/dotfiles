@@ -1,6 +1,5 @@
 (require '11xx-setup)
 
-;; (lambda () (interactive) (find-alternate-file ".."))
 (defun dired-find-alternate-file-up ()
   "Sames as `dired-find-alternate-file' but go up one directory instead."
   (interactive)
@@ -15,7 +14,8 @@ The app is chosen from your OS's preference."
     (mapc
      (lambda (file-path)
        (let ((process-connection-type nil))
-         (start-process "" nil "launch" file-path))) file-list)))
+         (start-process "" nil "launch" file-path)))
+     file-list)))
 ;; default terminal application path
 (defvar v/terminal (getenv "TERMINAL")
   "The default terminal environment vairable.")

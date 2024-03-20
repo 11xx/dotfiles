@@ -144,3 +144,35 @@ hmmm http://www.makble.com/emacs-font-lock-how-to-highlight-multiline-text
 dream at =\$noop(((.|\n)*).*)= https://regexr.com
 nuuh https://stackoverflow.com/questions/159118/how-do-i-match-any-character-across-multiple-lines-in-a-regular-expression
 
+* picard-ts-mode
+#+begin_src emacs-lisp
+(require 'picard-mode)
+
+(defun taggerscript-ts-setup ()
+  ;; (setq-local treesit-font-lock-settings
+  ;;             (apply #'treesit-font-lock-rules))
+
+  (treesit-font-lock-rules
+ :language 'html
+ :override t
+ :feature 'delimiter
+ '([ "<" ">" "/>" "</"] @font-lock-bracket-face)
+
+ :language 'html
+ :override t
+ :feature 'comment
+ '((comment) @font-lock-comment-face))
+
+  (treesit-major-mode-setup))
+
+(define-derived-mode taggerscript-ts-mode picard-mode "TaggerScript[ts]"
+  "Major mode for editing Tagger with tree-sitter."
+
+  (setq-local font-lock-defaults nil)
+  (when (treesit-ready-p 'taggerscript)
+    (treesit-parser-create 'taggerscript)
+    (taggerscript-ts-setup)))
+
+(provide 'picard-ts-mode)
+#+end_src
+

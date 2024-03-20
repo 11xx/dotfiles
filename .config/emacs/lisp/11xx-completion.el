@@ -46,6 +46,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;; vertico-resize t
            ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
            vertico-cycle t)
+
   (setopt read-extended-command-predicate #'command-completion-default-include-p
           enable-recursive-minibuffers t
           completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
@@ -54,11 +55,9 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                                          t
                                          cursor-intangible
                                          t face minibuffer-prompt))
+
   (:with-hook after-init-hook
-    (:hook vertico-mode))
-  ;; vertico-reverse-mode
-  ;; (:hook-into after-init)
-  )
+    (:hook vertico-mode)))
 (setopt read-extended-command-predicate #'command-completion-default-include-p
         enable-recursive-minibuffers t
         completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
@@ -151,23 +150,21 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                  corfu-terminal)
 
   (:with-map corfu-map
-    (:bind "S-SPC" corfu-insert-separator ; was `self-insert-command'
-           )
+    (:bind "C-SPC" corfu-insert-separator)
     (:unbind "C-n"
-             "C-p"
-             ))
+             "C-p"))
   (:option corfu-cycle t
            corfu-auto t
-           corfu-auto-delay 0.01
-           corfu-auto-prefix 1
+           corfu-auto-delay 0.1
+           corfu-auto-prefix 2
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
-           lsp-completion-provider :none ; this otherwise conflicts with corfu
-           corfu-preview-current nil
-           )
+           ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
+           corfu-preview-current nil)
 
-  (:with-hook after-init-hook
-    (:hook global-corfu-mode))
+  ;; (:with-hook after-init-hook
+  ;;   (:hook global-corfu-mode))
+  (global-corfu-mode 1)
 
 
   ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
@@ -182,57 +179,56 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
       (setq-local corfu-echo-delay nil ;; Disable automatic echo and popup
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
-  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
-
-  ;; move to minibuffer - #TODO void-variable corfu-map on startup
-  ;; (defun corfu-move-to-minibuffer ()
-  ;;   (interactive)
-  ;;   (when completion-in-region--data
-  ;;     (let ((completion-extra-properties corfu--extra)
-  ;;           completion-cycle-threshold completion-cycling)
-  ;;       (apply #'consult-completion-in-region completion-in-region--data))))
-  ;; (keymap-set corfu-map "M-m" #'corfu-move-to-minibuffer)
-  ;; (add-to-list 'corfu-continue-commands #'corfu-move-to-minibuffer)
-
-  ;; (defun my/lsp-mode-setup-completion ()
-  ;;   (setf (alist-get 'styles (alist-get 'lsp-capf completion-category-defaults))
-  ;;         '(orderless))) ;; Configure orderless
-  ;; (:with-mode lsp-completion-mode
-  ;;   (:hook my/lsp-mode-setup-completion))
-  )
-
+  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
 (setup (:package prescient corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
     (:hook corfu-prescient-mode))
   (:option prescient-persist-mode t))
+;; Add extensions
+(use-package cape
+  :ensure t
+  ;; Bind dedicated completion commands
+  ;; Alternative prefix keys: C-c p, M-p, M-+, ...
+  :bind (("C-c p p" . completion-at-point) ;; capf
+         ("C-c p t" . complete-tag)        ;; etags
+         ("C-c p d" . cape-dabbrev)        ;; or dabbrev-completion
+         ("C-c p h" . cape-history)
+         ("C-c p f" . cape-file)
+         ("C-c p k" . cape-keyword)
+         ("C-c p s" . cape-elisp-symbol)
+         ("C-c p e" . cape-elisp-block)
+         ("C-c p a" . cape-abbrev)
+         ("C-c p l" . cape-line)
+         ("C-c p w" . cape-dict)
+         ("C-c p :" . cape-emoji)
+         ("C-c p \\" . cape-tex)
+         ("C-c p _" . cape-tex)
+         ("C-c p ^" . cape-tex)
+         ("C-c p &" . cape-sgml)
+         ("C-c p r" . cape-rfc1345))
+  :init
+  ;; Add to the global default value of `completion-at-point-functions' which is
+  ;; used by `completion-at-point'.  The order of the functions matters, the
+  ;; first function returning a result wins.  Note that the list of buffer-local
+  ;; completion functions takes precedence over the global list.
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-elisp-block)
+  ;;(add-to-list 'completion-at-point-functions #'cape-history)
+  ;;(add-to-list 'completion-at-point-functions #'cape-keyword)
+  ;;(add-to-list 'completion-at-point-functions #'cape-tex)
+  ;;(add-to-list 'completion-at-point-functions #'cape-sgml)
+  ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
+  ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
+  ;;(add-to-list 'completion-at-point-functions #'cape-dict)
+  ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
+  ;;(add-to-list 'completion-at-point-functions #'cape-line)
+)
 (setup (:package yasnippet)
-  ;; (:disabled)
   (:hide-mode yas-minor-mode)
-
-  ;; Haskell
   (:package haskell-snippets)
-  ;; Provided snippets are:
-  ;;       new  - newtype
-  ;;       mod  - module [simple, exports]
-  ;;       main - main module and function
-  ;;       let  - let bindings
-  ;;       lang - language extension pragmas
-  ;;       opt  - GHC options pragmas
-  ;;       \    - lambda function
-  ;;       inst - instance declairation
-  ;;       imp  - import modules [simple, qualified]
-  ;;       if   - if conditional [inline, block]
-  ;;       <-   - monadic get
-  ;;       fn   - top level function [simple, guarded, clauses]
-  ;;       data - data type definition [inline, record]
-  ;;       =>   - type constraint
-  ;;       {-   - block comment
-  ;;       case - case statement
-
-  ;; (:global "C-M-i" )
-  (yas-global-mode)
-  )
+  (yas-global-mode))
 (setup (:package tempel)
 
   ;; Require trigger prefix before template name when completing.

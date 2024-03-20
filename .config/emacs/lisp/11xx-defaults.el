@@ -1,8 +1,8 @@
-;; (require '11xx-package)
 (require '11xx-setup)
 (require '11xx-functions)
+(require 'init-no-littering)
 
-(require 'utf8-default)
+(require 'utf-8-default)
 (setup emacs
   ;; Keybindings
   (:global
@@ -106,15 +106,9 @@
                messages-buffer-mode-hook
                diff-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
-(use-package syntax-subword
-  :disabled
-  :ensure t)
-;; (:with-mode global-subword-mode
-;;   (:hide-mode global-subword-mode)
-;;   (:hook-into after-init))
-;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
-;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
-;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
+(setup (:package syntax-subword)
+  (:hide-mode global-subword-mode)
+  (add-hook 'after-init-hook #'global-syntax-subword-mode))
 (setup (:package ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
   (:global "M-o" ace-window))
@@ -152,16 +146,6 @@
   :ensure t)
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
-;;; Disabling this, uncomment if necessary
-
-;; (defun f/check-file-touch (file)
-;;   "Check if FILE exists and create it if it doesn't.
-
-;; It uses `make-empty-file' PARENTS argument 't'."
-;;   (if (not (file-exists-p file))
-;;       (make-empty-file file)))
-
-;; (f/check-file-touch custom-file)
 (load custom-file 'noerror 'nomessage)
 (setup (:package async))
 (setup (:package detached)

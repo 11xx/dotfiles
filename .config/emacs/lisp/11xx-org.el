@@ -1,79 +1,14 @@
 ;; -*- lexical-binding: t; -*-
 
-(defun org-babel-repeat-previous-src-block ()
-  "Copy previous src block excluding the content."
-  (interactive)
-  (let (result)
-    (save-excursion
-      (org-babel-previous-src-block)
-      (let ((element (org-element-at-point)))
-        (when (eq (car element) 'src-block)
-          (let* ((pl (cadr element))
-                 (lang (plist-get pl :language))
-                 (switches (plist-get pl :switches))
-                 (parms (plist-get pl :parameters)))
-            (setq result
-                  (format
-                   (concat "\n#+begin_src %s\n"
-                           "\n"
-                           "#+end_src\n")
-                   (mapconcat #'identity
-                              (delq nil (list lang switches parms))
-                              " ")))))))
-    (and result (insert result))
-    (forward-line -2))
-  (recenter-top-bottom))
-(defun f/eval-string (string)
-  "Read STRING and evaluate its lisp expression.
+(require '11xx-org-functions)
 
-Returns STRING if it doesn't start with \"(\"."
-  (if (string-match-p "^(" string)
-      (eval (read string))
-    string))
-
-(defun tdir (&optional path)
-  "Expand PATH given to \"tangle-dir\" property.
-
-If the \"tangle-dir\" property exists and is a directory, return the
-expanded directory path concatenated with the provided PATH.
-
-If the property exists and is an expression, evaluate it and return the
-expanded result.
-
-If the property is not found, use the base directory of the current
-buffer concatenated with the provided PATH."
-  (let ((dir (string-trim (f/eval-string (org-entry-get nil "tangle-dir" t)) nil "/"))
-        (file (if path (string-trim path "/" nil))))
-    (if dir
-        (expand-file-name file dir)
-      (error
-       "tdir failed in getting a directory. Aborting tangle from '%s'."
-       (buffer-file-name)))))
-;; override the default
-(with-eval-after-load 'org
-  (defun org-babel-noweb-wrap (&optional regexp)
-    "Return regexp matching a Noweb reference.
-
-Match any reference, or only those matching REGEXP, if non-nil.
-
-When matching, reference is stored in match group 1."
-    (rx-to-string
-     `(and (or "<<" "«")
-           (group
-            (not (or " " "\t" "\n"))
-            (? (*? any) (not (or " " "\t" "\n"))))
-           (or ">>" "»"))))
-
-  (defun f/org-babel-noweb-wrap-insert-chars ()
-    "Insert \"«\" and \"»\" "
-    (interactive)
-    (insert "«»")
-    (backward-char)))
 ;; (setup org
 ;;   ;; Disable angle bracket syntax highlighting/matching
 ;;   (:hook (lambda()
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
+
+;; (setup (:package org-contrib))
 
 (use-package org
   :bind (:map org-mode-map
@@ -93,7 +28,7 @@ When matching, reference is stored in match group 1."
    ("M-D" . backward-kill-word)
    ;; "M-h"   backward-delete-char ; was `org-mark-element'
    ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
-   )
+   ("C-c o p" . org-kill-full-outline-path))
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
@@ -102,13 +37,14 @@ When matching, reference is stored in match group 1."
          ("C-c o c" . org-capture))
 
   :config
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   (append org-babel-load-languages
-           '((haskell . t)
-             ;; (async   . t) ; from ob-async
-             (shell   . t)
-             (C       . t))))
+  ;; Move this to file local
+  ;; (org-babel-do-load-languages
+  ;;  'org-babel-load-languages
+  ;;  (append org-babel-load-languages
+  ;;          '((haskell . t)
+  ;;            ;; (async   . t) ; from ob-async
+  ;;            (shell   . t)
+  ;;            (C       . t))))
   ;; Disable angle bracket syntax highlighting/matching
   (add-hook 'org-mode-hook
             (lambda()
@@ -219,6 +155,6 @@ When matching, reference is stored in match group 1."
   ;; Toggle for links display set in (setup org)
   :custom ((org-appear-autolinks 'just-brackets)) ; nil is default
   :hook org-mode)
-(setq org-fold-core-style 'text-properties)
+(setopt org-fold-core-style 'text-properties)
 
 (provide '11xx-org)
