@@ -30,7 +30,7 @@ Here are some complete configuration examples:
 * init.el
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle init.el :export tangle
-:CUSTOM_ID: vwgsovkxqln
+:CUSTOM_ID: orgid-uvktht
 :END:
 
 Add subdirectory to load path containing custom modules.
@@ -1798,7 +1798,7 @@ If a `\\[universal-argument]' prefix is present FORCE is set to t."
 
 **** Random characters string
 :PROPERTIES:
-:CUSTOM_ID: kpshvwuiigm
+:CUSTOM_ID: orgid-vuivrg
 :END:
 
 - source https://stackoverflow.com/a/60790863
@@ -1829,7 +1829,7 @@ a limit of 530, more than that and lisp nesting will overflow."
 
 ** 11xx-dired.el
 :PROPERTIES:
-:CUSTOM_ID: lzvlgsmyjux
+:CUSTOM_ID: orgid-wlgppl
 :END:
 *** Provide
 #+begin_src emacs-lisp :tangle lisp/11xx-dired.el :noweb yes
@@ -2755,8 +2755,7 @@ Load theme based on Dark or Light system theme:
     =~/.config/xdg-desktop-portal/portals.conf= has to override
     =org.freedesktop.impl.portal.Settings= to use darkman's
     implementation, e.g.:
-    See [[file:~/.config/darkman/README.org::#mikqkqvzuui][Making Darkman portal implementation work on minimal setups]].
-
+    See [[file:~/.config/darkman/README.org::#orgid-ohmzyr][Making Darkman portal implementation work on minimal setups]].
     #+begin_example
     [preferred]
     org.freedesktop.impl.portal.Settings=darkman
