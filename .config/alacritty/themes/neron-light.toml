@@ -1,0 +1,44 @@
+[colors.primary]
+background = "#ffffff"
+bright_foreground = "#f6f6f6"
+foreground = "#545e62"
+
+[colors.normal]
+black = "#000000"
+blue = "#1e5ca8"
+cyan = "#006861"
+green = "#316900"
+magenta = "#b30071"
+red = "#ba0d0d"
+# white = "#929595" wrong contrast
+white = "#5e5c5a"
+yellow = "#755800" # much better
+
+[colors.bright]
+black = "#908c8c" # halved so 3.33
+blue = "#0656c6"
+cyan = "#63abff"
+green = "#00ffaa" # "#1c6b00"
+magenta = "#9107D1"
+red = "#f66151"
+white = "#ffffff"
+yellow = "#615f12"
+
+[colors.dim]
+black = "#cccccc"
+blue = "#1e5ca8"
+cyan = "#1694ab"
+green = "#456600" # "#529f05" # #376647
+magenta = "#8c465e"
+red = "#cb7370"
+white = "#7d8380"
+yellow = "#725740"
+
+
+[colors.cursor]
+cursor = "#3d5a9e"
+text = "#ffffff"
+
+[colors.selection]
+background = "#5a30f3"
+text = "#ffffff"

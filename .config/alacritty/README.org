@@ -1,0 +1,245 @@
+#+TITLE: Alacritty terminal
+
+* Config file
+:PROPERTIES:
+:header-args:toml: :tangle alacritty.toml
+:END:
+
+#+begin_src toml
+# only full paths are supported
+import = [ "~/.config/alacritty/themes/neron-light.toml" ]
+
+[env]
+TERM = "xterm-256color"
+
+[font]
+# draw_bold_text_with_bright_colors = false
+size = 11
+
+[font.bold]
+family = "Literation Mono Nerd Font"
+style = "Bold"
+
+[font.bold_italic]
+family = "Literation Mono Nerd Font"
+style = "Bold Italic"
+
+[font.italic]
+family = "Literation Mono Nerd Font"
+style = "Italic"
+
+[font.normal]
+family = "Literation Mono Nerd Font"
+style = "Regular"
+
+[keyboard]
+bindings = [
+{ action = "Paste", key = "Y", mode = "~Vi", mods = "Control|Alt" }
+, { action = "Copy", key = "W", mods = "Control|Alt" }
+, { action = "none", key = "Paste" }
+, { action = "none", key = "Copy" }
+, { action = "none", key = "Home", mode = "~Alt", mods = "Shift" }
+, { action = "none", key = "End", mode = "~Alt", mods = "Shift" }
+, { action = "none", key = "F", mode = "~Search", mods = "Control|Shift" }
+, { action = "none", key = "B", mode = "~Search", mods = "Control|Shift" }
+, { action = "none", key = "C", mode = "Vi|~Search", mods = "Control|Shift" }
+, { action = "none", key = "Insert", mods = "Shift" }
+# , { action = "none", key = "Key0", mods = "Control" }
+# , { action = "none", key = "Equals", mods = "Control" }
+# , { action = "none", key = "Plus", mods = "Control" }
+, { action = "none", key = "NumpadAdd", mods = "Control" }
+, { action = "none", key = "Minus", mods = "Control" }
+, { action = "none", key = "NumpadSubtract", mods = "Control" }
+, ]
+
+[mouse]
+bindings = [
+{ action = "Paste", mouse = "Middle" }
+, { action = "Copy", mouse = "Right" }
+]
+
+[scrolling]
+history = 10000
+multiplier = 3
+
+[window.dimensions]
+columns = 236
+lines = 50
+
+[window.padding]
+x = 12
+y = 12
+#+end_src
+
+* Themes
+
+** neron-dark
+:PROPERTIES:
+:header-args:toml: :tangle themes/neron-dark.toml
+:END:
+#+begin_src toml
+[colors.primary]
+background = "#18251b"
+foreground = "#a6a8a9"
+
+[colors.normal]
+black = "#414a44"
+blue = "#63abff"
+cyan = "#16b0cf"
+green = "#61bd00"
+magenta = "#ff77ce"
+red = "#f88785"
+white = "#929595"
+yellow = "#b8aa07"
+
+[colors.bright]
+black = "#555d58"
+blue = "#70AAEE"
+cyan = "#33AEC7"
+green = "#6FB922"
+magenta = "#ED81C7"
+red = "#E88E8C"
+white = "#a6a8a9"
+yellow = "#B4AA27"
+
+[colors.dim]
+black = "#2c382f"
+blue = "#5490D1"
+cyan = "#1694AB"
+green = "#529F05"
+magenta = "#D167AA"
+red = "#CB7370"
+white = "#7d8380"
+yellow = "#988F0B"
+
+[colors.cursor]
+cursor = "#4455bb"
+text = "#18251b"
+
+[colors.selection]
+background = "#63abff"
+text = "#18251b"
+#+end_src
+
+** neron-light
+:PROPERTIES:
+:header-args:toml: :tangle themes/neron-light.toml
+:END:
+
+# #TODO update bright, dim, cursor, selection
+# updated normal values # [2024-02-19 Mon 13:09:59 -03] @ak
+#+begin_src toml
+[colors.primary]
+background = "#ffffff"
+bright_foreground = "#f6f6f6"
+foreground = "#545e62"
+
+[colors.normal]
+black = "#000000"
+blue = "#1e5ca8"
+cyan = "#006861"
+green = "#316900"
+magenta = "#b30071"
+red = "#ba0d0d"
+# white = "#929595" wrong contrast
+white = "#5e5c5a"
+yellow = "#755800" # much better
+
+[colors.bright]
+black = "#908c8c" # halved so 3.33
+blue = "#0656c6"
+cyan = "#63abff"
+green = "#00ffaa" # "#1c6b00"
+magenta = "#9107D1"
+red = "#f66151"
+white = "#ffffff"
+yellow = "#615f12"
+
+[colors.dim]
+black = "#cccccc"
+blue = "#1e5ca8"
+cyan = "#1694ab"
+green = "#456600" # "#529f05" # #376647
+magenta = "#8c465e"
+red = "#cb7370"
+white = "#7d8380"
+yellow = "#725740"
+
+
+[colors.cursor]
+cursor = "#3d5a9e"
+text = "#ffffff"
+
+[colors.selection]
+background = "#5a30f3"
+text = "#ffffff"
+#+end_src
+
+# (c/bg      "#ffffff"
+# (c/fg      "#545e62"
+# (c/current "#fdf6df"
+# (c/comment "#a0a1a7"
+# (c/cyan    "#006861"
+# (c/green   "#1c6b00"
+# (c/orange  "#964505"
+# (c/pink    "#b30071"
+# (c/purple  "#4d2eff"
+# (c/red     "#ba0d0d"
+# (c/yellow  "#615f0b"
+# (c/blue    "#0353c6"
+# (c/cursor  "#3d51c2"
+# (c/warning "#7a5524"
+# ;; Other colors
+# (c/invisible-fg "#868787"
+# (c/invisible-bg "#f6f6f6"
+# (c/bg-term-pink "#2a1e2b"
+# ;; (bg2             "#333333"
+# ;; (bg3             "#1c1c1c"
+# ;; (bg3         "#1F2130"
+# (c/bg-term-green "#18251b"
+# ;;         background: '#18251b'
+# (c/bg-616           "#f6f6f6")                          ; 616 ratio
+# (c/white "#929595" "#878787" "white")
+# (c/black "#414a44" "#5f5f5f" "black")
+# (c/bg-diff-added "#152615" "#005f00" "green")
+# (c/bg-diff-removed "#301d1e" "#ff8787" "red")
+# (c/bg-light-blue "#d1fffd")
+
+
+# { # "name": "Neron Dark",
+# "background": "#18251B",
+# "foreground": "#A6A8A9",
+# "black": "#414A44",
+# "blue": "#63ABFF",
+# "cyan": "#16B0CF",
+# "green": "#61BD00",
+# "purple": "#FF77CE",
+# "red": "#F88785",
+# "selectionBackground": "#63ABFF",
+# "white": "#929595",
+# "yellow": "#B8AA07"
+# "cursorColor": "#4455BB",
+# },
+# {
+# "background": "#FFFFFF",
+# "black": "#414A44",
+# "blue": "#0353C6",
+# "brightBlack": "#555753",
+# "brightBlue": "#0353C6",
+# "brightCyan": "#006861",
+# "brightGreen": "#1C6B00",
+# "brightPurple": "#B30071",
+# "brightRed": "#BA0D0D",
+# "brightWhite": "#929595",
+# "brightYellow": "#615F0B",
+# "cursorColor": "#3D51C2",
+# "cyan": "#006861",
+# "foreground": "#545E62",
+# "green": "#1C6B00",
+# "name": "Neron Light",
+# "purple": "#B30071",
+# "red": "#BA0D0D",
+# "selectionBackground": "#FDF6DF",
+# "white": "#929595",
+# "yellow": "#615F0B"
+# },
