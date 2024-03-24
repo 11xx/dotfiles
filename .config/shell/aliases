@@ -1,0 +1,89 @@
+alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'
+
+alias pac='sudo /usr/bin/pacman -S'
+alias pacss='/usr/bin/pacman -Ss'
+alias pacssq='/usr/bin/pacman -Ssq'
+alias pacsyu='sudo /usr/bin/pacman -Syu'
+alias paruss='paru -Ss'
+alias pacrcsn='sudo /usr/bin/pacman -Rcsn'
+alias pacrsn='sudo /usr/bin/pacman -Rsn'
+alias pacrcn='sudo /usr/bin/pacman -Rcn'
+alias update='pacsyu; paru'
+alias pacqs='/usr/bin/pacman -Qs'
+alias pacqi='/usr/bin/pacman -Qi'
+alias pacsi='/usr/bin/pacman -Si'
+alias parusi='paru -Si'
+alias pacqo='/usr/bin/pacman -Qo'
+alias pacqi='/usr/bin/pacman -Qi'
+alias pacf='/usr/bin/pacman -F'
+alias pacfy='/usr/bin/pacman -Fy'
+
+alias sd="systemctl"
+alias sdu="systemctl --user"
+alias cheers='sudo systemctl start radarr sonarr prowlarr sabnzbd qbittorrent-nox jellyfin cmedia cmedia-merger'
+alias suspend='systemctl suspend'
+
+# alias sudo='doas'
+alias doas=sudo
+
+alias cp="cp -vi"
+alias mv="mv -vi"
+alias e="$EDITOR"
+alias re="sudo $EDITOR"
+alias m="ncmpcpp"
+alias a="aria2c"
+alias f="fzf"
+
+alias suwine="sudo -su wineuser"
+
+alias l='exa -lag --color=auto --group-directories-first --time-style long-iso'
+# alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
+alias cdsd='cd /etc/systemd/system'
+alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
+alias cdc='cd "$XDG_CONFIG_HOME"'
+alias cds='cd "$XDG_DATA_HOME"'
+alias cdcc='cd "$XDG_CACHE_HOME"'
+alias cdst='cd "$XDG_STATE_HOME"'
+alias cdconf='cd "$XDG_CONFIG_HOME"'
+alias cdshare='cd "$XDG_DATA_HOME"'
+alias cdcache='cd "$XDG_CACHE_HOME"'
+alias cdstate='cd "$XDG_STATE_HOME"'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias ......='cd ../../../../..'
+# no one should have that many children hehe
+
+alias mkdir='mkdir -pv'
+
+alias diff='diff --color=auto'
+alias grep='grep --color=auto'
+alias ip='ip -color=auto'
+
+alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
+
+alias alarm='ssh -p 1111 alarm@alarm'
+
+alias pc='patool create'
+alias pe='patool extract'
+alias px='patool extract'
+alias pl='patool list'
+alias xs='xtosubdir'
+
+alias rgboff='sudo openrgb --device 0 -m off; sudo openrgb --device 1 -m off;'
+
+# I think --install-method=copy --enable-executable-static are default now
+alias cidist='cabal install --overwrite-policy=always --installdir=dist'
+alias ci.='cabal install --overwrite-policy=always --installdir=.'
+# alias cabal-exe-minimal="cabal init -nm -l Unlicense --main-is=Main.hs --source-dir='' --application-dir='' --exe -x ''; cp $HOME/Code/UNLICENSE"
+
+alias gamma1='xrandr --output HDMI1 --gamma 1'
+alias gamma1.2='xrandr --output HDMI1 --gamma 1.222'
+alias gamma2='xrandr --output HDMI1 --gamma 1.222'
+alias monitors-setup-alias='nvidia-settings --assign CurrentMetaMode="DPY-1: 2560x1440_165 @2560x1440 +0+0 {ViewPortIn=2560x1440, ViewPortOut=2560x1440+0+0, ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}, DPY-3: 2560x1440_60 @2560x1440 +2560+0 {ViewPortIn=2560x1440, ViewPortOut=2560x1440+0+0, ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}"'
+
+alias b10='brightness 10'
+alias b30='brightness 30'
+alias b100='brightness 100'

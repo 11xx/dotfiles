@@ -1,0 +1,1357 @@
+#+title: Shell configurations
+#+description: General configuration defaults for all used shells.
+
+- Basic shell references:
+  + [[https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html][3.5.3 Shell Parameter Expansion]]
+  + [[https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html][3.4.2 Special Parameters]]
+  + [[https://www.computerhope.com/jargon/p/positional-parameter.htm][What is a Positional Parameter? - Computer Hope]]
+
+* =aliases=: Shell aliases
+:PROPERTIES:
+:header-args:shell: :tangle ~/.config/shell/aliases :mkdirp yes
+:END:
+
+[[https://www.youtube.com/watch?v=4v4Mcncvsac][Shell Aliases Every Linux User Needs - YouTube]]
+
+** Grub
+#+begin_src shell
+alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'
+#+end_src
+
+** Pacman & Paru
+#+begin_src shell
+alias pac='sudo /usr/bin/pacman -S'
+alias pacss='/usr/bin/pacman -Ss'
+alias pacssq='/usr/bin/pacman -Ssq'
+alias pacsyu='sudo /usr/bin/pacman -Syu'
+alias paruss='paru -Ss'
+alias pacrcsn='sudo /usr/bin/pacman -Rcsn'
+alias pacrsn='sudo /usr/bin/pacman -Rsn'
+alias pacrcn='sudo /usr/bin/pacman -Rcn'
+alias update='pacsyu; paru'
+alias pacqs='/usr/bin/pacman -Qs'
+alias pacqi='/usr/bin/pacman -Qi'
+alias pacsi='/usr/bin/pacman -Si'
+alias parusi='paru -Si'
+alias pacqo='/usr/bin/pacman -Qo'
+alias pacqi='/usr/bin/pacman -Qi'
+alias pacf='/usr/bin/pacman -F'
+alias pacfy='/usr/bin/pacman -Fy'
+#+end_src
+
+** Systemd
+#+begin_src shell
+alias sd="systemctl"
+alias sdu="systemctl --user"
+alias cheers='sudo systemctl start radarr sonarr prowlarr sabnzbd qbittorrent-nox jellyfin cmedia cmedia-merger'
+alias suspend='systemctl suspend'
+#+end_src
+
+** sudo vs doas
+# doas not worth on arch + emacs :c
+#+begin_src shell
+# alias sudo='doas'
+alias doas=sudo
+#+end_src
+
+** Launchers
+#+begin_src shell
+alias cp="cp -vi"
+alias mv="mv -vi"
+alias e="$EDITOR"
+alias re="sudo $EDITOR"
+alias m="ncmpcpp"
+alias a="aria2c"
+alias f="fzf"
+#+end_src
+# MPD
+# alias mpcl='mpc -p 7777'
+# alias ml="ncmpcpp -p 7777"
+
+** wine
+#+begin_src shell
+alias suwine="sudo -su wineuser"
+#+end_src
+
+** Navigation & listing
+#+begin_src shell
+alias l='exa -lag --color=auto --group-directories-first --time-style long-iso'
+# alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
+alias cdsd='cd /etc/systemd/system'
+alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
+alias cdc='cd "$XDG_CONFIG_HOME"'
+alias cds='cd "$XDG_DATA_HOME"'
+alias cdcc='cd "$XDG_CACHE_HOME"'
+alias cdst='cd "$XDG_STATE_HOME"'
+alias cdconf='cd "$XDG_CONFIG_HOME"'
+alias cdshare='cd "$XDG_DATA_HOME"'
+alias cdcache='cd "$XDG_CACHE_HOME"'
+alias cdstate='cd "$XDG_STATE_HOME"'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias ......='cd ../../../../..'
+# no one should have that many children hehe
+
+
+#+end_src
+
+** Directory
+#+begin_src shell
+alias mkdir='mkdir -pv'
+#+end_src
+
+** Colours
+#+begin_src shell
+alias diff='diff --color=auto'
+alias grep='grep --color=auto'
+alias ip='ip -color=auto'
+#+end_src
+
+** Git
+[[https://www.youtube.com/watch?v=tBoLDpTWVOM][Git Bare Repository - A Better Way To Manage Dotfiles]]
+#+begin_src shell
+alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
+#+end_src
+
+** SSH
+#+begin_src shell
+alias alarm='ssh -p 1111 alarm@alarm'
+#+end_src
+
+** Archives & Compressed files
+#+begin_src shell
+alias pc='patool create'
+alias pe='patool extract'
+alias px='patool extract'
+alias pl='patool list'
+alias xs='xtosubdir'
+#+end_src
+
+** Root commands without password
+# commands that require permissions from the =/etc/sudoers= file.
+Commands to be runned as root configured not to ask for password.
+
+#+begin_src shell
+alias rgboff='sudo openrgb --device 0 -m off; sudo openrgb --device 1 -m off;'
+#+end_src
+
+** Haskell
+#+begin_src shell
+# I think --install-method=copy --enable-executable-static are default now
+alias cidist='cabal install --overwrite-policy=always --installdir=dist'
+alias ci.='cabal install --overwrite-policy=always --installdir=.'
+# alias cabal-exe-minimal="cabal init -nm -l Unlicense --main-is=Main.hs --source-dir='' --application-dir='' --exe -x ''; cp $HOME/Code/UNLICENSE"
+#+end_src
+
+** Tools & Utilities
+*** Xorg
+# wayland lul # [2023-09-22 Fri 12:46:26 -03]
+#+begin_src shell
+alias gamma1='xrandr --output HDMI1 --gamma 1'
+alias gamma1.2='xrandr --output HDMI1 --gamma 1.222'
+alias gamma2='xrandr --output HDMI1 --gamma 1.222'
+alias monitors-setup-alias='nvidia-settings --assign CurrentMetaMode="DPY-1: 2560x1440_165 @2560x1440 +0+0 {ViewPortIn=2560x1440, ViewPortOut=2560x1440+0+0, ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}, DPY-3: 2560x1440_60 @2560x1440 +2560+0 {ViewPortIn=2560x1440, ViewPortOut=2560x1440+0+0, ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}"'
+#+end_src
+
+*** Monitor controls
+"=brightness=" is an AUR script. See [[file:~/org/arch-linux.org::*Change brightness from the command-line][Change brightness from the command-line]].
+#+begin_src shell
+alias b10='brightness 10'
+alias b30='brightness 30'
+alias b100='brightness 100'
+#+end_src
+
+* =profile=: Shell environment variables & user-login configuration
+:PROPERTIES:
+:header-args:shell: :tangle ~/.config/shell/profile
+:END:
+
+# https://github.com/BrodieRobertson/dotfiles/blob/master/.zshenv
+
+# User defined variables are in lowerCamelCase.
+
+
+** XDG Standard enviroment variables
+
+# For the XDG standard, the only less conventional one is =XDG_STATE_HOME=.
+# as of # [2022-11-30 Wed 16:41:29 -03].
+See [[https://stackoverflow.com/questions/25897836/where-should-i-write-a-user-specific-log-file-to-and-be-xdg-base-directory-comp/27965014#27965014][Where should I write a user specific log file to (and be XDG base directory compatible) - Stack Overflow]].
+
+#+begin_src shell
+export XDG_CACHE_HOME="$HOME/.local/cache"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_BIN_HOME="$HOME/.local/bin"
+#+end_src
+# # Export them
+# export XDG_CACHE_HOME XDG_CONFIG_HOME XDG_DATA_HOME
+# export XDG_STATE_HOME XDG_BIN_HOME
+# wtf? i dont remember what this is about
+# You can add this function to your shell =.bashrc= or =.bash_profile=
+# script, save, and then source the file with =source .bashrc= or =source
+# .bash_profile=, depending on where you added the function. You may then
+# invoke =export_vars= any time you wish to export the variables.
+
+** Additional PATH directories
+Function copied from =/etc/profile= to append argument to variable PATH:
+#+begin_src shell
+append_path () {
+    case ":$PATH:" in
+        ,*:"$1":*)
+        ;;
+        ,*)
+            PATH="${PATH:+$PATH:}$1"
+    esac
+}
+#+end_src
+
+Add local, user-space, package manager directories to PATH
+#+begin_src shell
+append_path "$XDG_DATA_HOME/cargo/bin"
+append_path "$XDG_DATA_HOME/cabal/bin"
+#+end_src
+# removed checks because it shouldn't matter? # [2023-11-18 Sat 18:06:24 -03]
+# [ -d "$XDG_DATA_HOME/cargo/bin" ] && # [ -d "$XDG_DATA_HOME/cabal/bin" ] &&
+
+More path directories
+#+begin_src shell
+append_path "$XDG_BIN_HOME"
+#+end_src
+
+See [[https://github.com/LukeSmithxyz/voidrice/blob/284b1078cb6231863244a1355dd08cd81be279a6/.config/shell/profile#L9][voidrice/profile at master · LukeSmithxyz/voidrice#L9]].
+Putting the directories in =XDG_BIN_HOME= /after/ PATH to make already present
+executables, e.g. from =/usr/bin=, take precedence.
+#+begin_src shell
+find_subdirs_xdg_bin_home_scalar() {
+    # scalar are single non-word-split values like value1:value2:value3
+    [ -d "$XDG_BIN_HOME" ] &&
+        find "$XDG_BIN_HOME" \
+             -mindepth 1 \
+             -maxdepth 1 \
+             -type d \
+             -not -name '.*' \
+             -printf %p:
+}
+#+end_src
+- where
+  + =-not -name '.*'= is to exclude directories (=-type d=) beggining with =.= (dot).
+  + =-mindepth 1= prevents the target directory =$XDG_BIN_HOME= itself from being included.
+    * See https://stackoverflow.com/a/13525005
+  + =-maxdepth 1= includes only first-level subdirectories of =$XDG_BIN_HOME=.
+
+Get the output of =find_subdirs_xdg_bin_home_scalar=, save it in a
+local variable (POSIX-style), remove any =:= at the end of it while
+appending to path with =append_path=. =unset= for good measure.
+#+begin_src shell
+[ -d "$XDG_BIN_HOME" ] && {
+    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_scalar)
+    append_path "${_xdg_bin_home_dirs%:}"
+    unset _xdg_bin_home_dirs
+}
+#+end_src
+
+# This came here because in earlier versions of this config when
+# adding subdirectories of XDG_BIN_HOME to PATH `-mindepth 1' wasn't
+# being used in find, leading to duplicates being added to PATH. But
+# leave it here just because it's redundant.
+# [2024-02-24 Sat 22:19:41 -03] @ak
+Remove duplicated from PATH without changing the order:
+See [[https://superuser.com/questions/449636/path-is-filled-with-duplicates/1321712#1321712][bash - $PATH is filled with duplicates - Super User]]
+#+begin_src shell
+PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
+#+end_src
+
+Finally, export PATH:
+#+begin_src shell
+export PATH
+#+end_src
+
+
+** Defending Home
+based on [[https://lobste.rs/s/3wntbx/practical_self_defense_against_scourge][Practical Self-Defense against the Scourge of Dot-Files | Lobsters]].
+#+begin_src shell
+export XAUTHORITY="$XDG_DATA_HOME"/xorg/Xauthority
+export XINITRC="$XDG_CONFIG_HOME"/X11/xinitrc
+export XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
+export GEM_PATH="$XDG_DATA_HOME/ruby/gems"
+export GEM_SPEC_CACHE="$XDG_DATA_HOME/ruby/specs"
+#+end_src
+
+NOTE: setting =GEM_HOME= now causes issues, in special the error:
+#+begin_example
+/usr/lib/ruby/3.0.0/rubygems.rb:265:in `find_spec_for_exe': can't find gem gemname (>= 0.a) with executable asciidoctor (Gem::GemNotFoundException)
+      from /usr/lib/ruby/3.0.0/rubygems.rb:284:in `activate_bin_path'
+      from /usr/bin/asciidoctor:25:in `<main>'
+#+end_example
+: export GEM_HOME="$XDG_DATA_HOME/ruby/gems"
+
+#+begin_src shell -r
+export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
+export NVM_DIR="$XDG_DATA_HOME"/nvm
+export GOPATH="$XDG_DATA_HOME"/go
+export GNUPGHOME="$XDG_DATA_HOME"/gnupg
+mkdir -p -m 700 "$GNUPGHOME"
+export _JAVA_OPTIONS=-Djava.util.prefs.userRoot="${XDG_CONFIG_HOME}"/java
+export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
+export CARGO_HOME="$XDG_DATA_HOME"/cargo
+export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
+#export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
+#export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
+#export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
+export TERMINFO="$XDG_DATA_HOME"/terminfo
+export TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
+
+# Haskell:
+export STACK_ROOT="$XDG_DATA_HOME"/stack
+export STACK_XDG=1
+export CABAL_DIR="$XDG_DATA_HOME"/cabal
+export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
+export XMONAD_CACHE_DIR="$XDG_CACHE_HOME"/xmonad
+export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
+export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
+
+export LESSHISTFILE="-"
+export WINEPREFIX="$XDG_DATA_HOME/wine/prefixes/default"
+export GRIPHOME="$XDG_CONFIG_HOME/grip"
+export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
+alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
+export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
+export MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
+export MAIL="$XDG_DATA_HOME"/mail # Mailutils
+export NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages # dotNet
+export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
+# ~/.slime: https://github.com/slime/slime/issues/610
+export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
+export UNISON="$XDG_DATA_HOME"/unison
+export PARALLEL_HOME="$XDG_CONFIG_HOME"/parallel
+export IPYTHONDIR="${XDG_CONFIG_HOME}"/ipython
+export ANDROID_HOME=${XDG_DATA_HOME}/android
+export CUDA_CACHE_PATH=${XDG_CACHE_HOME}/nv
+alias dosbox=dosbox -conf "$XDG_CONFIG_HOME"/dosbox/dosbox.conf
+export GRADLE_USER_HOME="$XDG_DATA_HOME"/gradle
+alias nvidia-settings='mkdir -p "${XDG_CONFIG_HOME}"/nvidia && nvidia-settings --config="$XDG_CONFIG_HOME"/nvidia/settings'
+# https://github.com/ansible/ansible/commit/d7fbde4ea9db6cc44e81c39d699595330f4fa3c6
+export ANSIBLE_HOME="$XDG_CACHE_HOME"/ansible
+export RUSTUP_HOME=${XDG_DATA_HOME}/rustup
+alias wget="wget --hsts-file=${XDG_DATA_HOME}/wget-hsts"
+#+end_src
+
+** Desktop Toolkit Theme
+*** Qt
+# export QT_STYLE_OVERRIDE=adwaita-dark # deprecated by qgnomeplatform:
+#+begin_src shell
+export QT_QPA_PLATFORMTHEME=gnome
+
+# export QT_WAYLAND_DECORATION=adwaita
+# provided by qadwaitadecorations-qt{5,6}-git, doesn't change Qt theme though
+#+end_src
+
+** Terminal Colors
+#+begin_src shell
+export MANPAGER="bat" # or "less -R --use-color -Dd+r -Du+b"
+export LESSOPEN="| /usr/bin/source-highlight-esc.sh %s"
+export LESS='-R --use-color -Dd+r$Du+b'
+export SYSTEMD_COLORS=256
+export TERM='xterm-256color' # TrueColor output
+export COLORTERM='truecolor'
+#+end_src
+
+** Default Apps
+Commands
+#+begin_src shell
+#export READER="zatura"
+export GIT_EDITOR='emacs-minimal -t git-floatWMRULE'
+export ALTERNATE_EDITOR='emacs-minimal -nw'
+export EDITOR="emacs-launcher -nw -m"
+export VISUAL="emacs-launcher -m"
+export TERMINAL=alacritty
+export BROWSER=firefox
+export VIDEO=mpv
+export IMAGE=qimgv
+export OPENER=launch
+export PAGER=bat
+export WM=Hyprland
+#+end_src
+
+** Import environment variables from systemd
+- See
+  [[https://github.com/systemd/systemd/issues/17180#issuecomment-723856129][systemd ignores $HOME/.config/environment.d/envvars.conf file · Issue #17180 · systemd/systemd]]
+  [[https://curiouscoding.nl/linux/environment-variables/][Environment variables done once · CuriousCoding]]
+  # [2023-02-19 Sun 03:28:04 -03]
+  [[https://wiki.archlinux.org/title/Environment_variables#:~:text=use systemd-environment-d-generator(8) to generate environment%2C][Environment variables - ArchWiki]]
+  # [2023-04-07 Fri 05:58:58 -03]
+
+Install =run-parts= to run all scripts within a directory.
+
+The check is to make sure the =30-systemd-environment-d-generator=
+program doesn't return an empty result, from having an empty or
+inexistent =environment.d= directory.
+#+begin_src shell
+ps -p 1 -o comm= | grep -q systemd &&
+    [ "$(/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator | wc -l)" != 0 ] &&
+    export $(run-parts /usr/lib/systemd/user-environment-generators/ | xargs)
+#+end_src
+Here, =xargs= separates the output of the scripts into a space-separated
+list of arguments.
+
+#+begin_src shell
+# check for duplicates in the PATH again
+PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
+#+end_src
+
+** NVIDIA hardware acceleration
+#+begin_src shell
+export MOZ_DISABLE_RDD_SANDBOX=1
+export LIBVA_DRIVER_NAME=nvidia
+export NVD_BACKEND=direct
+#+end_src
+# idk anything else but this just worked # [2023-03-23 Thu 18:20:00 -03]
+# ####
+# ## X11 only
+# export MOZ_X11_EGL=1 # this doesn't seem to work but `gfx.x11-egl.force-enabled = true' does
+
+# export MOZ_DRM_DEVICE=/dev/dri/renderD128 # testing not necessary with `libva-nvidia-driver' [AUR]
+# apparently this is all firefox need, testing # [2023-03-23 Thu 18:35:16 -03]
+# ps: for X11, testing wayland # [2023-03-31 Fri 08:19:39 -03]
+
+# ## Wayland only
+# moved these to built-in window manager's enviroment variables,
+# e.g. `env' keyword in Hyprland.
+# export EGL_PLATFORM=wayland # unset this when on X11
+# export MOZ_ENABLE_WAYLAND=1 # necessary otherwise Firefox will only try X11
+
+
+** Program specific settings
+*** LSP
+[[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP Mode - LSP support for Emacs]]
+
+#+begin_src shell
+export LSP_USE_PLISTS=true
+#+end_src
+
+* Zsh
+:PROPERTIES:
+:tangle-dir: (concat (xdg-config-home) "/shell")
+:END:
+
+[[https://apple.stackexchange.com/questions/388622/zsh-zprofile-zshrc-zlogin-what-goes-where][ZSH: .zprofile, .zshrc, .zlogin - What goes where?]]
+# [2022-04-14 Thu 23:25:18]
+
+# - Install zsh base extensions and font:
+#   + zsh-autosuggestions
+#   + zsh-history-substring-search
+#   + zsh-syntax-highlighting
+#   + zsh-theme-powerlevel10k
+#   + ttf-liberation-mono-nerd
+#   + noto-fonts-cjk
+#   + noto-fonts-emoji
+#   + noto-fonts
+
+** =.zprofile=: Login profile setup and $ZDOTDIR
+:PROPERTIES:
+:header-args:bash: :tangle (tdir "/.zprofile") :mkdirp yes
+:END:
+
+*** Autostart
+#+begin_src bash
+if [ "$(tty)" = "/dev/tty1" ] # check if it is the first tty login
+then
+    echo 'Autostart of window manager disabled.'
+    # pgrep "$WM" || "$WM"
+    # sx
+fi
+#+end_src
+
+** =.zshrc=
+:PROPERTIES:
+:header-args:bash: :tangle (tdir "/.zshrc") :mkdirp yes
+:END:
+
+*** TRAMP/dumb terminal check
+For some reason, specially on bigger configs split between [[*TRAMP/dumb terminal check][.zshrc]] and
+[[*=.zshenv=][.zshenv]], this needs to be checked on BOTH.
+#+NAME: tramp-dumb-terminal-check
+#+begin_src bash
+if [[ $TERM == "dumb" ]] || [[ -n $INSIDE_EMACS ]]; then
+    # NOTE: set this on BOTH `.zshrc' AND `.zshenv'
+    unsetopt zle
+    PS1='$ '
+    export HISTFILE=$HOME/.tramp_history
+    return
+fi
+#+end_src
+
+*** Debug / backtrace
+#+begin_src bash
+[[ -n $DEBUG ]] && set -x
+#+end_src
+
+*** Check if shell is interactive
+If not interactive don't load configuration file.
+#+begin_src bash
+[[ $- != *i* ]] && return
+#+end_src
+
+*** powerlevel10k
+- See
+  + [[https://github.com/romkatv/powerlevel10k#instant-prompt][romkatv/powerlevel10k#instant-prompt]]
+  + [[https://github.com/romkatv/powerlevel10k#how-do-i-configure-instant-prompt][romkatv/powerlevel10k#How-Do-I-Configure-Instant-Prompt]]
+
+#+NAME: powerlevel10k-header
+#+begin_src bash
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+# generated by powerlevel10k theme:
+# To customize prompt, run `p10k configure` or edit ~/.config/zsh/.p10k.zsh.
+[[ ! -f "${ZDOTDIR}"/.p10k.zsh ]] || source "${ZDOTDIR}"/.p10k.zsh
+#+end_src
+
+*** Colours
+https://github.com/garabik/grc
+Install =grc=.
+
+#+begin_src bash
+autoload -U colors && colors
+[[ -z $DEBUG ]] && [[ -s "/etc/grc.zsh" ]] && source /etc/grc.zsh
+#+end_src
+
+Source =LS_COLORS=. Some programs support it but default to something
+else when =LS_COLORS= is unset, e.g. =fd=. See [[https://github.com/sharkdp/fd/issues/368][Issue #368 · sharkdp/fd]].
+#+begin_src bash
+# use if check rather than <(..) redirection to save some startup ms
+LS_COLORS_ENV_FILE=${XDG_DATA_HOME}/LS_COLORS_ENV
+if [[ ! -s ${LS_COLORS_ENV_FILE} ]]; then
+    dircolors > "${LS_COLORS_ENV_FILE}"
+    source "${LS_COLORS_ENV_FILE}"
+else
+    source "${LS_COLORS_ENV_FILE}"
+fi
+# source <(dircolors)
+#+end_src
+
+**** TODO Customize how commands are highlighted using =zsh-syntax-highlighting=
+wizard [[https://github.com/zsh-users/zsh-syntax-highlighting/issues/464][How to change the highlight color??? · Issue #464 · zsh-users/zsh-syntax-highlighting]]
+
+Customizing =ZSH_HIGHLIGHT_STYLES= options
+#+begin_src bash :tangle no
+# if, for
+ZSH_HIGHLIGHT_STYLES[reserved-word]=fg=magenta
+
+# quotes
+# ZSH_HIGHLIGHT_STYLES[single-quoted-argument]=fg='#cbc3ff'
+# ZSH_HIGHLIGHT_STYLES[double-quoted-argument]=fg='#cbc3ff'
+ZSH_HIGHLIGHT_STYLES[single-quoted-argument]=fg=magenta
+ZSH_HIGHLIGHT_STYLES[double-quoted-argument]=fg=magenta
+#+end_src
+
+*** zsh-newuser-install
+#+begin_src bash
+unsetopt beep
+bindkey -e # set emacs mode
+setopt autocd extendedglob nomatch notify
+#+end_src
+
+*** Enable case insensitivity
+wizard [[https://stackoverflow.com/questions/24226685/have-zsh-return-case-insensitive-auto-complete-matches-but-prefer-exact-matches/24237590#24237590][oh my zsh - Have zsh return case-insensitive auto-complete matches, but prefer exact matches - Stack Overflow]]
+# [2022-11-09 Wed 22:06:25 -03]
+#+begin_src bash
+zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+#+end_src
+
+*** Sourcing
+
+**** Installed packages
+#+begin_src bash
+[[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+[[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+[[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
+#+end_src
+
+**** Aliases
+#+begin_src bash
+source "$XDG_CONFIG_HOME/shell/aliases"
+#+end_src
+
+**** Theme
+#+begin_src bash
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+#+end_src
+
+*** Autosuggestions
+#+begin_src bash
+AUTOSUGGESTION_ACCEPT_RIGHT_ARROW=1
+#+end_src
+
+*** Bindkeys
+:PROPERTIES:
+:CUSTOM_ID: zsh-bindkeys
+:END:
+Emacs
+# 😊
+#+begin_src bash
+#bindkey '^I'   complete-word       # tab          | complete
+bindkey '^[[Z'  forward-word  # shift + tab  | autosuggest
+# ctrl-left and ctrl-right
+bindkey "\e[1;5D" backward-word
+bindkey "\e[1;5C" forward-word
+# ctrl-bs and ctrl-del
+bindkey "\e[3;5~" kill-word
+bindkey "\C-_"    backward-kill-word
+# del, home and end
+bindkey "\e[3~" delete-char
+bindkey "\e[H"  beginning-of-line
+bindkey "\e[F"  end-of-line
+# alt-bs
+bindkey "\e\d"  undo
+# ctrl+e
+bindkey "^E"    end-of-line
+bindkey "^F"    autosuggest-fetch
+
+bindkey -e '' undo
+bindkey -e 'd' kill-word
+
+# search
+# bindkey '' up-line-or-search
+# bindkey '' down-line-or-search
+#+end_src
+
+**** Search
+#+begin_src bash
+bindkey "^S" history-incremental-search-backward
+autoload -U up-line-or-beginning-search
+autoload -U down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey "^[[A" up-line-or-beginning-search # Up
+bindkey "^[[B" down-line-or-beginning-search # Down
+
+# https://stackoverflow.com/questions/26409337/inserting-a-newline-in-a-multiline-zsh-command-pulled-from-history/26461450#26461450
+# bindkey '^M'   accept-line # vterm fix
+bindkey '^[^M' self-insert-unmeta # Insert newline without accepting the command
+
+# `'^J' as self-insert-unmeta' conflicts with Emacs vterm, so only set
+# it outside.
+if [[ ! $INSIDE_EMACS == vterm ]] || [[ -z $EMACS_VTERM_PATH ]]; then
+    bindkey '^J' self-insert-unmeta
+fi
+
+bindkey '^H'   backward-kill-word
+bindkey '^F'   forward-char
+#+end_src
+
+**** Clipboard support
+- See
+  [[https://unix.stackexchange.com/questions/51933/zsh-copy-and-paste-like-emacs/51938#51938][clipboard - zsh copy and paste like emacs - Unix & Linux Stack Exchange]]
+  # #wzrd
+
+Different clipboard program based on (=loginctl=) session type
+#+begin_src bash
+current_clip() {
+    selfSessionType=$( loginctl show-session self -p Type | awk -F'=' '{print $2}' )
+    if [ "${selfSessionType}" = wayland ]; then
+        ## Wayland
+        export clipCopy=wl-copy
+        export clipPaste=wl-paste
+    else
+        ## Xorg
+        export clipCopy=(xclip -r -i -t UTF8_STRING -selection clip)
+        export clipPaste=(xclip -o -selection clip \</dev/null)
+    fi
+}
+#+end_src
+Check for =tty= only is made later:
+# #TODO-better-logic ?
+
+#+begin_src bash
+xw-clip-kill-region () {
+    zle copy-region-as-kill
+    printf '%s' "$CUTBUFFER" | ${clipCopy}
+}
+zle -N xw-clip-kill-region
+
+xw-clip-kill-region () {
+    zle kill-region
+    printf '%s' "$CUTBUFFER" | ${clipCopy}
+}
+zle -N xw-clip-kill-region
+
+xw-clip-kill-line () {
+    zle kill-line
+    printf '%s' "$CUTBUFFER" | ${clipCopy}
+}
+zle -N xw-clip-kill-line
+
+xw-clip-yank () {
+    CUTBUFFER=$( ${clipPaste} )
+    zle yank
+}
+zle -N xw-clip-yank
+
+x-wayland-bindkeys() {
+    bindkey -e '^[w' xw-clip-kill-region
+    bindkey -e '^W' xw-clip-kill-region
+    bindkey -e '^Y' xw-clip-yank
+    bindkey -e '^K' xw-clip-kill-line
+}
+
+tty-clipboard-binkeys-emacs() {
+    bindkey -e '^[w' copy-region-as-kill
+    bindkey -e '^W' kill-region
+    bindkey -e '^Y' yank
+    bindkey -e '^K' kill-line
+}
+current_clip
+
+if [[ -n $WAYLAND_DISPLAY ]]; then
+    x-wayland-bindkeys
+elif [[ -n $DISPLAY ]] && [[ -z $WAYLAND_DISPLAY ]]; then
+    x-wayland-bindkeys
+else
+    tty-clipboard-binkeys-emacs
+fi
+#+end_src
+
+**** Disable shortcuts/bindkeys
+[[https://askubuntu.com/questions/477474/prevent-command-from-stopping-when-pressing-ctrlc/477859#477859][shortcut keys - Prevent command from stopping when pressing CTRL+C - Ask Ubuntu]]
+# [2022-05-07 Sat 22:58:42]
+#+begin_src bash
+bindkey -r '^[x' # execute-named-cmd
+
+# remap default ctrl + c (interrupt)
+stty intr '^G' <$TTY >$TTY
+#+end_src
+
+- Disable =C-d= exit action
+  [[https://unix.stackexchange.com/questions/512862/use-bash-exit-trap-to-confirm-or-cancel-ctrld/512864#512864][shell script - Use bash EXIT trap to confirm or cancel ctrl+d - Unix & Linux Stack Exchange]]
+  # [2022-05-20 Fri 00:48:39]
+#+begin_src bash
+set -o ignoreeof
+#+end_src
+
+# Disable =Ctrl + S= and =Ctrl + Q= on terminal/shell
+- Disable =C-s= and =C-q= "control flow" keys, see:
+  [[https://unix.stackexchange.com/questions/332791/how-to-permanently-disable-ctrl-s-in-terminal/332793#332793][command line - How to permanently disable Ctrl-s in terminal? - Unix & Linux Stack Exchange]]
+  # [2022-12-12 Mon 01:07:16 -03]
+  [[https://github.com/sorin-ionescu/prezto/pull/1771#issuecomment-575598782][apply `stty -ixon` only to tty by romkatv · Pull Request #1771 · sorin-ionescu/prezto]]
+
+#+begin_src bash
+[[ -r ${TTY:-} && -w ${TTY:-} && $+commands[stty] == 1 ]] &&
+    stty -ixon <$TTY >$TTY
+#+end_src
+
+*** Footer
+#+begin_src bash
+# Disable lack-of-newline percentile symbol https://unix.stackexchange.com/questions/167582/why-zsh-ends-a-line-with-a-highlighted-percent-symbol/167600#167600
+unsetopt PROMPT_SP
+# https://www.cassey.dev/til/2020-11-09-zsh-percent-signs/
+# https://unix.stackexchange.com/questions/167582/why-zsh-ends-a-line-with-a-highlighted-percent-symbol
+# export PROMPT_EOL_MARK=''
+#+end_src
+
+*** DONE Dynamic terminal title based on current path
+:PROPERTIES:
+:header-args:bash: :tangle no
+:END:
+
+[[https://makandracards.com/makandra/494001-linux-how-to-make-a-terminal-window-title-reflect-the-current-path#section-zsh][How to make a terminal window title reflect the current path - makandra dev]]
+# [2022-05-05 Thu 03:04:22]
+#+begin_src bash
+function precmd () {
+    echo -ne "\033]0;Terminal (${SHELL##*/}): $(pwd | sed -e "s;^$HOME;~;")\a"
+}
+#+end_src
+
+*** DONE Show time that command took to finish
+:PROPERTIES:
+:header-args:bash: :tangle no
+:END:
+
+Source code: [[https://github.com/popstas/zsh-command-time][popstas/zsh-command-time: Show execution time for long commands in zsh]]
+# [2023-05-14 Sun 16:48:22 -03]
+
+Useful when /not/ using a theme that provides this functionality.
+#+begin_src bash
+_command_time_preexec() {
+  # check excluded
+  if [ -n "$ZSH_COMMAND_TIME_EXCLUDE" ]; then
+    cmd="$1"
+    for exc ($ZSH_COMMAND_TIME_EXCLUDE) do;
+      if [ "$(echo $cmd | grep -c "$exc")" -gt 0 ]; then
+        # echo "command excluded: $exc"
+        return
+      fi
+    done
+  fi
+
+  timer=${timer:-$SECONDS}
+  ZSH_COMMAND_TIME_MSG=${ZSH_COMMAND_TIME_MSG-"Time: %s"}
+  ZSH_COMMAND_TIME_COLOR=${ZSH_COMMAND_TIME_COLOR-"white"}
+  export ZSH_COMMAND_TIME=""
+}
+
+_command_time_precmd() {
+  if [ $timer ]; then
+    timer_show=$(($SECONDS - $timer))
+    if [ -n "$TTY" ] && [ $timer_show -ge ${ZSH_COMMAND_TIME_MIN_SECONDS:-3} ]; then
+      export ZSH_COMMAND_TIME="$timer_show"
+      if [ ! -z ${ZSH_COMMAND_TIME_MSG} ]; then
+        zsh_command_time
+      fi
+    fi
+    unset timer
+  fi
+}
+
+# Default
+# zsh_command_time() {
+#   if [ -n "$ZSH_COMMAND_TIME" ]; then
+#     timer_show=$(printf '%dh:%02dm:%02ds\n' $(($ZSH_COMMAND_TIME/3600)) $(($ZSH_COMMAND_TIME%3600/60)) $(($ZSH_COMMAND_TIME%60)))
+#     print -P "%F{$ZSH_COMMAND_TIME_COLOR}$(printf "${ZSH_COMMAND_TIME_MSG}\n" "$timer_show")%f"
+#   fi
+# }
+
+zsh_command_time() {
+    if [ -n "$ZSH_COMMAND_TIME" ]; then
+        hours=$(($ZSH_COMMAND_TIME/3600))
+        min=$(($ZSH_COMMAND_TIME/60))
+        sec=$(($ZSH_COMMAND_TIME%60))
+        if [ "$ZSH_COMMAND_TIME" -le 60 ]; then
+            timer_show="$fg[green]$ZSH_COMMAND_TIME s."
+        elif [ "$ZSH_COMMAND_TIME" -gt 60 ] && [ "$ZSH_COMMAND_TIME" -le 180 ]; then
+            timer_show="$fg[yellow]$min min. $sec s."
+        else
+            if [ "$hours" -gt 0 ]; then
+                min=$(($min%60))
+                timer_show="$fg[red]$hours h. $min min. $sec s."
+            else
+                timer_show="$fg[red]$min min. $sec s."
+            fi
+        fi
+        printf "${ZSH_COMMAND_TIME_MSG}\n" "$timer_show"
+    fi
+}
+
+precmd_functions+=(_command_time_precmd)
+preexec_functions+=(_command_time_preexec)
+#+end_src
+
+*** Utility functions
+#+begin_src bash
+function is_command() {
+    command -v "$1" &> /dev/null && return 0
+    return 1
+}
+#+end_src
+
+from https://gitlab.com/dwt1/dotfiles/-/blob/master/.bashrc#L138
+#+begin_src bash :tangle no :noweb-ref dummy
+up () {
+  local d=""
+  local limit="$1"
+
+  # Default to limit of 1
+  if [ -z "$limit" ] || [ "$limit" -le 0 ]; then
+    limit=1
+  fi
+
+  for ((i=1;i<=limit;i++)); do
+    d="../$d"
+  done
+
+  # perform cd. Show error if cd fails
+  if ! cd "$d"; then
+    echo "Couldn't go up $limit dirs.";
+  fi
+}
+#+end_src
+
+*** $FPATH: directories for autoload shell function definitions
+Extensions to be placed on =FPATH=
+- [[https://stackoverflow.com/questions/20451029/what-is-the-difference-between-path-and-fpath/20451088#20451088][macos - What is the difference between $PATH and $fpath? - Stack Overflow]]
+- Add directories to =$fpath=. They should be defined before any other
+  function/command that uses them.
+- Note: =$fpath= is an array and =$FPATH= is a scalar path definition, aka
+  =/dir1/:/dir2/=. So when customizing =FPATH= always use the lowercase
+  array one (=$fpath=) and append or prepend a directory to it with
+  =fpath+=/path/to/dir= or =fpath=("/path/to/dir" $fpath)= respectively.
+
+#+begin_src bash
+localFPATH="${XDG_DATA_HOME}"/zsh/functions
+mkdir -p "$localFPATH"
+fpath+="$localFPATH"
+
+function is_user_fpath_file() {
+    if [[ -f ${localFPATH%/}/$1 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function download_to_user_fpath() {
+    if is_user_fpath_file "$1"; then
+        return 0
+    else
+        printf 'Downloading "%s" to "%s"\nSource: %s\n\n' "$1" "$localFPATH"/"$1" "$2"
+        curl -sL -o "$localFPATH"/"$1" "$2"
+    fi
+}
+#+end_src
+
+***** =delsel-mode=: delete-selection-mode for zsh
+[[https://github.com/knu/zsh-delsel-mode][knu/zsh-delsel-mode: delsel-mode (delete-selection-mode) for zsh]]
+# wizard
+#+begin_src bash
+download_to_user_fpath delsel-mode 'https://raw.githubusercontent.com/knu/zsh-delsel-mode/master/delsel-mode'
+# then autoload it
+autoload -Uz delsel-mode
+delsel-mode
+#+end_src
+
+*** Autocompletion
+:PROPERTIES:
+:CUSTOM_ID: orgid-yuoowp
+:END:
+- *NOTE*: Place the start of =compinit= at the end:
+  =compinit= only working when started manually/placed at the end
+  of the file This is a problem related to the loading of the =$fpath=
+  variable. If a directory in =$fpath= which includes completions is
+  loaded after =compinit= is started it may not recognize that
+  directory, so only when placing the call for =compinit= or calling it
+  manually after makes it reload the =$fpath= directories and find the
+  completion functions.
+
+  + See
+    [[https://github.com/conda-incubator/conda-zsh-completion/issues/26][Issue #26 · conda-incubator/conda-zsh-completion]]
+    [[https://github.com/conda-incubator/conda-zsh-completion/blob/master/_conda#L19][conda-incubator/conda-zsh-completion/_conda#L19]]
+    # [2023-05-23 Tue 06:40:53 -03]
+
+  For the best performance all =$fpath= directories must be added before
+  the call for =compinit=.
+
+  Alternatively, the easiest fix, at the cost of startup performance, is
+  to call =compinit= again after adding a new directory to =$fpath=:
+  #+begin_src bash :tangle no :noweb-ref dummy
+  userCompletionsDir=${ZDOTDIR}/completions
+  fpath+=${userCompletionsDir}
+  compinit
+  #+end_src
+
+**** Enable support for Bash completions
+#+begin_src bash
+autoload -U +X bashcompinit && bashcompinit
+#+end_src
+
+**** Program-specific completions
+***** Git
+# This section is using zero width spaces (ZERO WIDTH SPACE [00200B]) in some places.
+# this comment may be placed anywhere else that is using it.
+
+# [2022-03-30 Wed 18:27:02]
+Install =bash-completion=
+
+Download [[https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.zsh][git-completion.zsh]] to a file named =_git= and place it in a
+directory present in the =$fpath= array.
+#+begin_src bash
+is_command git &&
+    download_to_user_fpath _git 'https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.zsh'
+#+end_src
+
+
+***** Stack bash/zsh auto-completion                               :noexport:
+# *NOTE*: This is valid for the arch repo install
+# #TODO check ghcup's version
+# [2022-11-09 Wed 22:01:58 -03]
+
+[[https://docs.haskellstack.org/en/stable/shell_autocompletion/][Shell auto-completion - The Haskell Tool Stack]]
+# [2022-05-11 Wed 16:30:14]
+Install =stack=
+#+begin_src bash
+is_command stack && {
+    is_user_fpath_file "$1" ||
+        stack --bash-completion-script `which stack` > "$localFPATH"/_stack
+}
+
+#+end_src
+make sure this is sourced before a call of =compinit=. Alternatively
+source it directly with:
+: source <(stack --bash-completion-script `which stack`)
+# Alternatively, place the contents of =<(..)= in a file of any =$fpath=
+# directory called =_stack=.
+
+**** compinstall
+#+begin_src bash
+# The following lines were added (generated) by compinstall
+zstyle ':completion:*' completer _expand _complete _ignored _correct _approximate
+zstyle ':completion:*' list-colors ''
+zstyle ':completion:*' list-prompt '%SAt %p: Hit TAB for more, or the character to insert%s'
+zstyle ':completion:*' matcher-list '+' 'l:|=* r:|=*' 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'm:{[:lower:]}={[:upper:]} r:|[._-]=** r:|=**'
+zstyle ':completion:*' menu select=0
+zstyle ':completion:*' select-prompt '%SScrolling active: current selection at %p%s'
+zstyle :compinstall filename "$ZDOTDIR/.zshrc"
+
+# autoload -Uz compinit && compinit
+_comp_options+=(globdots) # Include hidden files.
+# End of lines added by compinstall
+#+end_src
+
+**** Custom completion files
+#+begin_src bash
+shellCompletionDir=${XDG_DATA_HOME}/shell-completion
+[[ -d ${shellCompletionDir}/zsh ]] && fpath+=${shellCompletionDir}/zsh
+#+end_src
+
+**** compinit
+After all =$fpath= setup, call =compinit=
+#+begin_src bash
+autoload -Uz compinit && compinit
+#+end_src
+
+**** Source bash completion files
+Sourcing bash completion files have to be done after =compinit= because
+they may only be interpreted when =zsh= loaded the =compdef= function,
+provided by =compinit=.
+# [2023-06-12 Mon 08:54:59 -03]
+#+begin_src bash
+[[ -d ${shellCompletionDir}/bash ]] &&
+    for file in $(find "${shellCompletionDir}"/bash/* -type f); do
+        [[ -f ${file} ]] && source "${file}"
+    done
+#+end_src
+
+*** History
+Default zsh history setup
+#+begin_src bash
+[[ -d ${XDG_STATE_HOME}/zsh ]] || mkdir -p "${XDG_STATE_HOME}"/zsh
+export HISTFILE=$XDG_STATE_HOME/zsh/history
+export HISTSIZE=10000000
+export SAVEHIST=10000000
+#+end_src
+
+*** atuin: History alternative
+[[https://github.com/atuinsh/atuin][GitHub - atuinsh/atuin: ✨ Magical shell history]]
+
+- Install =atuin= from standard repos
+  + run =atuin import auto= for importing the current shell history into
+    atuin's database.
+  + add =eval "$(atuin init zsh)"= to =.zshrc= (alternatively print it to
+    a file and source the file), also make sure to set it /after/ custom
+    keybind definitions because it sets keybinds of its own.
+# [2024-03-11 Mon 00:22:43 -03] @ak
+
+Shell history third party tool
+#+begin_src bash
+eval "$(atuin init zsh)"
+
+# set additional keybinds
+# actually use C-r for search and keep C-p default
+# bindkey '^P' atuin-up-search
+#+end_src
+
+Clean duplicates in zsh's history memory, not file.
+[[https://unix.stackexchange.com/questions/599641/why-do-i-have-duplicates-in-my-zsh-history/599656#599656][Why do I have duplicates in my zsh history? - Unix & Linux Stack Exchange]]
+# [2022-11-08 Tue 18:33:01 -03]
+#+begin_src bash
+setopt histignorealldups
+#+end_src
+
+also more duplicates options can be set with:
+#+begin_example shell
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_FIND_NO_DUPS
+setopt HIST_SAVE_NO_DUPS
+#+end_example
+
+*** zoxide: cd alternative
+[[https://github.com/ajeetdsouza/zoxide][GitHub - ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
+
+#+begin_src bash
+eval "$(zoxide init zsh)"
+#+end_src
+
+After init the command "=z=" is bound to the zoxide command. So alias =cd=
+to it.
+#+begin_src bash
+alias cd=z
+alias c=z
+#+end_src
+
+*** Modularized setup files sourcing
+#+begin_src bash
+# source_check() {
+#     [ -r "$1" ] &&
+#         . "$1"
+# }
+
+# source_check "$XDG_CONFIG_HOME"/shell/nnn-setup.bash
+# source_check "$XDG_CONFIG_HOME"/shell/ghcup-setup.sh
+
+__setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
+if test -d "${__setupModulesDir}"; then
+    for module in "${__setupModulesDir}"/*.sh \
+                  "${__setupModulesDir}"/*.bash; do
+        test -r "$module" && . "$module"
+    done
+    unset module
+fi
+unset __setupModulesDir
+#+end_src
+
+*** Notes
+
+**** stty: 'standard input': Inappropriate ioctl for device
+When using =stty=, the =<$TTY >$TTY= redirections may be be
+necessary in all call of it. See [[https://github.com/romkatv/powerlevel10k/issues/388#issuecomment-567679874][Issue #388 · romkatv/powerlevel10k]].
+
+
+
+**** Add zsh completions
+Add completion files that begin with undescore, like =_git=, to =$fpath=,
+a custom directory can be placed in =fpath= as such:
+#+begin_example
+mkdir $HOME/.completions
+fpath+=$HOME/.completions
+#+end_example
+- Also, see [[#orgid-yuoowp][compinit only working when initialized at the end of the file]].
+
+** =.zshenv=
+:PROPERTIES:
+:header-args:bash: :tangle ~/.zshenv
+:END:
+
+*** TRAMP/dumb terminal check
+For some reason, specially on bigger configs split between [[*TRAMP/dumb terminal check][.zshrc]] and
+[[*=.zshenv=][.zshenv]], this needs to be checked on BOTH.
+#+begin_src bash :noweb yes
+«tramp-dumb-terminal-check»
+#+end_src
+
+*** Check if shell is "interative"
+#+begin_src bash
+[[ $- != *i* ]] && return
+#+end_src
+
+*** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
+#+begin_src bash
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
+    source "$XDG_CONFIG_HOME"/shell/profile
+#+end_src
+
+*** ZDOTDIR
+=$ZDOTDIR= is the environment variable that tells ZSH where to search for its
+configuration files.
+
+The =ZDOTDIR= environment variable can be defined at boot before any
+user logged-in.
+
+Simply create the file =/etc/zsh/zshenv= and add:
+: export ZDOTDIR="$HOME/.config/zsh"
+
+Note that Zsh reads this file first before sourcing =/etc/profile= so
+setting =$ZDOTDIR= in a =/etc/profile.d= script is insufficient.
+#+begin_src bash
+export ZDOTDIR="$XDG_CONFIG_HOME/shell"
+#+end_src
+
+* Setup Modules
+:PROPERTIES:
+:header-args: :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
+:END:
+Files meant for sourcing, modulating the shell config and centralizing
+program-specific setting into their own files.
+
+** nnn file manager
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/nnn-setup.bash
+:END:
+- Using =.bash= as extension for sourceable files and adding a echo shebang.
+  See https://unix.stackexchange.com/a/299621.
+
+The nnn file manager is configured by environment variables.
+#+begin_src shell
+append_nnn_plug_commands() {
+    # local mode="$1"  # 'append' or 'replace'
+    local items="$1"
+
+    # if [[ "$mode" == "append" ]]; then
+    NNN_PLUG_COMMANDS="${NNN_PLUG_COMMANDS:+$NNN_PLUG_COMMANDS;}$items"
+    # elif [[ "$mode" == "replace" ]]; then
+    #     # #todo replace using string matching?
+    #     NNN_PLUG_COMMANDS="$items"
+    # else
+    #     echo "Invalid mode. Please specify 'append' or 'replace'."
+    #     return 1
+    # fi
+}
+
+
+append_nnn_plug_official() {
+    local items="$1"
+
+    NNN_PLUG_OFFICIAL="${NNN_PLUG_OFFICIAL:+$NNN_PLUG_OFFICIAL;}$items"
+}
+
+alias anpca='append_nnn_plug_commands'
+alias anpoa='append_nnn_plug_official'
+
+anpca '0:!sacdx "$nnn"'
+anpca 'm:!mediainfo-color "$nnn"'
+# anpca 'q:!clear && audio-quality "$nnn"'
+# anpca 'E:!echo-files "$nnn"'
+anpca 'o:launch4nnn'
+anpca 'x:xtosubdir4nnn'
+anpca 's:dusum4nnn'
+# anpca 'a:!archive "$nnn"'
+# anpca 'c:!archive -11 "$nnn"'
+# anpca 'r:rclone-gcrypt-to-local4nnn'
+
+anpoa 'd:dragdrop'
+anpoa 'F:fzopen'
+anpoa 'i:imgview'
+anpoa 'p:preview-tui'
+anpoa 'z:autojump' # using with zoxide
+
+## nnn = https://github.com/jarun/nnn/wiki/Usage#configuration
+# NNN_PLUG_COMMANDS='0:!sacdx $nnn;m:!mediainfo-color $nnn;q:!audio-quality-info $nnn;E:!echo-files $nnn;o:launch4nnn;x:xtosubdir4nnn;s:dusum4nnn;a:!archive "$nnn";c:!archive -11 "$nnn";r:rclone-gcrypt-to-local4nnn'
+# NNN_PLUG_OFFICIAL='d:dragdrop;F:fzopen;i:imgview;p:preview-tui'
+NNN_PLUG="$NNN_PLUG_COMMANDS;$NNN_PLUG_OFFICIAL"
+export NNN_PLUG
+# export NNN_TRASH=1
+
+# BLK="04" CHR="04" DIR="04" EXE="00" REG="00" HARDLINK="00" SYMLINK="06" MISSING="00" ORPHAN="01" FIFO="0F" SOCK="0F" OTHER="02"
+# export NNN_FCOLORS="0404040404040404"
+
+# export NNN_COLORS="2136" # colors of the 4 "workspaces"
+# export NNN_TMPFILE=${XDG_STATE_HOME:-$HOME/.local/state}/nnn/lastd
+# [[ ! -d ${NNN_TMPFILE%lastd} ]] && mkdir -p "${NNN_TMPFILE%.lastd}"
+# export NNN_SEL=${XDG_STATE_HOME:-$HOME/.local/state}/nnn/selection
+export NNN_TMPFILE=/tmp/nnn.tmp
+export NNN_FIFO=/tmp/nnn.fifo
+export NNN_SEL=/tmp/nnn.sel
+#export NO_COLOR=1
+#NNN_FCOLORS='c1e2272e006033f7c6d6abc4'
+export NNN_OPENER="$OPENER"
+export NNN_FALLBACK_OPENER="$OPENER"
+# Hidden files on top
+export LC_COLLATE="C"
+
+
+# include hidden files on 'r'ename
+# [[https://github.com/jarun/nnn/commit/49be2cfcd19e800f69f2aa4e371db2bb13fc6a7c][Fix #1153: sync hidden on batch rename · jarun/nnn@49be2cf]]
+export INCLUDE_HIDDEN=1
+n() {
+    VISUAL=$EDITOR # nnn reads in order: $VISUAL -> $EDITOR -> vi
+
+    # Block nesting of nnn in subshells
+    [ "${NNNLVL:-0}" = 0 ] || {
+        echo "nnn is already running"
+        return
+    }
+
+    # The default behaviour is to cd on quit (nnn checks if NNN_TMPFILE is set)
+    # To cd on quit only on ^G, remove the "export" as in:
+    #     NNN_TMPFILE="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.lastd"
+    # export NNN_TMPFILE="${XDG_STATE_HOME:-$HOME/.local/state}/nnn/.lastd"
+
+    # Unmask ^Q (, ^V etc.) (if required, see `stty -a`) to Quit nnn
+    # stty start undef
+    # stty stop undef
+    # stty lwrap undef
+    # stty lnext undef
+
+    # set color scheme
+    # nnn_dark_light_set # defined in sourced `nnn-setup.bash'
+    # ^ disabled because using 'proper' ansi color theme.
+
+    if command -v cpg >/dev/null && command -v mvg >/dev/null; then
+        nnn -EHr "$@"
+    else
+        nnn -EH "$@"
+    fi
+
+    if [ -f "$NNN_TMPFILE" ]; then
+        . "$NNN_TMPFILE"
+        rm -f "$NNN_TMPFILE" > /dev/null
+    fi
+}
+
+nnn_cd()
+{
+    if ! [ -z "$NNN_PIPE" ]; then
+        printf "%s\0" "0c${PWD}" > "${NNN_PIPE}" !&
+    fi
+}
+
+trap nnn_cd EXIT
+#+end_src
+
+*** nnn Colors
+#+begin_src shell
+block=08
+char=03
+dir=04
+exe=02
+regular=00
+hardlink=05
+symlink=06
+miss=07 # also affects details
+orph=09
+fifo=0d
+socket=05
+unkn=01
+
+export NNN_FCOLORS="$block$char$dir$exe$regular$hardlink$symlink$miss$orph$fifo$socket$unkn"
+
+unset block char dir exe regular hardlink symlink miss orph fifo socket unkn
+#+end_src
+
+
+** GHCup
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/ghcup-setup.sh
+:END:
+This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]],
+GHCup installs binaries and links to =XDG_BIN_HOME= so with alias it is
+possible to override where it installs and managers it's files.
+#+begin_src shell
+is_command append_path &&
+    append_path "${XDG_BIN_HOME%/*}/ghcup-bin"
+#+end_src
+
+#+begin_src shell
+export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
+#+end_src
+
+To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
+#+begin_src shell -r
+alias ghcup='XDG_BIN_HOME="${XDG_BIN_HOME%/*}/ghcup-bin" ghcup'  (ref:ghcup-alias-bin-anchor)
+#+end_src
+
+* Local file variables                                             :noexport:
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# eval: (org-babel-do-load-languages 'org-babel-load-languages '((shell . t)))
+# End:
+
+# meta comments
+# #+title: ZSH Shell configuration.
+# <2021-12-22 Wed 15:19>
+# moved here (arch-linux.org) [2022-03-30 Wed 17:47:48]
+# moved here arch-linux.org [2022-04-01 Fri 01:57:29]
+# moved back # [2022-11-30 Wed 08:01:05 -03]
+# moved back # [2022-12-12 Mon 19:17:12 -03]
+# moved to ~/.config/shell/ # [2023-06-03 Sat 12:14:11 -03]
+# back at # [2024-01-22 Mon 16:28:06 -03] @arch
