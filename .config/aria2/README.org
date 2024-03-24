@@ -1,0 +1,39 @@
+#+TITLE: aria2 downloader
+
+#+PROPERTY: header-args:conf :tangle aria2.conf :noweb yes
+
+#+begin_src conf
+continue=true
+log=<<xdg-state-home()>>/aria2/aria2c.log
+console-log-level=warn
+summary-interval=0
+file-allocation=none
+max-concurrent-downloads=4
+split=16
+max-connection-per-server=16
+min-split-size=32M
+check-integrity=true
+# dir=${HOME}/Downloads/aria2
+#+end_src
+
+* Command-line wrapper
+:PROPERTIES:
+:CUSTOM_ID: orgid-nolkgp
+:END:
+For making sure the log file will be in an existing directory.
+
+#+begin_src shell :tangle (concat (xdg-bin-home) "/wrappers/aria2c") :tangle-mode o755 :mkdirp yes
+mkdir -pv "${XDG_STATE_HOME}"/aria2
+
+aria2c "$@"
+#+end_src
+
+
+* noweb vars                                                :noexport:ignore:
+#+NAME: xdg-state-home
+#+begin_src elisp
+(xdg-state-home)
+#+end_src
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:
