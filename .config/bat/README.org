@@ -1,0 +1,37 @@
+#+TITLE: bat: Pager, terminal print & concat for text files (cat alternative)
+#+PROPERTY: header-args :tangle config
+
+# [2023-09-16 Sat 17:23:36 -03]
+- A default config file can be generated with:
+  : bat --generate-config-file
+
+#+begin_src conf
+--theme=base16-256 # For themed terminals (not great looking but works)
+--style=grid,header-filename
+--tabs 2 # smaller tabs
+#--color always # use this when piping to keep colors
+--wrap=never # use pager for scrolling horizontally instead
+#+end_src
+
+* Additional Languages
+- See
+  + [[https://github.com/sharkdp/bat#adding-new-syntaxes--language-definitions][Adding new syntaxes / language definitions - sharkdp/bat]]
+  + [[https://github.com/phw/sublime-tagger-script-syntax][GitHub - phw/sublime-tagger-script-syntax: MusicBrainz Picard Tagger Script syntax highlighting for Sublime Text]]
+# [2022-03-21 Mon 01:31:31]
+# moved # [2024-03-15 Fri 01:21:54 -03] @ak
+
+- Dependencies
+  + bat
+  + git
+# Eval the code block
+#+begin_src shell :results code :tangle no
+mkdir -p "$(bat --config-dir)/syntaxes"
+cd "$(bat --config-dir)/syntaxes" || exit 1
+
+# syntax repos to add
+git clone 'https://github.com/phw/sublime-tagger-script-syntax'
+
+
+# install them
+bat cache --build
+#+end_src
