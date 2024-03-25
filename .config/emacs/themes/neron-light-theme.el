@@ -331,7 +331,12 @@ read it before opening a new issue about your will.")
                (diredfl-deletion :inherit diredfl-deletion-file-name)                  ;; *Face used for deletion flags (D) in Dired buffers.
                ;; dired-efap / dired rename
                ;; (dired-efap-face :height 140 :box (:line-width 2 :color "grey20" :style pressed-button))
-
+               (dired-subtree-depth-1-face :background ,c/bg)
+               (dired-subtree-depth-2-face :background ,c/bg)
+               (dired-subtree-depth-3-face :background ,c/bg)
+               (dired-subtree-depth-4-face :background ,c/bg)
+               (dired-subtree-depth-5-face :background ,c/bg)
+               (dired-subtree-depth-6-face :background ,c/bg)
 
 
                ;; tree-sitter
