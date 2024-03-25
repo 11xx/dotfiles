@@ -246,9 +246,12 @@ find_subdirs_xdg_bin_home_scalar() {
     * See https://stackoverflow.com/a/13525005
   + =-maxdepth 1= includes only first-level subdirectories of =$XDG_BIN_HOME=.
 
-Get the output of =find_subdirs_xdg_bin_home_scalar=, save it in a
-local variable (POSIX-style), remove any =:= at the end of it while
-appending to path with =append_path=. =unset= for good measure.
+- Now:
+  + Get the output of =find_subdirs_xdg_bin_home_scalar=;
+  + save it in a local variable (POSIX-style);
+  + remove any =:= at the end of it while appending to path with
+    =append_path=.
+  + =unset= the local variable for good measure.
 #+begin_src shell
 [ -d "$XDG_BIN_HOME" ] && {
     _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_scalar)
