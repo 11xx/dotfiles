@@ -1,0 +1,126 @@
+#+TITLE: tofi: dmenu alternative for Wayland
+#+PROPERTY: tangle-dir (concat (xdg-config-home) "/tofi")
+#+PROPERTY: header-args:conf :noweb yes
+
+# TODO-FIX noweb mess with config include=path, see man tofi.5
+# see: man tofi.5
+# [2023-06-14 Wed 17:09:31 -03]
+
+- [[https://www.youtube.com/watch?v=4O3D5TIt_0Q][Dmenu Is Dead To Me!! (In Wlroots Wayland) - YouTube]]
+- [[https://github.com/philj56/tofi][philj56/tofi: Tiny dynamic menu for Wayland]]
+
+* Default =tofi= config
+- dmenu theme
+#+NAME: tofi-config-defaults
+#+begin_src conf :tangle config :mkdirp yes
+anchor = top
+width = 100%
+height = 30
+horizontal = true
+font-size = 14
+prompt-text = ":"
+prompt-padding = 10
+font = /usr/share/fonts/TTF/LiterationMonoNerdFont-Regular.ttf
+# font = Literation Mono Nerd Font
+hint-font = false
+
+selection-background-padding = 3
+
+min-input-width = 120
+result-spacing = 15
+
+padding-top = 0
+padding-bottom = 0
+padding-left = 0
+padding-right = 0
+
+fuzzy-match = true
+
+text-cursor = true
+
+outline-width = 0
+border-width = 0
+
+# theme-specific colors, default to dark
+include=./def-dark
+#+end_src
+
+- Dark
+#+begin_src conf :tangle def-dark :mkdirp yes
+text-color = #ffffff
+background-color = #22222233
+selection-color = #222222ff
+selection-background = #61bd09
+
+outline-color = #61bd09ee
+border-color = #ff77cfee
+#+end_src
+
+- Light
+#+begin_src conf :tangle def-light :mkdirp yes
+text-color = #333333
+background-color = #ffffffff
+selection-color = #ffffffff
+selection-background = #333333
+
+outline-color = #333333
+border-color = #333333
+#+end_src
+
+* =tofi= center box
+
+#+begin_src conf :tangle center-box :mkdirp yes
+font-size = 16
+prompt-text = ""
+prompt-padding = 10
+
+hint-font = false
+
+selection-background-padding = 3
+
+min-input-width = 120
+result-spacing = 15
+
+text-cursor = true
+
+corner-radius = 10
+padding-top = 10
+padding-left = 10
+padding-right = 10
+padding-bottom = 10
+
+fuzzy-match=false
+
+horizontal=false
+width = 20%
+height = 40%
+
+# make the columns of emojis more centered
+anchor=left
+margin-left=45%
+
+include=center-box-dark
+#+end_src
+
+#+begin_src conf :tangle center-box-light :mkdirp yes
+include=center-box-colors-light
+#+end_src
+
+#+begin_src conf :tangle center-box-dark :mkdirp yes
+include=center-box-colors-dark
+#+end_src
+
+#+begin_src conf :tangle center-box-outline :mkdirp yes
+outline-width = 0
+border-width = 3
+#+end_src
+
+#+begin_src conf :tangle center-box-colors-light :mkdirp yes
+include=def-light
+include=center-box-outline
+#+end_src
+
+#+begin_src conf :tangle center-box-colors-dark :mkdirp yes
+include=def-dark
+include=center-box-outline
+#+end_src

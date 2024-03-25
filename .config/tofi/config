@@ -1,0 +1,30 @@
+anchor = top
+width = 100%
+height = 30
+horizontal = true
+font-size = 14
+prompt-text = ":"
+prompt-padding = 10
+font = /usr/share/fonts/TTF/LiterationMonoNerdFont-Regular.ttf
+# font = Literation Mono Nerd Font
+hint-font = false
+
+selection-background-padding = 3
+
+min-input-width = 120
+result-spacing = 15
+
+padding-top = 0
+padding-bottom = 0
+padding-left = 0
+padding-right = 0
+
+fuzzy-match = true
+
+text-cursor = true
+
+outline-width = 0
+border-width = 0
+
+# theme-specific colors, default to dark
+include=./def-light
