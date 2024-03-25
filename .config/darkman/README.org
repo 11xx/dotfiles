@@ -494,16 +494,3 @@ themeName=Adwaita-dark
 
 sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
 #+end_src
-
-* TODO Rely of files instead of replacing?
-# [2024-02-19 Mon 15:56:05 -03] @ak
-
-* TODO Use sources instead of noweb setup/helpers?
-# [2024-02-20 Tue 16:13:12 -03] @ak
-* TODO Merge app headings and tangle both dark and light
-instead of separating dark and light and having app headings on each, duh
-# [2024-02-20 Tue 16:14:27 -03] @ak
-* Configuration in other places
-- nnn terminal file manager: [[file:~/.config/shell/README.org::*nnn Colors][nnn Colors]]
-  # [2023-06-04 Sun 12:19:54 -03]
-
