@@ -1,0 +1,509 @@
+# -*- eval: (defun darkmandir (shfile) (cond ((string= (org-entry-get nil "theme" t) "light") (concat (xdg-data-home) "/light-mode.d/" shfile)) ((string= (org-entry-get nil "theme" t) "dark") (concat (xdg-data-home) "/dark-mode.d/" shfile)))); -*-
+#
+# Added this function as local file prop:
+# (defun darkmandir (shfile)
+#   (cond ((string= (org-entry-get nil "theme" t) "light") (concat (xdg-data-home) "/light-mode.d/" shfile))
+#         ((string= (org-entry-get nil "theme" t) "dark") (concat (xdg-data-home) "/dark-mode.d/" shfile))))
+# [2024-02-23 Fri 12:33:17 -03] @ak
+
+#+TITLE: darkman: Dark/Light switcher by dbus, scripts and APIs calls
+
+# originally used 2021-10-27, back # [2023-06-03 Sat 08:25:12 -03]
+# moved # [2024-02-17 Sat 17:42:40 -03] @ak
+
+# Export as HTML
+#+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
+
+#+OPTIONS: toc:3
+
+Check =XDG_DATA_DIRS=, where darkman searches for directories
+=light-mode.d= and =dark-mode.d= (defaults to =~/.local/share= for users).
+
+* =config.yaml=: Darkman's config file
+:PROPERTIES:
+:header-args:yaml: :tangle config.yaml
+:END:
+- To get the latitude and longitude of a city go to Google Maps and
+  + On PC: Right click on a general region and click the first item in
+    the context menu.
+  + On the phone app: Long press somewhere and the lat and long number
+    appear in the search bar.
+  + Latitude and longitude numbers can be negative and only one
+    decimal number is enough.
+# São Paulo / Brazil
+#+begin_src yaml
+lat: -23.5
+lng: -46.6
+#+end_src
+
+* Darkman setup notes
+** GTK & QT
+To allow dynamic/live theme changes, specially for QT on minimal
+setups:
+- Qt
+  + Install =qgnomeplatform-qt5= and =-qt6=:
+    * set =QT_QPA_PLATFORMTHEME=gnome=
+    * and, if using a wayland WM also set =QT_QPA_PLATFORM=wayland= in it.
+    * Note: Sometimes this method doesn't work properly and
+      [[https://github.com/FedoraQt/QGnomePlatform?tab=readme-ov-file#qgnomeplatform-project-is-unmaintained-a-no-longer-actively-developed][it isn't maintained anymore]].
+
+- GTK
+  + If there's an issue where =gsettings= doesn't seem to work check if
+    GTK config files are present in =~/config/gtk-*= or if the =GTK_THEME=
+    environment variable is set, they take precedence over =gsettings=
+    and prevent it from changing the theme live/on-demand. Modern
+    programs may also listen to the [[*Making Darkman portal implementation work on minimal setups][D-Bus API]] instead.
+  + For older <GTK3 programs XSETTINGS is used instead.
+  + See
+    * [[https://github.com/swaywm/sway/wiki/GTK-3-settings-on-Wayland][GTK 3 settings on Wayland · swaywm/sway Wiki]]
+
+# #TODO reduntant?
+Redundant notes on [[*GTK and Qt][GTK and Qt]]
+# [2023-06-04 Sun 09:49:26 -03]
+
+** Making Darkman portal implementation work on minimal setups
+:PROPERTIES:
+:CUSTOM_ID: orgid-ohmzyr
+:END:
+
+- See
+  + [[https://www.reddit.com/r/archlinux/comments/17bkz58/comment/kh51tnc/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button][Dark mode (darkman) and xdg-desktop-portal* driving me nuts : r/archlinux]]
+  + Discussion: [[https://github.com/keepassxreboot/keepassxc/issues/9892][System theme not followed - sway · Issue #9892 · keepassxreboot/keepassxc]]
+  + [[https://github.com/flatpak/xdg-desktop-portal/issues/1017#issuecomment-1731712470][Settings portals should not be provided unconditionally · Issue #1017 · flatpak/xdg-desktop-portal]]
+  + [[https://darkman.whynothugo.nl/#DEBUGGING][darkman(1)#DEBUGGING]] example on how to get current "color-scheme"
+    from the freedesktop bus, if it's working. See note below for why.
+  + [[https://github.com/LionyxML/auto-dark-emacs/blob/045472a5a28a16216d4ec74f1382003e8f7d1cdc/auto-dark.el#L125][LionyxML/auto-dark-emacs/auto-dark.el#L125]]
+  + [[https://man.archlinux.org/man/extra/xdg-desktop-portal/portals.conf.5.en][portals.conf(5) — Arch manual pages]]
+  + Extra reference for the discussion on implementing overrides with
+    =~/.config/xdg-desktop-portal/portals.conf=:
+    * [[https://github.com/flatpak/xdg-desktop-portal/issues/906#issuecomment-1302217878][Issue #906 · flatpak/xdg-desktop-portal]]
+    * [[https://github.com/flatpak/xdg-desktop-portal/pull/955][Pull Request #955 · flatpak/xdg-desktop-portal]]
+  + [[https://wiki.archlinux.org/title/XDG_Desktop_Portal][XDG Desktop Portal - ArchWiki]]
+  + [[https://dbus.freedesktop.org/doc/dbus-tutorial.html][D-Bus Tutorial]]
+Desktop Environments standard for getting changes to the color scheme
+is to use the D-Bus =org.freedesktop.portal.Desktop= with interface
+=org.freedesktop.portal.Settings= provided by a =xdg-desktop-portal-*=
+implementation and exposed by =xdg-desktop-portal=:
+- Try running this command:
+  #+begin_src shell :tangle no :noweb-ref dummy
+  dbus-send --type=method_call --print-reply \
+            --dest='org.freedesktop.portal.Desktop' \
+            '/org/freedesktop/portal/desktop' \
+            'org.freedesktop.portal.Settings.Read' \
+            string:'org.freedesktop.appearance' \
+            string:'color-scheme'
+  #+end_src
+  Example (working) output:
+  #+begin_example
+  method return time=1708524466.520474 sender=:1.265 -> destination=:1.268 serial=60 reply_serial=2
+    variant       variant          uint32 2
+  #+end_example
+  + Where, in the last column after "variant", +afaik+:
+    * 0 = light, being a fallback default;
+    * 1 = dark;
+    * 2 = light.
+    * See a working example from [[https://github.com/LionyxML/auto-dark-emacs/blob/045472a5a28a16216d4ec74f1382003e8f7d1cdc/auto-dark.el#L224C53-L224C63][auto-dark-emacs]].
+  If the error in returned:
+  : Error org.freedesktop.DBus.Error.UnknownMethod: No such interface “org.freedesktop.portal.Settings” on object at path /org/freedesktop/portal/desktop
+  instead of the variant information, the running =xdg-desktop-portal-*=
+  implementation is not exposing the =org.freedesktop.portal.Settings=
+  interface. Darkman provides an alternative for it but it needs to be
+  enabled in the =portals.conf= file provided or read by the current
+  =xdg-desktop-portal-*= implementation. For example when using Hyprland
+  and the recommended =xdg-desktop-portal-hyprland= it by default won't
+  read the =Settings= interface so after installing Hyprland's desktop
+  portal, to make it read the D-Bus interface for color scheme
+  changes, expose that interface explicitly in the =portal.conf= file
+  read by the portal implementation:
+  : org.freedesktop.impl.portal.Settings=darkman
+
+- SOLUTION: create the file =~/.config/xdg-desktop-portal/portals.conf=
+  with an override for =org.freedesktop.portal.Settings=:
+  #+begin_src conf :tangle ~/.config/xdg-desktop-portal/portals.conf :comments link
+  [preferred]
+  org.freedesktop.impl.portal.Settings=darkman
+  #+end_src
+
+* Darkman Scripts
+:PROPERTIES:
+:header-args:bash: :mkdirp yes :shebang #!/usr/bin/env bash :noweb no-export :comments link
+:header-args:shell: :mkdirp yes :shebang #!/usr/bin/env sh :noweb no-export :comments link
+:END:
+
+# (mainly Wayland)
+
+# update this se #TODO # [2024-02-22 Thu 23:11:48 -03] @ak
++TODO:+ There are two versions of every script. Comments, notes and
+observations are in [[*=light-mode.d=: Light][light-mode.d: Light]].
+
+- Notes:
+  + Darkman will hang on long running processes until that process
+    exits or is sent to the background.
+
+Helper functions for checking and setup
+#+NAME: darkman-helper-functions
+#+begin_src shell
+check_file() {
+    [ -f "$1" ] && return 0
+    printf 'The file "%s" does not exist, aborting...\n' "$1"
+    exit 1
+}
+
+check_cmd() {
+    ! command -v "$1" > /dev/null && exit 1
+}
+
+running_check() {
+    pgrep -ixU "$(id -u)" "$1" > /dev/null
+}
+
+running_check_killall() {
+    running_check "$1" && killall "$1" --quiet
+}
+#+end_src
+
+** Notify change
+*** Light
+:PROPERTIES:
+:theme:    light
+:END:
+- From [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/dark-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/dark-mode.d/executable_desktop-notification.sh]]
+#+begin_src shell :tangle (darkmandir "notification.sh")
+notify-send --app-name="darkman" --urgency=low --icon=weather-clear "Switching to light mode"
+#+end_src
+
+*** Dark
+:PROPERTIES:
+:theme:    dark
+:END:
+- [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/light-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/light-mode.d/executable_desktop-notification.sh]]
+#+begin_src shell :tangle (darkmandir "notification.sh")
+notify-send --app-name="darkman" --urgency=low --icon=weather-clear-night "Switching to dark mode"
+#+end_src
+
+
+** Dunst: Notification server
+The themed versions of =dunstrc= are named =dunstrc-dark= and
+=dunstrc-light= and should be present in the same directory.
+#+NAME: dunst-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+check_cmd dunst
+
+dunstrc="${XDG_CONFIG_HOME}"/dunst/dunstrc
+dunstrcLight="${dunstrc}"-light
+dunstrcDark="${dunstrc}"-dark
+
+check_file "${dunstrcLight}"
+check_file "${dunstrcDark}"
+
+running_check_killall dunst
+trap 'running_check dunst || dunst &' EXIT INT
+
+override_dunstrc() {
+    # use full path to cp to skip any aliases
+    /usr/bin/cp --force "$1" "${dunstrc}"
+}
+#+end_src
+
+*** Light
+:PROPERTIES:
+:theme:    light
+:END:
+#+begin_src shell :tangle (darkmandir "dunst.sh")
+«dunst-setup»
+
+override_dunstrc "${dunstrcLight}"
+#+end_src
+
+*** Dark
+:PROPERTIES:
+:theme:    dark
+:END:
+#+begin_src shell :tangle (darkmandir "dunst.sh")
+«dunst-setup»
+
+override_dunstrc "${dunstrcDark}"
+#+end_src
+
+
+** Wallpaper
+# - =lightordark-wallpaper= is a script. Instead changed to using
+# - Wayland-specific swaybg explicitly because the script wasn't
+# - working # inside systemd.
+
+#+NAME: wallpaper-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+check_cmd swaybg
+
+running_check_killall swaybg
+# swaybg --color '#eeeeee' &
+swaybg_fork() {
+    # Setting the wayland display because systemd would not recognize it otherwise. #TODO-Workarounds?
+    WAYLAND_DISPLAY=wayland-1 swaybg --color "$@" & # IMPORTANT: fork this process because
+                          # otherwise darkman will not execute the
+                          # other scripts, waiting for this one to
+                          # finish.
+}
+#+end_src
+
+*** Light
+:PROPERTIES:
+:theme:    light
+:END:
+#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+«wallpaper-setup»
+
+swaybg_fork '#eeeeee'
+#+end_src
+
+*** Dark
+:PROPERTIES:
+:theme:    dark
+:END:
+#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+«wallpaper-setup»
+
+swaybg_fork '#382738'
+#+end_src
+
+** Hyprland
+This method relies on an 'import' in =hyprland.conf=, a file containing
+only relevant color theme definitions for border colors (and any other
+customization made within Hyprland) is sourced so that any changes do
+that file makes only those settings update. Instead of using the IPC
+this makes changes last even if the configuration is reloaded, since
+it sources a written file.
+
+- The setup is:
+  + =themes/= directory inside =$XDG_CONFIG_HOME/hypr=
+  + =themes.conf= file containing /only/ a =source= to a standard dark or
+    light filename, =00-dark-theme.conf= or =00-light-theme.conf=. e.g the
+    line:
+    : source = themes/00-light-theme.conf
+
+  + both the =00-dark-theme.conf= or =00-light-theme.conf= files can
+    contain either =hyprland.conf= settings directly or another =source= a
+    final specific theme.
+  + Nesting sources like this, though more abstract, allows for easier
+    maintanance/changing of themes.
+
+Actual theming done & prepared withing Hyprland's directory.
+#+NAME: hyprland-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+hyprDir=${XDG_CONFIG_HOME}/hypr
+themeConfFile=${hyprDir}/themes/theme.conf
+
+lightFile=00-light-theme.conf
+darkFile=00-dark-theme.conf
+
+check_file "${themeConfFile}"
+check_file "${themeConfFile%/*}/${lightFile}"
+check_file "${themeConfFile%/*}/${darkFile}"
+
+hyprland_source_theme() {
+    case "$1" in
+        dark) themeFile=${darkFile} ;;
+        light) themeFile=${lightFile} ;;
+    esac
+    # sourcing can be done using relative paths too
+    printf 'source = %s\n' "${themeFile}" > "${themeConfFile}"
+}
+#+end_src
+*** Light
+:PROPERTIES:
+:theme:    light
+:END:
+
+#+begin_src shell :tangle (darkmandir "/hyprland.sh")
+«hyprland-setup»
+
+hyprland_source_theme light
+#+end_src
+
+*** Dark
+:PROPERTIES:
+:theme:    dark
+:END:
+
+#+begin_src shell :tangle (darkmandir "/hyprland.sh")
+«hyprland-setup»
+
+hyprland_source_theme dark
+#+end_src
+
+
+** TODO =light-mode.d=: Light
+:PROPERTIES:
+:tangle-dir: (concat (xdg-data-home) "/light-mode.d")
+:END:
+
+*** GTK and Qt
+Using the Adwaita theme for everything since it has better support for
+both GTK and Qt, and =qgnomeplatform-qt5= (=-qt6=) also allows Qt applications
+using the supported GTK theme to change live/on-demand, without
+restarting. Though it's unmantained as of Feb 2024.
+#+begin_src shell :tangle (tdir "/gtk-qt.sh")
+gsettings set org.gnome.desktop.interface gtk-theme Adwaita
+gsettings set org.gnome.desktop.interface color-scheme prefer-light
+# icon theme too ?
+#+end_src
+
+*** Alacritty
+Using toml import where =$theme= is the filename of them theme without
+extension.
+#+begin_src shell :tangle (tdir "/alacritty.sh")
+theme=neron-light
+
+«darkman-alacritty-colors-replace»
+#+end_src
+
+#+NAME: darkman-alacritty-colors-replace
+#+begin_src shell :tangle (tdir "/alacritty.sh")
+replace_theme_import() {
+    sed -i -E "s|^(import = \[ \"~/.config/alacritty/themes/)(.*)(\.toml.*)|\1$1\3|" \
+        "$2"
+}
+
+replace_theme_import "${theme}" "${XDG_CONFIG_HOME}"/alacritty/alacritty.toml
+#+end_src
+
+*** Eww mainbar
+Setup that will be used in both scripts:
+#+NAME: darkman-eww-mainbar-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+ewwDir=${XDG_CONFIG_HOME}/eww
+
+# files containing css variables, the eww.scss file have to use them properly
+light=light-colors.scss
+dark=dark-colors.scss
+#+end_src
+
+This approach uses a prepared `eww.scss' file with defined color
+variables that have two versions, a light and a dark, separated into
+two files. The one being used in the moment is sourced with a css
+import, e.g.: @import "light-colors.scss"
+
+This script replaces that line with the alternative.
+#+begin_src shell :tangle (tdir "/eww-mainbar.sh")
+«darkman-eww-mainbar-setup»
+
+# check the one that will be changed to
+check_file "${ewwDir}"/"${light}"
+
+sed -i "s/^\(@import\) *\"${dark}\".*/\1 \"${light}\";/" \
+    "${ewwDir}"/eww.scss
+#+end_src
+
+
+
+
+*** tofi
+#+NAME: darkman-tofi-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+tofiDir=${XDG_CONFIG_HOME}/tofi
+
+check_file "${tofiDir}"/config
+check_file "${tofiDir}"/center-box
+
+tofi_replace_include_theme() {
+    cd "${tofiDir}" || exit 1
+    sed -Ei 's/^(include=)((\.\/)?(center-box-|def-)).*/\1\2'$theme'/' config center-box
+}
+#+end_src
+
+#+begin_src shell :tangle (tdir "/tofi.sh")
+«darkman-tofi-setup»
+
+theme=light
+
+tofi_replace_include_theme
+#+end_src
+
+*** xsettingsd: XSETTINGS daemon
+#+NAME: darkman-xsettingsd-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+xsettingsdConf=${XDG_CONFIG_HOME:-$HOME/.config}/xsettingsd/xsettingsd.conf
+
+check_file "${xsettingsdConf}"
+
+trap 'running_check xsettingsd && killall -HUP xsettingsd' EXIT INT
+#+end_src
+
+#+begin_src shell :tangle (tdir "/xsettingsd.sh")
+«darkman-xsettingsd-setup»
+
+themeName=Adwaita
+
+sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+#+end_src
+
+** TODO =dark-mode.d=: Dark
+:PROPERTIES:
+:tangle-dir: (concat (xdg-data-home) "/dark-mode.d")
+:END:
+
+*** GTK and Qt
+#+begin_src shell :tangle (tdir "/gtk-qt.sh")
+gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+#+end_src
+
+*** Alacritty
+#+begin_src shell :tangle (tdir "/alacritty.sh")
+theme=neron-dark
+
+«darkman-alacritty-colors-replace»
+#+end_src
+
+*** Eww mainbar
+#+begin_src shell :tangle (tdir "/eww-mainbar.sh")
+«darkman-eww-mainbar-setup»
+
+# check the one that will be changed to
+check_file "${ewwDir}"/"${dark}"
+
+sed -i "s/^\(@import\) *\"${light}\".*/\1 \"${dark}\";/" \
+    "${ewwDir}"/eww.scss
+#+end_src
+*** tofi
+#+begin_src shell :tangle (tdir "/tofi.sh")
+«darkman-tofi-setup»
+
+theme=dark
+
+tofi_replace_include_theme
+#+end_src
+
+*** xsettingsd: XSETTINGS daemon
+#+begin_src shell :tangle (tdir "/xsettingsd.sh")
+«darkman-xsettingsd-setup»
+
+themeName=Adwaita-dark
+
+sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+#+end_src
+
+* TODO Rely of files instead of replacing?
+# [2024-02-19 Mon 15:56:05 -03] @ak
+
+* TODO Use sources instead of noweb setup/helpers?
+# [2024-02-20 Tue 16:13:12 -03] @ak
+* TODO Merge app headings and tangle both dark and light
+instead of separating dark and light and having app headings on each, duh
+# [2024-02-20 Tue 16:14:27 -03] @ak
+* Configuration in other places
+- nnn terminal file manager: [[file:~/.config/shell/README.org::*nnn Colors][nnn Colors]]
+  # [2023-06-04 Sun 12:19:54 -03]
+
