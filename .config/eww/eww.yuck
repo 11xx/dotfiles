@@ -1,0 +1,182 @@
+(defwindow mainbar2
+           :monitor 1
+           :geometry (geometry :x "0%"
+                               :y "0px"
+                               :width "100%"
+                               :height "26px"
+                               :anchor "top center")
+           :stacking "fg" ; foreground is still below fullscreen
+           :reserve (struts :distance "30px" :side "top")
+           ;; :windowtype "dock" ; x11
+           ;; :wm-ignore false ; x11
+           :exclusive true ; wayland
+           :namespace "bar" ; wayland
+
+           ;; for some reason when two defwindows use the same class it either
+           ;; appends a number to it or requires manual disambiguation.
+           :class "mainbar2"
+           (bar-all-modules))
+
+(defwindow mainbar
+           :monitor 0
+           :geometry (geometry :x "0%"
+                               :y "0px"
+                               :width "100%"
+                               :height "26px"
+                               :anchor "top center")
+           :stacking "fg" ; foreground is still below fullscreen
+           :reserve (struts :distance "30px" :side "top")
+           ;; :windowtype "dock" ; x11
+           ;; :wm-ignore false ; x11
+           :exclusive true ; wayland
+           :namespace "bar" ; wayland
+           :class "mainbar"
+           (bar-all-modules))
+
+
+(defwidget bar-all-modules []
+           (box :space-evenly true
+                :class "bar-all-modules"
+                :orientation "h"
+                (left-modules)
+                ;; (center-modules)
+                (right-modules)))
+
+(defwidget sep []
+           (label :class "separator" :text "|"))
+
+(defwidget left-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "start"
+                :class "left-modules"
+                (workspaces)
+                (sep)
+                (window-title)))
+
+(defwidget center-modules []
+           (box :orientation "h"
+                :space-evenly false
+                ;; :halign "center"
+                :halign "center"
+                :class "center-modules"))
+
+(defwidget right-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "end"
+                :class "right-modules"
+                (mpd-current :nth 0)
+                (sep)
+                (label :text "${time}" :class "time-label")))
+
+(defvar time-visible false)   ; for :run-while property of below variable
+                              ; when this turns true, the polling starts and
+                              ; var gets updated with given interval
+
+(defpoll time :interval "5s"
+              :initial "Loading date..."  ; optional, defaults to poll at startup
+              :run-while time-visible   ; optional, defaults to 'true'
+              "date +'%Y/%m/%d (%H:%M)'")
+
+(deflisten workspaces-listen :initial "[]" "scripts/get-workspaces")
+(deflisten current-workspace :initial "{}" "scripts/get-active-workspace")
+(defwidget workspaces []
+  (eventbox
+   :onscroll "scripts/change-active-workspace {} ${current-workspace.focused}"
+   :class "workspaces-widget-eventbox"
+
+   (box
+    :space-evenly true
+    (label :text "${workspaces-listen}${current-workspace}"
+           :visible false)
+    (for workspace in workspaces-listen
+         (eventbox
+          :onclick "hyprctl dispatch workspace ${workspace.id}"
+          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
+               (label :text "${workspace.id}")
+               ))))))
+
+(deflisten window-listen :initial "..." "scripts/get-window-title")
+(defwidget window-title []
+  (box
+   (label :text "${window-listen}"
+          :limit-width 50
+          :class "window-title-label"
+          ;; :truncate-left true
+          )))
+
+(defvar mpd-current-poll-state-1st true)
+
+;; (defvar dummy-json
+;;   '{"Title":"Waiting", "AlbumArtist":"for MPD", "Album":"to start", "duration":0, "elapsed":0}')
+
+;; This creates junk in the log file if there's nothing playing
+;; because the widgets that depend on it cannot parse it's value.
+(defpoll mpd-current-json-1st-instance
+         :interval "1s"
+         :run-while mpd-current-poll-state-1st
+         :initial "{}"  ; dummy json until it loads the executable:
+         "mpd-current-json")
+
+(defwidget seconds-to-length [secs ?min-width]
+           (label
+            :style "min-width: ${min-width > 0 ? min-width : 0}px;"
+            :text "${secs >= 3600 ? "${jq(secs / 3600, 'floor')}:" : "" }${jq(secs / 60, 'floor') < 10 ? "0" : ""}${jq(secs / 60, 'floor')}:${jq(secs % 60, 'floor') < 10 ? "0" : ""}${jq(secs % 60, 'floor')}"))
+
+(defwidget mpd-current-nth-instance [curr-json ?icon]
+           (box
+            ;; :spacing 10
+            :space-evenly false
+
+            (label :class "mpd-current-icon" :text icon)
+            ;; Title
+            (label :class "mpd-current-meta-field mpd-current-meta-field-title"
+                   :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
+                   :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
+
+            ;; Title Artist separator
+            (label :class "mpd-current-artist-separator" :text "·")
+
+            ;; Artist: if album_artist is empty, use Artist
+            (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
+                   :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
+                          curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
+
+            ;; Title Artist separator
+            (label :class "mpd-current-artist-separator" :text "·")
+
+            ;; Album
+            (label :class "mpd-current-meta-field mpd-current-meta-field-album"
+                   :limit-width 50
+                   :text {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""}
+                   :tooltip {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""})
+
+            ;; Elapsed/Duration
+            (box :spacing 2
+                 :class "mpd-current-meta-field mpd-current-meta-field-elapsed"
+                 :space-evenly false
+                 (seconds-to-length :min-width 40 ; fix (some of) the text wiggle, prolly font-dependant
+                                    :secs {curr-json.status.elapsed})
+                 (label :text "/" :class "mpd-time-sep")
+                 (seconds-to-length :min-width 43 :secs {curr-json.status.duration})
+                 (circular-progress :class "mpd-circular-progress"
+                                    :width 20
+                                    :height 20
+                                    ;; :value {jq(curr-json.status.elapsed / curr-json.status.duration * 100, "floor")}
+                                    :value {curr-json.status.elapsed_percent}
+                                    :thickness 4
+                                    :start-at 70
+                                    :valign "center"))))
+
+(defwidget mpd-current-1st-wrap []
+           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}
+                                     :icon ""))
+
+(defvar mpd-expand-bool true)
+(defwidget mpd-current []
+           (box :class "mpd-current-box"
+                :space-evenly false
+                :orientation "h"
+                :valign "center"
+                (mpd-current-1st-wrap)))

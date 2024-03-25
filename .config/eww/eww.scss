@@ -1,0 +1,104 @@
+@import "dark-colors.scss";
+
+$current-bb-t: .15em;
+
+// * { all: unset; }
+
+.mainbar {
+  // font-size: 14;
+  color: $neron-fg;
+  background-color: $bar-bg;
+}
+
+// for some reason when two defwindows use the same class it either
+// appends a number to it or requires manual disambiguation.
+.mainbar2 {
+  // font-size: 14;
+  color: $neron-fg;
+  background-color: $bar-bg;
+}
+
+.workspace-entry {
+  padding: 0 .2em;
+  border-bottom: $current-bb-t solid $bar-bg; /* to make text not shift position when
+                                               * .current uses border-bottom too */
+  &:hover {
+    background-color: $middle-gray;
+  }
+}
+
+.workspace-entry.current {
+  font-weight: bold;
+  background-color: $neron-current;
+  border-bottom: $current-bb-t solid $neron-green;
+  // padding-bottom: 0;
+}
+
+.workspace-entry.occupied {
+  color: $neron-fg;
+}
+
+.workspace-entry.empty {
+  color: $neron-current;
+}
+
+.workspace-entry.active-unfocused {
+  font-weight: bold;
+  background-color: $neron-current;
+  border-bottom: $current-bb-t solid $neron-pink;
+  // padding-bottom: 0;
+
+}
+
+.separator {
+  color: $neron-current;
+  margin: 0 1em;
+  font-weight: bold;
+}
+
+.window-title-label {
+  color: $middle-gray;
+}
+
+.time-label {
+  margin: 0 10 0 0;
+}
+
+
+
+.mpd-circular-progress {
+  color: $middle-gray;
+  background-color: $neron-current;
+  // margin: 0 0;
+  // width: 100;
+}
+
+.mpd-current-box {
+  font-size: inherit;
+  // font-weight: bold;
+}
+
+.mpd-current-meta-field {
+  margin: 0;
+}
+
+.mpd-current-meta-field-album {
+  margin: 0;
+}
+
+.mpd-current-meta-field-elapsed {
+  margin: 0 0 0 15;
+}
+
+// .mpd-current-elapsed {
+//   padding: 0 10 0 10;
+// }
+
+.mpd-current-icon {
+  color: $current-icon;
+  margin-right: 15;
+}
+
+.mpd-current-artist-separator {
+  margin: 0 8;
+}
