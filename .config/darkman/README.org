@@ -389,7 +389,7 @@ dark=dark-colors.scss
 This approach uses a prepared `eww.scss' file with defined color
 variables that have two versions, a light and a dark, separated into
 two files. The one being used in the moment is sourced with a css
-import, e.g.: @import "light-colors.scss"
+import, e.g.: =@import "light-colors.scss";=.
 
 This script replaces that line with the alternative.
 #+begin_src shell :tangle (tdir "/eww-mainbar.sh")
