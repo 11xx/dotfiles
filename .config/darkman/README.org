@@ -103,7 +103,7 @@ implementation and exposed by =xdg-desktop-portal=:
     * 1 = dark;
     * 2 = light.
     * See a working example from [[https://github.com/LionyxML/auto-dark-emacs/blob/045472a5a28a16216d4ec74f1382003e8f7d1cdc/auto-dark.el#L224C53-L224C63][auto-dark-emacs]].
-  If the error in returned:
+  But if the error is returned:
   : Error org.freedesktop.DBus.Error.UnknownMethod: No such interface “org.freedesktop.portal.Settings” on object at path /org/freedesktop/portal/desktop
   instead of the variant information, the running =xdg-desktop-portal-*=
   implementation is not exposing the =org.freedesktop.portal.Settings=
