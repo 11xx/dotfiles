@@ -286,10 +286,10 @@ it sources a written file.
     : source = themes/00-light-theme.conf
 
   + both the =00-dark-theme.conf= or =00-light-theme.conf= files can
-    contain either =hyprland.conf= settings directly or another =source= a
-    final specific theme.
+    contain either =hyprland.conf= settings directly or another =source=
+    of a (final) specific theme.
   + Nesting sources like this, though more abstract, allows for easier
-    maintanance/changing of themes.
+    maintanance/changing of themes with scripts.
 
 Actual theming done & prepared withing Hyprland's directory.
 #+NAME: hyprland-setup
