@@ -1,0 +1,78 @@
+#+TITLE: Firefox configurable files
+
+# [2024-03-01 Fri 03:14:16 -03] @ak
+
+* user.js
+The =user.js= can easily be transferred between backups. It is a file
+override of settings from =about:config=.
+
+Since Firefox really doesn't like having a custom profile folder
+(though one can be set, see [[*Set custom profile directory][Set custom profile directory]]), this file
+will remain here stored. It will need to be moved/copied/linked to
+inside the current profile folder manually.
+
+- See this readme for more info on user.js
+  + [[https://github.com/pyllyukko/user.js][GitHub - pyllyukko/user.js: user.js -- Firefox configuration hardening]]
+#+begin_src typescript :tangle firefox-user.js
+// Wayland libva nvidia video decode
+user_pref("media.ffmpeg.vaapi.enabled", true);
+user_pref("media.rdd-ffmpeg.enabled", true);
+user_pref("media.av1.enabled", true); // You may skip this if your GPU does not support AV1
+user_pref("gfx.x11-egl.force-enabled", true);
+user_pref("widget.dmabuf.force-enabled", true);
+
+// Disable alt menu
+user_pref("ui.key.menuAccessKeyFocuses", false);
+
+// enable userChrome.css
+// also enable options from https://github.com/Bali10050/FirefoxCSS/blob/main/user.js
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+user_pref("svg.context-properties.content.enabled", true);
+user_pref("layout.css.has-selector.enabled", true);
+// https://www.reddit.com/r/FirefoxCSS/comments/myc578/svg_icon_contextfill_resolves_to_black/
+#+end_src
+Link to appropriate place e.g.
+: ln -sf ~/.mozilla/firefox-user.js ~/.mozilla/firefox/profile-folder/user.js
+
+* User css
+- See
+  + [[https://firefoxcss-store.github.io/][FirefoxCSS Store]]
+  + [[https://www.userchrome.org/][userChrome.css for Customizing Firefox]]
+  + [[https://www.userchrome.org/what-is-userchrome-css.html][What is userChrome.css? What can it do?]]
+  + [[https://www.userchrome.org/how-create-userchrome-css.html][How to Create a userChrome.css File]]
+  + [[https://www.reddit.com/r/FirefoxCSS/comments/myc578/svg_icon_contextfill_resolves_to_black/][svg icon context-fill resolves to black : r/FirefoxCSS]]
+  + [[https://mrotherguy.github.io/ToyfoCSS/][ToyfoCSS - CSS Intro]]
+
+Setup for css
+: cd ~/.mozilla
+: ln -sf ../../chromecss-default firefox/profile-folder/chrome
+: ln -sf jarnotmaciej-essence-firefoxcss chromecss-default
+so only =chromecss-default= has to be changed.
+
+- NOTE: if =chrome= was a link already give =ln= the =-T= flag.
+
+* Firefox Notes
+# moved from arch-linux.org # [2024-03-01 Fri 03:18:06 -03] @ak
+** Get current profile directory
+Go to the page =about:support= on Firefox, down in the table there is a
+row named =Profile Directory= with the directory path.
+
+** Set custom profile directory
+- See
+  [[*Get current profile directory][Get current profile directory]]
+  [[https://support.mozilla.org/en-US/questions/1196116][is it possible to change the location of the FF profile folder? - Mozilla Support]]
+
+The command
+: firefox --profile /path/to/profiledir
+allow Firefox to use a custom profile. If it complains about using an
+older Firefox version with a profile from a newer version the flag
+=--allow-downgrade= can also be used.
+
+Having a profile directory backed-up, to continue using it, setting it
+as default:
+- Go to page: =about:profiles=
+- "=Create a New Profile=";
+  + choose a name for the profile;
+  + click =Choose Folder...= and point to the backed-up profile dir.
+
+This can also be used for renaming a profile directory.
