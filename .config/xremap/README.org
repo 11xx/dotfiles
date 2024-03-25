@@ -1,0 +1,108 @@
+* Firefox Emacs keybinds
+Remap the defaults.
+
+Firefox doesn't support any sane way of customizing keybinds. So remap
+Firefox "locally" (per-application).
+
+- See
+  + [[https://support.mozilla.org/en-US/kb/keyboard-shortcuts-perform-firefox-tasks-quickly][Keyboard shortcuts - Perform common Firefox tasks quickly | Firefox Help]]
+  + [[https://github.com/k0kubun/xremap/blob/master/example/emacs.yml][k0kubun/xremap/example/emacs.yml]]
+
+* Browser Emacs
+https://raw.githubusercontent.com/k0kubun/xremap/master/example/emacs.yml
+
+- Note: A drawback I noticed was that while focused on the browser
+  xremap catches key strokes before they're recognized by the WM
+  (Hyprland in this case) so a few of the WM keybinds won't work while
+  xremap is acting on the keyboard.
+#+begin_src yaml :tangle browser-emacs.yaml
+# Credit: https://github.com/mooz/xkeysnail/blob/bf3c93b4fe6efd42893db4e6588e5ef1c4909cfb/example/config.py#L62-L125
+keymap:
+  - name: Emacs
+    application:
+      only: [firefox, vivaldi-stable]
+    remap:
+      # Cursor
+      C-b: { with_mark: left }
+      C-f: { with_mark: right }
+      C-p: { with_mark: up }
+      C-n: { with_mark: down }
+      # Forward/Backward word
+      M-b: { with_mark: C-left }
+      M-f: { with_mark: C-right }
+      # Beginning/End of line
+      C-a: { with_mark: home }
+      C-e: { with_mark: end }
+      # Page up/down
+      M-v: { with_mark: pageup }
+      C-v: { with_mark: pagedown }
+      # Beginning/End of file
+      M-Shift-comma: { with_mark: C-home }
+      M-Shift-dot: { with_mark: C-end }
+      # Newline
+      C-m: enter
+      C-j: enter
+      C-o: [enter, left]
+      # Copy
+      C-w: [C-x, { set_mark: false }]
+      M-w: [C-c, { set_mark: false }]
+      C-y: [C-v, { set_mark: false }]
+      # Delete
+      C-d: [delete, { set_mark: false }]
+      M-d: [C-delete, { set_mark: false }]
+      # Kill line
+      C-k: [Shift-end, C-x, { set_mark: false }]
+      # Kill word backward
+      Alt-backspace: [C-backspace, {set_mark: false}]
+      # set mark next word continuously.
+      C-M-space: [C-Shift-right, {set_mark: true}]
+      # Undo
+      C-slash: [C-z, { set_mark: false }]
+      C-Shift-ro: C-z
+      # Mark
+      C-space: { set_mark: true }
+      # Search
+      C-s: C-f
+      C-r: Shift-F3
+      M-Shift-5: C-h
+      # Cancel
+      C-g: [esc, { set_mark: false }]
+      # C-x YYY
+      # Tabs
+      M-p: C-pageup
+      M-n: C-pagedown
+      # C-slash: C-shift-t
+      # C-k: C-w
+      C-M-b: M-left
+      C-M-f: M-right
+      C-slash: C-shift-t # undo close tab
+      C-M-k: C-w # close tab
+      M-shift-b: M-left
+      M-shift-f: M-right
+      C-x:
+        remap:
+          # C-x h (select all)
+          h: [C-home, C-a, { set_mark: true }]
+          # C-x C-f (open)
+          C-f: C-o
+          # C-x C-s (save)
+          C-s: C-s
+          # C-x k (kill tab)
+          k: C-f4
+          # C-x C-c (exit)
+          C-c: C-q
+          # C-x u (undo)
+          u: [C-z, { set_mark: false }]
+#+end_src
+
+* Launcher script
+#+begin_src shell :tangle (concat (xdg-bin-home) "/xremap-default") :tangle-mode o755
+xremap ~/.config/xremap/browser-emacs.yaml --device 'SINO WEALTH USB KEYBOARD'
+
+notify() {
+    notify-send -a "xremap-default script" "xremap killed" "restart it as necessary."
+}
+
+trap notify INT QUIT TSTP TERM KILL EXIT
+#+end_src
+
