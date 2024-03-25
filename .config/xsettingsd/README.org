@@ -1,0 +1,50 @@
+#+title: xsettingsd GTK configuration Daemon
+#+description: This daemon tells running GTK applications how to render the new settings
+#+property: header-args:conf :tangle xsettingsd.conf :comments both
+
+- Dependencies
+  + =xsettingsd=
+  + =gnome-themes-extra=: for getting the default Adwaita themes.
+
+* Theme & Icon theme
+#+begin_src conf
+Net/ThemeName "Adwaita-dark"
+#+end_src
+
+# bogs out with new GTK sutff [2022-04-11 Mon 04:09:36]
+# Net/IconThemeName "hicolor"
+# Net/IconThemeName "Adwaita"
+
+  =Xft/DPI 100352=
+  DPI = (Width*Height) / (Screen Inch Size, e.g. 24)
+  =Xft/DPI 155217=
+  =Xft/DPI 116412=
+  =Xft/DPI 117651=
+  =Xft/DPI 156868=
+#+begin_src conf
+Xft/Antialias 1
+Xft/HintStyle "hintfull"
+Xft/Hinting 1
+Xft/RGBA "none"
+
+# Values other than "none" makes GDK fonts look horrible, at least for me.
+# Set lcddefault on 'Xresources' and/or 'fontconfig/fonts.conf' instead.
+Xft/lcdfilter "none"
+#+end_src
+
+
+
+
+
+# more settings bkp:
+# Gdk/UnscaledDPI 122880
+# Gdk/WindowScalingFactor 1
+# Gtk/EnableAnimations 1
+# Gtk/DecorationLayout "icon:minimize,maximize,close"
+# Gtk/PrimaryButtonWarpsSlider 0
+# Gtk/ToolbarStyle 3
+# Gtk/MenuImages 1
+# Gtk/ButtonImages 1
+# Gtk/CursorThemeSize 24
+# Gtk/CursorThemeName "breeze_cursors"
+# Gtk/FontName "Noto Sans,  10"
