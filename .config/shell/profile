@@ -10,6 +10,20 @@ append_path () {
         ;;
         *)
             PATH="${PATH:+$PATH:}$1"
+            PATH="${PATH#:}"
+            PATH="${PATH%:}"
+    esac
+}
+
+prepend_path () {
+    # Prioritize over system PATH directories
+    case ":$PATH:" in
+        *:"$1":*)
+        ;;
+        *)
+            PATH="$1:${PATH:+$PATH:}"
+            PATH="${PATH#:}"
+            PATH="${PATH%:}"
     esac
 }
 

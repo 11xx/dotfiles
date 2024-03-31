@@ -176,9 +176,13 @@ alias b100='brightness 100'
 
 ** XDG Standard enviroment variables
 
-# For the XDG standard, the only less conventional one is =XDG_STATE_HOME=.
+For the XDG standard, the only less conventional one is
+=XDG_STATE_HOME=, and =XDG_BIN_HOME= is /not/ a part of the specification
+but commonly used.
 # as of # [2022-11-30 Wed 16:41:29 -03].
-See [[https://stackoverflow.com/questions/25897836/where-should-i-write-a-user-specific-log-file-to-and-be-xdg-base-directory-comp/27965014#27965014][Where should I write a user specific log file to (and be XDG base directory compatible) - Stack Overflow]].
+- See
+  + [[https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html][XDG Base Directory Specification]]
+  + [[https://stackoverflow.com/questions/25897836/where-should-i-write-a-user-specific-log-file-to-and-be-xdg-base-directory-comp/27965014#27965014][Where should I write a user specific log file to (and be XDG base directory compatible) - Stack Overflow]].
 
 #+begin_src shell
 export XDG_CACHE_HOME="$HOME/.local/cache"
@@ -187,14 +191,6 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_BIN_HOME="$HOME/.local/bin"
 #+end_src
-# # Export them
-# export XDG_CACHE_HOME XDG_CONFIG_HOME XDG_DATA_HOME
-# export XDG_STATE_HOME XDG_BIN_HOME
-# wtf? i dont remember what this is about
-# You can add this function to your shell =.bashrc= or =.bash_profile=
-# script, save, and then source the file with =source .bashrc= or =source
-# .bash_profile=, depending on where you added the function. You may then
-# invoke =export_vars= any time you wish to export the variables.
 
 ** Additional PATH directories
 Function copied from =/etc/profile= to append argument to variable PATH:
@@ -205,6 +201,20 @@ append_path () {
         ;;
         ,*)
             PATH="${PATH:+$PATH:}$1"
+            PATH="${PATH#:}"
+            PATH="${PATH%:}"
+    esac
+}
+
+prepend_path () {
+    # Prioritize over system PATH directories
+    case ":$PATH:" in
+        ,*:"$1":*)
+        ;;
+        ,*)
+            PATH="$1:${PATH:+$PATH:}"
+            PATH="${PATH#:}"
+            PATH="${PATH%:}"
     esac
 }
 #+end_src
@@ -272,7 +282,6 @@ Finally, export PATH:
 #+begin_src shell
 export PATH
 #+end_src
-
 
 ** Defending Home
 based on:
@@ -444,7 +453,8 @@ export LSP_USE_PLISTS=true
 :tangle-dir: (concat (xdg-config-home) "/shell")
 :END:
 
-[[https://apple.stackexchange.com/questions/388622/zsh-zprofile-zshrc-zlogin-what-goes-where][ZSH: .zprofile, .zshrc, .zlogin - What goes where?]]
+- [[https://ospfranco.com/post/2023/08/15/zsh-configuration-files-load-order/][ZSH configuration files load order | Oscar Franco]]
+- [[https://apple.stackexchange.com/questions/388622/zsh-zprofile-zshrc-zlogin-what-goes-where][ZSH: .zprofile, .zshrc, .zlogin - What goes where?]]
 # [2022-04-14 Thu 23:25:18]
 
 # - Install zsh base extensions and font:
@@ -500,6 +510,13 @@ fi
 If not interactive don't load configuration file.
 #+begin_src bash
 [[ $- != *i* ]] && return
+#+end_src
+
+*** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
+#+begin_src bash
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
+    source "$XDG_CONFIG_HOME"/shell/profile
 #+end_src
 
 *** powerlevel10k
@@ -1149,13 +1166,6 @@ For some reason, specially on bigger configs split between [[*TRAMP/dumb termina
 [[ $- != *i* ]] && return
 #+end_src
 
-*** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
-#+begin_src bash
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
-    source "$XDG_CONFIG_HOME"/shell/profile
-#+end_src
-
 *** ZDOTDIR
 =$ZDOTDIR= is the environment variable that tells ZSH where to search for its
 configuration files.
@@ -1163,13 +1173,13 @@ configuration files.
 The =ZDOTDIR= environment variable can be defined at boot before any
 user logged-in.
 
-Simply create the file =/etc/zsh/zshenv= and add:
+Simply create the file =/etc/zsh/zshenv= and add, e.g.:
 : export ZDOTDIR="$HOME/.config/zsh"
 
 Note that Zsh reads this file first before sourcing =/etc/profile= so
 setting =$ZDOTDIR= in a =/etc/profile.d= script is insufficient.
 #+begin_src bash
-export ZDOTDIR="$XDG_CONFIG_HOME/shell"
+export ZDOTDIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell"
 #+end_src
 
 * Setup Modules
@@ -1324,7 +1334,6 @@ export NNN_FCOLORS="$block$char$dir$exe$regular$hardlink$symlink$miss$orph$fifo$
 unset block char dir exe regular hardlink symlink miss orph fifo socket unkn
 #+end_src
 
-
 ** GHCup
 :PROPERTIES:
 :header-args:shell: :tangle setup-modules/ghcup-setup.sh
@@ -1333,8 +1342,8 @@ This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]],
 GHCup installs binaries and links to =XDG_BIN_HOME= so with alias it is
 possible to override where it installs and managers it's files.
 #+begin_src shell
-is_command append_path &&
-    append_path "${XDG_BIN_HOME%/*}/ghcup-bin"
+is_command prepend_path &&
+    prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
 #+end_src
 
 #+begin_src shell
@@ -1345,6 +1354,18 @@ To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
 #+begin_src shell -r
 alias ghcup='XDG_BIN_HOME="${XDG_BIN_HOME%/*}/ghcup-bin" ghcup'  (ref:ghcup-alias-bin-anchor)
 #+end_src
+
+** Vault
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/vault-setup.sh
+:END:
+Private repo to accompany the public one. This should be hosted
+privately (in a local pc for example) and holds all other files meant
+for proper desktop usage.
+#+begin_src shell
+alias vot='git --git-dir="$HOME/.local/vault.git" --work-tree="$HOME"'
+#+end_src
+
 
 * Local file variables                                             :noexport:
 # Local Variables:
