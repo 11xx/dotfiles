@@ -112,7 +112,8 @@ If FORCE is t, always recreate the property."
 If a `\\[universal-argument]' prefix is present FORCE is set to t."
   (interactive "P")
   (let ((force (not (null current-prefix-arg))))  ;; Check if C-u prefix is used
-    (org-custom-id--get-create force nil)))
+    (org-custom-id--get-create force nil))
+  (org-store-link nil t))
 
 (keymap-global-set "C-c o i" #'org-custom-id)
 (defun random-string-g-z (n)
