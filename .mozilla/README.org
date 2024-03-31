@@ -7,7 +7,7 @@ The =user.js= can easily be transferred between backups. It is a file
 override of settings from =about:config=.
 
 Since Firefox really doesn't like having a custom profile folder
-(though one can be set, see [[*Set custom profile directory][Set custom profile directory]]), this file
+(though one can be set, see [[#orgid-kjzvnx][Set custom profile directory]]), this file
 will remain here stored. It will need to be moved/copied/linked to
 inside the current profile folder manually.
 
@@ -58,6 +58,9 @@ Go to the page =about:support= on Firefox, down in the table there is a
 row named =Profile Directory= with the directory path.
 
 ** Set custom profile directory
+:PROPERTIES:
+:CUSTOM_ID: orgid-kjzvnx
+:END:
 - See
   [[*Get current profile directory][Get current profile directory]]
   [[https://support.mozilla.org/en-US/questions/1196116][is it possible to change the location of the FF profile folder? - Mozilla Support]]
