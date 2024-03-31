@@ -1596,8 +1596,8 @@ appear when hovered.
   (setopt org-fold-core-style 'text-properties)
   #+end_src
 
-*** Exporting
-**** htmlize
+**** Exporting
+***** htmlize
 - See
   + [[https://github.com/hniksic/emacs-htmlize][GitHub - hniksic/emacs-htmlize: Convert buffer text and decorations to HTML.]]
   + [[https://emacs.stackexchange.com/questions/3374/set-the-background-of-org-exported-code-blocks-according-to-theme/3512#3512][org mode - Set the background of org-exported <code> blocks according to theme - Emacs Stack Exchange]]
@@ -1605,17 +1605,23 @@ appear when hovered.
 #+begin_src emacs-lisp
 (setup (:package htmlize)
   (setopt org-html-htmlize-output-type 'css ; 'inline-css
-           htmlize-html-charset "UTF-8"))
+           htmlize-html-charset "UTF-8")
+  (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
+                                   (:foreground nil :background nil))))
 #+end_src
 - For supported html charsets see
   + [[https://help.hcltechsw.com/dom_designer/9.0.1/appdev/LSAZ_APPENDIX_E_MIME_CHARSET_NAMES.html][MIME Charset Names]]
   + [[https://www.w3schools.com/charsets/][HTML Character Sets]]
   + [[https://en.wikipedia.org/wiki/Character_encodings_in_HTML][Character encodings in HTML - Wikipedia]]
-- Note: the package =htmlize= is also capable of exporting normal
-  buffers as HTML, but here it's mostly used for Org Mode exports.
+- Notes:
+  + The package =htmlize= is also capable of exporting normal buffers as
+    HTML, but here it's mostly used for Org Mode exports.
+  + Also the face of =whitespace-missing-newline-at-eof= may show up at
+    the end of code blocks as a yellow square. To fix it unset the
+    face e.g.:
+    : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
 
 ** 11xx-org-functions.el
-
 #+begin_src emacs-lisp :tangle lisp/11xx-org-functions.el :noweb yes
 ;; -*- lexical-binding: t; -*-
 
