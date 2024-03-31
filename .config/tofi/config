@@ -27,4 +27,4 @@ outline-width = 0
 border-width = 0
 
 # theme-specific colors, default to dark
-include=./def-light
+include=./def-dark
