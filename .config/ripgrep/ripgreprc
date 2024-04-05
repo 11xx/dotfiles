@@ -1,0 +1,10 @@
+--hidden
+--follow
+--no-ignore
+--glob=!{.git,.svn,node_modules,tealdeer,Trash,vendor}
+--glob=!*.{lock}
+--glob=!{package-lock.json,!*~}
+--max-columns=10000
+--smart-case
+--sort=path
+--no-messages

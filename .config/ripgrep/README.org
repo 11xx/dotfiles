@@ -1,0 +1,75 @@
+#+TITLE: ripgrep config file
+#+PROPERTY: header-args :tangle ripgreprc :padline no
+
+- Example config: [[https://github.com/dikiaap/dotfiles/blob/master/.ripgreprc][dotfiles/.ripgreprc at master · dikiaap/dotfiles]]
+# [2023-10-05 Thu 08:10:19 -03]
+
+Defaults for normal & quick usage on the shell. For ignoring the
+config file in, for example, a script use the =--no-config= flag.
+
+Search hidden files and directories.
+#+begin_src conf
+--hidden
+#+end_src
+- To disable all filtering for text files use =-uu= or to include binary
+  files use =-uuu=.
+  + See
+    : man --pager='less -p "AUTOMATIC FILTERING$"' rg
+
+Follow symbolic links.
+#+begin_src conf
+--follow
+#+end_src
+
+Don't respect ignore files (.gitignore, .ignore, etc.).
+#+begin_src conf
+--no-ignore
+#+end_src
+
+Exclude directories.
+#+begin_src conf
+--glob=!{.git,.svn,node_modules,tealdeer,Trash,vendor}
+#+end_src
+
+Exclude file types.
+#+begin_src conf
+--glob=!*.{lock}
+#+end_src
+
+Exclude files.
+#+begin_src conf
+--glob=!{package-lock.json,!*~}
+#+end_src
+- where
+  + =!*~= are Emacs auto-backup files, normal backup files are "=*~=",
+    having the same name as the original but with an =~= at the end.
+
+Don't print lines longer than this limit.
+#+begin_src conf
+--max-columns=10000
+#+end_src
+
+Searches case insensitively.
+#+begin_src conf
+--smart-case
+#+end_src
+
+Sort by file path.
+#+begin_src conf
+--sort=path
+#+end_src
+
+hide some error messages
+#+begin_src conf
+--no-messages
+#+end_src
+
+# Configure color settings and styles.
+# --colors=path:bg:0x3b,0x3b,0x3b
+# --colors=path:fg:white
+# --colors=line:fg:0xf2,0xc2,0x60
+# --colors=match:bg:0x2b,0x83,0xa6
+# --colors=match:fg:0xff,0xff,0xff
+# --colors=match:style:nobold
+
+Raw file: [[file:ripgreprc]]
