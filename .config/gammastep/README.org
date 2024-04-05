@@ -29,7 +29,7 @@ lon=-46.6
 :header-args:shell: :tangle (concat (xdg-bin-home) "/gammastep-toggle") :shebang #!/usr/bin/env sh
 :END:
 
-Untill toggled again, same as [[redshift-toggle]].
+Untill toggled again, same as in =redshift=.
 #+begin_src shell
 pkill -USR1 gammastep
 #+end_src
