@@ -38,6 +38,9 @@ lng: -46.6
 
 * Darkman setup notes
 ** GTK & QT
+:PROPERTIES:
+:CUSTOM_ID: orgid-tjunht
+:END:
 To allow dynamic/live theme changes, specially for QT on minimal
 setups:
 - Qt
