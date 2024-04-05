@@ -240,7 +240,7 @@ read it before opening a new issue about your will.")
                (trailing-whitespace :background ,c/red)
                (whitespace-tab :background "#330022")
                ;; guides / rulers
-               (fill-column-indicator :foreground ,c/current)
+               (fill-column-indicator :foreground ,c/comment)
                ;; sh mode
                (sh-heredoc :foreground ,c/purple)
                ;; (sh-heredoc undefined)
