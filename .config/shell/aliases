@@ -30,7 +30,6 @@ alias cp="cp -vi"
 alias mv="mv -vi"
 alias e="$EDITOR"
 alias re="sudo $EDITOR"
-alias m="ncmpcpp"
 alias a="aria2c"
 alias f="fzf"
 

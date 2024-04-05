@@ -60,13 +60,9 @@ alias cp="cp -vi"
 alias mv="mv -vi"
 alias e="$EDITOR"
 alias re="sudo $EDITOR"
-alias m="ncmpcpp"
 alias a="aria2c"
 alias f="fzf"
 #+end_src
-# MPD
-# alias mpcl='mpc -p 7777'
-# alias ml="ncmpcpp -p 7777"
 
 ** wine
 #+begin_src shell
@@ -1338,6 +1334,20 @@ unset block char dir exe regular hardlink symlink miss orph fifo socket unkn
 :PROPERTIES:
 :header-args:shell: :tangle setup-modules/ghcup-setup.sh
 :END:
+
+Fail short if =ghcup= is not found
+#+begin_src shell
+! is_command ghcup && {
+    printf '%s: ghcup not found. Skipping...\n' "$0" >&2
+    exit 1
+}
+#+end_src
+
+Custom install directory for GHCup downloads.
+#+begin_src shell
+GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
+#+end_src
+
 This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]],
 GHCup installs binaries and links to =XDG_BIN_HOME= so with alias it is
 possible to override where it installs and managers it's files.
@@ -1345,6 +1355,26 @@ possible to override where it installs and managers it's files.
 is_command prepend_path &&
     prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
 #+end_src
+- Arch Linux Note: When building a PKGBUILD, its build process uses
+  the running shell's PATH, so it may try to use GHCup's binaries and
+  probably fail. To fix this remove GHCup's binaries from PATH before
+  building the PKGBUILD e.g.:
+  : PATH=$(echo $PATH | sed 's,/home/user/.local/ghcup-bin:,,') paru
+  or if the directory to be removed is the first in PATH:
+  : PATH=${PATH#*:} paru
+  So to fix this simply alias the command:
+  #+begin_src shell
+  is_command paru && {
+      __newPath=$(
+          printf '%s\n' "$PATH" |
+              awk -v ghcupdir=${GHCUP_BIN_DIR} \
+                  '{ sub(ghcupdir":", "", $0); print $0":"ghcupdir }'
+               )
+      alias paru='PATH="${__newPath}" paru'
+
+      unset __newPath
+  }
+  #+end_src
 
 #+begin_src shell
 export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
@@ -1352,7 +1382,7 @@ export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
 
 To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
 #+begin_src shell -r
-alias ghcup='XDG_BIN_HOME="${XDG_BIN_HOME%/*}/ghcup-bin" ghcup'  (ref:ghcup-alias-bin-anchor)
+alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'  (ref:ghcup-alias-bin-anchor)
 #+end_src
 
 ** Vault
@@ -1366,6 +1396,17 @@ for proper desktop usage.
 alias vot='git --git-dir="$HOME/.local/vault.git" --work-tree="$HOME"'
 #+end_src
 
+** MPD
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/mpd-setup.sh
+:CUSTOM_ID: orgid-upnrlu
+:END:
+#+begin_src shell
+alias m='ncmpcpp --config="$XDG_CONFIG_HOME/mpd/ncmpcpp-config" --bindings="$XDG_CONFIG_HOME/mpd/ncmpcpp-bindings"'
+#+end_src
+# MPD
+# alias mpcl='mpc -p 7777'
+# alias ml="ncmpcpp -p 7777"
 
 * Local file variables                                             :noexport:
 # Local Variables:
