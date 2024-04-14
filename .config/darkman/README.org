@@ -124,6 +124,7 @@ implementation and exposed by =xdg-desktop-portal=:
   with an override for =org.freedesktop.portal.Settings=:
   #+begin_src conf :tangle ~/.config/xdg-desktop-portal/portals.conf :comments link
   [preferred]
+  default=gtk
   org.freedesktop.impl.portal.Settings=darkman
   #+end_src
 
