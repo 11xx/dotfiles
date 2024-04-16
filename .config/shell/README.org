@@ -56,8 +56,14 @@ alias doas=sudo
 
 ** Launchers
 #+begin_src shell
-alias cp="cp -vi"
-alias mv="mv -vi"
+if command -v cpg > /dev/null && command -v mvg > /dev/null; then
+    alias cp="cpg -vi --progress-bar"
+    alias mv="mvg -vi --progress-bar"
+else
+    alias cp="cp -vi"
+    alias mv="mv -vi"
+fi
+
 alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
