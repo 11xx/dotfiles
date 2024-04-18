@@ -1,4 +1,4 @@
---theme=base16-256 # For themed terminals (not great looking but works)
+--theme=base16 # For themed terminals (not great looking but works)
 --style=grid,header-filename
 --tabs 2 # smaller tabs
 #--color always # use this when piping to keep colors
