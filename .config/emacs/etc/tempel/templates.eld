@@ -114,10 +114,10 @@ sh-mode
 Usage: ${0##*/} ARG [ARGNAME(s)]
 
 Options:
-#TODO [...]
---                                    End of all options.
--h, --help                            Display this help and exit
--v, --verbose                         Verbose mode. Enables shell built-in 'set -x'. For debugging.
+  #TODO [...]
+  --                       : End of all options.
+  -h, --help               : Display this help and exit
+  -v, --verbose            : Verbose mode. Enables shell built-in 'set -x'. For debugging.
 EOF
 }
 
