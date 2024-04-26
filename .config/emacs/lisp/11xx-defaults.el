@@ -58,9 +58,8 @@
   (delete-selection-mode 1) ; delete marked region with backspace
 
   ;; #manual-smartparens
-  ;; (electric-pair-mode 1)
-  ;; (electric-indent-mode 1)
-  )
+  (electric-pair-mode 1)
+  (electric-indent-mode 1))
 
 (setopt
  read-process-output-max (* 3 (* 1024 1024)) ;; 3M
@@ -82,10 +81,22 @@
  )
 
 ;; #manual-smartparens
-(use-package smartparens
-  :ensure t
-  :config
-  (smartparens-global-mode 1))
+;; (use-package smartparens
+;;   :ensure t
+;;   :init
+;;   ;; [[https://xenodium.com/emacs-smartparens-auto-indent/][Emacs smartparens auto-indent]]
+;;   ;; [[https://github.com/Fuco1/smartparens/issues/80][Newline and indent on appropriate pairs · Issue #80 · Fuco1/smartparens · GitHub]]
+;;   (defun indent-between-pair (&rest _ignored)
+;;     (newline)
+;;     (indent-according-to-mode)
+;;     (forward-line -1)
+;;     (indent-according-to-mode))
+
+;;   (sp-local-pair 'prog-mode "{" nil :post-handlers '((indent-between-pair "RET")))
+;;   (sp-local-pair 'prog-mode "[" nil :post-handlers '((indent-between-pair "RET")))
+;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
+;;   :config
+;;   (smartparens-global-mode 1))
 (setup whitespace
   (:hide-mode)
   (:hook-into prog-mode text-mode)

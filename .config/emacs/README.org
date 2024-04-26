@@ -26,6 +26,7 @@ Here are some complete configuration examples:
 - [[https://github.com/angrybacon/dotemacs/blob/master/dotemacs.org][angrybacon's dotemacs]]
 - [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org][David Wilson's Emacs Configuration]]
 - [[https://tecosaur.github.io/emacs-config/config.html][tecosaur's Doom Emacs Configuration]]
+- [[https://github.com/zw963/.emacs.d/tree/master][GitHub - zw963/.emacs.d: My own .emacs.d]]
 
 * init.el
 :PROPERTIES:
@@ -470,19 +471,30 @@ current mode."
   (delete-selection-mode 1) ; delete marked region with backspace
 
   ;; #manual-smartparens
-  ;; (electric-pair-mode 1)
-  ;; (electric-indent-mode 1)
-  )
+  (electric-pair-mode 1)
+  (electric-indent-mode 1))
 
 (setopt
  <<emacs-setup-options>>
  )
 
 ;; #manual-smartparens
-(use-package smartparens
-  :ensure t
-  :config
-  (smartparens-global-mode 1))
+;; (use-package smartparens
+;;   :ensure t
+;;   :init
+;;   ;; [[https://xenodium.com/emacs-smartparens-auto-indent/][Emacs smartparens auto-indent]]
+;;   ;; [[https://github.com/Fuco1/smartparens/issues/80][Newline and indent on appropriate pairs · Issue #80 · Fuco1/smartparens · GitHub]]
+;;   (defun indent-between-pair (&rest _ignored)
+;;     (newline)
+;;     (indent-according-to-mode)
+;;     (forward-line -1)
+;;     (indent-according-to-mode))
+
+;;   (sp-local-pair 'prog-mode "{" nil :post-handlers '((indent-between-pair "RET")))
+;;   (sp-local-pair 'prog-mode "[" nil :post-handlers '((indent-between-pair "RET")))
+;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
+;;   :config
+;;   (smartparens-global-mode 1))
 #+end_src
 
 - Show whitespace but disable in some modes
