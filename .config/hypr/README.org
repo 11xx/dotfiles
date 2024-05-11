@@ -245,7 +245,7 @@ misc {
      # testing, it is recommended to set to true
      vfr=false # why energy save on this for desktop :)
      # Enable variable refresh rate
-     vrr=1 # 0 - off, 1 - on, 2 - fullscreen only
+     vrr=2 # 0 - off, 1 - on, 2 - fullscreen only
 
      animate_manual_resizes = false
      # mouse_move_focuses_monitor = true
@@ -794,10 +794,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
               "date +'%Y/%m/%d (%H:%M)'")
 
 (deflisten workspaces-listen :initial "[]" "scripts/get-workspaces")
-(deflisten current-workspace :initial "{}" "scripts/get-active-workspace")
+(deflisten current-workspace :initial "1" "scripts/get-active-workspace")
 (defwidget workspaces []
   (eventbox
-   :onscroll "scripts/change-active-workspace {} ${current-workspace.focused}"
+   :onscroll "scripts/change-active-workspace {} ${current-workspace}"
    :class "workspaces-widget-eventbox"
 
    (box
@@ -807,9 +807,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
     (for workspace in workspaces-listen
          (eventbox
           :onclick "hyprctl dispatch workspace ${workspace.id}"
-          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
-               (label :text "${workspace.id}")
-               ))))))
+          (box :class "workspace-entry ${workspace.id == current-workspace ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace ? "active-unfocused" : ""}"
+               (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "scripts/get-window-title")
 (defwidget window-title []
@@ -1064,12 +1063,8 @@ json_out_format() {
 
 json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
 
-socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 sed -nE '/^(focusedmon|workspace)>>/s/^.*(>>|>>([A-Z]+|[A-Z]+-[0-9]+(|,)))//p' |
-    while read -r activeFocusedWs; do
-        json_out_format "${activeFocusedWs}" "$(active_focused_ws false)"
-    done
-
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+    stdbuf -o0 awk -F '>>|,' -e '/^workspace>>/ {print $2}' -e '/^focusedmon>>/ {print $3}'
 #+end_src
 
 *** =get-window-title=
@@ -1083,7 +1078,7 @@ socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock -
 hyprctl activewindow -j | jq --raw-output .title
 
 # shellcheck disable=SC2016
-socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
     stdbuf -o0 grep '^activewindow>>' |
     stdbuf -o0 awk -F '>>|,' '{print $3}'
 
@@ -1105,7 +1100,7 @@ spaces (){
 
 spaces
 
-socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
     while read -r _; do
         spaces
     done

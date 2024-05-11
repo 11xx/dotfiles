@@ -13,6 +13,6 @@ command -v jaq > /dev/null &&
 hyprctl activewindow -j | jq --raw-output .title
 
 # shellcheck disable=SC2016
-socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
     stdbuf -o0 grep '^activewindow>>' |
     stdbuf -o0 awk -F '>>|,' '{print $3}'

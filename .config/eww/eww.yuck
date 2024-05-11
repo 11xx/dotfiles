@@ -80,10 +80,10 @@
               "date +'%Y/%m/%d (%H:%M)'")
 
 (deflisten workspaces-listen :initial "[]" "scripts/get-workspaces")
-(deflisten current-workspace :initial "{}" "scripts/get-active-workspace")
+(deflisten current-workspace :initial "1" "scripts/get-active-workspace")
 (defwidget workspaces []
   (eventbox
-   :onscroll "scripts/change-active-workspace {} ${current-workspace.focused}"
+   :onscroll "scripts/change-active-workspace {} ${current-workspace}"
    :class "workspaces-widget-eventbox"
 
    (box
@@ -93,9 +93,8 @@
     (for workspace in workspaces-listen
          (eventbox
           :onclick "hyprctl dispatch workspace ${workspace.id}"
-          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
-               (label :text "${workspace.id}")
-               ))))))
+          (box :class "workspace-entry ${workspace.id == current-workspace ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace ? "active-unfocused" : ""}"
+               (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "scripts/get-window-title")
 (defwidget window-title []

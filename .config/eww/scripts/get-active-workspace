@@ -22,8 +22,5 @@ json_out_format() {
 
 json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
 
-socat -u UNIX-CONNECT:/tmp/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 sed -nE '/^(focusedmon|workspace)>>/s/^.*(>>|>>([A-Z]+|[A-Z]+-[0-9]+(|,)))//p' |
-    while read -r activeFocusedWs; do
-        json_out_format "${activeFocusedWs}" "$(active_focused_ws false)"
-    done
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+    stdbuf -o0 awk -F '>>|,' -e '/^workspace>>/ {print $2}' -e '/^focusedmon>>/ {print $3}'
