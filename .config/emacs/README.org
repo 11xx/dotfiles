@@ -3068,6 +3068,8 @@ end of ~setup tex-mode~:
 #+end_src
 
 LaTeX preview in org-mode:
+- [[https://github.com/io12/org-fragtog][io12/org-fragtog: Automatically toggle Org mode LaTeX fragment previews as the cursor enters and exits them]]
+- See "=LaTeX previews=" heading: [[https://lucidmanager.org/productivity/ricing-org-mode/][Ricing Org Mode: A Beautiful Writing Environment]]
 #+begin_src emacs-lisp
 (setup (:package org-fragtog))
 #+end_src
