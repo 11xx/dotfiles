@@ -142,6 +142,8 @@ PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH})
 
 export MOZ_DISABLE_RDD_SANDBOX=1
 export LIBVA_DRIVER_NAME=nvidia
+# this can be disabled to not use video decoding per
+# command. e.g. 'LIBVA_DRIVER_NAME= firefox'
 export NVD_BACKEND=direct
 
 export LSP_USE_PLISTS=true

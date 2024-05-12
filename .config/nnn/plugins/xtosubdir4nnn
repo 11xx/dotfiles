@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+command -v xtosubdir >/dev/null || {
+    notify-send -a 'NNN plugin' \
+                "Unable to exectute plugin \"${0}\"" \
+                '"xtosubdir" command not found.'
+    exit 1
+}
+
+selection=${NNN_SEL:-${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.selection}
+
+if [ -s "$selection" ]; then
+    xargs -0 xtosubdir < "$selection"
+
+    # Clear selection
+    if [ -p "$NNN_PIPE" ]; then
+        printf "-" > "$NNN_PIPE"
+    fi
+else
+    xtosubdir "$1"
+fi

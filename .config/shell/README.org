@@ -424,6 +424,8 @@ PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH})
 #+begin_src shell
 export MOZ_DISABLE_RDD_SANDBOX=1
 export LIBVA_DRIVER_NAME=nvidia
+# this can be disabled to not use video decoding per
+# command. e.g. 'LIBVA_DRIVER_NAME= firefox'
 export NVD_BACKEND=direct
 #+end_src
 # idk anything else but this just worked # [2023-03-23 Thu 18:20:00 -03]
@@ -1192,9 +1194,12 @@ Files meant for sourcing, modulating the shell config and centralizing
 program-specific setting into their own files.
 
 ** nnn file manager
+
+*** Interactive shell setup
 :PROPERTIES:
 :header-args:shell: :tangle setup-modules/nnn-setup.bash
 :END:
+# n³
 - Using =.bash= as extension for sourceable files and adding a echo shebang.
   See https://unix.stackexchange.com/a/299621.
 
@@ -1316,7 +1321,7 @@ nnn_cd()
 trap nnn_cd EXIT
 #+end_src
 
-*** nnn Colors
+**** nnn Colors
 #+begin_src shell
 block=08
 char=03
@@ -1334,6 +1339,105 @@ unkn=01
 export NNN_FCOLORS="$block$char$dir$exe$regular$hardlink$symlink$miss$orph$fifo$socket$unkn"
 
 unset block char dir exe regular hardlink symlink miss orph fifo socket unkn
+#+end_src
+
+*** nnn Plugins
+:PROPERTIES:
+:header-args:shell: :shebang #!/usr/bin/env sh :tangle-mode o755
+:tangle-dir: (expand-file-name "nnn/plugins" (xdg-config-home))
+:END:
+
+Install plugins from [[https://github.com/jarun/nnn/tree/master/plugins][jarun/nnn/plugins]].
+
+**** launch4nnn
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "launch4nnn")
+:END:
+
+#+begin_src shell
+#
+# Description: Launches applications using $(launch)
+#
+# Dependencies: launch (custom launch script)
+#
+# Note: Works _only_ with selection (nnn can toggle the mode for the hovered file)
+#
+# Shell: POSIX compliant
+# Author: 11xx (using Arun Prakash Jana's 'togglex' plugin as template)
+
+command -v launch >/dev/null || {
+    notify-send -a 'NNN plugin' \
+                "Unable to exectute plugin \"${0}\"" \
+                '"launch" command not found.'
+    exit 1
+}
+
+selection=${NNN_SEL:-${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.selection}
+
+if [ -s "$selection" ]; then
+    xargs -0 launch < "$selection"
+
+    # Clear selection
+    if [ -p "$NNN_PIPE" ]; then
+        printf "-" > "$NNN_PIPE"
+    fi
+else
+    launch "$1"
+fi
+#+end_src
+
+**** xtosubdir4nnn
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "xtosubdir4nnn")
+:END:
+
+#+begin_src shell
+command -v xtosubdir >/dev/null || {
+    notify-send -a 'NNN plugin' \
+                "Unable to exectute plugin \"${0}\"" \
+                '"xtosubdir" command not found.'
+    exit 1
+}
+
+selection=${NNN_SEL:-${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.selection}
+
+if [ -s "$selection" ]; then
+    xargs -0 xtosubdir < "$selection"
+
+    # Clear selection
+    if [ -p "$NNN_PIPE" ]; then
+        printf "-" > "$NNN_PIPE"
+    fi
+else
+    xtosubdir "$1"
+fi
+#+end_src
+
+**** dusum4nnn
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "dusum4nnn")
+:END:
+
+#+begin_src shell
+command -v dusum >/dev/null || {
+    notify-send -a 'NNN plugin' \
+                "Unable to exectute plugin \"${0}\"" \
+                '"dusum" command not found.'
+    exit 1
+}
+
+selection=${NNN_SEL:-${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.selection}
+
+if [ -s "$selection" ]; then
+    xargs -0 dusum < "$selection" | less
+
+    # Clear selection
+    if [ -p "$NNN_PIPE" ]; then
+        printf "-" > "$NNN_PIPE"
+    fi
+else
+    dusum "$1" | less
+fi
 #+end_src
 
 ** GHCup
