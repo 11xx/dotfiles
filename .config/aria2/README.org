@@ -1,7 +1,6 @@
 #+TITLE: aria2 downloader
 
 #+PROPERTY: header-args:conf :tangle aria2.conf :noweb yes
-
 #+begin_src conf
 continue=true
 log=<<xdg-state-home()>>/aria2/aria2c.log
@@ -29,11 +28,12 @@ aria2c "$@"
 #+end_src
 
 
-* noweb vars                                                :noexport:ignore:
+* Local file variables & noweb vars                         :noexport:ignore:
 #+NAME: xdg-state-home
 #+begin_src elisp
 (xdg-state-home)
 #+end_src
+
 # Local Variables:
 # org-confirm-babel-evaluate: nil
 # End:
