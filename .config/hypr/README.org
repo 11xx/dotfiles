@@ -1039,6 +1039,9 @@ $current-bb-t: .15em;
 :PROPERTIES:
 :header-args:shell: :shebang #!/usr/bin/env sh :mkdirp yes :noweb yes
 :END:
+
+Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Status bars – Hyprland Wiki#Eww]]
+
 - DEPENDENCIES
   + socat
   + jaq (AND jq for all features)
