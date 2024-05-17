@@ -1,0 +1,11 @@
+* Zsh example setup
+/Example setup from shell readme:/
+#+INCLUDE: ~/.config/shell/README.org::#orgid-qromov
+
+* Notes
+** Import Zsh history from custom file
+: HISTFILE=$(readlink -f ./history) atuin import zsh
+- where
+  + =HISTFILE= is =zsh='s variable for setting the history file path.
+  + =./history= is the path of the file. Using =readlink -f= to expand the
+    path to a full path, for redundancy.

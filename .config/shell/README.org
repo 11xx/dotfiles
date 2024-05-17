@@ -1064,26 +1064,6 @@ export HISTSIZE=10000000
 export SAVEHIST=10000000
 #+end_src
 
-*** atuin: History alternative
-[[https://github.com/atuinsh/atuin][GitHub - atuinsh/atuin: ✨ Magical shell history]]
-
-- Install =atuin= from standard repos
-  + run =atuin import auto= for importing the current shell history into
-    atuin's database.
-  + add =eval "$(atuin init zsh)"= to =.zshrc= (alternatively print it to
-    a file and source the file), also make sure to set it /after/ custom
-    keybind definitions because it sets keybinds of its own.
-# [2024-03-11 Mon 00:22:43 -03] @ak
-
-Shell history third party tool
-#+begin_src bash
-eval "$(atuin init zsh)"
-
-# set additional keybinds
-# actually use C-r for search and keep C-p default
-# bindkey '^P' atuin-up-search
-#+end_src
-
 Clean duplicates in zsh's history memory, not file.
 [[https://unix.stackexchange.com/questions/599641/why-do-i-have-duplicates-in-my-zsh-history/599656#599656][Why do I have duplicates in my zsh history? - Unix & Linux Stack Exchange]]
 # [2022-11-08 Tue 18:33:01 -03]
@@ -1100,6 +1080,29 @@ setopt HIST_IGNORE_SPACE
 setopt HIST_FIND_NO_DUPS
 setopt HIST_SAVE_NO_DUPS
 #+end_example
+
+*** atuin: History alternative
+:PROPERTIES:
+:CUSTOM_ID: orgid-qromov
+:END:
+[[https://github.com/atuinsh/atuin][GitHub - atuinsh/atuin: ✨ Magical shell history]]
+
+- Install =atuin= from standard repos
+  + run =atuin import auto= for importing the current shell history into
+    atuin's database.
+  + add =eval "$(atuin init zsh)"= to =.zshrc= (alternatively print it to
+    a file and source the file), also make sure to set it /after/ custom
+    keybind definitions because it sets keybinds of its own.
+# [2024-03-11 Mon 00:22:43 -03] @ak
+
+Shell history third party tool
+#+begin_src bash
+eval "$(atuin init zsh)"
+#+end_src
+# set additional keybinds
+# actually use C-r for search and keep C-p default
+# bindkey '^P' atuin-up-search
+# [[https://github.com/atuinsh/atuin/issues/193][Custom key bindings · Issue #193 · atuinsh/atuin]]
 
 *** zoxide: cd alternative
 [[https://github.com/ajeetdsouza/zoxide][GitHub - ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
