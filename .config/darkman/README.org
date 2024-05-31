@@ -232,7 +232,12 @@ override_dunstrc "${dunstrcDark}"
 #+end_src
 
 
-** Wallpaper
+** DONE Wallpaper
+:PROPERTIES:
+:header-args:shell: :tangle no
+:END:
+# DISABLED-using Hyprland's misc:background_color
+
 # - =lightordark-wallpaper= is a script. Instead changed to using
 # - Wayland-specific swaybg explicitly because the script wasn't
 # - working # inside systemd.
@@ -258,7 +263,8 @@ swaybg_fork() {
 :PROPERTIES:
 :theme:    light
 :END:
-#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+# :tangle (darkmandir "wallpaper.sh")
+#+begin_src shell
 «wallpaper-setup»
 
 swaybg_fork '#eeeeee'
@@ -268,7 +274,8 @@ swaybg_fork '#eeeeee'
 :PROPERTIES:
 :theme:    dark
 :END:
-#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+# :tangle (darkmandir "wallpaper.sh")
+#+begin_src shell
 «wallpaper-setup»
 
 swaybg_fork '#382738'
