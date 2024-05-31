@@ -9,6 +9,10 @@
 The default example config file can be found in:
 : /usr/share/hyprland/hyprland.conf
 
+- Example Hyprland config
+  + [[https://github.com/prasanthrangan/hyprdots/tree/main/Configs/.config/hypr][hyprdots/Configs/.config/hypr at main · prasanthrangan/hyprdots]]
+  # Add the nix one too
+
 ** Displays & Workspaces
 - See
   + [[https://wiki.hyprland.org/Configuring/Monitors/][Monitors – Hyprland Wiki]]
@@ -145,8 +149,16 @@ general {
 
     resize_on_border = true
     # no_cursor_warps = true # don't move the cursor with keybinds
-    cursor_inactive_timeout = 0
     border_size = 2
+    resize_corner = 3
+    allow_tearing = true # https://wiki.hyprland.org/Configuring/Tearing/
+}
+#+end_src
+
+*** Cursor
+#+begin_src conf
+cursor {
+    inactive_timeout = 1
 }
 #+end_src
 
@@ -239,6 +251,7 @@ master {
 #+end_src
 
 *** Misc
+- [[https://wiki.hyprland.org/Configuring/Variables/#misc][Variables#Misc – Hyprland Wiki]]
 #+begin_src conf
 misc {
      disable_hyprland_logo = true
@@ -256,6 +269,8 @@ misc {
 
      mouse_move_enables_dpms = true #prevents accidental wake up
      key_press_enables_dpms = false
+
+     mouse_move_focuses_monitor = false
 }
 #+end_src
 
@@ -263,6 +278,16 @@ misc {
 #+begin_src conf
 debug {
       overlay = false
+}
+#+end_src
+
+*** Binds
+- [[https://wiki.hyprland.org/Configuring/Variables/#binds][Variables#Binds – Hyprland Wiki]]
+#+begin_src conf
+binds {
+      allow_workspace_cycles = true
+      workspace_center_on = 1
+      movefocus_cycles_fullscreen = false
 }
 #+end_src
 
