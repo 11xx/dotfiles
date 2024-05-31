@@ -93,7 +93,9 @@
     (for workspace in workspaces-listen
          (eventbox
           :onclick "hyprctl dispatch workspace ${workspace.id}"
-          (box :class "workspace-entry ${workspace.id == current-workspace ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace ? "active-unfocused" : ""}"
+          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} \
+                       ${workspace.windows > 0 ? "occupied" : "empty"} \
+                       ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
                (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "scripts/get-window-title")

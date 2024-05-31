@@ -840,7 +840,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
     (for workspace in workspaces-listen
          (eventbox
           :onclick "hyprctl dispatch workspace ${workspace.id}"
-          (box :class "workspace-entry ${workspace.id == current-workspace ? "current" : ""} ${workspace.windows > 0 ? "occupied" : "empty"} ${workspace.id == current-workspace ? "active-unfocused" : ""}"
+          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} \
+                       ${workspace.windows > 0 ? "occupied" : "empty"} \
+                       ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
                (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "scripts/get-window-title")
@@ -1100,7 +1102,10 @@ json_out_format() {
 json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
 
 socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 awk -F '>>|,' -e '/^workspace>>/ {print $2}' -e '/^focusedmon>>/ {print $3}'
+    stdbuf -o0 awk -F '>>|,' -e '/^workspace>>/ {print $2}' -e '/^focusedmon>>/ {print $3}' |
+    while read -r line; do
+        json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
+    done
 #+end_src
 
 *** =get-window-title=
