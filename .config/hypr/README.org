@@ -56,8 +56,6 @@ exec-once = gammastep -P
 # #TODO-review utility of these
 #+begin_src conf
 env = XDG_SESSION_TYPE,wayland
-env = QT_QPA_PLATFORM,wayland;xcb
-env = QT_AUTO_SCREEN_SCALE_FACTOR,1
 env = XDG_CURRENT_DESKTOP,Hyprland
 env = XDG_SESSION_TYPE,wayland
 env = XDG_SESSION_DESKTOP,Hyprland
@@ -69,6 +67,18 @@ env = XDG_SESSION_DESKTOP,Hyprland
 env = EGL_PLATFORM,wayland # unset this when on X11
 env = MOZ_ENABLE_WAYLAND,1 # necessary otherwise Firefox will only try X11
 #+end_src
+
+*** Toolkit backends
+- [[https://wiki.hyprland.org/Configuring/Environment-variables/#toolkit-backend-variables][Environment variables – Hyprland Wiki]]
+#+begin_src conf
+env = GDK_BACKEND,wayland,x11,*
+env = QT_QPA_PLATFORM,wayland;xcb
+env = QT_AUTO_SCREEN_SCALE_FACTOR,1
+env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
+env = SDL_VIDEODRIVER,wayland
+env = CLUTTER_BACKEND,wayland
+#+end_src
+
 
 ** Keywords
 - https://wiki.hyprland.org/Configuring/Keywords/
