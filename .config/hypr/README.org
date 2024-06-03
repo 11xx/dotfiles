@@ -13,6 +13,9 @@ The default example config file can be found in:
   + [[https://github.com/prasanthrangan/hyprdots/tree/main/Configs/.config/hypr][hyprdots/Configs/.config/hypr at main · prasanthrangan/hyprdots]]
   # Add the nix one too
 
+# ** Additional configuration modules
+# Split config files with specific functionality
+
 ** Displays & Workspaces
 - See
   + [[https://wiki.hyprland.org/Configuring/Monitors/][Monitors – Hyprland Wiki]]
@@ -35,80 +38,44 @@ workspace = 10, persistent:true
 ** Startup
 # exec-once = waybar & hyprpaper & firefox
 #+begin_src conf
-# ## Execute your favorite apps at launch
-# exec-once = dunst
-
 # http://wiki.hyprland.org/Useful-Utilities/Must-have/#authentication-agent
 exec-once = /usr/lib/polkit-kde-authentication-agent-1
 
-# swaybg --color '##382738' # wallpaper
-exec-once = lightordark-wallpaper
-exec-once = /usr/lib/kdeconnectd # KDE connect
+exec-once = lightordark-wallpaper # script
+exec-once = /usr/lib/kdeconnectd # KDE connect daemon
 exec-once = eww open mainbar & eww open mainbar2
-exec-once = xsettingsd
-# exec-once = kmonad-launch # script
-# exec-once = mpd-local # script
-exec-once = emacs --daemon && sleep 1 && emacs-launcher # script
-
-# Cursor
-$cursorTheme = Breeze # directory name of the cursor theme
-# set cursor theme [[https://wiki.hyprland.org/FAQ/#how-do-i-change-me-mouse-cursor][Faq | Hyprland Wiki]]
-exec-once = hyprctl setcursor '$cursorTheme' 24
-exec-once = gsettings set org.gnome.desktop.interface cursor-theme '$cursorTheme'
-exec-once = gsettings set org.gnome.desktop.interface cursor-size 20
-
+exec-once = xsettingsd # GTK2-3 theme live changes
+exec-once = xremap-default # script, keyboard remappings
+exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
 exec-once = gammastep -P
 #+end_src
 
 ** Environment variables
-[[https://wiki.hyprland.org/Configuring/Environment-variables/][Environment Variables | Hyprland Wiki]]
-#+begin_src conf
-# Some default env vars.
-env = XCURSOR_SIZE,24
-
+- [[https://wiki.hyprland.org/Configuring/Environment-variables/][Environment Variables | Hyprland Wiki]]
 # #TODO-review utility of these
-# Nvidia support
-env = LIBVA_DRIVER_NAME,nvidia
+#+begin_src conf
 env = XDG_SESSION_TYPE,wayland
-# env = GBM_BACKEND,nvidia-drm # can cause issues? [[https://github.com/hyprwm/Hyprland/issues/2369#issuecomment-1564994687][Stuttering frames · Issue #2369 · hyprwm/Hyprland]]
-env = __GLX_VENDOR_LIBRARY_NAME,nvidia
-env = WLR_NO_HARDWARE_CURSORS,1
-env = __GL_GSYNC_ALLOWED,1
-env = __GL_VRR_ALLOWED,0
-
 env = QT_QPA_PLATFORM,wayland;xcb
 env = QT_AUTO_SCREEN_SCALE_FACTOR,1
-
 env = XDG_CURRENT_DESKTOP,Hyprland
 env = XDG_SESSION_TYPE,wayland
 env = XDG_SESSION_DESKTOP,Hyprland
+#+end_src
 
+*** Browsers
+#+begin_src conf
 # Firefox
 env = EGL_PLATFORM,wayland # unset this when on X11
 env = MOZ_ENABLE_WAYLAND,1 # necessary otherwise Firefox will only try X11
-
-# GTK
-# env = GDK_SCALE,2
-
-# redundant with shell profile, setting here just as a reminder.
-# AUR package 'qgnomeplatform-{common,qt5,qt6}-git'
-env = QT_QPA_PLATFORMTHEME,gnome
-
-# xwayland scale
-# exec-once=xprop -root -f _XWAYLAND_GLOBAL_OUTPUT_SCALE 32c -set _XWAYLAND_GLOBAL_OUTPUT_SCALE 2
 #+end_src
 
 ** Keywords
-https://wiki.hyprland.org/Configuring/Keywords/
-
-# For all categories, see https://wiki.hyprland.org/Configuring/Variables/
-# device:sino-wealth-usb-keyboard {
-#     kb_layout=us,br
-# }
+- https://wiki.hyprland.org/Configuring/Keywords/
+- For all categories, see https://wiki.hyprland.org/Configuring/Variables/
 
 *** Input
-[[https://wiki.hyprland.org/Configuring/Variables/#input][Variables#Input | Hyprland Wiki]]
+- [[https://wiki.hyprland.org/Configuring/Variables/#input][Variables#Input | Hyprland Wiki]]
 #+begin_src conf
 input {
     kb_layout = us,br
@@ -137,19 +104,10 @@ input {
 *** General
 #+begin_src conf
 general {
-    # See https://wiki.hyprland.org/Configuring/Variables/ for more
-
-    gaps_in = 4
-    gaps_out = 8
-    border_size = 2
-
-    # (ref:hyprland-border-colors-import)
-
     layout = dwindle
 
     resize_on_border = true
     # no_cursor_warps = true # don't move the cursor with keybinds
-    border_size = 2
     resize_corner = 3
     allow_tearing = true # https://wiki.hyprland.org/Configuring/Tearing/
 }
@@ -170,57 +128,6 @@ xwayland {
                               # GDK_SCALE, if using scaling is
                               # overriden, but still sharp.
                               # [2023-06-14 Wed 08:24:55 -03]
-}
-#+end_src
-
-*** Decoration
-#+begin_src conf
-decoration {
-    # See https://wiki.hyprland.org/Configuring/Variables/ for more
-
-    rounding = 4 # def 10
-
-    blur {
-         enabled = true
-         size = 5
-         passes = 3
-         new_optimizations = true
-    }
-}
-
-source = ./shadows.conf
-#+end_src
-
-**** Shadows
-disable shadows
-#+begin_src conf :tangle shadows.conf
-decoration {
-    drop_shadow = false
-    shadow_range = 20
-    shadow_render_power = 3
-    col.shadow = rgba(00000080)
-    col.shadow_inactive = rgba(00000000)
-    # shadow_ignore_window = true
-    # shadow_scale = 1
-}
-#+end_src
-
-*** Animations
-#+begin_src conf
-animations {
-    enabled = false
-
-    # Some default animations, see https://wiki.hyprland.org/Configuring/Animations/ for more
-
-    # bezier = myBezier, 0.05, 0.9, 0.1, 1.05
-    bezier = myBezier, 0, 0, .58, 1
-
-    animation = windows, 1, 1, myBezier
-    animation = windowsOut, 1, 7, default, popin 80%
-    animation = border, 1, 5, default
-    animation = borderangle, 1, 8, default
-    animation = fade, 1, 7, default
-    animation = workspaces, 1, 4, default
 }
 #+end_src
 
@@ -558,13 +465,79 @@ aka special workspaces
 #+begin_src conf
 # file containing nested sourcing for color definitions, useful for
 # editing/automating changes from scripts like darkman.
-source = themes/theme.conf
+source = themes/theme.conf # (ref:hyprland-conf-theming-sourcing)
+source = shadows.conf
+source = animations.conf
+source = blur.conf
+
+# redundant with shell profile, setting here just as a reminder.
+# AUR package 'qgnomeplatform-{common,qt5,qt6}-git'
+env = QT_QPA_PLATFORMTHEME,gnome
+
+# Cursor
+$cursorTheme = Breeze # directory name of the cursor theme
+# set cursor theme [[https://wiki.hyprland.org/FAQ/#how-do-i-change-me-mouse-cursor][Faq | Hyprland Wiki]]
+exec-once = hyprctl setcursor '$cursorTheme' 20
+env = XCURSOR_SIZE, 20
+exec-once = gsettings set org.gnome.desktop.interface cursor-theme '$cursorTheme'
+exec-once = gsettings set org.gnome.desktop.interface cursor-size 20
 #+end_src
+Settings that use IPC like =gsettings= or =hyprctl= could and probably
+should also be set from darkman.
+
+*** =theme.conf=: General visual customization
+:PROPERTIES:
+:header-args:conf: :tangle themes/theme.conf :mkdirp yes
+:END:
+
+Split files, sourcing them at [[(hyprland-conf-theming-sourcing)][hyprland.conf Theming sourcing]]
+#+begin_src conf
+general {
+    gaps_in = 4
+    gaps_out = 8
+    border_size = 2
+}
+
+decoration {
+    rounding = 4 # def 10
+}
+#+end_src
+
+#+begin_src conf :tangle blur.conf
+decoration {
+    blur {
+         enabled = true
+         size = 5
+         passes = 3
+         new_optimizations = true
+    }
+}
+#+end_src
+
+#+NAME: hyprland-animations-conf
+#+begin_src conf :tangle animations.conf
+animations {
+    enabled = true
+
+    # Some default animations, see https://wiki.hyprland.org/Configuring/Animations/ for more
+
+    # bezier = myBezier, 0.05, 0.9, 0.1, 1.05
+    bezier = myBezier, 0, 0, .58, 1
+
+    animation = windows, 1, 1, myBezier
+    animation = windowsOut, 1, 7, default, popin 80%
+    animation = border, 1, 5, default
+    animation = borderangle, 1, 8, default
+    animation = fade, 1, 7, default
+    animation = workspaces, 1, 4, default
+}
+#+end_src
+
 
 Since =theme.conf= is in a subdirectory, if it sources a file in the
 same directory as itself the source path should also be relative to
 itself and not to =hyprland.conf=. +(or just use fullpaths)+
-#+begin_src conf :tangle themes/theme.conf :noweb yes :mkdirp yes
+#+begin_src conf :noweb yes
 source = 00-<<lightordark()>>-theme.conf
 #+end_src
 
@@ -575,7 +548,6 @@ source = light-borders.conf
 #+begin_src conf :tangle themes/00-dark-theme.conf :mkdirp yes
 source = neon-dark-borders.conf
 #+end_src
-
 
 *** Border color themes
 #+begin_src conf :tangle themes/neon-dark-borders.conf :mkdirp yes
@@ -592,9 +564,40 @@ general {
 }
 #+end_src
 
+*** =shadows.conf=: Disable shadows
+#+begin_src conf :tangle shadows.conf
+decoration {
+    drop_shadow = false
+    shadow_range = 20
+    shadow_render_power = 3
+    col.shadow = rgba(00000080)
+    col.shadow_inactive = rgba(00000000)
+    # shadow_ignore_window = true
+    # shadow_scale = 1
+}
+#+end_src
 
 *** Auto dark/light theme change with =darkman=
 #+INCLUDE: ~/.config/darkman/README.org::#orgid-xivkrg
+
+
+
+
+** =nvidia.conf=: Nvidia-specific settings for Hyprland
+# Nvidia support
+# env = GBM_BACKEND,nvidia-drm # can cause issues? [[https://github.com/hyprwm/Hyprland/issues/2369#issuecomment-1564994687][Stuttering frames · Issue #2369 · hyprwm/Hyprland]]
+#+begin_src conf :tangle nvidia.conf
+env = LIBVA_DRIVER_NAME,nvidia
+env = WLR_NO_HARDWARE_CURSORS,1
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = __GL_GSYNC_ALLOWED,1
+env = __GL_VRR_ALLOWED,0
+#+end_src
+
+Source in the main config file
+#+begin_src conf
+source = nvidia.conf
+#+end_src
 
 * Notes
 

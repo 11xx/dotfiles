@@ -33,8 +33,8 @@ hyprland_source_theme() {
         dark) themeFile=${darkFile} ;;
         light) themeFile=${lightFile} ;;
     esac
-    # sourcing can be done using relative paths too
-    printf 'source = %s\n' "${themeFile}" > "${themeConfFile}"
+
+    sed -Ei "s,^source([[:blank:]]+|)=([[:blank:]]+|)(${lightFile}|${darkFile})$,source = ${themeFile}," "${themeConfFile}"
 }
 
 hyprland_source_theme light
