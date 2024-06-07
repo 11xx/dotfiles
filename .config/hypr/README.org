@@ -49,6 +49,7 @@ exec-once = xremap-default # script, keyboard remappings
 exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
 exec-once = gammastep -P
+exec-once = hypridle
 #+end_src
 
 ** Environment variables
@@ -273,6 +274,9 @@ bind = $mainMod, R, togglesplit, # dwindle
 # usage: $reset at the end of `exec' keybinds
 # alternative for non-exec: declare the same keybind again with the `submap, reset' after the first two fields for the keybind.
 # remember to set a safety reset keybind e.g.: bind = $mainMod, G, submap, reset
+
+# [[https://www.reddit.com/r/hyprland/comments/12q4xib/comment/jgqd0gw/][Activating lock/dpms from script with swayidle : r/hyprland]]
+bindl = SUPER SHIFT, L, exec, sleep 1 && hyprctl dispatch dpms off
 
 bind = $mainMod, X, submap, exemap
 submap = exemap
@@ -590,9 +594,6 @@ decoration {
 *** Auto dark/light theme change with =darkman=
 #+INCLUDE: ~/.config/darkman/README.org::#orgid-xivkrg
 
-
-
-
 ** =nvidia.conf=: Nvidia-specific settings for Hyprland
 # Nvidia support
 # env = GBM_BACKEND,nvidia-drm # can cause issues? [[https://github.com/hyprwm/Hyprland/issues/2369#issuecomment-1564994687][Stuttering frames · Issue #2369 · hyprwm/Hyprland]]
@@ -608,6 +609,21 @@ Source in the main config file
 #+begin_src conf
 source = nvidia.conf
 #+end_src
+
+* =hypridle.conf=: Idle management daemon
+:PROPERTIES:
+:header-args:conf: :tangle hypridle.conf
+:END:
+- [[https://wiki.hyprland.org/Hypr-Ecosystem/hypridle/][hypridle – Hyprland Wiki]]
+
+#+begin_src conf
+listener {
+    timeout = 900 # 15m
+    on-timeout = hyprctl dispatch dpms off
+    on-resume = hyprctl dispatch dpms on
+}
+#+end_src
+
 
 * Notes
 

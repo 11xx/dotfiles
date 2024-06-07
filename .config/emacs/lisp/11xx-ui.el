@@ -79,8 +79,8 @@ number."
 (defun on-after-init ()
   (unless (display-graphic-p (selected-frame))
     (set-face-background 'default "unspecified-bg" (selected-frame))))
-;; NOTE: The string "unspecified-bg" maked it work.
 (add-hook 'window-setup-hook #'on-after-init)
+;; idk if the string "unspecified-bg" specifically has to be used but it works
 
 
 ;; [[https://stackoverflow.com/questions/19054228/emacs-disable-theme-background-color-in-terminal/33298750#33298750][Emacs: disable theme background color in terminal - Stack Overflow]]
