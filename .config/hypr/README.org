@@ -528,22 +528,27 @@ decoration {
 }
 #+end_src
 
+- Animations are declared with the =animation=  keyword.
+  : animation=NAME,ONOFF,SPEED,CURVE[,STYLE]
+  + =ONOFF= can be either 0 or 1, 0 to disable, 1 to enable. /note:/  if it’s 0, you can omit further args.
+  + =SPEED=  is the amount of ds (1ds = 100ms) the animation will take
+  + =CURVE= is the bezier curve name, see [[https://wiki.hyprland.org/Configuring/Animations/#curves][curves]].
+  + =STYLE=  (optional) is the animation style
+  The animations are a tree. If an animation is unset, it will inherit
+  its parent’s values. See [[https://wiki.hyprland.org/Configuring/Animations/#animation-tree][the animation tree]].
+- See [[https://wiki.hyprland.org/Configuring/Animations/][Animations – Hyprland Wiki]].
+
 #+NAME: hyprland-animations-conf
 #+begin_src conf :tangle animations.conf
 animations {
     enabled = true
-
-    # Some default animations, see https://wiki.hyprland.org/Configuring/Animations/ for more
-
-    # bezier = myBezier, 0.05, 0.9, 0.1, 1.05
-    bezier = myBezier, 0, 0, .58, 1
-
-    animation = windows, 1, 1, myBezier
-    animation = windowsOut, 1, 7, default, popin 80%
-    animation = border, 1, 5, default
-    animation = borderangle, 1, 8, default
-    animation = fade, 1, 7, default
-    animation = workspaces, 1, 4, default
+    # animation=NAME,ONOFF,SPEED,CURVE[,STYLE]
+    animation = windows     , 1, 2, default, popin
+    animation = windowsOut  , 1, 2, default
+    animation = border      , 1, 2, default
+    animation = borderangle , 1, 2, default
+    animation = fade        , 1, 2, default
+    animation = workspaces  , 1, 2, default, fade
 }
 #+end_src
 
