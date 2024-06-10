@@ -244,6 +244,11 @@ blurls = launcher
 #+end_src
 
 ** Keybinds
+*** =keybinds.conf=
+:PROPERTIES:
+:header-args:conf: :tangle keybinds.conf
+:END:
+
 - Note: Here, the stuff:
   #+begin_example
   bind = [MOD], [KEY], submap, [MAPNAME]
@@ -258,7 +263,12 @@ blurls = launcher
   to reset it back to the normal/default submap. No other way is
   supported by Hyprland.
 
-Pretty messy:
+Source in the main config file
+#+begin_src conf :tangle hyprland.conf
+source = keybinds.conf
+#+end_src
+
++Pretty messy:+
 #+begin_src conf
 # #### Binds ####
 # See https://wiki.hyprland.org/Configuring/Keywords/ for more
@@ -469,7 +479,7 @@ bind = $mainMod, M, exec, terminal -w 120 -h 20 --float pulsemixer
 # libdisplay-info-git
 # xorg-xwayland
 
-*** TODO Scratchpads
+**** TODO Scratchpads
 aka special workspaces
 #+begin_src conf
 # bind = $mainMod SHIFT, N, movetoworkspace, special:emacs-quick-note
