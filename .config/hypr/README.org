@@ -99,7 +99,8 @@ input {
     # 3 - full loose, will not refocus on click, but allow mouse focus to be
       # detached from the keyboard like in 2.
 
-    # float_switch_override_focus = 0
+    float_switch_override_focus = 0
+    # See https://wiki.hyprland.org/Configuring/Variables/#:~:text=float_switch_override_focus
 
     sensitivity = -0.6 # -1.0 - 1.0, 0 means no modification.
 
@@ -149,7 +150,7 @@ dwindle {
     pseudotile = true # master switch for pseudotiling. Enabling is bound to mainMod + P in the keybinds section below
     preserve_split = true # you probably want this
     force_split = 2 # 0 -> split follows mouse, 1 -> always split to the left (new = left or top) 2 -> always split to the right (new = right or bottom)
-    no_gaps_when_only = 0
+    no_gaps_when_only = 1
     # use_active_for_splits = true
 }
 #+end_src
@@ -178,7 +179,7 @@ misc {
      # Enable variable refresh rate
      vrr=2 # 0 - off, 1 - on, 2 - fullscreen only
 
-     animate_manual_resizes = false
+     animate_manual_resizes = true
      # mouse_move_focuses_monitor = true
      animate_mouse_windowdragging = false
      enable_swallow = false
@@ -186,7 +187,7 @@ misc {
      # swallow_exception_regex = ^(.*Microsoft Edge.*|Mozilla Firefox|.*Chromium|.*Brave.*|wev)$
 
      mouse_move_enables_dpms = true #prevents accidental wake up
-     key_press_enables_dpms = false
+     key_press_enables_dpms = true
 
      mouse_move_focuses_monitor = false
 }
@@ -317,7 +318,7 @@ bind = $mainMod, J, movefocus, d
 # bind = $mainMod, K, exec, hyprctl --batch 'dispatch movefocus u; dispatch movecursortocorner 1'
 # bind = $mainMod, J, exec, hyprctl --batch 'dispatch movefocus d; dispatch movecursortocorner 1'
 
-bind = $mainMod, S, togglesplit,
+bind = $mainMod, S, swapsplit,
 
 # vim
 bind = $mainMod SHIFT, H, movewindow, l
@@ -614,6 +615,55 @@ Source in the main config file
 #+begin_src conf
 source = nvidia.conf
 #+end_src
+
+** Plugins
+
+*** Hyprbars
+:PROPERTIES:
+:header-args:conf: :tangle plugins/hyprbars.conf :mkdirp yes
+:END:
+- [[https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars][hyprland-plugins/hyprbars at main · hyprwm/hyprland-plugins]]
+  # [2024-06-09 Sun 19:46:25 -03] @ak
+#+begin_src conf
+$neron-bg = rgb(222222)
+$neron-green = rgb(61bd09)
+$neron-pink = rgb(ff77cf)
+$neron-cyan = rgb(16b0cf)
+$neron-fg = rgb(a6a8a9)
+$neron-current = rgb(2f2f2f)
+$current-icon = rgb(666666)
+
+plugin {
+    hyprbars {
+        bar_height = 20
+        bar_color = $neron-bg
+        col.text = $neron-fg
+        bar_text_size = 9
+        # bar_text_font = Jetbrains Mono Nerd Font Mono Bold
+        bar_text_font = LiterationMono Nerd Font Bold
+        bar_button_padding = 10
+        bar_padding = 5
+        bar_precedence_over_border = true
+        hyprbars-button = $neron-pink, 16, , hyprctl dispatch killactive
+        hyprbars-button = $neron-green, 16, , hyprctl dispatch fullscreen 2
+        hyprbars-button = $neron-cyan, 16, , hyprctl dispatch togglefloating
+   }
+}
+#+end_src
+
+Disable title bars for tiles (non-floating) windows
+- See
+  + [[https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars#window-rules][hyprland-plugins/hyprbars#Window rules at main · hyprwm/hyprland-plugins]]
+  + [[https://www.reddit.com/r/hyprland/comments/1cyaz4u/comment/l5brgnw/][I like hyprbars. That's all. : r/hyprland]]
+#+begin_src conf
+windowrulev2 = plugin:hyprbars:nobar, ^floating:0
+#+end_src
+
+Source in main config
+#+begin_src conf :tangle hyprland.conf
+source = plugins/hyprbars.conf
+#+end_src
+
 
 * =hypridle.conf=: Idle management daemon
 :PROPERTIES:
