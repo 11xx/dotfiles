@@ -1,8 +1,11 @@
 #!/usr/bin/env sh
 # tested on a dual-monitor setup, may not work with different ones
 
+unset __usingjaq
+
 command -v jaq > /dev/null &&
-    alias jq=jaq
+    alias jq=jaq &&
+    __usingjaq=t
 # jaq is a faster jq clone
 
 # if [`jq' is not alias] AND [`jq' not found] = fail

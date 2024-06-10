@@ -750,8 +750,11 @@ do case $1 in
 
 #+NAME: hyprland-scripts-check-alias-jaq-or-jq
 #+begin_src shell
+unset __usingjaq
+
 command -v jaq > /dev/null &&
-    alias jq=jaq
+    alias jq=jaq &&
+    __usingjaq=t
 # jaq is a faster jq clone
 
 # if [`jq' is not alias] AND [`jq' not found] = fail
@@ -1165,7 +1168,8 @@ Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Stat
 
 - DEPENDENCIES
   + socat
-  + jaq (AND jq for all features)
+  + jaq or jq
+  + coreutils: provides stdbuf
 
 *** =get-active-workspace=
 :PROPERTIES:
@@ -1216,14 +1220,24 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 :header-args:shell+: :tangle (tdir "/scripts/get-workspaces")
 :END:
 
-- DEPENDENCIES
-  + =jq=, because =jaq= doesn't have =--argjson=.
+#+begin_src shell :noweb yes
+«hyprland-scripts-check-alias-jaq-or-jq»
 
-#+begin_src shell
-spaces (){
+spacesJq (){
     WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jq 'map({key: .id | tostring, value: .windows}) | from_entries')
     seq 1 10 | jq --argjson windows "${WORKSPACE_WINDOWS}" --slurp -Mc 'map(tostring) | map({id: ., windows: ($windows[.]//0)})'
 }
+
+spacesJaq() {
+    WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jaq 'map({key: .id | tostring, value: .windows}) | from_entries')
+    seq 1 10 | jaq --arg windows "${WORKSPACE_WINDOWS}" --slurp --color never -c 'map(tostring) | map({id: ., windows: (($windows | fromjson)[.]//0)})'
+}
+
+if [ -n "${__usingjaq}" ]; then
+    alias spaces=spacesJaq
+else
+    alias spaces=spacesJq
+fi
 
 spaces
 
