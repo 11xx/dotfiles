@@ -287,7 +287,7 @@ bind = $mainMod, R, togglesplit, # dwindle
 # remember to set a safety reset keybind e.g.: bind = $mainMod, G, submap, reset
 
 # [[https://www.reddit.com/r/hyprland/comments/12q4xib/comment/jgqd0gw/][Activating lock/dpms from script with swayidle : r/hyprland]]
-bindl = SUPER SHIFT, L, exec, sleep 1 && hyprctl dispatch dpms off
+bindl = $mainMod ALT, pause, exec, hyprctl dispatch dpms off
 
 bind = $mainMod, X, submap, exemap
 submap = exemap
