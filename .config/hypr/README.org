@@ -50,6 +50,8 @@ exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
 exec-once = gammastep -P
 exec-once = hypridle
+
+exec-once = hypr-dynamic-float-bitwarden-unlock-firefox # script, hack
 #+end_src
 
 ** Environment variables
@@ -190,6 +192,8 @@ misc {
      key_press_enables_dpms = true
 
      mouse_move_focuses_monitor = false
+
+     new_window_takes_over_fullscreen = 2
 }
 #+end_src
 
@@ -228,7 +232,6 @@ windowrulev2 = float,class:(emacs),title:(Ediff)
 windowrulev2 = size 100 100,class:(emacs),title:(Ediff)
 # windowrulev2 = center 1,class:(emacs),title:(Ediff)
 windowrulev2 = move cursor -50% -50%,class:(emacs),title:(Ediff)
-windowrulev2 = float,class:(firefox),title:^(Extension:.*)$ # doesnt work apprntly
 
 # Blender
 windowrulev2 = float,title:^Blender (Render|Preferences)$
@@ -800,6 +803,31 @@ exit 0
 # [ERR] Ignoring moveWorkspaceToMonitor: monitor doesnt exist
 # after disconnecting monitors and their number changing, could it be a higher = problem? # [2023-04-17 Mon 05:36:43 -03] --- seems fixed on recent workspace overhaul stuff # [2023-04-28 Fri 22:23:13 -03]
 # [[https://github.com/hyprwm/Hyprland/issues/2154][Switching workspace on focused monitor sometimes also changes workspace on non-focused monitor · Issue #2154 · hyprwm/Hyprland]]
+
+** =hypr-dynamic-float-bitwarden-unlock-firefox=: Hack for dealing with Bitwarden's extension window on Firefox
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "/hypr-dynamic-float-bitwarden-unlock-firefox") :shebang #!/usr/bin/env sh :mkdirp yes
+:END:
+
+Big name because this is so specific it will never be used outside of
+=exec-once=.
+
+- See
+  + [[https://github.com/hyprwm/Hyprland/issues/3835][Make `float` rule dynamic (related issue with Bitwarden opening maximized window on vault unlock) · Issue #3835 · hyprwm/Hyprland]]
+  + [[https://www.reddit.com/r/hyprland/comments/1bg25vf/how_to_exit_fullscreen_when_opening_a_new_window/][How to exit fullscreen when opening a new window? : r/hyprland]]
+    Along with running this script, setting
+    ~misc:new_window_takes_over_fullscreen = 2~ may also be desired.
+
+#+begin_src shell
+socat -U - UNIX-CONNECT:/run/user/1000/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock |
+    stdbuf -o0 grep '^activewindow>>.*Extension: (Bitwarden Password Manager) - Bitwarden — Mozilla Firefox$' |
+    while read -r _; do
+        hyprctl --batch \
+                dispatch setfloating title:'^(Extension:)(.*)(- Bitwarden — Mozilla Firefox)$' \; \
+                dispatch centerwindow
+    done
+#+end_src
+
 
 * Hyprland Notes
 ** Turn screen off (screen energy saver)
