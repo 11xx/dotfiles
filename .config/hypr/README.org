@@ -819,7 +819,7 @@ Big name because this is so specific it will never be used outside of
     ~misc:new_window_takes_over_fullscreen = 2~ may also be desired.
 
 #+begin_src shell
-socat -U - UNIX-CONNECT:/run/user/1000/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock |
+socat -U - UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock |
     stdbuf -o0 grep '^activewindow>>.*Extension: (Bitwarden Password Manager) - Bitwarden — Mozilla Firefox$' |
     while read -r _; do
         hyprctl --batch \
