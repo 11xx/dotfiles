@@ -159,20 +159,6 @@ dwindle {
 }
 #+end_src
 
-*** Master & Stack layout
-- Never used this.
-#+begin_src conf
-master {
-    # See https://wiki.hyprland.org/Configuring/Master-Layout/ for more
-    new_is_master = true
-}
-
-# gestures {
-#     # See https://wiki.hyprland.org/Configuring/Variables/ for more
-#     workspace_swipe = false
-# }
-#+end_src
-
 *** Misc
 - [[https://wiki.hyprland.org/Configuring/Variables/#misc][Variables#Misc – Hyprland Wiki]]
 #+begin_src conf
