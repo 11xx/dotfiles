@@ -596,8 +596,8 @@ general {
 
 #+begin_src conf :tangle themes/light-borders.conf :mkdirp yes
 general {
-    col.active_border = rgba(000000ff)
-    col.inactive_border = rgb(cccccc)
+    col.active_border = rgb(000000)
+    col.inactive_border = rgb(eeeeee)
 }
 #+end_src
 
