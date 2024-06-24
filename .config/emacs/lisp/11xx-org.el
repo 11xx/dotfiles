@@ -38,13 +38,13 @@
 
   :config
   ;; Move this to file local
-  ;; (org-babel-do-load-languages
-  ;;  'org-babel-load-languages
-  ;;  (append org-babel-load-languages
-  ;;          '((haskell . t)
-  ;;            ;; (async   . t) ; from ob-async
-  ;;            (shell   . t)
-  ;;            (C       . t))))
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   (append org-babel-load-languages
+           '((haskell . t)
+             ;; (async   . t) ; from ob-async
+             (shell   . t)
+             (C       . t))))
   ;; Disable angle bracket syntax highlighting/matching
   (add-hook 'org-mode-hook
             (lambda()
