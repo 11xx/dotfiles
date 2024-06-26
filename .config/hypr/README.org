@@ -220,6 +220,7 @@ windowrulev2 = float,class:(emacs),title:(Ediff)
 windowrulev2 = size 100 100,class:(emacs),title:(Ediff)
 # windowrulev2 = center 1,class:(emacs),title:(Ediff)
 windowrulev2 = move cursor -50% -50%,class:(emacs),title:(Ediff)
+windowrulev2 = float,class:.*\.exe$
 
 # Blender
 windowrulev2 = float,title:^Blender (Render|Preferences)$
