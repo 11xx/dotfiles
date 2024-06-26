@@ -9,17 +9,18 @@ GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
 is_command prepend_path &&
     prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
 
-is_command paru && {
-    __newPath=$(
-        printf '%s\n' "$PATH" |
-            awk -v ghcupdir=${GHCUP_BIN_DIR} \
-                '{ sub(ghcupdir":", "", $0); print $0":"ghcupdir }'
-             )
-    # double-quote for making it expand.
+__newPath=$(
+    printf '%s\n' "$PATH" |
+        awk -v ghcupdir=${GHCUP_BIN_DIR} \
+            '{ sub(ghcupdir":", "", $0); print $0":"ghcupdir }'
+         )
+is_command paru && # make sure variables expand.
     alias paru="PATH=\"${__newPath}\" paru"
 
-    unset __newPath
-}
+is_command makepkg &&
+    alias makepkg="PATH=\"${__newPath}\" makepkg"
+
+unset __newPath
 
 export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
 

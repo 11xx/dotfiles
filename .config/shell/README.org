@@ -1475,20 +1475,25 @@ is_command prepend_path &&
   : PATH=$(echo $PATH | sed 's,/home/user/.local/ghcup-bin:,,') paru
   or if the directory to be removed is the first in PATH:
   : PATH=${PATH#*:} paru
-  So to fix this simply alias the command:
+  So to fix this simply alias the commands:
   #+begin_src shell
-  is_command paru && {
-      __newPath=$(
-          printf '%s\n' "$PATH" |
-              awk -v ghcupdir=${GHCUP_BIN_DIR} \
-                  '{ sub(ghcupdir":", "", $0); print $0":"ghcupdir }'
-               )
-      # double-quote for making it expand.
+  __newPath=$(
+      printf '%s\n' "$PATH" |
+          awk -v ghcupdir=${GHCUP_BIN_DIR} \
+              '{ sub(ghcupdir":", "", $0); print $0":"ghcupdir }'
+           )
+  is_command paru && # make sure variables expand.
       alias paru="PATH=\"${__newPath}\" paru"
 
-      unset __newPath
-  }
+  is_command makepkg &&
+      alias makepkg="PATH=\"${__newPath}\" makepkg"
+
+  unset __newPath
   #+end_src
+  + Note: the aliases let the local variable ~__newPath~ expand because
+    it is cleaned after the alias definition. Normally aliases can
+    contain unexpanded variables since when run those variables expand
+    at runtime.
 
 #+begin_src shell
 export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
