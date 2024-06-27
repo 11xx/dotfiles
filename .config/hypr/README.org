@@ -265,7 +265,7 @@ source = keybinds.conf
 # #### Binds ####
 # See https://wiki.hyprland.org/Configuring/Keywords/ for more
 $mainMod = SUPER
-$browser = firefox-launcher
+$browser = firefox
 
 bind = $mainMod, V, togglefloating,
 bind = $mainMod, R, togglesplit, # dwindle
