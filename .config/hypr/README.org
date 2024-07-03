@@ -646,10 +646,13 @@ decoration {
 # env = GBM_BACKEND,nvidia-drm # can cause issues? [[https://github.com/hyprwm/Hyprland/issues/2369#issuecomment-1564994687][Stuttering frames · Issue #2369 · hyprwm/Hyprland]]
 #+begin_src conf :tangle nvidia.conf
 env = LIBVA_DRIVER_NAME,nvidia
-env = WLR_NO_HARDWARE_CURSORS,1
 env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 env = __GL_GSYNC_ALLOWED,1
 env = __GL_VRR_ALLOWED,0
+
+cursor {
+    no_hardware_cursors = true
+}
 #+end_src
 
 Source in the main config file
