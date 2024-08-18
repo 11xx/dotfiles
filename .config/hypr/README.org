@@ -246,14 +246,27 @@ blurls = launcher
   bind = [MOD], [KEY], submap, [MAPNAME]
   submap = [MAPNAME]
   [...]
-  bind = [MOD], [KEY], submap, reset
-  source=./reset-submap.conf
+  source = ./catchall-reset-submap.conf
   submap = reset
   #+end_example
-  Is to, basically, enable Emacs-like key chords. The key is the
-  =source= of the file =./reset-submap.conf= that hardcodes any key press
-  to reset it back to the normal/default submap. No other way is
-  supported by Hyprland.
+  Is to, basically, enable Emacs-like key chords. This is allowed by
+  the special =catchall= keybind that catches almost any key press to
+  reset it back to the normal/default submap. Though it doesn't catch
+  all mod keys presses so they have to be specified manually.
+  + See [[https://wiki.hyprland.org/Configuring/Binds/#catch-all][Binds – Hyprland Wiki#Catch-All]]
+  # [2024-07-03 Wed 04:56:22 -03] @ak
+  #+begin_src conf :tangle catchall-reset-submap.conf
+  # don't forget to set $mainMod aka SUPER
+  bind =                         , catchall, submap, reset
+  bind = $mainMod                , catchall, submap, reset
+  bind = $mainMod ALT            , catchall, submap, reset
+  bind = $mainMod CTRL           , catchall, submap, reset
+  bind = $mainMod SHIFT          , catchall, submap, reset
+  bind = $mainMod ALT CTRL       , catchall, submap, reset
+  bind = $mainMod ALT SHIFT      , catchall, submap, reset
+  bind = $mainMod CTRL SHIFT     , catchall, submap, reset
+  bind = $mainMod ALT CTRL SHIFT , catchall, submap, reset
+  #+end_src
 
 Source in the main config file
 #+begin_src conf :tangle hyprland.conf
@@ -298,8 +311,7 @@ bind = , V, exec, vivaldi
 # bind = , N, exec, [workspace special:emacs-quick-note;noanim] emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
 # bind = , N, exec, emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
 
-bind = $mainMod, G, submap, reset
-source=./reset-submap.conf
+source = ./catchall-reset-submap.conf
 submap = reset
 
 bind = $mainMod ALT, C, killactive, # for kill with s-M-c
@@ -397,8 +409,7 @@ submap = wm
 bind = $mainMod, F, fullscreen, 1
 # bind = , F, togglefloating,
 
-# bind = $mainMod, G, submap, reset # fallback
-source=./reset-submap.conf
+source = ./catchall-reset-submap.conf
 submap = reset
 
 bind = $mainMod, F11, fullscreen, 0
