@@ -199,7 +199,10 @@ binds {
 }
 #+end_src
 
-** Window Rules
+** =window-rules.conf=: Window rules collection
+:PROPERTIES:
+:header-args:conf: :tangle window-rules.conf
+:END:
 #+begin_src conf
 # See https://wiki.hyprland.org/Configuring/Window-Rules/
 windowrulev2 = float,class:^(org.kde.polkit-kde-authentication-agent-1)$
@@ -222,11 +225,30 @@ windowrulev2 = float,class:.*\.exe$
 # Blender
 windowrulev2 = float,title:^Blender (Render|Preferences)$
 
-# Steam
+# Steam & Games
 windowrulev2 = float,title:^Create or select new Steam library folder$
+windowrulev2 = float,class:steam,title:Friends List
+windowrulev2 = float,class:steam,title:Steam Settings
+windowrulev2 = float,class:steam # just float everything steam
 
-# Blur notifications and bars, [[https://wiki.hyprland.org/Configuring/Keywords/#blurring-layersurfaces][Keywords | Hyprland Wiki]]
-# [[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
+# File managers
+windowrulev2 = float,class:org.kde.ark,title:^(File Already Exists).*Ark$
+windowrulev2 = float,class:org.kde.dolphin,title:^(Choose Application).*Dolphin$
+
+# Browser
+windowrulev2 = float,class:firefox,title:^$ # firefox notification pop-ups are empty
+#+end_src
+
+#+begin_src conf :tangle hyprland.conf
+source = window-rules.conf
+
+windowrulev2 = suppressevent maximize, class:.*
+#+end_src
+
+** Blur layer
+Blur notifications and bars, [[https://wiki.hyprland.org/Configuring/Keywords/#blurring-layersurfaces][Keywords | Hyprland Wiki]]
+[[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
+#+begin_src conf
 blurls = notifications
 blurls = wob
 blurls = launcher
