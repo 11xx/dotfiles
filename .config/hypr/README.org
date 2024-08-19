@@ -48,12 +48,18 @@ exec-once = xsettingsd # GTK2-3 theme live changes
 exec-once = xremap-default # script, keyboard remappings
 exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
-exec-once = gammastep -P
+# exec-once = gammastep -P
 exec-once = hypridle
 
 exec-once = hypr-dynamic-float-bitwarden-unlock-firefox # script, hack
 
 exec-once = hyprpm reload -n # Load plugins
+
+exec-once = dunst
+
+exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6 # fix dolphin mime-types associations
+
+exec-once = hypr-eww-restart-on-monitor-change # script
 #+end_src
 
 ** Environment variables
@@ -1000,26 +1006,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
   + [[https://elkowar.github.io/eww/configuration.html][Configuration - eww documentation]]
   + [[https://dharmx.is-a.dev/eww-powermenu/][EWW Powermenu - dead airspace]]
 
-#+begin_src yuck
-(defwindow mainbar2
-           :monitor 1
-           :geometry (geometry :x "0%"
-                               :y "0px"
-                               :width "100%"
-                               :height "26px"
-                               :anchor "top center")
-           :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance "30px" :side "top")
-           ;; :windowtype "dock" ; x11
-           ;; :wm-ignore false ; x11
-           :exclusive true ; wayland
-           :namespace "bar" ; wayland
-
-           ;; for some reason when two defwindows use the same class it either
-           ;; appends a number to it or requires manual disambiguation.
-           :class "mainbar2"
-           (bar-all-modules))
-
+#+begin_src yuck :noweb yes
 (defwindow mainbar
            :monitor 0
            :geometry (geometry :x "0%"
@@ -1036,6 +1023,35 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            :class "mainbar"
            (bar-all-modules))
 
+(defwindow mainbar2
+           :monitor 1
+           :geometry (geometry :x "0%"
+                               :y "0px"
+                               :width "<<eww-width-scaling-hyprland-second-monitor()>>px"
+                               :height "26px"
+                               :anchor "top center")
+           :stacking "fg" ; foreground is still below fullscreen
+           :reserve (struts :distance "30px" :side "top")
+           ;; :windowtype "dock" ; x11
+           ;; :wm-ignore false ; x11
+           :exclusive true ; wayland
+           :namespace "bar" ; wayland
+
+           ;; for some reason when two defwindows use the same class it either
+           ;; appends a number to it or requires manual disambiguation.
+           :class "mainbar2"
+           (box :space-evenly true
+                (box :orientation "h"
+                     :space-evenly false
+                     (label :text "${time}" :class "time-label")
+                     (mpd-current :nth 0))
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "end"
+                     (window-title-second-monitor)
+                     (sep)
+                     (workspaces)
+                     (sep))))
 
 (defwidget bar-all-modules []
            (box :space-evenly true
@@ -1071,6 +1087,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :class "right-modules"
                 (mpd-current :nth 0)
                 (sep)
+                (systray :orientation "h" :spacing 10 :icon-size 24)
+                (sep)
                 (label :text "${time}" :class "time-label")))
 
 (defvar time-visible false)   ; for :run-while property of below variable
@@ -1082,11 +1100,11 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
               :run-while time-visible   ; optional, defaults to 'true'
               "date +'%Y/%m/%d (%H:%M)'")
 
-(deflisten workspaces-listen :initial "[]" "scripts/get-workspaces")
-(deflisten current-workspace :initial "1" "scripts/get-active-workspace")
+(deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
+(deflisten current-workspace :initial '{"focused":"1","unfocused":"2"}' "hypr-get-active-workspace")
 (defwidget workspaces []
   (eventbox
-   :onscroll "scripts/change-active-workspace {} ${current-workspace}"
+   ;; :onscroll " {} ${current-workspace}"
    :class "workspaces-widget-eventbox"
 
    (box
@@ -1095,17 +1113,26 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            :visible false)
     (for workspace in workspaces-listen
          (eventbox
-          :onclick "hyprctl dispatch workspace ${workspace.id}"
+          :onclick "hypr-workspace ${workspace.id}"
           (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} \
                        ${workspace.windows > 0 ? "occupied" : "empty"} \
                        ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
                (label :text "${workspace.id}")))))))
 
-(deflisten window-listen :initial "..." "scripts/get-window-title")
+(deflisten window-listen :initial "..." "hypr-get-window-title")
+(deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
 (defwidget window-title []
   (box
    (label :text "${window-listen}"
           :limit-width 50
+          :class "window-title-label"
+          ;; :truncate-left true
+          )))
+
+(defwidget window-title-second-monitor []
+  (box
+   (label :text "${window-listen-second-monitor}"
+          :limit-width 70
           :class "window-title-label"
           ;; :truncate-left true
           )))
@@ -1186,6 +1213,15 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (mpd-current-1st-wrap)))
 
 #+end_src
+
+The following noweb variable is workaround for eww on hyprland not
+scaling properly on a scaled secondary/side monitor where 100% will
+not cover the width of the scaled monitor.
+#+NAME: eww-width-scaling-hyprland-second-monitor
+#+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :exports none :tangle no
+awk -F, '{print $3}' monitors.conf | awk NF | sort | tail -1 | awk -Fx '{print $1}'
+#+end_src
+# [2024-08-02 Fri 00:33:35 -03] @ak
 
 ** =eww.scss=: Customization for =eww.yuck= widgets
 :PROPERTIES:
@@ -1329,6 +1365,7 @@ $current-bb-t: .15em;
 ** Eww Hyprland Scripts
 :PROPERTIES:
 :header-args:shell: :shebang #!/usr/bin/env sh :mkdirp yes :noweb yes
+:tangle-dir: (expand-file-name "hyprland" (xdg-bin-home))
 :END:
 
 Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Status bars – Hyprland Wiki#Eww]]
@@ -1338,9 +1375,9 @@ Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Stat
   + jaq or jq
   + coreutils: provides stdbuf
 
-*** =get-active-workspace=
+*** =hypr-get-active-workspace=
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "/scripts/get-active-workspace")
+:header-args:shell+: :tangle (tdir "hypr-get-active-workspace")
 :END:
 
 #+begin_src shell
@@ -1365,9 +1402,9 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
     done
 #+end_src
 
-*** =get-window-title=
+*** =hypr-get-window-title=
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "/scripts/get-window-title")
+:header-args:shell+: :tangle (tdir "hypr-get-window-title")
 :END:
 
 #+begin_src shell
@@ -1379,12 +1416,11 @@ hyprctl activewindow -j | jq --raw-output .title
 socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
     stdbuf -o0 grep '^activewindow>>' |
     stdbuf -o0 awk -F '>>|,' '{print $3}'
-
 #+end_src
 
-*** =get-workspaces=
+*** =hypr-get-workspaces=
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "/scripts/get-workspaces")
+:header-args:shell+: :tangle (tdir "hypr-get-workspaces")
 :END:
 
 #+begin_src shell :noweb yes
@@ -1414,6 +1450,116 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
     done
 #+end_src
 
+
+*** =hypr-get-window-title-second-monitor=
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "hypr-get-window-title-second-monitor")
+:END:
+#+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :noweb yes
+«hyprland-scripts-check-alias-jaq-or-jq»
+
+MONITOR_PORT=${MONITOR_PORT:-$1}
+MONITOR_PORT=${MONITOR_PORT:-"DP-2"}
+
+get_window_title_workspace_mon() {
+    idActiveWorkspaceOnMon=$(hyprctl monitors -j | jq -r --arg monitor_port "${MONITOR_PORT}" '.[] | select(.name == $monitor_port).activeWorkspace.id')
+    hyprctl workspaces -j | jq --arg idActiveWorkspaceOnMon "$idActiveWorkspaceOnMon" -r '.[] | select(.id == ($idActiveWorkspaceOnMon | tonumber)).lastwindowtitle'
+}
+
+get_window_title_workspace_mon
+
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+    stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
+    while read -r _; do
+        get_window_title_workspace_mon
+    done
+#+end_src
+
+*** =hypr-eww-restart-on-monitor-change=: Restart eww on monitor on/off/reconnect
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "hypr-eww-restart-on-monitor-change")
+:END:
+#+begin_src shell :noweb yes
+«hyprland-scripts-check-alias-jaq-or-jq»
+
+eww_open_bars() {
+    eww open mainbar
+    eww open mainbar2
+}
+
+eww_unreachable_restart() {
+    pkill -f '^eww.*mainbar'
+    eww_open_bars
+    return 0
+}
+
+socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+    stdbuf -o0 grep '^monitoradded>>' |
+    stdbuf -o0 awk -F '>>' '{print $2}' |
+    while read -r port; do
+        sleep 2
+        eww ping >/dev/null || {
+            eww_unreachable_restart && continue
+        }
+        eww close-all
+        eww_open_bars
+    done
+
+# monitorremoved
+#+end_src
+
+
+* Hyprland-specific file mime associations
+- *NOTE*: The file name for the "DE"-specific "=*-mimeapps.list=" file
+  should contain the value of the =XDG_CURRENT_DESKTOP= env var, in this
+  case, since it's =Hyprland= the filename is also named that, including
+  the capital letter.
+#+begin_src conf :tangle (expand-file-name "Hyprland-mimeapps.list" (xdg-config-home))
+[Default Applications]
+application/pdf=launch.desktop
+text/tcl=launch.desktop
+text/x-tex=launch.desktop
+text/x-c++src=launch.desktop
+text/html=launch.desktop
+text/x-java=launch.desktop
+text/x-chdr=launch.desktop
+text/x-moc=launch.desktop
+text/x-makefile=launch.desktop
+text/x-c++hdr=launch.desktop
+text/tab-separated-values=launch.desktop
+text/x-pascal=launch.desktop
+text/plain=launch.desktop
+text/csv=launch.desktop
+text/x-csrc=launch.desktop
+text/spreadsheet=launch.desktop
+application/x-spkac+base64=launch.desktop
+application/vnd.apple.mpegurl=launch.desktop
+application/sdp=launch.desktop
+application/x-cmakecache=launch.desktop
+application/x-cue=launch.desktop
+application/postscript=launch.desktop
+application/rtf=launch.desktop
+application/xml=launch.desktop
+application/x-pem-file=launch.desktop
+application/x-shellscript=launch.desktop
+application/x-directory=launch.desktop
+inode/directory=launch.desktop
+image/x-portable-bitmap=launch.desktop
+image/x-portable-anymap=launch.desktop
+image/x-portable-graymap=launch.desktop
+image/webp=launch.desktop
+image/tiff=launch.desktop
+image/x-tga=launch.desktop
+image/bmp=launch.desktop
+image/vnd.zbrush.pcx=launch.desktop
+image/x-xbitmap=launch.desktop
+image/x-portable-pixmap=launch.desktop
+image/jpeg=launch.desktop
+image/png=launch.desktop
+
+# [Added Associations]
+# text/x-c=firefox.desktop;
+#+end_src
 
 * Local file variables & Noweb variables                    :noexport:ignore:
 :PROPERTIES:

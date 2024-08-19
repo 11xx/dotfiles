@@ -345,6 +345,63 @@ hyprland_source_theme dark
 #+end_src
 
 
+** Eww
+Setup that will be used in both scripts:
+#+NAME: darkman-eww-mainbar-setup
+#+begin_src shell
+«darkman-helper-functions»
+
+
+ewwDir=${XDG_CONFIG_HOME}/eww
+
+# files containing css variables, the eww.scss file have to use them properly
+light=light-colors.scss
+dark=dark-colors.scss
+
+# check if the scss files exist
+check_file "${ewwDir}"/"${light}"
+check_file "${ewwDir}"/"${dark}"
+
+eww_scss_source_theme() {
+    case "$1" in
+        dark) themeFile="${dark}" ;;
+        light) themeFile="${light}" ;;
+    esac
+
+    sed -i "s/^\(@import\) *\"\(${light}\|${dark}\)\".*/\1 \"${themeFile}\";/" \
+        "${ewwDir}"/eww.scss
+}
+#+end_src
+
+This approach uses a prepared =eww.scss= file with defined color
+variables that have two versions, a light and a dark, separated into
+two files. The one being used in the moment is sourced with a css
+import, e.g.: =@import "light-colors.scss";=.
+
+The scripts replace that line with the alternative.
+
+*** Light
+:PROPERTIES:
+:theme:    light
+:END:
+
+#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh")
+«darkman-eww-mainbar-setup»
+
+eww_scss_source_theme light
+#+end_src
+
+*** Dark
+:PROPERTIES:
+:theme:    dark
+:END:
+
+#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh")
+«darkman-eww-mainbar-setup»
+
+eww_scss_source_theme dark
+#+end_src
+
 ** TODO =light-mode.d=: Light
 :PROPERTIES:
 :tangle-dir: (concat (xdg-data-home) "/light-mode.d")
@@ -379,38 +436,6 @@ replace_theme_import() {
 
 replace_theme_import "${theme}" "${XDG_CONFIG_HOME}"/alacritty/alacritty.toml
 #+end_src
-
-*** Eww mainbar
-Setup that will be used in both scripts:
-#+NAME: darkman-eww-mainbar-setup
-#+begin_src shell
-«darkman-helper-functions»
-
-ewwDir=${XDG_CONFIG_HOME}/eww
-
-# files containing css variables, the eww.scss file have to use them properly
-light=light-colors.scss
-dark=dark-colors.scss
-#+end_src
-
-This approach uses a prepared `eww.scss' file with defined color
-variables that have two versions, a light and a dark, separated into
-two files. The one being used in the moment is sourced with a css
-import, e.g.: =@import "light-colors.scss";=.
-
-This script replaces that line with the alternative.
-#+begin_src shell :tangle (tdir "/eww-mainbar.sh")
-«darkman-eww-mainbar-setup»
-
-# check the one that will be changed to
-check_file "${ewwDir}"/"${light}"
-
-sed -i "s/^\(@import\) *\"${dark}\".*/\1 \"${light}\";/" \
-    "${ewwDir}"/eww.scss
-#+end_src
-
-
-
 
 *** tofi
 #+NAME: darkman-tofi-setup
@@ -474,16 +499,6 @@ theme=neron-dark
 «darkman-alacritty-colors-replace»
 #+end_src
 
-*** Eww mainbar
-#+begin_src shell :tangle (tdir "/eww-mainbar.sh")
-«darkman-eww-mainbar-setup»
-
-# check the one that will be changed to
-check_file "${ewwDir}"/"${dark}"
-
-sed -i "s/^\(@import\) *\"${light}\".*/\1 \"${dark}\";/" \
-    "${ewwDir}"/eww.scss
-#+end_src
 *** tofi
 #+begin_src shell :tangle (tdir "/tofi.sh")
 «darkman-tofi-setup»

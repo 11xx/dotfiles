@@ -1,22 +1,3 @@
-(defwindow mainbar2
-           :monitor 1
-           :geometry (geometry :x "0%"
-                               :y "0px"
-                               :width "100%"
-                               :height "26px"
-                               :anchor "top center")
-           :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance "30px" :side "top")
-           ;; :windowtype "dock" ; x11
-           ;; :wm-ignore false ; x11
-           :exclusive true ; wayland
-           :namespace "bar" ; wayland
-
-           ;; for some reason when two defwindows use the same class it either
-           ;; appends a number to it or requires manual disambiguation.
-           :class "mainbar2"
-           (bar-all-modules))
-
 (defwindow mainbar
            :monitor 0
            :geometry (geometry :x "0%"
@@ -33,6 +14,35 @@
            :class "mainbar"
            (bar-all-modules))
 
+(defwindow mainbar2
+           :monitor 1
+           :geometry (geometry :x "0%"
+                               :y "0px"
+                               :width "2048px"
+                               :height "26px"
+                               :anchor "top center")
+           :stacking "fg" ; foreground is still below fullscreen
+           :reserve (struts :distance "30px" :side "top")
+           ;; :windowtype "dock" ; x11
+           ;; :wm-ignore false ; x11
+           :exclusive true ; wayland
+           :namespace "bar" ; wayland
+
+           ;; for some reason when two defwindows use the same class it either
+           ;; appends a number to it or requires manual disambiguation.
+           :class "mainbar2"
+           (box :space-evenly true
+                (box :orientation "h"
+                     :space-evenly false
+                     (label :text "${time}" :class "time-label")
+                     (mpd-current :nth 0))
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "end"
+                     (window-title-second-monitor)
+                     (sep)
+                     (workspaces)
+                     (sep))))
 
 (defwidget bar-all-modules []
            (box :space-evenly true
@@ -68,6 +78,8 @@
                 :class "right-modules"
                 (mpd-current :nth 0)
                 (sep)
+                (systray :orientation "h" :spacing 10 :icon-size 24)
+                (sep)
                 (label :text "${time}" :class "time-label")))
 
 (defvar time-visible false)   ; for :run-while property of below variable
@@ -79,11 +91,11 @@
               :run-while time-visible   ; optional, defaults to 'true'
               "date +'%Y/%m/%d (%H:%M)'")
 
-(deflisten workspaces-listen :initial "[]" "scripts/get-workspaces")
-(deflisten current-workspace :initial "1" "scripts/get-active-workspace")
+(deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
+(deflisten current-workspace :initial '{"focused":"1","unfocused":"2"}' "hypr-get-active-workspace")
 (defwidget workspaces []
   (eventbox
-   :onscroll "scripts/change-active-workspace {} ${current-workspace}"
+   ;; :onscroll " {} ${current-workspace}"
    :class "workspaces-widget-eventbox"
 
    (box
@@ -92,17 +104,26 @@
            :visible false)
     (for workspace in workspaces-listen
          (eventbox
-          :onclick "hyprctl dispatch workspace ${workspace.id}"
+          :onclick "hypr-workspace ${workspace.id}"
           (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} \
                        ${workspace.windows > 0 ? "occupied" : "empty"} \
                        ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
                (label :text "${workspace.id}")))))))
 
-(deflisten window-listen :initial "..." "scripts/get-window-title")
+(deflisten window-listen :initial "..." "hypr-get-window-title")
+(deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
 (defwidget window-title []
   (box
    (label :text "${window-listen}"
           :limit-width 50
+          :class "window-title-label"
+          ;; :truncate-left true
+          )))
+
+(defwidget window-title-second-monitor []
+  (box
+   (label :text "${window-listen-second-monitor}"
+          :limit-width 70
           :class "window-title-label"
           ;; :truncate-left true
           )))

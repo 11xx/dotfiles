@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*Eww mainbar][Eww mainbar:2]]
+# [[file:../../../.config/darkman/README.org::*Light][Light:1]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -18,15 +18,26 @@ running_check_killall() {
     running_check "$1" && killall "$1" --quiet
 }
 
+
 ewwDir=${XDG_CONFIG_HOME}/eww
 
 # files containing css variables, the eww.scss file have to use them properly
 light=light-colors.scss
 dark=dark-colors.scss
 
-# check the one that will be changed to
+# check if the scss files exist
 check_file "${ewwDir}"/"${light}"
+check_file "${ewwDir}"/"${dark}"
 
-sed -i "s/^\(@import\) *\"${dark}\".*/\1 \"${light}\";/" \
-    "${ewwDir}"/eww.scss
-# Eww mainbar:2 ends here
+eww_scss_source_theme() {
+    case "$1" in
+        dark) themeFile="${dark}" ;;
+        light) themeFile="${light}" ;;
+    esac
+
+    sed -i "s/^\(@import\) *\"\(${light}\|${dark}\)\".*/\1 \"${themeFile}\";/" \
+        "${ewwDir}"/eww.scss
+}
+
+eww_scss_source_theme light
+# Light:1 ends here
