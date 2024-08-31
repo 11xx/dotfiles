@@ -19,8 +19,7 @@
    "C-c C-M-t"  visual-line-mode
    "C-c M-t"    toggle-truncate-lines
    ;; Insert text
-   "C-c i t" f/current-timestamp
-   ;; "C-c i c" f/current-timestamp-hashtag-comment
+   "C-c i t" f/current-timestamp-insert
    ;; UI Changes
    "C-c d c" visual-fill-column-mode
    "C-x C-z" org-set-property

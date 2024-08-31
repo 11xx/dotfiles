@@ -40,26 +40,20 @@ and if inconclusive, use current `indent-tabs-mode'."
     (if (> space-count tab-count) (setq indent-tabs-mode nil))
     (if (> tab-count space-count) (setq indent-tabs-mode t))))
 (add-hook 'prog-mode-hook #'f/infer-indentation-style)
-(defun f-posix/current-timestamp ()
-  "Query shell for the current time in the YYYY-mm-dd ShortWeekDay HH-MM-SS format."
-  (insert (concat "# ["
-                  (shell-command-to-string "printf '%s' \"$(date +'%Y-%m-%d %a %T %Z')\"")
-                  "]" " @" (shell-command-to-string "printf '%s' \"$(cat /etc/hostname)\""))))
-
-;; (Windows-NT)
-(defun f-windows-nt/current-timestamp ()
-  "Print ISO formatted date as '#' comment."
-  (let ((timestamp (s-trim (shell-command-to-string "cmd /c echo.|powershell -Command Get-Date -Format 'yyyy-MM-dd ddd HH:mm:ss K'")))
-        (hostname (s-trim (shell-command-to-string "hostname"))))
-    (insert (format "# [%s] @%s" timestamp hostname))))
+(defun f/current-timestamp-format ()
+  "Return current timestamp and hostname in a formatted string."
+  (concat "[" (format-time-string "%Y-%m-%d %a %H:%M:%S %Z" (current-time)) "] @" (system-name)))
 
 ;;;###autoload
-(defun f/current-timestamp ()
-  "Check `system-type' and use either `f-posix/current-timestamp' or `f-windows-nt/current-timestamp'."
+(defun f/current-timestamp-insert ()
+  "Insert the current timestamp and hostname in a formatted string as a comment."
   (interactive)
-  (if (not (eq system-type 'windows-nt))
-      (f-posix/current-timestamp)
-    (f-windows-nt/current-timestamp)))
+  (let ((str (f/current-timestamp-format))
+        (start-point (point)))
+    (insert str)
+    (set-mark start-point)
+    (comment-region (region-beginning) (region-end))))
+;; [2024-08-28 Wed 03:14:39 -03] @ak
 ;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
 (defun f/kill-matching-lines (regexp &optional rstart rend interactive)
   "Kill lines containing matches for REGEXP.
