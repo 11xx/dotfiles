@@ -212,6 +212,8 @@ read it before opening a new issue about your will.")
                (window-divider :foreground ,c/bg) ; had bg2
                (window-divider-first-pixel :foreground ,c/bg) ; had bg2
                (vertical-border :foreground ,c/bg) ; had bg2 ; window/buffer divider line
+               (widget-field :background ,c/bg-616)
+
                ;; isearch, also inherited by consult
                (isearch :background ,c/pink :foreground ,c/bg :weight extra-bold)
                (isearch-fail :background ,c/red :foreground ,c/bg)

@@ -67,7 +67,8 @@ number."
   (:hook-into prog-mode text-mode html-mode)
   (:with-hook (term-mode-hook
                shell-mode-hook
-               eshell-mode-hook)
+               eshell-mode-hook
+               org-mode-hook)
     (:hook (lambda() (display-line-numbers-mode -1)))))
 (setopt show-paren-mode t
         show-paren-delay 0.01
@@ -126,7 +127,7 @@ number."
   (unless (display-graphic-p) ; redundant with :only-if?
     (fira-code-mode -1))
   (with-eval-after-load 'fira-code-mode
-    (add-to-list 'fira-code-mode-disabled-ligatures "-}"))
-  )
+    (dolist (ligature '("-}"))
+      (add-to-list 'fira-code-mode-disabled-ligatures ligature))))
 
 (provide '11xx-ui)

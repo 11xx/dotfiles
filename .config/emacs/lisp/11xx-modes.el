@@ -4,7 +4,7 @@
   ;; (:option haskell-process-path-ghci "ghci-9.2.2"  ; this is for ghcup versioned ghc & ghci binaries.
   ;; haskell-process-args-ghci '("-ferror-spans")
   ;; )
-  (setq haskell-font-lock-symbols t)
+  (setq haskell-font-lock-symbols nil) ; disable the bad built-in font ligatures solution.
 
   (:bind "C-c C-v" haskell-cabal-visit-file)
   )
@@ -12,6 +12,7 @@
 (setup (:package yaml-mode))
 (setup (:package pkgbuild-mode))
 (setup (:package powershell))
+(setup (:package ansible ansible-doc ansible-vault))
 (setup (:package yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))

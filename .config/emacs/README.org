@@ -796,8 +796,8 @@ default encoding.
 # ;; v-- maybe this is too much? keep cjk encoding by having this disabled.
 # ;; (setq utf-translate-cjk-mode nil) ; disable CJK coding/encoding
 
-To force UTF-8 on specific files, add a buffer or file local variable
-with:
+To force LF UTF-8 on specific files, add a buffer or file local
+variable with:
 : M-: (setq-local buffer-file-coding-system 'utf-8-unix) RET
 or
 : M-x add-file-local-variable-prop-line RET coding RET utf-8 RET
@@ -841,7 +841,7 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
   ;; (:option haskell-process-path-ghci "ghci-9.2.2"  ; this is for ghcup versioned ghc & ghci binaries.
   ;; haskell-process-args-ghci '("-ferror-spans")
   ;; )
-  (setq haskell-font-lock-symbols t)
+  (setq haskell-font-lock-symbols nil) ; disable the bad built-in font ligatures solution.
 
   (:bind "C-c C-v" haskell-cabal-visit-file)
   )
@@ -864,10 +864,12 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 (setup (:package powershell))
 #+end_src
 
-**** Special modes
-Special major modes are for specific config files and stuff
+***** Ansible
+#+begin_src emacs-lisp
+(setup (:package ansible ansible-doc ansible-vault))
+#+end_src
 
-***** =yuck-mode=: for EWW's (bar) config file
+***** =yuck-mode=: Specifically for EWW's (bar) config file
 #+begin_src emacs-lisp
 (setup (:package yuck-mode))
 #+end_src
@@ -1625,6 +1627,13 @@ appear when hovered.
     the end of code blocks as a yellow square. To fix it unset the
     face e.g.:
     : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
+
+**** Prettify Org Mode
+#+begin_src emacs-lisp
+(setup (:package org-modern)
+  (setopt org-modern-block-fringe nil)
+  (:hook-into org-mode))
+#+end_src
 
 ** 11xx-org-functions.el
 #+begin_src emacs-lisp :tangle lisp/11xx-org-functions.el :noweb yes
@@ -2725,7 +2734,8 @@ number."
   (:hook-into prog-mode text-mode html-mode)
   (:with-hook (term-mode-hook
                shell-mode-hook
-               eshell-mode-hook)
+               eshell-mode-hook
+               org-mode-hook)
     (:hook (lambda() (display-line-numbers-mode -1)))))
 #+end_src
 
@@ -2879,8 +2889,8 @@ Fira Code Symbol externally.
   (unless (display-graphic-p) ; redundant with :only-if?
     (fira-code-mode -1))
   (with-eval-after-load 'fira-code-mode
-    (add-to-list 'fira-code-mode-disabled-ligatures "-}"))
-  )
+    (dolist (ligature '("-}"))
+      (add-to-list 'fira-code-mode-disabled-ligatures ligature))))
 #+end_src
 
 ** 11xx-half-scroll.el

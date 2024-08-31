@@ -161,5 +161,8 @@
            htmlize-html-charset "UTF-8")
   (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
                                    (:foreground nil :background nil))))
+(setup (:package org-modern)
+  (setopt org-modern-block-fringe nil)
+  (:hook-into org-mode))
 
 (provide '11xx-org)
