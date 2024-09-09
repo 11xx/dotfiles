@@ -256,13 +256,38 @@ source = window-rules.conf
 windowrulev2 = suppressevent maximize, class:.*
 #+end_src
 
-** Blur layer
-Blur notifications and bars, [[https://wiki.hyprland.org/Configuring/Keywords/#blurring-layersurfaces][Keywords | Hyprland Wiki]]
-[[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
+
+** =layer-surface-rules.conf=: Layer surface rules
+:PROPERTIES:
+:header-args:conf: :tangle layer-surface-rules.conf
+:END:
+
+- [[https://wiki.hyprland.org/Configuring/Window-Rules/#layer-rules][Hyprland Wiki: Window Rules#Layer Rules]]
+
+- Blur layer
+  + [[https://wiki.hyprland.org/Configuring/Keywords/#blurring-layersurfaces][Keywords | Hyprland Wiki]]
+  + [[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
+  Blur notifications and bars
 #+begin_src conf
 blurls = notifications
 blurls = wob
 blurls = launcher
+#+end_src
+
+- Layer Rules
+  + =ignorezero=: Layer rule for Hyprland to ignore fully transparent
+    pixels and e.g. not blur them.
+#+begin_src conf
+layerrule = ignorezero, notifications
+layerrule = blur, swaync-control-center
+layerrule = blur, swaync-notification-window
+layerrule = ignorezero, swaync-control-center
+layerrule = ignorezero, swaync-notification-window
+#+end_src
+
+Source in the main config file
+#+begin_src conf :tangle hyprland.conf
+source = layer-surface-rules.conf
 #+end_src
 
 ** Keybinds
@@ -528,10 +553,6 @@ source = shadows.conf
 source = animations.conf
 source = blur.conf
 source = mouse.conf
-
-# redundant with shell profile, setting here just as a reminder.
-# AUR package 'qgnomeplatform-{common,qt5,qt6}-git'
-env = QT_QPA_PLATFORMTHEME,gnome
 #+end_src
 Settings that use IPC like =gsettings= or =hyprctl= could and probably
 should also be set from darkman.
@@ -555,8 +576,10 @@ theme directory should be installed preferably user-local in
 # because Linux is easy 😿
 
 # Cursor theme names are their directory names
-$XCursorTheme = BreezeX-RosePine
-$hyprcursorTheme = rose-pine-hyprcursor
+$XCursorTheme = Oxygen_Yellow
+$hyprcursorTheme = Oxygen_Yellow
+# $XCursorTheme = BreezeX-RosePine
+# $hyprcursorTheme = rose-pine-hyprcursor
 $XCursorSize = 20
 $hyprcursorSize = 22 # 2px difference from what I could tell
 
@@ -635,6 +658,7 @@ source = 00-<<lightordark()>>-theme.conf
 
 #+begin_src conf :tangle themes/00-light-theme.conf :mkdirp yes
 source = light-color-vars.conf
+source = neron-color-vars.conf
 
 $bg-color = $lt-bg
 $fg-color = $lt-fg
@@ -667,8 +691,13 @@ general {
 
 #+begin_src conf :tangle themes/light-borders.conf :mkdirp yes
 general {
-    col.active_border = rgb(000000)
-    col.inactive_border = rgb(eeeeee)
+    # col.active_border = rgb(ff00aa)
+    col.active_border = $neron-pink 45deg
+    col.inactive_border = rgba(eeeeee00)
+
+    gaps_in = 4
+    gaps_out = 8
+    border_size = 4
 }
 #+end_src
 
@@ -1530,47 +1559,8 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
   case, since it's =Hyprland= the filename is also named that, including
   the capital letter.
 #+begin_src conf :tangle (expand-file-name "Hyprland-mimeapps.list" (xdg-config-home))
-[Default Applications]
-application/pdf=launch.desktop
-text/tcl=launch.desktop
-text/x-tex=launch.desktop
-text/x-c++src=launch.desktop
-text/html=launch.desktop
-text/x-java=launch.desktop
-text/x-chdr=launch.desktop
-text/x-moc=launch.desktop
-text/x-makefile=launch.desktop
-text/x-c++hdr=launch.desktop
-text/tab-separated-values=launch.desktop
-text/x-pascal=launch.desktop
-text/plain=launch.desktop
-text/csv=launch.desktop
-text/x-csrc=launch.desktop
-text/spreadsheet=launch.desktop
-application/x-spkac+base64=launch.desktop
-application/vnd.apple.mpegurl=launch.desktop
-application/sdp=launch.desktop
-application/x-cmakecache=launch.desktop
-application/x-cue=launch.desktop
-application/postscript=launch.desktop
-application/rtf=launch.desktop
-application/xml=launch.desktop
-application/x-pem-file=launch.desktop
-application/x-shellscript=launch.desktop
-application/x-directory=launch.desktop
-inode/directory=launch.desktop
-image/x-portable-bitmap=launch.desktop
-image/x-portable-anymap=launch.desktop
-image/x-portable-graymap=launch.desktop
-image/webp=launch.desktop
-image/tiff=launch.desktop
-image/x-tga=launch.desktop
-image/bmp=launch.desktop
-image/vnd.zbrush.pcx=launch.desktop
-image/x-xbitmap=launch.desktop
-image/x-portable-pixmap=launch.desktop
-image/jpeg=launch.desktop
-image/png=launch.desktop
+# [Default Applications]
+
 
 # [Added Associations]
 # text/x-c=firefox.desktop;
@@ -1588,5 +1578,4 @@ image/png=launch.desktop
 #+begin_src shell
 lightordark
 #+end_src
-
 
