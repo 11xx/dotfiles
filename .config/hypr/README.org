@@ -1012,8 +1012,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 #+begin_src yuck :noweb yes
 (defwindow mainbar
-           :monitor 0
-           :geometry (geometry :x "0%"
+           :monitor "DELL S2721DGF"
+           :geometry (geometry :x "0px"
                                :y "0px"
                                :width "100%"
                                :height "26px"
@@ -1028,8 +1028,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            (bar-all-modules))
 
 (defwindow mainbar2
-           :monitor 1
-           :geometry (geometry :x "0%"
+           :monitor "DELL P2418D"
+           :geometry (geometry :x "0px"
                                :y "0px"
                                :width "<<eww-width-scaling-hyprland-second-monitor()>>px"
                                :height "26px"
@@ -1047,8 +1047,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            (box :space-evenly true
                 (box :orientation "h"
                      :space-evenly false
-                     (label :text "${time}" :class "time-label")
-                     (mpd-current :nth 0))
+                     (label :text "${time}" :class "time-label"))
                 (box :orientation "h"
                      :space-evenly false
                      :halign "end"
