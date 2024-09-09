@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*tofi][tofi:2]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -31,4 +30,3 @@ tofi_replace_include_theme() {
 theme=light
 
 tofi_replace_include_theme
-# tofi:2 ends here

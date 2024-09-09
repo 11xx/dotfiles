@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*Dark][Dark:1]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -38,4 +37,3 @@ hyprland_source_theme() {
 }
 
 hyprland_source_theme dark
-# Dark:1 ends here

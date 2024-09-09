@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*Light][Light:1]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -36,4 +35,3 @@ override_dunstrc() {
 }
 
 override_dunstrc "${dunstrcLight}"
-# Light:1 ends here

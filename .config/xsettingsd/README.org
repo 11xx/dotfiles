@@ -9,6 +9,9 @@
 * Theme & Icon theme
 #+begin_src conf
 Net/ThemeName "Adwaita-dark"
+
+Net/IconThemeName "Papirus"
+Gtk/CursorThemeName "BreezeX-RosePine"
 #+end_src
 
 # bogs out with new GTK sutff [2022-04-11 Mon 04:09:36]
@@ -21,11 +24,13 @@ Net/ThemeName "Adwaita-dark"
   =Xft/DPI 116412=
   =Xft/DPI 117651=
   =Xft/DPI 156868=
+
+* Font config
 #+begin_src conf
 Xft/Antialias 1
 Xft/HintStyle "hintfull"
 Xft/Hinting 1
-Xft/RGBA "none"
+Xft/RGBA "rgb"
 
 # Values other than "none" makes GDK fonts look horrible, at least for me.
 # Set lcddefault on 'Xresources' and/or 'fontconfig/fonts.conf' instead.
@@ -48,3 +53,16 @@ Xft/lcdfilter "none"
 # Gtk/CursorThemeSize 24
 # Gtk/CursorThemeName "breeze_cursors"
 # Gtk/FontName "Noto Sans,  10"
+
+* Sounds
+#+begin_src conf
+Net/EnableEventSounds 1
+EnableInputFeedbackSounds 0
+#+end_src
+
+* Customizing other GTK-specific settings
+Prefer customizing =dconf= using =gsettings= for live changes. But if the
+objective is to use a "set it and forget it" setup with config files
+install =nwg-look=, specially for Wayland, and customize GTK config
+files.
+# [2024-08-31 Sat 05:37:04 -03] @ak

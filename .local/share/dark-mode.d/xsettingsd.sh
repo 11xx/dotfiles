@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*xsettingsd: XSETTINGS daemon][xsettingsd: XSETTINGS daemon:1]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -27,4 +26,3 @@ trap 'running_check xsettingsd && killall -HUP xsettingsd' EXIT INT
 themeName=Adwaita-dark
 
 sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
-# xsettingsd: XSETTINGS daemon:1 ends here

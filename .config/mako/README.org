@@ -1,0 +1,134 @@
+#+TITLE: mako notification daemon settings
+# [2024-09-03 Tue 14:17:32 -03] @ak
+
+#+auto_tangle: nil
+
+* =config=: Main config file
+:PROPERTIES:
+:header-args:conf: :tangle config :cache yes
+:END:
+
+#+begin_src conf
+default-timeout=5000
+#+end_src
+- Set the default timeout to timeout in milliseconds. To disable the
+  timeout, set it to zero. Default: 0
+
+#+begin_src conf
+output=DP-1
+#+end_src
+- Show notifications on the specified output. If empty, notifications
+  will appear on the focused output. Requires the compositor to
+  support the Wayland protocol xdg-output-unstable-v1
+  version 2. Default: ""
+
+#+begin_src conf
+max-history=100
+#+end_src
+- Set maximum number of expired notifications to keep in the history
+  buffer to n. If the buffer is full, newly expired notifications
+  replace the oldest ones. If 0, history is disabled. Default: 5
+
+Dimensions
+#+begin_src conf
+width=500
+height=300
+max-icon-size=150
+#+end_src
+
+- Keys that take directional values support CSS style directorions.
+#+begin_src conf
+margin=10,30
+#+end_src
+
+#+begin_src conf
+border-radius=4
+#+end_src
+
+Default mako theme, using the =include= option here as it will be easier
+to script changes. This is useful because when =mako= starts it doesn't
+activate a [[#orgid-gnpzww][specific mode]].
+#+begin_src conf
+include=~/.config/mako/light-mode
+#+end_src
+- Because as of version 1.9.0 there's no =--initial-mode= option yet.
+  [[https://github.com/emersion/mako/pull/433#discussion_r912972697][Add support for multiple modes by emersion · Pull Request #433 · emersion/mako]]
+
+** Theme (mode) settings
+:PROPERTIES:
+:CUSTOM_ID: orgid-gnpzww
+:END:
+- Colors can be specified as =#RRGGBB= or =#RRGGBBAA=.
+
+- Mako supports mode switching.
+  + See MODES info from the config man page and =makoctl=
+    # #+begin_src shell :tangle no :noweb no :results code
+    : man mako.5 | sed -n '/^MODES/,/^AUTHORS/p' | sed '$d'
+    : makoctl help | grep mode
+    * [[https://github.com/emersion/mako/blob/master/doc/mako.5.scd#modes][GitHub/emersion/mako/doc/mako.5.scd#MODES]]
+    * *NOTE*: If =makoctl= returns errors try using =busctl= directly (what
+      makoctl uses internally):
+      : busctl --user call org.freedesktop.Notifications /fr/emersion/Mako fr.emersion.Mako -- SetMode s mode-name
+      where =mode-name= is the string after ~=~ as in ~[mode=mode-name]~.
+      # [2024-09-04 Wed 10:17:39 -03] @ak
+
+*** Light mode
+See the named code block [[mako-light-mode]] for what this ~<<noweb>>~
+variable expands to.
+#+begin_src conf :noweb tangle
+[mode=light]
+<<mako-light-mode>>
+#+end_src
+# border-color=#f6f6f6
+# background-color=#ffffffcc
+# text-color=#545e62
+
+#+NAME: mako-light-mode
+#+begin_src conf :tangle light-mode
+background-color=#f6f6f680
+text-color=#101010ff
+
+border-color=#316900
+border-size=3
+#+end_src
+
+
+*** Dark mode
+See the named code block [[mako-dark-mode]] for what this ~<<noweb>>~
+variable expands to.
+#+begin_src conf :noweb tangle
+[mode=dark]
+<<mako-dark-mode>>
+#+end_src
+
+#+NAME: mako-dark-mode
+#+begin_src conf :tangle dark-mode
+background-color=#3a3a3a80
+text-color=#f0f0f0ff
+border-color=#27282c
+border-size=2
+#+end_src
+
+# background-color=#222222cc
+# text-color=#a6a8a9
+# border-color=#61bd00
+
+** Default theme
+* Troubleshooting
+** Hyprland usage note
+When using blur on /Hyprland/ and margins on /mako/, set a Hyprland
+~layerrule~ to ignore fully transparent pixels, otherwise the margins
+around mako's window will also be blurred by Hyprland.
+- See
+  + [[https://wiki.hyprland.org/Configuring/Window-Rules/#rules-1][Hyprland Wiki: Window Rules#Rules]]
+
+Test with
+: hyprctl keyword layerrule ignorezero,notifications
+
+- Then set in the config file:
+  #+INCLUDE: ~/.config/hypr/README.org::layerrule-ignorezero-notifications
+
+* file local variables                                      :ignore:noexport:
+# Local Variables:
+# eval: (add-hook 'after-save-hook (lambda ()(if (y-or-n-p "Tangle?")(org-babel-tangle))) nil t)
+# End:

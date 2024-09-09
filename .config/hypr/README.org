@@ -55,9 +55,13 @@ exec-once = hypr-dynamic-float-bitwarden-unlock-firefox # script, hack
 
 exec-once = hyprpm reload -n # Load plugins
 
-exec-once = dunst
+# exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6
 
-exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6 # fix dolphin mime-types associations
+# [[https://bbs.archlinux.org/viewtopic.php?pid=2167673#p2167673][[SOLVED] Weird XDG MIME Behavior with KDE Dolphin on Hyprland / Applications & Desktop Environments / Arch Linux Forums]]
+# [[https://wiki.archlinux.org/title/Xdg-menu][xdg-menu - ArchWiki]]
+# Fix file association in dolphin.
+# env = XDG_MENU_PREFIX,plasma-
+env = XDG_MENU_PREFIX,arch-
 
 exec-once = hypr-eww-restart-on-monitor-change # script
 #+end_src

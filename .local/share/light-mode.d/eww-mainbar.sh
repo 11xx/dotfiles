@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# [[file:../../../.config/darkman/README.org::*Light][Light:1]]
 check_file() {
     [ -f "$1" ] && return 0
     printf 'The file "%s" does not exist, aborting...\n' "$1"
@@ -40,4 +39,3 @@ eww_scss_source_theme() {
 }
 
 eww_scss_source_theme light
-# Light:1 ends here

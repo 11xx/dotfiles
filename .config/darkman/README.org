@@ -1,12 +1,4 @@
-# -*- eval: (defun darkmandir (shfile) (cond ((string= (org-entry-get nil "theme" t) "light") (concat (xdg-data-home) "/light-mode.d/" shfile)) ((string= (org-entry-get nil "theme" t) "dark") (concat (xdg-data-home) "/dark-mode.d/" shfile)))); -*-
-#
-# Added this function as local file prop:
-# (defun darkmandir (shfile)
-#   (cond ((string= (org-entry-get nil "theme" t) "light") (concat (xdg-data-home) "/light-mode.d/" shfile))
-#         ((string= (org-entry-get nil "theme" t) "dark") (concat (xdg-data-home) "/dark-mode.d/" shfile))))
-# [2024-02-23 Fri 12:33:17 -03] @ak
-
-#+TITLE: darkman: Dark/Light switcher by dbus, scripts and APIs calls
+#+TITLE: darkman: Dark/Light switcher by D-Bus API, scripts & IPCs
 
 # originally used 2021-10-27, back # [2023-06-03 Sat 08:25:12 -03]
 # moved # [2024-02-17 Sat 17:42:40 -03] @ak
@@ -37,32 +29,232 @@ lng: -46.6
 #+end_src
 
 * Darkman setup notes
-** GTK & QT
+** GTK & QT: Uniform look and live theme change
 :PROPERTIES:
 :CUSTOM_ID: orgid-tjunht
 :END:
-To allow dynamic/live theme changes, specially for QT on minimal
-setups:
-- Qt
-  + Install =qgnomeplatform-qt5= and =-qt6=:
-    * set =QT_QPA_PLATFORMTHEME=gnome=
-    * and, if using a wayland WM also set =QT_QPA_PLATFORM=wayland= in it.
-    * Note: Sometimes this method doesn't work properly and
-      [[https://github.com/FedoraQt/QGnomePlatform?tab=readme-ov-file#qgnomeplatform-project-is-unmaintained-a-no-longer-actively-developed][it isn't maintained anymore]].
 
-- GTK
-  + If there's an issue where =gsettings= doesn't seem to work check if
-    GTK config files are present in =~/config/gtk-*= or if the =GTK_THEME=
-    environment variable is set, they take precedence over =gsettings=
-    and prevent it from changing the theme live/on-demand. Modern
-    programs may also listen to the [[*Making Darkman portal implementation work on minimal setups][D-Bus API]] instead.
-  + For older <GTK3 programs XSETTINGS is used instead.
-  + See
-    * [[https://github.com/swaywm/sway/wiki/GTK-3-settings-on-Wayland][GTK 3 settings on Wayland · swaywm/sway Wiki]]
+- To allow dynamic/live theme changes for running
+  applications/programs, specially for Qt on minimal setups, see:
+  + [[#orgid-tqgntk][Qt live theme change outside KDE]].
 
-# #TODO reduntant?
-Redundant notes on [[*GTK and Qt][GTK and Qt]]
+- The GTK setup is more straightforward and better supported outside
+  of GNOME, see
+  + [[#orgid-rzourk][GTK live theme change outside GNOME]]
+
+- There's more settings done by the shell regarding this setup, see:
+  + [[file:~/.config/shell/README.org::#orgid-twrkwj][shell: GTK & Qt: Uniform look & live theme change]]
+
+*** Qt live theme change outside KDE
+:PROPERTIES:
+:CUSTOM_ID: orgid-tqgntk
+:END:
+
+- The Qt live theme change setup is divided in two:
+  + [[#plasma-workspace-mothod-note][Plasma Workspace method]]
+  + [[#qgnomeplatform-mothod-note][QGnomePlatform method]]
+
+**** Plasma Workspace method
+:PROPERTIES:
+:CUSTOM_ID: plasma-workspace-mothod-note
+:END:
+
+This is the preferred and better supported method for live theme
+changes with Qt.
+
+Install the following packages to get KDE Plasma's functionality
+outside of the DE:
+- =plasma-workspace=: provides =plasma-apply-colorscheme= which allows for
+  setting the env. var. ~QT_QPA_PLATFORMTHEME=kde~ and applying =kvantum=
+  themes, (this package also provides =lookandfeeltool= but it doesn't
+  seem to recognize kvantum themes).
+- =kvantum=: Normally used by setting the
+  env. var. =QT_STYLE_OVERRIDE=kvantum= but in this setup only the
+  provided "=Kv*=" Qt themes are used, no overrides necessary.
+
+Export the env. var. =QT_QPA_PLATFORMTHEME=kde=, this makes Qt apps (not
+all though) use Plasma's backend leaving them susceptible to
+=plasma-workspace='s CLI tools "=plasma-apply-colorscheme=" and
+"=lookandfeeltool=" allowing live theme changes.
+
+With a running Qt app running run the following command to see if it
+changes the theme live:
+: plasma-apply-colorscheme KvGnome
+or
+: plasma-apply-colorscheme KvGnomeDark
+Note that when running from an environment that has a different or
+unset =DISPLAY= or =WAYLAND_DISPLAY= env. var. the target Qt app may be
+unreachable making it necessary to use the option "=--platform
+offscreen=" (required when running from systemd for example), though
+"=offscreen=" is not the only available choice, for a normal desktop
+setup it should be enough.
+
+**** QGnomePlatform method
+:PROPERTIES:
+:CUSTOM_ID: qgnomeplatform-mothod-note
+:END:
+Install the following packages:
+- =qgnomeplatform-qt5=, =qgnomeplatform-qt6=, =qgnomeplatform-common=
+  (provided by =qgnomeplatform= group package).
+- =adwaita-qt5=, =adwaita-qt6=: dependencies for =qgnomeplatform=.
+ # * =qt5-wayland= and =qt6-wayland= should be pulled by packages as
+ #   dependencies.
+Though [[https://github.com/FedoraQt/QGnomePlatform?tab=readme-ov-file#qgnomeplatform-project-is-unmaintained-a-no-longer-actively-developed][QGnomePlatform isn't maintained anymore]] it works for Qt apps
+that are older and/or that only expect theme settings from a config
+file or env. var. It should work when apps won't respect
+~QT_QPA_PLATFORMTHEME=kde~ for live changes. Note that since it requires
+the same env. var. as the [[#plasma-workspace-mothod-note][Plasma Workspace method]] but with the value
+~QT_QPA_PLATFORMTHEME=gnome~ instead, unfortunately apps that will only
+live change with QGnomePlatform need to be wrapped manually, providing
+~QT_QPA_PLATFORMTHEME=gnome~.
+- To make sure the wrappers take precedence over the main ~PATH~
+  binaries and remain isolated not polluting any other directory in
+  PATH, create a new one
+  e.g. =~/.local/share/qt-platform-theme-wrappers/= and;
+  + *NOTE*: This directory /cannot/ be inside another one already in
+    PATH. For example if "=~/.local/bin=" is in PATH using
+    "=~/.local/bin/qt-wrappers=" won't work because when the shell
+    indexes executables from "=~/.local/bin=" into =hash= any other
+    executable inside it will /NOT/ take precedence over other
+    executables exclusively on their own top-evel directory, even if
+    it comes first in the PATH scalar list.
+    # [2024-09-04 Wed 16:45:34 -03] @ak
+- Place the wrappers there with contents e.g.:
+  #+begin_src shell :tangle no :noweb-ref dummy
+  #!/usr/bin/env bash
+  QT_QPA_PLATFORMTHEME=gnome program "$@"
+  #+end_src
+  where the only thing that need to change across files will be the
+  program name, in this example is "=picard=". The filename should be
+  the same name as the program since it's supposed to take precedence
+  over existing ones.
+  + Note: The shebang can be dropped to let the current shell execute
+    it instead, since it's just setting an env. var., and make sure
+    it's executable (permissions 755/+x).
+- Then /PREpend/ the directory =~/.local/share/qt-platform-theme-wrappers=
+  to =PATH= by adding it prior in the list, specially before system
+  directories, e.g.:
+  : PATH=$HOME/.local/share/qt-platform-theme-wrappers:$PATH
+
+- /Though cumbersome this method should only be necessary for a few
+  applications./
+
+  The reason for script wrappers instead of something like aliases is
+  that this should also work with GUI program launchers such as
+  dmenu-like launchers or Window Manager keybinds, though an extra
+  step may be required for =.desktop= files but since this is a minimal
+  setup the =.desktop= files are never really used.
+  # [2024-09-04 Wed 11:01:44 -03] @ak
+
+- See [[#orgid-jwzzky][QGnomePlatform environment variable wrappers]] for the tangled
+  files.
+
+*** GTK live theme change outside GNOME
+:PROPERTIES:
+:CUSTOM_ID: orgid-rzourk
+:END:
+
+Modern GTK apps should listen to =dconf='s key-based configuration
+system which is a backend for =gsettings= but also works through a D-Bus
+interface. For theming and color schemes it exposes the
+schema/namespace "=org.gnome.desktop.interface=" which, among others,
+stores the keys "=gtk-theme=" and "=color-scheme=".
+- Get the current values with:
+  : gsettings get org.gnome.desktop.interface gtk-theme
+  : gsettings get org.gnome.desktop.interface color-scheme
+- and to set new ones run e.g.:
+  : gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
+  : gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+  where the last argument's possible values are:
+  + =gtk-theme=: a GTK theme name, which should be the same as a
+    directory name from =/usr/share/themes/= or
+    =~/.local/share/themes=.
+  + =color-scheme=: one of =default=, =prefer-dark= or =prefer-dark=.
+
+- Discover available schemas, keys and values for keys with:
+  : gsettings list-schemas
+  To list configurable schemas, optional flag =--print-paths=.
+
+  : gsettings list-keys org.gnome.desktop.interface
+  To list available configurable keys within schemas.
+
+  : gsettings range org.gnome.desktop.interface color-scheme
+  To list documented supported values from schema keys. This pulls
+  documentation from XML files, in this case from
+  =/usr/share/glib-2.0/schemas/org.gnome.desktop.interface.gschema.xml=.
+
+- In case =gsettings= didn't work, see:
+  + [[gsettings-not-working-note][GSettings not working note]]
+  + [[xsettingsd-setup-note][XSETTINGS setup note]]
+
+<<gsettings-not-working-note>>
+If there's an issue where =gsettings= doesn't seem to set theme
+settings, check if:
+- GTK config files are present in =~/config/gtk-*= or =~/.gtkrc*=;
+- The =GTK_THEME= environment variable is set.
+- In case of GTK 4/libadwaita apps setting it may be necessary to
+  the set the env. var. ~ADW_DISABLE_PORTAL=1~.
+  See [[https://wiki.archlinux.org/title/GTK#GTK_3_and_GTK_4][ArchWiki/GTK#GTK 3 and GTK 4]].
+These "hard" settings take precedence over =dconf= / =gsettings= / =D-Bus=
+and prevent it from changing the theme live/on-demand.
+
+<<xsettingsd-setup-note>>
+For older GTK <3 programs XSETTINGS is used instead. To use XSETTINGS:
+- Install =xsettingsd= for the most minimal (and manual) approach. This
+  is the "=d="aemon for XSETTINGS and it reads settings from
+  =~/.config/xsettingsd/xsettingsd.conf=. The theme option is:
+  : Net/ThemeName "Adwaita-dark"
+  where the string is a GTK theme name. For the live theme change
+  effect, if e.g. the theme option =Net/ThemeName= in the config file
+  has been changed to something else, to make =xsettingsd= pick up the
+  new config file changes send a =-HUP= signal to it, e.g.:
+  : killall -HUP xsettingsd
+  or
+  : pkill -HUP xsettingsd
+  # [2024-09-04 Wed 15:15:12 -03] @ak
+  + The signal "=HUP=" should be code "=1=" in "kill/send-signal"
+    utilities.
+
+- Note: even if =xsettingsd= is launched /after/ the GTK <3 application,
+  launching it should then trigger the app to update to new changes.
+- See
+  + [[https://github.com/swaywm/sway/wiki/GTK-3-settings-on-Wayland][GTK 3 settings on Wayland · swaywm/sway Wiki]]
+  + [[https://apple.stackexchange.com/questions/103610/what-does-hup-do-when-used-with-killall][macos - What does -HUP do when used with killall? - Ask Different]]
 # [2023-06-04 Sun 09:49:26 -03]
+*** Make GTK applications use KDE's (or other) file picker
+Set the environment variable ~GTK_USE_PORTAL=1~, then if e.g. the
+current desktop portal is =xdg-desktop-portal-kde= it should use
+KDE's/Dolphin file picker.
+- *NOTE*: Using ~GTK_USE_PORTAL=1~ may break how some GTK <3 apps read
+  their settings making e.g. font rendering uglier. To fix this make
+  sure =xdg-desktop-portal-gtk= is also installed to serve as fallback
+  for them. The order of priority for =x-d-p= implementations /not/ always
+  are overriden by the =portal.conf= file. See note in
+  [[file:~/.config/xdg-desktop-portal/README.org::#orgid-uxoxxl][GTK apps lost font rendering, cursor theme or other settings]].
+
+  An alternative to this is to use wrapper that set ~GTK_USE_PORTAL=1~
+  for individual apps.
+
+Another way to force a specific file picker from a desktop portal that
+implements it is to e.g. set the option
+~org.freedesktop.impl.portal.FileChooser=kde~ on
+=~/.config/xdg-desktop-portal/portals.conf=. See an example:
+[[file:~/.config/xdg-desktop-portal/README.org::#orgid-rhgutk][Hyprland-specific overrides]].
+# [2024-09-06 Fri 20:14:08 -03] @ak
+
+**** Application-specific settings to use XDG Desktop Portal
+:PROPERTIES:
+:CUSTOM_ID: orgid-sqomyz
+:END:
+Programs that provide settings to use the portal's file picker instead
+of using environment variables or overrides in =portals.conf=.
+
+***** Firefox
+In =about:config= set =widget.use-xdg-desktop-portal.file-picker= to =1=.
+# [2024-09-07 Sat 14:42:26 -03] @ak
+- See
+  + Example using a =user.js= file: [[file:~/.mozilla/README.org::#orgid-jryihm][firefox: XDG Desktop Portal integration]]
+  + [[https://www.reddit.com/r/kde/comments/pz2y0m/comment/heyem8r/][#comment@r/kde/Firefox and GTK_USE_PORTAL=1 vs Firefox not detected as default browser]]
 
 ** Making Darkman portal implementation work on minimal setups
 :PROPERTIES:
@@ -106,7 +298,7 @@ implementation and exposed by =xdg-desktop-portal=:
     * 1 = dark;
     * 2 = light.
     * See a working example from [[https://github.com/LionyxML/auto-dark-emacs/blob/045472a5a28a16216d4ec74f1382003e8f7d1cdc/auto-dark.el#L224C53-L224C63][auto-dark-emacs]].
-  But if the error is returned:
+  But if the following error is returned:
   : Error org.freedesktop.DBus.Error.UnknownMethod: No such interface “org.freedesktop.portal.Settings” on object at path /org/freedesktop/portal/desktop
   instead of the variant information, the running =xdg-desktop-portal-*=
   implementation is not exposing the =org.freedesktop.portal.Settings=
@@ -121,28 +313,33 @@ implementation and exposed by =xdg-desktop-portal=:
   : org.freedesktop.impl.portal.Settings=darkman
 
 - SOLUTION: create the file =~/.config/xdg-desktop-portal/portals.conf=
-  with an override for =org.freedesktop.portal.Settings=:
-  #+begin_src conf :tangle ~/.config/xdg-desktop-portal/portals.conf :comments link
+  with an override for =org.freedesktop.portal.Settings= that uses
+  =darkman=:
+  #+begin_src conf :tangle no :noweb-ref dummy
   [preferred]
-  default=gtk
+  default=kde
   org.freedesktop.impl.portal.Settings=darkman
   #+end_src
 
 * Darkman Scripts
 :PROPERTIES:
-:header-args:bash: :mkdirp yes :shebang #!/usr/bin/env bash :noweb no-export :comments link
-:header-args:shell: :mkdirp yes :shebang #!/usr/bin/env sh :noweb no-export :comments link
+:header-args:bash: :mkdirp yes :shebang #!/usr/bin/env bash :noweb no-export
+:header-args:shell: :mkdirp yes :shebang #!/usr/bin/env sh :noweb no-export
 :END:
 
 # (mainly Wayland)
 
 # update this se #TODO # [2024-02-22 Thu 23:11:48 -03] @ak
-+TODO:+ There are two versions of every script. Comments, notes and
-observations are in [[*=light-mode.d=: Light][light-mode.d: Light]].
+- There are two versions of every script. They usually share a header
+  of helper functions and setup.
 
 - Notes:
   + Darkman will hang on long running processes until that process
     exits or is sent to the background.
+
+- The tangled scripts are at
+  + [[file:~/.local/share/light-mode.d]]
+  + [[file:~/.local/share/dark-mode.d]]
 
 Helper functions for checking and setup
 #+NAME: darkman-helper-functions
@@ -167,23 +364,69 @@ running_check_killall() {
 #+end_src
 
 ** Notify change
-*** Light
-:PROPERTIES:
-:theme:    light
-:END:
+
+- Light
 - From [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/dark-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/dark-mode.d/executable_desktop-notification.sh]]
-#+begin_src shell :tangle (darkmandir "notification.sh")
+#+begin_src shell :tangle (darkmandir "notification.sh") :theme light
 notify-send --app-name="darkman" --urgency=low --icon=weather-clear "Switching to light mode"
 #+end_src
 
-*** Dark
-:PROPERTIES:
-:theme:    dark
-:END:
+- Dark
 - [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/light-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/light-mode.d/executable_desktop-notification.sh]]
-#+begin_src shell :tangle (darkmandir "notification.sh")
+#+begin_src shell :tangle (darkmandir "notification.sh") :theme dark
 notify-send --app-name="darkman" --urgency=low --icon=weather-clear-night "Switching to dark mode"
 #+end_src
+
+** GTK and Qt
+
+- Light
+#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme light
+gsettings set org.gnome.desktop.interface gtk-theme Adwaita
+gsettings set org.gnome.desktop.interface color-scheme prefer-light
+
+# icon theme too ?
+
+# `--platform offscreen' is necessary since this script will be run by systemd
+plasma-apply-colorscheme --platform offscreen KvGnome
+#+end_src
+
+- Dark
+#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme dark
+gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
+gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+
+plasma-apply-colorscheme --platform offscreen KvGnomeDark
+#+end_src
+
+*** QGnomePlatform environment variable wrappers
+:PROPERTIES:
+:tangle-dir: (expand-file-name "qt-platform-theme-wrappers" (xdg-data-home))
+:header-args:bash: :tangle-mode o775 :mkdirp yes
+:header-args:python: :tangle-mode o775 :mkdirp yes
+:CUSTOM_ID: orgid-jwzzky
+:END:
+
+- picard: MusicBrainz Picard's launcher is just a Python script, NOTE:
+  *do not* try to wrap the system provided one using a shell script or
+  it will cause an infinite loop of processes spawning (though they do
+  nothing). Instead set the environment variable in Python and just
+  copy over rest of the launcher script.
+  #+begin_src python :tangle (tdir "picard")
+  #!/usr/bin/python3
+  import os
+  os.environ['QT_QPA_PLATFORMTHEME'] = 'gnome'
+
+  # rest is the same from /usr/bin/picard:
+  try:
+      from picard.tagger import main
+      main('/usr/share/locale', True)
+  except SystemExit:
+      raise  # Just continue with a normal application exit
+  except:  # noqa: E722,F722 # pylint: disable=bare-except
+      from picard import crash_handler
+      crash_handler()
+      raise
+  #+end_src
 
 
 ** Dunst: Notification server
@@ -211,26 +454,82 @@ override_dunstrc() {
 }
 #+end_src
 
-*** Light
-:PROPERTIES:
-:theme:    light
-:END:
-#+begin_src shell :tangle (darkmandir "dunst.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "dunst.sh") :theme light
 «dunst-setup»
 
 override_dunstrc "${dunstrcLight}"
 #+end_src
 
-*** Dark
-:PROPERTIES:
-:theme:    dark
-:END:
-#+begin_src shell :tangle (darkmandir "dunst.sh")
+- Dark
+#+begin_src shell :tangle (darkmandir "dunst.sh") :theme dark
 «dunst-setup»
 
 override_dunstrc "${dunstrcDark}"
 #+end_src
 
+** Mako: Notification daemon
+
+- See [[file:~/.config/mako/README.org::#orgid-gnpzww][Theme (mode) settings]] for the mako modes the scripts change here
+
+#+NAME: mako-setup
+#+begin_src shell :tangle no
+«darkman-helper-functions»
+
+check_cmd mako
+check_cmd busctl
+
+# Using busctl directly since makoctl is a script and it's buggy 2024-09-04
+mako_set_mode() {
+    busctl --user call \
+           org.freedesktop.Notifications \
+           /fr/emersion/Mako \
+           fr.emersion.Mako \
+           -- \
+           SetMode s "$1"
+}
+
+mako_reload() {
+    busctl --user call org.freedesktop.Notifications /fr/emersion/Mako fr.emersion.Mako -- Reload
+}
+
+makoDir=${XDG_CONFIG_HOME}/mako
+
+# mako themes
+light=light-mode
+dark=dark-mode
+
+check_file "${makoDir}"/"${light}"
+check_file "${makoDir}"/"${dark}"
+
+mako_source_theme() {
+    case "$1" in
+        dark) themeFile="${dark}" ;;
+        light) themeFile="${light}" ;;
+    esac
+
+    sed -E -i "s,^(include=)(~/.config/mako|${makoDir})/(${light}|${dark}),\1\2/${themeFile}," \
+        "${makoDir}"/config
+}
+
+trap 'mako_reload' EXIT INT
+#+end_src
+
+- Light
+#+begin_src shell :tangle (darkmandir "mako.sh") :theme light
+«mako-setup»
+
+mako_set_mode light
+mako_source_theme light
+#+end_src
+
+- Dark
+#+begin_src shell :tangle (darkmandir "mako.sh") :theme dark
+«mako-setup»
+
+mako_set_mode dark
+mako_source_theme dark
+#+end_src
 
 ** Wallpaper
 # - =lightordark-wallpaper= is a script. Instead changed to using
@@ -247,28 +546,21 @@ running_check_killall swaybg
 # swaybg --color '#eeeeee' &
 swaybg_fork() {
     # Setting the wayland display because systemd would not recognize it otherwise. #TODO-Workarounds?
-    WAYLAND_DISPLAY=wayland-1 swaybg --color "$@" & # IMPORTANT: fork this process because
-                          # otherwise darkman will not execute the
-                          # other scripts, waiting for this one to
-                          # finish.
+    WAYLAND_DISPLAY=wayland-1 swaybg --color "$@" &
+    # IMPORTANT: fork this process because otherwise darkman will not
+    # execute the other scripts, waiting for this one to finish.
 }
 #+end_src
 
-*** Light
-:PROPERTIES:
-:theme:    light
-:END:
-#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "wallpaper.sh") :theme light
 «wallpaper-setup»
 
 swaybg_fork '#eeeeee'
 #+end_src
 
-*** Dark
-:PROPERTIES:
-:theme:    dark
-:END:
-#+begin_src shell :tangle (darkmandir "wallpaper.sh")
+- Dark
+#+begin_src shell :tangle (darkmandir "wallpaper.sh") :theme dark
 «wallpaper-setup»
 
 swaybg_fork '#382738'
@@ -322,28 +614,20 @@ hyprland_source_theme() {
     sed -Ei "s,^source([[:blank:]]+|)=([[:blank:]]+|)(${lightFile}|${darkFile})$,source = ${themeFile}," "${themeConfFile}"
 }
 #+end_src
-*** Light
-:PROPERTIES:
-:theme:    light
-:END:
 
-#+begin_src shell :tangle (darkmandir "/hyprland.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "/hyprland.sh") :theme light
 «hyprland-setup»
 
 hyprland_source_theme light
 #+end_src
 
-*** Dark
-:PROPERTIES:
-:theme:    dark
-:END:
-
-#+begin_src shell :tangle (darkmandir "/hyprland.sh")
+- Dark
+#+begin_src shell :tangle (darkmandir "/hyprland.sh") :theme dark
 «hyprland-setup»
 
 hyprland_source_theme dark
 #+end_src
-
 
 ** Eww
 Setup that will be used in both scripts:
@@ -380,55 +664,25 @@ import, e.g.: =@import "light-colors.scss";=.
 
 The scripts replace that line with the alternative.
 
-*** Light
-:PROPERTIES:
-:theme:    light
-:END:
-
-#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh") :theme light
 «darkman-eww-mainbar-setup»
 
 eww_scss_source_theme light
 #+end_src
 
-*** Dark
-:PROPERTIES:
-:theme:    dark
-:END:
-
-#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh")
+- Dark
+#+begin_src shell :tangle (darkmandir "/eww-mainbar.sh") :theme dark
 «darkman-eww-mainbar-setup»
 
 eww_scss_source_theme dark
 #+end_src
 
-** TODO =light-mode.d=: Light
-:PROPERTIES:
-:tangle-dir: (concat (xdg-data-home) "/light-mode.d")
-:END:
+** Alacritty
 
-*** GTK and Qt
-Using the Adwaita theme for everything since it has better support for
-both GTK and Qt, and =qgnomeplatform-qt5= (=-qt6=) also allows Qt applications
-using the supported GTK theme to change live/on-demand, without
-restarting. Though it's unmantained as of Feb 2024.
-#+begin_src shell :tangle (tdir "/gtk-qt.sh")
-gsettings set org.gnome.desktop.interface gtk-theme Adwaita
-gsettings set org.gnome.desktop.interface color-scheme prefer-light
-# icon theme too ?
-#+end_src
-
-*** Alacritty
-Using toml import where =$theme= is the filename of them theme without
-extension.
-#+begin_src shell :tangle (tdir "/alacritty.sh")
-theme=neron-light
-
-«darkman-alacritty-colors-replace»
-#+end_src
-
+Shared setup functions:
 #+NAME: darkman-alacritty-colors-replace
-#+begin_src shell :tangle (tdir "/alacritty.sh")
+#+begin_src shell :tangle no
 replace_theme_import() {
     sed -i -E "s|^(import = \[ \"~/.config/alacritty/themes/)(.*)(\.toml.*)|\1$1\3|" \
         "$2"
@@ -437,7 +691,24 @@ replace_theme_import() {
 replace_theme_import "${theme}" "${XDG_CONFIG_HOME}"/alacritty/alacritty.toml
 #+end_src
 
-*** tofi
+- Light
+Using toml import where =$theme= is the filename of them theme without
+extension.
+#+begin_src shell :tangle (darkmandir "/alacritty.sh") :theme light
+theme=neron-light
+
+«darkman-alacritty-colors-replace»
+#+end_src
+
+- Dark
+#+begin_src shell :tangle (darkmandir "/alacritty.sh") :theme dark
+theme=neron-dark
+
+«darkman-alacritty-colors-replace»
+#+end_src
+
+** tofi
+
 #+NAME: darkman-tofi-setup
 #+begin_src shell
 «darkman-helper-functions»
@@ -453,7 +724,8 @@ tofi_replace_include_theme() {
 }
 #+end_src
 
-#+begin_src shell :tangle (tdir "/tofi.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "/tofi.sh") :theme light
 «darkman-tofi-setup»
 
 theme=light
@@ -461,7 +733,17 @@ theme=light
 tofi_replace_include_theme
 #+end_src
 
-*** xsettingsd: XSETTINGS daemon
+- Dark
+#+begin_src shell :tangle (darkmandir "/tofi.sh") :theme dark
+«darkman-tofi-setup»
+
+theme=dark
+
+tofi_replace_include_theme
+#+end_src
+
+
+** xsettingsd: XSETTINGS daemon
 #+NAME: darkman-xsettingsd-setup
 #+begin_src shell
 «darkman-helper-functions»
@@ -473,7 +755,8 @@ check_file "${xsettingsdConf}"
 trap 'running_check xsettingsd && killall -HUP xsettingsd' EXIT INT
 #+end_src
 
-#+begin_src shell :tangle (tdir "/xsettingsd.sh")
+- Light
+#+begin_src shell :tangle (darkmandir "/xsettingsd.sh") :theme light
 «darkman-xsettingsd-setup»
 
 themeName=Adwaita
@@ -481,38 +764,59 @@ themeName=Adwaita
 sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
 #+end_src
 
-** TODO =dark-mode.d=: Dark
-:PROPERTIES:
-:tangle-dir: (concat (xdg-data-home) "/dark-mode.d")
-:END:
-
-*** GTK and Qt
-#+begin_src shell :tangle (tdir "/gtk-qt.sh")
-gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
-gsettings set org.gnome.desktop.interface color-scheme prefer-dark
-#+end_src
-
-*** Alacritty
-#+begin_src shell :tangle (tdir "/alacritty.sh")
-theme=neron-dark
-
-«darkman-alacritty-colors-replace»
-#+end_src
-
-*** tofi
-#+begin_src shell :tangle (tdir "/tofi.sh")
-«darkman-tofi-setup»
-
-theme=dark
-
-tofi_replace_include_theme
-#+end_src
-
-*** xsettingsd: XSETTINGS daemon
-#+begin_src shell :tangle (tdir "/xsettingsd.sh")
+- Dark
+#+begin_src shell :tangle (darkmandir "/xsettingsd.sh") :theme dark
 «darkman-xsettingsd-setup»
 
 themeName=Adwaita-dark
 
 sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+#+end_src
+
+
+* Dir local variables                                       :noexport:ignore:
+# [2024-02-23 Fri 12:33:17 -03] @ak
+# [2024-09-03 Tue 11:46:32 -03] @ak
+
+#+begin_src elisp :tangle .dir-locals.el
+((nil . ((eval . (defun org-babel-get-src-block-header-arg (header-arg)
+                   "Get the value of the header argument HEADER-ARG from the provided SRC-BLOCK-INFO.
+
+First argument `org-babel-get-src-block-info' is set to `t'
+because it will try to evaluate function in e.g. `:tangle' and if
+for some reason that function refers to
+`org-babel-get-src-block-info' it infinite loops."
+;; This could be set as an optional arg? but then what's the point meh haha
+                   (let* ((src-block-info (org-babel-get-src-block-info t)) ; t for NO-EVAL, otherwise it will infinite loop
+                          (params (nth 2 src-block-info)))
+                     (assoc-default header-arg params))))
+
+         ;; evaluate to a directory as specified https://gitlab.com/WhyNotHugo/darkman#introduction
+         (eval . (defun darkmandir (shfile)
+                   "Evaluate to a filename in a directory from `XDG_DATA_HOME' that's either `light-mode.d' or `dark-mode.d'.
+
+The string argument SHFILE is the target filename of the darkman script to be tangled.
+
+Usage:
+  Either set
+  A header-arg \":theme light\" or \":theme dark\";
+  A `org-set-property' called 'theme' with value \"dark\" or \"light\".
+
+  Then using the function returns:
+  (darkmandir \"script.sh\")
+    => \"/home/user/.local/share/light-mode.d/script.sh\"
+    or
+    => \"/home/user/.local/share/dark-mode.d/script.sh\""
+                   (let* ((file (if shfile (string-trim shfile "/")))
+                          (dir-light (expand-file-name "light-mode.d/" (xdg-data-home)))
+                          (dir-dark (expand-file-name "dark-mode.d/" (xdg-data-home)))
+                          (out-path-light (expand-file-name file dir-light))
+                          (out-path-dark (expand-file-name file dir-dark)))
+                     (cond
+                      ((or (string= (org-babel-get-src-block-header-arg :theme) "light")
+                           (string= (org-entry-get nil "theme" t) "light"))
+                       out-path-light)
+                      ((or (string= (org-babel-get-src-block-header-arg :theme) "dark")
+                           (string= (org-entry-get nil "theme" t) "dark"))
+                       out-path-dark))))))))
 #+end_src

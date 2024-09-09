@@ -1,0 +1,77 @@
+#+title: XDG Desktop Portal overrides
+# [2024-09-03 Tue 14:06:01 -03] @ak
+
+- [[https://flatpak.github.io/xdg-desktop-portal/docs/portals.conf.html][portals.conf - XDG Desktop Portal documentation]]
+- [[https://man.archlinux.org/man/extra/xdg-desktop-portal/portals.conf.5.en][portals.conf(5) — Arch manual pages]]
+
+- Note that when referring to specific desktop portal implementations
+  [[https://man.archlinux.org/man/extra/xdg-desktop-portal/portals.conf.5.en#:~:text=after%20case%2Dfolding%20ASCII%20upper%20case%20to%20lower%20case][the names should be lowercase]].
+
+* Override specific portal implementations
+- [[https://wiki.archlinux.org/title/XDG_Desktop_Portal#Configuration][ArchWiki/XDG Desktop Portal#Configuration]]
+
+In the =portals.conf= file set ~org.freedesktop.impl.portal.*=PORTAL~ where PORTAL is a desktop
+portal implementation.
+# [2024-09-06 Fri 22:49:43 -03] @ak
+
+* Hyprland-specific overrides
+:PROPERTIES:
+:CUSTOM_ID: orgid-rhgutk
+:END:
+- [[https://wiki.hyprland.org/Useful-Utilities/xdg-desktop-portal-hyprland/#using-the-kde-file-picker-with-xdph][Hyprland Wiki/Hyprland Desktop Portal#Using the KDE file picker with XDPH]]
+
+#+begin_src conf :tangle hyprland-portals.conf
+[preferred]
+default=hyprland;kde
+org.freedesktop.impl.portal.Settings=darkman
+org.freedesktop.impl.portal.FileChooser=kde
+#+end_src
+- where
+  + =;= semicolons allow specifying order of fallback
+  + =;*= is a fallback for activating any other portal found. In special
+    for =Settings= this makes GTK apps using =GTK_USE_PORTAL=1= that
+    didn't pick up settings from the portal activate
+    =xdg-desktop-portal-gtk= for example (Note that using
+    ~GTK_USE_PORTAL=1~ may cause more issues. See
+    [[xdg-desktop-portal-gtk-use-portal-problem-note]]
+  + I don't know the difference between "=;*=" vs "=;*;=" at the end of
+    fallbacks
+  + ~FileChooser=kde~ is probably reduntant with ~default=kde~ but keeping
+    in case =default= is changed in the future or vice-versa.
+  # keeping it just bc
+
+
+# #+INCLUDE: "~/.config/darkman/README.org::#orgid-ohmzyr" :minlevel 1
+
+* Notes
+
+** See [[file:~/.config/darkman/README.org::#orgid-sqomyz][Application-specific settings to use XDG Desktop Portal]]
+
+* Troubleshooting
+
+** GTK apps lost font rendering, cursor theme or other settings
+:PROPERTIES:
+:CUSTOM_ID: orgid-uxoxxl
+:END:
+Install =xdg-desktop-portal-gtk=.
+# [2024-09-06 Fri 22:52:27 -03] @ak
+
+#+name: xdg-desktop-portal-gtk-use-portal-problem-note
+- *NOTE*:
+  + This may cause more conflicts specially between =XDP-kde= and
+    =XDP-gtk= since the config file order is not really respected
+    properly.
+    * See
+      - [[https://github.com/SoumyaRanjanPatnaik/xdg-desktop-portal/commit/c62f36652d67f282f2e3d35be63c9814e80140c3][portal-impl: fix config ordering · SoumyaRanjanPatnaik/xdg-desktop-portal@c62f366]].
+
+- See
+  + [[https://wiki.archlinux.org/title/XDG_Desktop_Portal#Poor_font_rendering_in_GTK_apps_on_KDE_Plasma][ArchWiki/XDG Desktop Portal#Poor font rendering in GTK apps on KDE Plasma]]
+  + [[https://www.reddit.com/r/kde/comments/10pbv6n/wayland_how_to_fix_bad_fonts_on_gtk_apps_without/][[Wayland] How to fix bad fonts on GTK apps without removing GTK_USE_PORTAL=1 ? : r/kde]]
+  + [[https://github.com/flatpak/flatpak/issues/2861#issuecomment-735476004][Font is not antialiased with GTK apps on wayland · Issue #2861 · flatpak/flatpak]]
+  + [[https://github.com/flatpak/xdg-desktop-portal/issues/1112][[Bug]: Flatpak doesn't use Breeze theme, uses Adwaita in KDE Plasma · Issue #1112 · flatpak/xdg-desktop-portal]]
+    * https://github.com/flatpak/xdg-desktop-portal/issues/1112#issuecomment-1733683797
+    # - https://github.com/flatpak/xdg-desktop-portal/issues/1112#issuecomment-1745094800
+  + [[https://github.com/flatpak/xdg-desktop-portal/pull/1018][Respect portal configuration for find_all_portal by kennylevinsen · Pull Request #1018 · flatpak/xdg-desktop-portal]]
+    and comments
+  + [[https://github.com/flatpak/xdg-desktop-portal/issues/642][Broken font rendering on KDE without GNOME/GTK portal · Issue #642 · flatpak/xdg-desktop-portal]]
+  + [[https://github.com/flatpak/xdg-desktop-portal-gtk/issues/355][Wayland GTK Flatpaks do not antialias fonts when run on KDE Plasma Wayland · Issue #355 · flatpak/xdg-desktop-portal-gtk]]
