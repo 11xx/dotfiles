@@ -123,23 +123,6 @@
 (use-package ox-gfm
   :ensure t
   :after org)
-
-;; (:package org-auto-tangle)
-;; [[https://www.youtube.com/watch?v=D3FzMPZm7vY][Write Everything In Emacs Org Mode? You NEED This Plugin! - YouTube]]
-;; org-auto-tangle: Org babel tangle file on save
-;; [[https://github.com/yilkalargaw/org-auto-tangle][yilkalargaw/org-auto-tangle: a simple emacs package to allow org file tangling upon save]]
-;; (:require org-auto-tangle)
-;; (:hook org-auto-tangle-mode)
-;; Note about auto tangle: Since it uses async.el that spawns a new
-;; Emacs instance, if for example :tangle is used containing a
-;; function that is not the default it may throw the error:
-;; > error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
-;; See https://stackoverflow.com/a/22843310
-;;
-;; Two options are available: Use only default functions and paths
-;; for tangling or include the desired functions to be passed in the
-;; async Emacs by customizing auto-tangle's async-start function
-;; (which idk how to do).
 (defun f/org-export-dispatch-disable-whitespace-mode (&rest args)
   "Disable `whitespace-mode' for the Org Export Dispatch Buffer."
   (let ((buf (get-buffer "*Org Export Dispatcher*")))

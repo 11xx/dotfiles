@@ -1,6 +1,6 @@
 #+title: Emacs "init" config file
 #+author: 11xx
-#+PROPERTY: header-args :export both :mkdirp yes :results drawer
+#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes
 
 # #+STARTUP: hidestars
 
@@ -30,7 +30,7 @@ Here are some complete configuration examples:
 
 * init.el
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle init.el :export tangle
+:header-args:emacs-lisp: :tangle init.el :export tangle :cache yes
 :CUSTOM_ID: orgid-uvktht
 :END:
 
@@ -188,7 +188,7 @@ Backup & auto-save
 
 * 11xx config
 :PROPERTIES:
-:header-args:emacs-lisp: :mkdirp yes :export tangle
+:header-args:emacs-lisp: :mkdirp yes :export tangle :cache yes
 :END:
 
 Personal config modularized into "pseudo-packages"
@@ -1538,23 +1538,6 @@ It uses `make-directory' PARENTS argument 't'."
 (use-package ox-gfm
   :ensure t
   :after org)
-
-;; (:package org-auto-tangle)
-;; [[https://www.youtube.com/watch?v=D3FzMPZm7vY][Write Everything In Emacs Org Mode? You NEED This Plugin! - YouTube]]
-;; org-auto-tangle: Org babel tangle file on save
-;; [[https://github.com/yilkalargaw/org-auto-tangle][yilkalargaw/org-auto-tangle: a simple emacs package to allow org file tangling upon save]]
-;; (:require org-auto-tangle)
-;; (:hook org-auto-tangle-mode)
-;; Note about auto tangle: Since it uses async.el that spawns a new
-;; Emacs instance, if for example :tangle is used containing a
-;; function that is not the default it may throw the error:
-;; > error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
-;; See https://stackoverflow.com/a/22843310
-;;
-;; Two options are available: Use only default functions and paths
-;; for tangling or include the desired functions to be passed in the
-;; async Emacs by customizing auto-tangle's async-start function
-;; (which idk how to do).
 #+end_src
 
 # ;; (:with-mode org-num-mode
@@ -1635,6 +1618,33 @@ appear when hovered.
   (:hook-into org-mode))
 #+end_src
 
+**** TODO auto-tangle
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+
+- Just use =after-save-hook= instead:
+  : eval: (add-hook 'after-save-hook (lambda () (org-babel-tangle)) nil t)
+
+;; [[https://www.youtube.com/watch?v=D3FzMPZm7vY][Write Everything In Emacs Org Mode? You NEED This Plugin! - YouTube]]
+;; org-auto-tangle: Org babel tangle file on save
+;; [[https://github.com/yilkalargaw/org-auto-tangle][yilkalargaw/org-auto-tangle: a simple emacs package to allow org file tangling upon save]]
+#+begin_src emacs-lisp
+(setup (:package org-auto-tangle)
+  (:require org-auto-tangle)
+  (:hook org-auto-tangle-mode))
+#+end_src
+Note about auto tangle: Since it uses async.el that spawns a new Emacs
+instance, if for example :tangle is used containing a function that is
+not the default it may throw the error:
+: error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
+- See https://stackoverflow.com/a/22843310
+Two options are available: Use only default functions and paths for
+tangling or include the desired functions to be passed in the async
+Emacs by customizing auto-tangle's async-start function (which idk how
+to do).
+# #TODO
+
 ** 11xx-org-functions.el
 #+begin_src emacs-lisp :tangle lisp/11xx-org-functions.el :noweb yes
 ;; -*- lexical-binding: t; -*-
@@ -1686,7 +1696,7 @@ appear when hovered.
 # [2023-05-19 Fri 23:48:32 -03]
 #+begin_src emacs-lisp
 (defun f/eval-string (string)
-  "Read STRING and evaluate its lisp expression.
+  "!!UNSAFE!! Read STRING and evaluate its lisp expression.
 
 Returns STRING if it doesn't start with \"(\"."
   (if (string-match-p "^(" string)
@@ -2601,25 +2611,29 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 - To sandbox the pip dependencies do:
   + On Linux
     : ❯ python -m venv ./.python-venv
-    : ❯ ./python-venv/bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
-    # then source the venv before launching Emacs:
-    # : ❯ source ./python-venv/bin/activate
-    # : ❯ emacs
+    : ❯ ./.python-venv/bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
+    then source the venv before launching Emacs:
+    : ❯ source ./python-venv/bin/activate
+    : ❯ emacs
   # + On Windows (#TODO does it work on windows-nt?)
   #   : python -m venv .\.python-venv
   #   : .\.python-venv\Scripts\pip.exe install epc orjson sexpdata six setuptools paramiko rapidfuzz
-  + Now set the python venv root inside Emacs:
-    : (setq python-shell-virtualenv-root "./.python-env")
+  # + Install Now set the python venv root inside Emacs:
 
 [[https://github.com/manateelazycat/lsp-bridge#installation][manateelazycat/lsp-bridge: A blazingly fast LSP client for Emacs]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
+(setup (:package pyenv-mode))
+
+(let (python-shell-virtualenv-root "./.python-venv")
+  (pythonic-activate)
+  (run-python "python pip --version"))
+
 (use-package lsp-bridge
-  :vc '(lsp-bridge :type git :host github :repo "manateelazycat/lsp-bridge"
-                   :files (:defaults "*.el" "*.py" "acm" "core" "langserver" "multiserver" "resources")
-                   :build (:not compile))
-  ;; :init
-  ;; (global-lsp-bridge-mode)
-  )
+  :vc (:url "manateelazycat/lsp-bridge"))
+
+(package-vc-install '(lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge"))
+
+(setup (:package (lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge")))
 #+end_src
 Before testing disable Corfu or any other completion.
 Run with =lsp-bridge-mode=.
@@ -3137,7 +3151,13 @@ retrieve the password.
 
 * File Local Variables                                             :noexport:
 # Local Variables:
+# eval: (add-hook 'after-save-hook (lambda () (org-babel-tangle)) nil t)
 # End:
+
+- [[https://www.reddit.com/r/orgmode/comments/jy8fuc/orgbabeltangle_on_save/][org-babel-tangle on save? : r/orgmode]]
+- [[https://gitlab.com/joseph8th/literatemacs/-/blob/master/README.org?ref_type=heads&plain=1#L1915][README.org · master · Joseph E. Edwards VIII / literatemacs · GitLab]]
+- [[https://web.archive.org/web/20230117073433/https://github.com/joseph8th/literatemacs#conclusion][GitHub - joseph8th/literatemacs: My literate Emacs config]]
+
 #+begin_src emacs-lisp :tangle no :noweb-ref dummy
 ;; setting this as buffer local doesn't work for tangling
 (add-hook 'org-babel-post-tangle-hook

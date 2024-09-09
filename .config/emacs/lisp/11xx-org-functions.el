@@ -24,7 +24,7 @@
     (forward-line -2))
   (recenter-top-bottom))
 (defun f/eval-string (string)
-  "Read STRING and evaluate its lisp expression.
+  "!!UNSAFE!! Read STRING and evaluate its lisp expression.
 
 Returns STRING if it doesn't start with \"(\"."
   (if (string-match-p "^(" string)
