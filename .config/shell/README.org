@@ -77,7 +77,8 @@ alias suwine="sudo -su wineuser"
 
 ** Navigation & listing
 #+begin_src shell
-alias l='exa -lag --color=auto --group-directories-first --time-style long-iso'
+alias l='eza -lag --color=auto --group-directories-first --time-style long-iso'
+alias lt='l -T'
 # alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
 alias cdsd='cd /etc/systemd/system'
 alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
@@ -238,8 +239,7 @@ See [[https://github.com/LukeSmithxyz/voidrice/blob/284b1078cb6231863244a1355dd0
 Putting the directories in =XDG_BIN_HOME= /after/ PATH to make already present
 executables, e.g. from =/usr/bin=, take precedence.
 #+begin_src shell
-find_subdirs_xdg_bin_home_scalar() {
-    # scalar are single non-word-split values like value1:value2:value3
+find_subdirs_xdg_bin_home_colon_sep() {
     [ -d "$XDG_BIN_HOME" ] &&
         find "$XDG_BIN_HOME" \
              -mindepth 1 \
@@ -256,14 +256,14 @@ find_subdirs_xdg_bin_home_scalar() {
   + =-maxdepth 1= includes only first-level subdirectories of =$XDG_BIN_HOME=.
 
 - Now:
-  + Get the output of =find_subdirs_xdg_bin_home_scalar=;
+  + Get the output of =find_subdirs_xdg_bin_home_colon_sep=;
   + save it in a local variable (POSIX-style);
   + remove any =:= at the end of it while appending to path with
     =append_path=.
   + =unset= the local variable for good measure.
 #+begin_src shell
 [ -d "$XDG_BIN_HOME" ] && {
-    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_scalar)
+    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_colon_sep)
     append_path "${_xdg_bin_home_dirs%:}"
     unset _xdg_bin_home_dirs
 }
@@ -332,7 +332,6 @@ export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
 export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
 
 export LESSHISTFILE="-"
-export WINEPREFIX="$XDG_DATA_HOME/wine/prefixes/default"
 export GRIPHOME="$XDG_CONFIG_HOME/grip"
 export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
 alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
@@ -1108,16 +1107,10 @@ alias cd=z
 alias c=z
 #+end_src
 
-*** Modularized setup files sourcing
+*** Source setup modules
+Modularized setup files sourcing
+
 #+begin_src bash
-# source_check() {
-#     [ -r "$1" ] &&
-#         . "$1"
-# }
-
-# source_check "$XDG_CONFIG_HOME"/shell/nnn-setup.bash
-# source_check "$XDG_CONFIG_HOME"/shell/ghcup-setup.sh
-
 __setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
 if test -d "${__setupModulesDir}"; then
     for module in "${__setupModulesDir}"/*.sh \
@@ -1451,9 +1444,9 @@ Custom install directory for GHCup downloads.
 GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
 #+end_src
 
-This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]],
-GHCup installs binaries and links to =XDG_BIN_HOME= so with alias it is
-possible to override where it installs and managers it's files.
+This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]], GHCup installs binaries and links
+to =XDG_BIN_HOME= so with alias it is possible to override where it
+installs and manages its files.
 #+begin_src shell
 is_command prepend_path &&
     prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
@@ -1516,6 +1509,20 @@ alias m='ncmpcpp --config="$XDG_CONFIG_HOME/mpd/ncmpcpp-config" --bindings="$XDG
 # MPD
 # alias mpcl='mpc -p 7777'
 # alias ml="ncmpcpp -p 7777"
+
+** Wine
+
+*** Default prefix
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/wine.sh
+:END:
+#+begin_src shell
+wineDefaultPrefixDir=${XDG_DATA_HOME}/wine/prefixes/default
+/usr/bin/mkdir -p "${wineDefaultPrefixDir}"
+alias winedef="WINEPREFIX=${wineDefaultPrefixDir} wine"
+unset wineDefaultPrefixDir
+#+end_src
+
 
 ** GTK & Qt: Uniform look & live theme change
 :PROPERTIES:

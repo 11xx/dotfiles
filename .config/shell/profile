@@ -32,8 +32,7 @@ append_path "$XDG_DATA_HOME/cabal/bin"
 
 append_path "$XDG_BIN_HOME"
 
-find_subdirs_xdg_bin_home_scalar() {
-    # scalar are single non-word-split values like value1:value2:value3
+find_subdirs_xdg_bin_home_colon_sep() {
     [ -d "$XDG_BIN_HOME" ] &&
         find "$XDG_BIN_HOME" \
              -mindepth 1 \
@@ -44,7 +43,7 @@ find_subdirs_xdg_bin_home_scalar() {
 }
 
 [ -d "$XDG_BIN_HOME" ] && {
-    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_scalar)
+    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_colon_sep)
     append_path "${_xdg_bin_home_dirs%:}"
     unset _xdg_bin_home_dirs
 }
@@ -84,7 +83,6 @@ export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
 export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
 
 export LESSHISTFILE="-"
-export WINEPREFIX="$XDG_DATA_HOME/wine/prefixes/default"
 export GRIPHOME="$XDG_CONFIG_HOME/grip"
 export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
 alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'

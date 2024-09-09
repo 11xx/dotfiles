@@ -254,14 +254,6 @@ eval "$(zoxide init zsh)"
 alias cd=z
 alias c=z
 
-# source_check() {
-#     [ -r "$1" ] &&
-#         . "$1"
-# }
-
-# source_check "$XDG_CONFIG_HOME"/shell/nnn-setup.bash
-# source_check "$XDG_CONFIG_HOME"/shell/ghcup-setup.sh
-
 __setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
 if test -d "${__setupModulesDir}"; then
     for module in "${__setupModulesDir}"/*.sh \

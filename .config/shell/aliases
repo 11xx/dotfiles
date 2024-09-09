@@ -41,7 +41,8 @@ alias f="fzf"
 
 alias suwine="sudo -su wineuser"
 
-alias l='exa -lag --color=auto --group-directories-first --time-style long-iso'
+alias l='eza -lag --color=auto --group-directories-first --time-style long-iso'
+alias lt='l -T'
 # alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
 alias cdsd='cd /etc/systemd/system'
 alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
