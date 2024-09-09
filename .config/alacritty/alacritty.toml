@@ -1,4 +1,4 @@
-# only full paths are supported
+# only full paths are supported https://github.com/alacritty/alacritty/pull/7690
 import = [ "~/.config/alacritty/themes/neron-dark.toml" ]
 
 [env]
