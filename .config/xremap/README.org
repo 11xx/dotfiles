@@ -18,7 +18,7 @@ https://raw.githubusercontent.com/k0kubun/xremap/master/example/emacs.yml
 #+begin_src yaml :tangle browser-emacs.yaml
 # Credit: https://github.com/mooz/xkeysnail/blob/bf3c93b4fe6efd42893db4e6588e5ef1c4909cfb/example/config.py#L62-L125
 keymap:
-  - name: Emacs
+  - name: Browser Emacs
     application:
       only: [firefox, vivaldi-stable]
     exact_match: true # required for not conflicting with
