@@ -160,7 +160,7 @@ read it before opening a new issue about your will.")
                 (c/current "#fdf6df" "#000000" "blue")                  ; official current-line/selection
                 (c/comment "#a0a1a7" "#afaf87" "yellow")                ; official comment
                 (c/cyan    "#006861" "#00afaf" "cyan")                  ; official cyan
-                (c/green   "#1c6b00" "#5faf00" "green")                 ; official green
+                (c/green   "#316900" "#5faf00" "green")                 ; official green
                 (c/orange  "#964505" "#ff8700" "red")                   ; both official orange
                 (c/pink    "#b30071" "#ff87d7" "magenta")               ; official pink
                 (c/purple  "#4d2eff" "#afafff" "magenta")               ; official purple
