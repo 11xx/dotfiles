@@ -45,7 +45,7 @@ exec-once = lightordark-wallpaper # script
 exec-once = kdeconnectd # KDE connect daemon
 exec-once = eww open mainbar & eww open mainbar2
 exec-once = xsettingsd # GTK2-3 theme live changes
-exec-once = xremap-default # script, keyboard remappings
+# exec-once = xremap-default # script, keyboard remappings
 exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
 # exec-once = gammastep -P
@@ -502,6 +502,7 @@ binde = , XF86AudioRaiseVolume, exec, change-volume --wob --change-volume +5
 
 # [[https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h][libxkbcommon/xkbcommon-keysyms.h at master · xkbcommon/libxkbcommon]]
 bind = , print, exec, mkdir -p "$(xdg-user-dir PICTURES)/screenshots/" && grim -l 0 -t png "$(xdg-user-dir PICTURES)/screenshots/$(date +'%Y%m%d-%H%M%S-screenshot.png')" && notify-send -a Screenshot 'Fullscreen Screenshot taken'
+# color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 
 # Hang when using default exit:
 # FIX wizard https://github.com/hyprwm/Hyprland/issues/3558#issuecomment-1848768654
@@ -841,6 +842,7 @@ env = WLR_DRM_NO_ATOMIC,1
 windowrulev2 = immediate,class:^eldenring.exe$
 windowrulev2 = immediate,class:^gamescope$
 windowrulev2 = immediate,class:^steam_app_[0-9]+$
+windowrulev2 = immediate,class:^mpv$
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
