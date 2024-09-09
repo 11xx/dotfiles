@@ -3,6 +3,10 @@
 # [2024-03-01 Fri 03:14:16 -03] @ak
 
 * user.js
+:PROPERTIES:
+:header-args:typescript: :tangle firefox-user.js
+:END:
+
 The =user.js= can easily be transferred between backups. It is a file
 override of settings from =about:config=.
 
@@ -11,28 +15,72 @@ Since Firefox really doesn't like having a custom profile folder
 will remain here stored. It will need to be moved/copied/linked to
 inside the current profile folder manually.
 
+Link to appropriate place e.g.
+: ln -sf ~/.mozilla/firefox-user.js ~/.mozilla/firefox/profile-folder/user.js
+
 - See this readme for more info on user.js
   + [[https://github.com/pyllyukko/user.js][GitHub - pyllyukko/user.js: user.js -- Firefox configuration hardening]]
-#+begin_src typescript :tangle firefox-user.js
-// Wayland libva nvidia video decode
+
+** Disable alt menu
+#+begin_src typescript
+user_pref("ui.key.menuAccessKeyFocuses", false);
+#+end_src
+
+** Wayland libva VA-API NVIDIA video decode
+#+begin_src typescript
 user_pref("media.ffmpeg.vaapi.enabled", true);
 user_pref("media.rdd-ffmpeg.enabled", true);
 user_pref("media.av1.enabled", true); // You may skip this if your GPU does not support AV1
 user_pref("gfx.x11-egl.force-enabled", true);
 user_pref("widget.dmabuf.force-enabled", true);
+#+end_src
 
-// Disable alt menu
-user_pref("ui.key.menuAccessKeyFocuses", false);
-
+** UI
+- also enable options from https://github.com/Bali10050/FirefoxCSS/blob/main/user.js
+- https://www.reddit.com/r/FirefoxCSS/comments/myc578/svg_icon_contextfill_resolves_to_black/
+#+begin_src typescript
 // enable userChrome.css
-// also enable options from https://github.com/Bali10050/FirefoxCSS/blob/main/user.js
 user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 user_pref("svg.context-properties.content.enabled", true);
 user_pref("layout.css.has-selector.enabled", true);
-// https://www.reddit.com/r/FirefoxCSS/comments/myc578/svg_icon_contextfill_resolves_to_black/
 #+end_src
-Link to appropriate place e.g.
-: ln -sf ~/.mozilla/firefox-user.js ~/.mozilla/firefox/profile-folder/user.js
+
+** XDG Desktop Portal integration
+:PROPERTIES:
+:CUSTOM_ID: orgid-jryihm
+:END:
+- See
+  + [[file:~/.config/darkman/README.org::#orgid-sqomyz][Application-specific settings to use XDG Desktop Portal]]
+    # linked here
+#+begin_src typescript
+user_pref("widget.use-xdg-desktop-portal.file-picker", 1);
+user_pref("widget.use-xdg-desktop-portal.location", 1);
+user_pref("widget.use-xdg-desktop-portal.mime-handler", 1);
+user_pref("widget.use-xdg-desktop-portal.open-uri", 1);
+user_pref("widget.use-xdg-desktop-portal.settings", 1);
+#+end_src
+
+** Performance
+- *NOTE*: =dom.ipc.processCount.extension= set to more than 1 (default)
+  disables extensions.
+  + See
+    * [[https://bugzilla.mozilla.org/show_bug.cgi?id=1419341][1419341 - Firefox web extensions disabled by dom.ipc.processCount.extension > 1]]
+    * [[https://searchfox.org/mozilla-central/rev/919dce54f43356c22d6ff6b81c07ef412b1bf933/toolkit/components/extensions/Extension.jsm#1047-1049][Extension.jsm - mozsearch]]
+#+begin_src typescript
+user_pref("gfx.webrender.all", true);
+user_pref("browser.preferences.defaultPerformanceSettings.enabled", false);
+// setting all the following dom.ipc to higher values made a noticeable difference
+user_pref("dom.ipc.processCount", 8); // was 8 by default
+user_pref("dom.ipc.processCount.extension", 1); // default is 1 and CANNOT be changed otherwise it will disable extensions.
+user_pref("dom.ipc.processCount.file", 8); // was 1
+user_pref("dom.ipc.processCount.privilegedabout", 8); // was 1
+user_pref("dom.ipc.processCount.privilegedmozilla", 8); // was 1
+user_pref("dom.ipc.processCount.webIsolated", 8); // was 4
+
+// store cache in xdg_runtime_dir's tmpfs
+user_pref("browser.cache.disk.parent_directory", "/run/user/1000/firefox"); // update UID if it's not 1000
+user_pref("browser.sessionstore.interval", 60000); // in milliseconds
+#+end_src
 
 * User css
 - See
@@ -79,3 +127,54 @@ as default:
   + click =Choose Folder...= and point to the backed-up profile dir.
 
 This can also be used for renaming a profile directory.
+
+** user.js vs autoconfig.js aka userChrome.js
+- [[https://www.reddit.com/r/FirefoxCSS/comments/x04k1b/what_is_the_difference_between_userjs_and/][What is the difference between user.js and userChrome.js? : r/FirefoxCSS]]
+# [2024-08-30 Fri 12:30:23 -03] @ak
+
+=user.js= is for =user_pref=. =autoconfig.js= is for injection.
+
+* TODO AutoConfig                                         :ignore:noexport:
+:PROPERTIES:
+:header-args:typescript: :tangle no
+:END:
+
+- https://support.mozilla.org/en-US/kb/customizing-firefox-using-autoconfig
+
+Set up firefox to read a js file called =custom-firefox.cfg= placed at
+the top level of the installation directory:
+# #+begin_src typescript :tangle /usr/lib/firefox/defaults/pref/autoconfig.js
+pref("general.config.filename", "11xx-custom-firefox.cfg");
+pref("general.config.obscure_value", 0);
+#+end_src
+
+
+# #+begin_src typescript :tangle /usr/lib/firefox/11xx-custom-firefox.cfg
+// IMPORTANT: Start your code on the 2nd line
+let { classes: Cc, interfaces: Ci, manager: Cm  } = Components;
+const {Services} = Components.utils.import('resource://gre/modules/Services.jsm');
+function ConfigJS() { Services.obs.addObserver(this, 'chrome-document-global-created', false); }
+ConfigJS.prototype = {
+  observe: function (aSubject) { aSubject.addEventListener('DOMContentLoaded', this, {once: true}); },
+  handleEvent: function (aEvent) {
+    let document = aEvent.originalTarget;
+    let window = document.defaultView;
+    let location = window.location;
+    if (/^(chrome:(?!\/\/(global\/content\/commonDialog|browser\/content\/webext-panels)\.x?html)|about:(?!blank))/i.test(location.href)) {
+      if (window._gBrowser) {
+        let keys = ["key_close","key_closeWindow"];
+        for (var i=0; i < keys.length; i++) {
+          let keyCommand = window.document.getElementById(keys[i]);
+          if (keyCommand != undefined) {
+            keyCommand.removeAttribute("command");
+            keyCommand.removeAttribute("key");
+            keyCommand.removeAttribute("modifiers");
+            keyCommand.removeAttribute("oncommand");
+            keyCommand.removeAttribute("data-l10n-id");
+          }
+        }
+      }
+    }
+  }
+};
+#+end_src
