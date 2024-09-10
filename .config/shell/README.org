@@ -290,6 +290,7 @@ based on:
 - [[https://lobste.rs/s/3wntbx/practical_self_defense_against_scourge][Practical Self-Defense against the Scourge of Dot-Files | Lobsters]]
 - https://github.com/BrodieRobertson/dotfiles/blob/master/.zshenv
 - [[https://wiki.archlinux.org/title/XDG_Base_Directory][XDG Base Directory - ArchWiki]]
+- [[https://github.com/b3nj5m1n/xdg-ninja][b3nj5m1n/xdg-ninja: A shell script which checks your $HOME for unwanted files and directories.]]
 #+begin_src shell
 export XAUTHORITY="$XDG_DATA_HOME"/xorg/Xauthority
 export XINITRC="$XDG_CONFIG_HOME"/X11/xinitrc
@@ -331,7 +332,7 @@ export XMONAD_CACHE_DIR="$XDG_CACHE_HOME"/xmonad
 export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
 export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
 
-export LESSHISTFILE="-"
+export LESSHISTFILE="$XDG_STATE_HOME"/less/history
 export GRIPHOME="$XDG_CONFIG_HOME/grip"
 export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
 alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
@@ -346,14 +347,18 @@ export UNISON="$XDG_DATA_HOME"/unison
 export PARALLEL_HOME="$XDG_CONFIG_HOME"/parallel
 export IPYTHONDIR="${XDG_CONFIG_HOME}"/ipython
 export ANDROID_HOME=${XDG_DATA_HOME}/android
+alias adb='HOME="$XDG_DATA_HOME"/android adb'
 export CUDA_CACHE_PATH=${XDG_CACHE_HOME}/nv
 alias dosbox=dosbox -conf "$XDG_CONFIG_HOME"/dosbox/dosbox.conf
 export GRADLE_USER_HOME="$XDG_DATA_HOME"/gradle
 alias nvidia-settings='mkdir -p "${XDG_CONFIG_HOME}"/nvidia && nvidia-settings --config="$XDG_CONFIG_HOME"/nvidia/settings'
 # https://github.com/ansible/ansible/commit/d7fbde4ea9db6cc44e81c39d699595330f4fa3c6
-export ANSIBLE_HOME="$XDG_CACHE_HOME"/ansible
+export ANSIBLE_HOME=${XDG_DATA_HOME}/ansible
 export RUSTUP_HOME=${XDG_DATA_HOME}/rustup
 alias wget="wget --hsts-file=${XDG_DATA_HOME}/wget-hsts"
+export CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
+export RANDFILE=${XDG_CACHE_HOME}/rnd
+export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
 #+end_src
 
 ** Terminal Colors
