@@ -255,6 +255,19 @@ In =about:config= set =widget.use-xdg-desktop-portal.file-picker= to =1=.
 - See
   + Example using a =user.js= file: [[file:~/.mozilla/README.org::#orgid-jryihm][firefox: XDG Desktop Portal integration]]
   + [[https://www.reddit.com/r/kde/comments/pz2y0m/comment/heyem8r/][#comment@r/kde/Firefox and GTK_USE_PORTAL=1 vs Firefox not detected as default browser]]
+*** Blur with kvantum (specially Dolphin)
+- [[https://github.com/tsujan/Kvantum/blob/master/Kvantum/INSTALL.md#desktop-environments][Kvantum/Kvantum/INSTALL.md at master · tsujan/Kvantum]]
+- [[https://forum.endeavouros.com/t/transparencies-in-kvantum-eos-kde/56168/5][Transparencies in Kvantum EOS KDE - Desktop Environments / Plasma - EndeavourOS]]
+
+Make sure to set /either/ kvantum-dark or qt6ct on =plasma-open-settings=
+> =Colors & Thems= > =Application Style=.
+# [2024-09-10 Tue 13:22:26 -03] @ak
+*** pcmanfm-qt doesn't show icons
+- [[https://forum.endeavouros.com/t/pcmanfm-qt-doesnt-show-icons/4854/8][Pcmanfm-qt doesn't show icons - Desktop Environments / Lxqt - EndeavourOS]]
+
+install qt5ct/qt6ct and change icon there
+# [2024-09-10 Tue 13:23:27 -03] @ak
+
 
 ** Making Darkman portal implementation work on minimal setups
 :PROPERTIES:
