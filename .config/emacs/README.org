@@ -1,6 +1,6 @@
 #+title: Emacs "init" config file
 #+author: 11xx
-#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes
+#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes :noweb yes
 
 # #+STARTUP: hidestars
 
@@ -30,8 +30,8 @@ Here are some complete configuration examples:
 
 * init.el
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle init.el :export tangle :cache yes
 :CUSTOM_ID: orgid-uvktht
+:header-args:emacs-lisp+: :tangle init.el
 :END:
 
 Add subdirectory to load path containing custom modules.
@@ -40,6 +40,12 @@ Add subdirectory to load path containing custom modules.
 #+end_src
 
 ** Elpaca package manager bootstrap & setup.el
+First disable =packge.el= as early as possible in =early-init.el=
+#+begin_src emacs-lisp :tangle early-init.el
+(setq package-enable-at-startup nil)
+#+end_src
+
+Bootstrap elpaca
 #+begin_src emacs-lisp
 (defvar elpaca-installer-version 0.7)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
@@ -80,28 +86,38 @@ Add subdirectory to load path containing custom modules.
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
-;; install setup.el
+#+end_src
+
+Install pkal's =setup.el= and define its macros
+#+begin_src emacs-lisp
 (elpaca setup (require 'setup))
 (elpaca-wait)
+
+(defmacro setup-elpaca (order &rest body)
+  "Execute BODY in `setup' declaration after ORDER is finished.
+If the :disabled keyword is present in body, the package is completely ignored.
+This happens regardless of the value associated with :disabled.
+The expansion is a string indicating the package has been disabled."
+  (declare (indent 1))
+  (if (memq :disabled body)
+      (format "%S :disabled by -setup" order)
+    (let ((o order))
+      (when-let ((ensure (cl-position :ensure body)))
+        (setq o (if (null (nth (1+ ensure) body)) nil order)
+              body (append (cl-subseq body 0 ensure)
+                           (cl-subseq body (+ ensure 2)))))
+      `(elpaca ,o (setup
+                      ,(if-let (((memq (car-safe order) '(quote \`)))
+                                (feature (flatten-tree order)))
+                           (cadr feature)
+                         (elpaca--first order))
+                    ,@body)))))
 #+end_src
 
-also disable packge.el as early as possible in early-init.el
-#+begin_src emacs-lisp :tangle early-init.el
-(setq package-enable-at-startup nil)
-#+end_src
-*** 11xx-setup.el
-#+begin_src emacs-lisp :tangle lisp/11xx-setup.el :noweb yes
-;; -*- lexical-binding: t; -*-
-;; (require '11xx-package)
-
-<<setup-el-install>>
-<<setup-el-def>>
-
-(provide '11xx-setup)
-#+end_src
+*** 11xx-setup.l
 
 - [[https://www.emacswiki.org/emacs/SetupEl#h5o-26][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
-#+begin_src emacs-lisp :tangle no :noweb-ref setup-el-install
+#+begin_src emacs-lisp :noweb-ref
 (defun my-protect-setup (expansion)
   "Wrap `setup' output with `condition-case'."
   (let ((err (gensym "setup-err")))
@@ -121,7 +137,7 @@ also disable packge.el as early as possible in early-init.el
 
 **** =setup.el=
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref setup-el-def
+:header-args:emacs-lisp+: :noweb-ref setup-el
 :END:
 - See:
   + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
@@ -129,35 +145,8 @@ also disable packge.el as early as possible in early-init.el
 
 ***** =setup.el= additional macros
 
-****** DONE :package
-- [[https://www.emacswiki.org/emacs/SetupEl#h5o-24][EmacsWiki: Setup El#Package-vc support]]
-#+begin_src emacs-lisp :tangle no :noweb-ref dummy
-(setup-define :package
-  (lambda (package)
-    (if (consp package)
-        `(unless (and (package-installed-p ',(car package))
-                      (package-vc-p (cadr (assoc ',(car package)
-                                                 (package--alist)))))
-           (package-vc-install
-            ,(if (consp (cdr package))
-                 `',(car package)
-               `(list ',(car package) ,@(cdr package)))))
-      `(unless (package-installed-p ',package)
-         (unless (memq ',package package-archive-contents)
-           (package-refresh-contents))
-         (package-install ',package))))
-  :documentation "Install PACKAGE if it hasn't been installed yet.
-The first PACKAGE can be used to deduce the feature context.  If
-PACKAGE is a cons-cell, then the it will be interpreted as a
-package specification that will be passed to
-`package-vc-install'."
-  :repeatable t
-  :shorthand (lambda (form)
-               (if (consp (cadr form)) (caadr form) (cadr form))))
-#+end_src
-
 ****** :elpaca
-[[https://www.emacswiki.org/emacs/SetupEl#:~:text=Using-,elpaca,-Elpaca%20is%20an][EmacsWiki: Setup El]]
+[[https://www.emacswiki.org/emacs/SetupEl#:~:text=Using-,elpaca,-Elpaca%20is%20an][EmacsWiki/Setup El#Elpaca]]
 #+begin_src emacs-lisp
 (defun setup-wrap-to-install-package (body _name)
   "Wrap BODY in an `elpaca' block if necessary.
@@ -186,8 +175,7 @@ The ORDER can be used to deduce the feature context."
 #+end_src
 
 ****** :local-or-package
-from https://www.emacswiki.org/emacs/SetupEl#h5o-18
-
+from [[https://www.emacswiki.org/emacs/SetupEl#:~:text=setup-define%20%3Alocal-or-package][EmacsWiki/Setup El#Install a package if not available locally]]
 #+begin_src emacs-lisp
 (setup-define :local-or-package
   (lambda (feature-or-package)
@@ -203,7 +191,7 @@ the first PACKAGE."
 #+end_src
 
 ****** :disabled
-from https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
+https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
 #+begin_src emacs-lisp
 (setup-define :disabled
   (lambda ()
@@ -291,34 +279,29 @@ current mode."
 #+end_src
 
 ** init-no-littering: Keep user-emacs-directory clean
-#+begin_src emacs-lisp
-(require 'init-no-littering)
-(require 'init-backup-auto-save)
-#+end_src
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref no-littering
+:END:
 
-#+NAME: no-littering-def
-#+begin_src emacs-lisp :tangle lisp/init-no-littering.el
-(require '11xx-setup)
+#+begin_src emacs-lisp
+(elpaca no-littering (require 'no-littering))
+(elpaca-wait)
 
 (when (fboundp 'startup-redirect-eln-cache)
   (startup-redirect-eln-cache
    (convert-standard-filename
-    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+    (expand-file-name  "eln-cache" no-littering-var-directory))))
 
 (add-to-list 'native-comp-eln-load-path
              (convert-standard-filename
-              (expand-file-name "var/eln-cache/" user-emacs-directory)))
-
-(setup (:elpaca no-littering)
-  (:require no-littering))
-
-(provide 'init-no-littering)
+              (expand-file-name "eln-cache" no-littering-var-directory)))
+#+end_src
+** Require dependencies
+#+begin_src emacs-lisp
+(require '11xx-functions)
 #+end_src
 
 ** init-backup-auto-save.el: Move back-up and auto-save files
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle lisp/init-backup-auto-save.el
-:END:
 Backup & auto-save
 - See
   + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
@@ -328,19 +311,18 @@ Backup & auto-save
   + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
 
 #+begin_src emacs-lisp
-(require '11xx-functions)
-
 (defvar v/backup-directory
   (expand-file-name "backups"
                     (expand-file-name "var" user-emacs-directory))
   "Custom backup-files directory.")
-(f/check-make-directory v/backup-directory)
 
 ;; Auto-save directory variable
 (defvar v/auto-save-directory
   (expand-file-name "auto-save"
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
+
+(f/check-make-directory v/backup-directory)
 (f/check-make-directory v/auto-save-directory)
 
 ;; ;; add random number to auto save file list
@@ -375,10 +357,6 @@ Backup & auto-save
   +Is this legacy stuff from the ancient times of shared terminals?+
   # [2024-02-14 Wed 11:00:23 -03] @ak
 
-#+begin_src emacs-lisp
-(provide 'init-backup-auto-save)
-#+end_src
-
 ** Native compilation settings
 #+begin_src emacs-lisp
 (setopt native-comp-jit-compilation t
@@ -386,31 +364,30 @@ Backup & auto-save
         native-comp-async-report-warnings-errors 'silent)
 #+end_src
 
-** Load custom config
+** TODO Load custom config
 #+begin_src emacs-lisp
-(setup 11xx-defaults)
-(setup 11xx-completion)
+;; (setup (:with-hook elpaca-after-init-hook
+;;          (:hook (lambda()
+;;                   (require '11xx-defaults)
+;;                   (require '11xx-completion)
+;;                   (require '11xx-ui)
+;;                   (require '11xx-navigation)
+;;                   (require '11xx-half-scroll)
+;;                   (require '11xx-pixel-scroll)
+;;                   (require '11xx-dired)
+;;                   (require '11xx-magit)
+;;                   (require '11xx-gc)
+;;                   (require '11xx-org)
+;;                   (require '11xx-modes)))))
 
-(setup 11xx-ui
-  (:load-after frame))
-
-(setup 11xx-navigation)
-
-(setup 11xx-half-scroll
-  (:load-after frame))
-
-(setup 11xx-pixel-scroll
-  (:load-after frame))
-
-(setup 11xx-dired
-  (:load-after dired))
-
-(setup 11xx-magit
-  (:load-after dired))
-
-(setup 11xx-gc)
-(setup 11xx-org)
-(setup 11xx-modes)
+<<new-defaults>>
+<<11xx-completion>>
+<<11xx-ui>>
+<<11xx-navigation>>
+<<11xx-half-scroll>>
+<<11xx-pixel-scroll>>
+<<11xx-dired>>
+<<11xx-magit>>
 #+end_src
 
 ** Startup report
@@ -438,28 +415,17 @@ Personal config modularized into "pseudo-packages"
 Increase Garbage Collection threshold:
 - [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
 - [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
-#+begin_src emacs-lisp :tangle lisp/11xx-gc.el
+#+begin_src emacs-lisp
 ;; -*- lexical-binding: t; -*-
 (setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
 (add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
-
-(provide '11xx-gc)
 #+end_src
 
 ** 11xx-defaults.el: New defaults
-#+begin_src emacs-lisp :tangle lisp/11xx-defaults.el :noweb yes
-(require '11xx-setup)
-(require '11xx-functions)
-(require 'init-no-littering)
-
-<<new-defaults-def>>
-
-(provide '11xx-defaults)
-#+end_src
 
 *** emacs new defaults def
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref new-defaults-def
+:header-args:emacs-lisp+: :noweb-ref new-defaults
 :END:
 **** Emacs setup
 - Notes:
@@ -472,7 +438,6 @@ Increase Garbage Collection threshold:
     config was tested and caused problems when not using it.
 
 #+begin_src emacs-lisp :noweb yes
-(require 'utf-8-default)
 (setup emacs
   ;; Keybindings
   (:global
@@ -555,30 +520,6 @@ Increase Garbage Collection threshold:
 
 - Show whitespace but disable in some modes
   + Also see [[org-dispatcher-disable-show-whitespace][Disable show-trailing-whitespace on Org Export Dispatcher]]
-#+begin_src elisp :noweb-ref dummy :tangle no
-(use-package whitespace
-  :delight ; hide in modeline
-  :config
-  (setopt whitespace-style '(face tabs missing-newline-at-eof)
-          show-trailing-whitespace t)
-  :hook
-  (prog text) ; enable everywhere, but disable in some modes:
-  ((special-mode-hook
-    term-mode-hook
-    vterm-mode-hook
-    comint-mode-hook
-    compilation-mode-hook
-    minibuffer-setup-hook
-    minibuffer-mode-hook
-    calendar-mode-hook
-    ;; embark-mode-hook
-    eshell-mode-hook
-    completion-list-mode-hook
-    messages-buffer-mode-hook
-    diff-mode-hook) . (lambda() (setq-local show-trailing-whitespace nil))))
-#+end_src
-
-# #TODO-remove example
 #+begin_src emacs-lisp
 (setup whitespace
   (:hide-mode)
@@ -606,12 +547,12 @@ Increase Garbage Collection threshold:
   + use of =forward-same-syntax=:
   + [[https://stackoverflow.com/questions/1771102/changing-emacs-forward-word-behaviour/2565961#2565961][emacs23 - Changing Emacs Forward-Word Behaviour - Stack Overflow]]
   + [[https://stackoverflow.com/questions/58300666/backward-same-syntax-in-emacs/58306071#58306071]["backward-same-syntax" in Emacs - Stack Overflow]]
-    #+begin_src elisp :noweb-ref dummy :tangle no
+    #+begin_example
     (defun f/backward-same-syntax ()
       "Wrapper for `forward-same-syntax' with negative argument."
       (interactive)
       (forward-same-syntax -1))
-    #+end_src
+    #+end_example
 
 - But a better alternative includes subword same-syntax (aka support
   =camelCase= cursor movement):
@@ -631,44 +572,38 @@ Increase Garbage Collection threshold:
   (:global "M-o" ace-window))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
-(use-package helpful
-  :ensure t
+(setup (:elpaca helpful)
   ;; Helpful.el
-  :bind
-  (([remap describe-function] . helpful-callable)
-   ([remap describe-command] . helpful-command)
-   ([remap describe-variable] . helpful-variable)
-   ([remap describe-key] . helpful-key)
-   ([remap describe-symbol] . helpful-symbol)))
+  (:global
+   [remap describe-function] helpful-callable
+   [remap describe-command] helpful-command
+   [remap describe-variable] helpful-variable
+   [remap describe-key] helpful-key
+   [remap describe-symbol] helpful-symbol))
 
-(use-package which-key
-  :ensure t
-  :defer 10
-  ;; (:hide-mode)
-  ;; :hook ('elpaca-after-init-hook)
-  :config
+(setup (:elpaca which-key)
+  ;; :defer 10
   (setopt which-key-idle-delay 2.0))
 
 
-(use-package jump-char
-  :after kmacro ; bc I only use this for macro-ing anyway
-  :ensure t
-  :bind
-  (("C-c j f" . jump-char-forward)
-   ("C-c j b" . jump-char-backward)
-   ("C-c j m f" . jump-char-forward-set-mark)
-   ("C-c j m b" . jump-char-backward-set-mark)))
+(setup (:elpaca jump-char)
+  (:load-after kmacro) ; bc I only use this for macro-ing anyway
+
+  (:global
+   "C-c j f" jump-char-forward
+   "C-c j b" jump-char-backward
+   "C-c j m f" jump-char-forward-set-mark
+   "C-c j m b" jump-char-backward-set-mark))
 
 #+end_src
 
 - Customize how mode indicators appear in the modeline
   + See [[https://www.gnu.org/software/emacs/manual/html_node/use-package/Delight.html][Delight (use-package User Manual)]].
 #+begin_src emacs-lisp
-(use-package delight
-  :ensure t)
+(setup (:elpaca delight))
 #+end_src
 
-TODO
+#TODO
 - Spell check
   + =ispell-program-name= should be set when a supported program is installed
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
@@ -829,7 +764,7 @@ default encoding.
   + [[https://skybert.net/craftsmanship/utf-8-for-the-impatient/][UTF-8 for the Impatient | skybert.net]]
 # do this especially on Windows, else python output problem
 
-#+begin_src emacs-lisp :tangle lisp/utf-8-default.el
+#+begin_src emacs-lisp
 (prefer-coding-system 'utf-8-unix)
 (setopt x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
         default-process-coding-system '(utf-8-unix . utf-8-unix))
@@ -845,8 +780,6 @@ default encoding.
 (set-terminal-coding-system 'utf-8-unix)
 
 (set-locale-environment "en.UTF-8")
-
-(provide 'utf-8-default)
 #+end_src
 # ;; (set-language-environment "UTF-8") ; maybe this is not for coding system :p
 #
@@ -863,16 +796,10 @@ or
 # [2022-11-08 Tue 17:10:44 -03]
 
 ** TODO 11xx-modes.el
-# #TODO-modularize more
-#+begin_src emacs-lisp :tangle lisp/11xx-modes.el :noweb yes
-<<11xx-modes-def>>
-
-(provide '11xx-modes)
-#+end_src
 
 *** Modes
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-modes-def
+:header-args:emacs-lisp: :noweb-ref 11xx-modes
 :END:
 
 **** Edit Modes
@@ -1270,9 +1197,11 @@ Configuration for obscure scripting languages and such
 #+end_src
 
 ** 11xx-functions.el: Utility functions
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-functions.el
+:END:
 
-*** Provide
-#+begin_src emacs-lisp :tangle lisp/11xx-functions.el :noweb yes
+#+begin_src emacs-lisp
 <<11xx-functions-el>>
 
 (provide '11xx-functions)
@@ -1451,19 +1380,9 @@ It uses `make-directory' PARENTS argument 't'."
 - Reffs:
   + [[https://www.youtube.com/watch?v=VcgjTEa0kU4][Emacs From Scratch #5 - Org Mode Basics]]
 
-#+begin_src emacs-lisp :tangle lisp/11xx-org.el :noweb yes
-;; -*- lexical-binding: t; -*-
-
-(require '11xx-org-functions)
-
-<<org-def-setup>>
-
-(provide '11xx-org)
-#+end_src
-
 *** Org setup
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref org-def-setup
+:header-args:emacs-lisp: :noweb-ref org-setup
 :END:
 
 [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#auto-show-markup-symbols][Auto-show Markup Symbols]] | [[https://stackoverflow.com/questions/10969617/hiding-markup-elements-in-org-mode/10970665#10970665][Hiding markup elements in org-mode]]
@@ -1672,45 +1591,11 @@ appear when hovered.
   (:hook-into org-mode))
 #+end_src
 
-**** TODO auto-tangle
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
-
-- Just use =after-save-hook= instead:
-  : eval: (add-hook 'after-save-hook (lambda () (org-babel-tangle)) nil t)
-
-;; [[https://www.youtube.com/watch?v=D3FzMPZm7vY][Write Everything In Emacs Org Mode? You NEED This Plugin! - YouTube]]
-;; org-auto-tangle: Org babel tangle file on save
-;; [[https://github.com/yilkalargaw/org-auto-tangle][yilkalargaw/org-auto-tangle: a simple emacs package to allow org file tangling upon save]]
-#+begin_src emacs-lisp
-(setup (:elpaca org-auto-tangle)
-  (:require org-auto-tangle)
-  (:hook org-auto-tangle-mode))
-#+end_src
-Note about auto tangle: Since it uses async.el that spawns a new Emacs
-instance, if for example :tangle is used containing a function that is
-not the default it may throw the error:
-: error in process sentinel: async-when-done: Symbol’s function definition is void: function-name
-- See https://stackoverflow.com/a/22843310
-Two options are available: Use only default functions and paths for
-tangling or include the desired functions to be passed in the async
-Emacs by customizing auto-tangle's async-start function (which idk how
-to do).
-# #TODO
-
 ** 11xx-org-functions.el
-#+begin_src emacs-lisp :tangle lisp/11xx-org-functions.el :noweb yes
-;; -*- lexical-binding: t; -*-
-
-<<org-def-functions>>
-
-(provide '11xx-org-functions)
-#+end_src
 
 *** Org functions
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref org-def-functions
+:header-args:emacs-lisp: :noweb-ref org-functions
 :END:
 
 **** Copy previous source-block with header arguments
@@ -1921,18 +1806,10 @@ a limit of 530, more than that and lisp nesting will overflow."
 :PROPERTIES:
 :CUSTOM_ID: orgid-wlgppl
 :END:
-*** Provide
-#+begin_src emacs-lisp :tangle lisp/11xx-dired.el :noweb yes
-(require '11xx-setup)
-
-<<11xx-dired-def>>
-
-(provide '11xx-dired)
-#+end_src
 
 *** Dired
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-dired-def
+:header-args:emacs-lisp: :noweb-ref 11xx-dired
 :END:
 
 **** Dired functions
@@ -2000,22 +1877,61 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 
 NOTE: =dired-async= is provided by the =async= package.
 #+begin_src emacs-lisp
-(setup dired
-  (:load-after dired)
-  ;; #TODO-test dired-before-readin-hook
-  (:elpaca dired-rainbow
-            dired-hide-dotfiles
-            dired-narrow
-            dired-subtree
-            dired-efap
-            all-the-icons-dired
-            diredfl
-            ;; dired-single
-            ;; joseph-single-dired
-            ;; obsoleted by `dired-kill-when-opening-new-dired-buffer'
-            )
+(setup (:elpaca dired-rainbow)
+  (require 'dired-rainbow)
+  ;; * `dired-rainbow-define` - add face by file extension
+  ;; * `dired-rainbow-define-chmod` - add face by file permissions
+  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
+  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
+  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
+  (dired-rainbow-define log              "#d2a022" ("log"))
+  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
+  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
+  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
+  ;; How it works:
+  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
+  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
+  ;; can be individually customized on a theme file, overriding the
+  ;; default FACE-PROPS. E.g.:
+  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
+  ;; is created.
+  )
 
-  (:also-load dired-x dired-aux)
+(setup (:elpaca dired-narrow))
+(setup (:elpaca dired-subtree))
+
+(setup (:elpaca dired-efap)
+  (:bind "r" dired-efap)
+  (setopt dired-efap-initial-filename-selection nil))
+
+(setup (:elpaca all-the-icons-dired)
+  (:hook-into dired-mode))
+
+(setup dired
+  ;; (:elpaca dired-rainbow) ; bugged on elpaca?
+  ;; (:elpaca dired-hacks-utils)
+  (:elpaca diredfl)
+
+  ;; #TODO-test dired-before-readin-hook
+
+  ;; dired-single
+  ;; joseph-single-dired
+  ;; obsoleted by `dired-kill-when-opening-new-dired-buffer'
+
+  (:require dired-x dired-aux)
   (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
            ls-lisp-dirs-first t ;; show directories on top of the list
            ;; delete-by-moving-to-trash t ;; move to trash instead of hard deleting
@@ -2037,40 +1953,6 @@ NOTE: =dired-async= is provided by the =async= package.
          ;; dired-hide-dotfiles-mode
          auto-revert-mode
          diredfl-mode)
-
-  (:also-load dired-rainbow)
-  (:with-feature dired-rainbow
-    ;; * `dired-rainbow-define` - add face by file extension
-    ;; * `dired-rainbow-define-chmod` - add face by file permissions
-    (dired-rainbow-define-chmod directory  "#69aaff" "d.*")
-    (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-    (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-    (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-    (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-    (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-    (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-    (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-    (dired-rainbow-define log              "#d2a022" ("log"))
-    (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-    (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-    (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-    (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-    (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-    (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-    (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-    (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-    (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-    (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-    (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-    ;; How it works:
-    ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-    ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-    ;; can be individually customized on a theme file, overriding the
-    ;; default FACE-PROPS. E.g.:
-    ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-    ;; is created.
-    )
-
 
   ;; Enable disabled commands
   (:put-enable dired-find-alternate-file)
@@ -2105,15 +1987,6 @@ NOTE: =dired-async= is provided by the =async= package.
          ;; [remap dired-up-directory] dired-single-up-directory ;; was M-x dired-do-redisplay
          )
 
-  ;; dired-efap
-  (:bind "r" dired-efap)
-  (:with-feature dired-efap
-    (:option dired-efap-initial-filename-selection nil))
-
-  (:with-feature all-the-icons-dired
-    (:load-after dired)
-    (:hook-into dired-mode))
-
   ;; (eval-after-load 'dired '(progn (require 'joseph-single-dired)))
   ;; (:with-feature joseph-single-dired
   ;;   (:load-after dired))
@@ -2134,16 +2007,9 @@ NOTE: =dired-async= is provided by the =async= package.
 
 ** 11xx-magit.el
 
-#+begin_src emacs-lisp :tangle lisp/11xx-magit.el :noweb yes
-<<11xx-magit-def>>
-
-(provide '11xx-magit)
-#+end_src
-
-
 *** Magit
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-magit-def
+:header-args:emacs-lisp: :noweb-ref 11xx-magit
 :END:
 
 - See
@@ -2154,7 +2020,10 @@ NOTE: =dired-async= is provided by the =async= package.
     # #wizard
 
 #+begin_src emacs-lisp
-(setup (:elpaca magit)
+(setup-elpaca transient) ; keyboard menu for magit.
+;; fix elpaca version mismatch
+;; See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
+(setup-elpaca magit
   ;; For dotfiles
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
     (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
@@ -2240,23 +2109,11 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   (require '11xx-vot))
 #+end_src
 
-#+RESULTS:
-:results:
-t
-:end:
-
 ** 11xx-completion.el: Completion frakework, Minibuffer
-#+begin_src emacs-lisp :tangle lisp/11xx-completion.el :noweb yes
-(require '11xx-setup)
-
-<<11xx-completion-def>>
-
-(provide '11xx-completion)
-#+end_src
 
 *** def
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-completion-def
+:header-args:emacs-lisp+: :noweb-ref 11xx-completion
 :END:
 
 - [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6mfh7/?utm_source=share&utm_medium=web2x&context=3][what are Vertico, Consult, Marginalia, Embark]]
@@ -2291,7 +2148,6 @@ Like `kill-word' but doesn't add deleted words to kill ring."
 Like `kill-line' but doesn't add deleted characters to kill ring."
     (interactive "p")
     (delete-region (point) (progn (end-of-line arg) (point))))
-
   ;; prevent cursor on minibuffer
   (:with-hook minibuffer-setup-hook
     (:hook cursor-intangible-mode))
@@ -2320,25 +2176,20 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
            vertico-cycle t)
 
-  <<vertico-minibuffer-settings>>
-
+  ;; vertico-minibuffer-settings
+  ;; - Hide commands in M-x which do not work in the current mode.
+  ;; # Emacs 28
+  ;; - Vertico commands are hidden in normal buffers.
+  (setopt read-extended-command-predicate #'command-completion-default-include-p
+          enable-recursive-minibuffers t
+          completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
+          ;; Do not allow the cursor in the minibuffer prompt
+          minibuffer-prompt-properties '(read-only
+                                         t
+                                         cursor-intangible
+                                         t face minibuffer-prompt))
   (:with-hook 'elpaca-after-init-hook
     (:hook vertico-mode)))
-#+end_src
-
-- Hide commands in M-x which do not work in the current mode.
-  # Emacs 28
-- Vertico commands are hidden in normal buffers.
-#+NAME: vertico-minibuffer-settings
-#+begin_src emacs-lisp
-(setopt read-extended-command-predicate #'command-completion-default-include-p
-        enable-recursive-minibuffers t
-        completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
-        ;; Do not allow the cursor in the minibuffer prompt
-        minibuffer-prompt-properties '(read-only
-                                       t
-                                       cursor-intangible
-                                       t face minibuffer-prompt))
 #+end_src
 
 **** Savehist
@@ -2445,7 +2296,8 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 **** Embark
 [[https://github.com/oantolin/embark#quick-start][Embark#Quick start]]
 #+begin_src emacs-lisp
-(setup (:elpaca embark embark-consult)
+(setup (:elpaca embark)
+       (:elpaca embark-consult)
   (:load-after consult)
   (:global "C-." embark-act
            ;; "C-;" embark-dwim
@@ -2465,7 +2317,8 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 **** Corfu
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
 #+begin_src emacs-lisp
-(setup (:elpaca corfu corfu-terminal)
+(setup (:elpaca corfu)
+       (:elpaca corfu-terminal)
 
   (:with-map corfu-map
     (:bind "C-SPC" corfu-insert-separator)
@@ -2501,7 +2354,8 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 #+end_src
 
 #+begin_src emacs-lisp
-(setup (:elpaca prescient corfu-prescient)
+(setup (:elpaca prescient)
+       (:elpaca corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
     (:hook corfu-prescient-mode))
@@ -2514,28 +2368,26 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 # [2022-12-01 Thu 01:46:10 -03]
 #+begin_src emacs-lisp
 ;; Add extensions
-(use-package cape
-  :ensure t
+(setup (:elpaca cape)
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
-  :bind (("C-c p p" . completion-at-point) ;; capf
-         ("C-c p t" . complete-tag)        ;; etags
-         ("C-c p d" . cape-dabbrev)        ;; or dabbrev-completion
-         ("C-c p h" . cape-history)
-         ("C-c p f" . cape-file)
-         ("C-c p k" . cape-keyword)
-         ("C-c p s" . cape-elisp-symbol)
-         ("C-c p e" . cape-elisp-block)
-         ("C-c p a" . cape-abbrev)
-         ("C-c p l" . cape-line)
-         ("C-c p w" . cape-dict)
-         ("C-c p :" . cape-emoji)
-         ("C-c p \\" . cape-tex)
-         ("C-c p _" . cape-tex)
-         ("C-c p ^" . cape-tex)
-         ("C-c p &" . cape-sgml)
-         ("C-c p r" . cape-rfc1345))
-  :init
+  (:global "C-c p p" completion-at-point ;; capf
+           "C-c p t" complete-tag        ;; etags
+           "C-c p d" cape-dabbrev        ;; or dabbrev-completion
+           "C-c p h" cape-history
+           "C-c p f" cape-file
+           "C-c p k" cape-keyword
+           "C-c p s" cape-elisp-symbol
+           "C-c p e" cape-elisp-block
+           "C-c p a" cape-abbrev
+           "C-c p l" cape-line
+           "C-c p w" cape-dict
+           "C-c p :" cape-emoji
+           "C-c p \\" cape-tex
+           "C-c p _" cape-tex
+           "C-c p ^" cape-tex
+           "C-c p &" cape-sgml
+           "C-c p r" cape-rfc1345)
   ;; Add to the global default value of `completion-at-point-functions' which is
   ;; used by `completion-at-point'.  The order of the functions matters, the
   ;; first function returning a result wins.  Note that the list of buffer-local
@@ -2552,39 +2404,9 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
   ;;(add-to-list 'completion-at-point-functions #'cape-dict)
   ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
-)
-#+end_src
-
-**** DONE DISABLED YASnippet                                 :noexport:ignore:
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
-
-- [[https://github.com/joaotavora/yasnippet][joaotavora/yasnippet: A template system for Emacs]].
-- [[https://joaotavora.github.io/yasnippet/snippet-development.html][Writing snippets]]
-#+begin_src emacs-lisp
-(setup (:elpaca yasnippet)
-  (:hide-mode yas-minor-mode)
-  ;; (yas-global-mode)
   )
 #+end_src
-- Haskell provided snippets are:
-  + new  - newtype
-  + mod  - module [simple, exports]
-  + main - main module and function
-  + let  - let bindings
-  + lang - language extension pragmas
-  + opt  - GHC options pragmas
-  + \    - lambda function
-  + inst - instance declairation
-  + imp  - import modules [simple, qualified]
-  + if   - if conditional [inline, block]
-  + <-   - monadic get
-  + fn   - top level function [simple, guarded, clauses]
-  + data - data type definition [inline, record]
-  + =>   - type constraint
-  + {-   - block comment
-  + case - case statement
+
 **** TempEl
 [[https://github.com/minad/tempel][minad/tempel: TempEl - Simple templates for Emacs]].
 See the example template file: [[https://github.com/minad/tempel#template-file-format][minad/tempel: TempEl - Simple templates for Emacs]].
@@ -2714,15 +2536,9 @@ See [[*Corfu][Corfu]].
 #+end_src
 ** 11xx-ui.el: User Interface settings
 
-#+begin_src emacs-lisp :tangle lisp/11xx-ui.el :noweb yes
-<<11xx-ui-def>>
-
-(provide '11xx-ui)
-#+end_src
-
 *** User Interface
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-ui-def
+:header-args:emacs-lisp+: :noweb-ref 11xx-ui
 :END:
 
 **** Change UI modes
@@ -2802,7 +2618,6 @@ number."
 #+end_src
 
 **** Display line numbers
-# removed disabling on org-mode-hook
 #+begin_src emacs-lisp
 (setup display-line-numbers
   ;; disable line numbers for some modes
@@ -2968,8 +2783,12 @@ Fira Code Symbol externally.
 #+end_src
 
 ** 11xx-half-scroll.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref 11xx-half-scroll
+:END:
+
 Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswiki.org/Half Scrolling]]
-#+begin_src emacs-lisp :tangle lisp/11xx-half-scroll.el
+#+begin_src emacs-lisp
 ;; source https://www.emacswiki.org/emacs/HalfScrolling
 (defun window-half-height ()
   (max 1 (/ (1- (window-height (selected-window))) 2)))
@@ -2997,25 +2816,23 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 
 (keymap-global-set "<remap> <scroll-up-command>" #'scroll-up-div)
 (keymap-global-set "<remap> <scroll-down-command>" #'scroll-down-div)
-;; [next] good-scroll-up-full-screen
-;; [prior] good-scroll-down-full-screen
-;; Scroll
-;; [remap scroll-up-command] scroll-up-half
-
-;; [remap scroll-down-command] scroll-down-half
-
-;; [remap scroll-up-command] pixel-scroll-up
-;; [remap scroll-down-command] pixel-scroll-down
-
-(provide '11xx-half-scroll)
 #+end_src
-
+# ;; [next] good-scroll-up-full-screen
+# ;; [prior] good-scroll-down-full-screen
+# ;; Scroll
+# ;; [remap scroll-up-command] scroll-up-half
+# ;; [remap scroll-down-command] scroll-down-half
+# ;; [remap scroll-up-command] pixel-scroll-up
+# ;; [remap scroll-down-command] pixel-scroll-down
 ** 11xx-pixel-scroll.el: Smooth scrolling
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref 11xx-pixel-scroll
+:END:
 - See
   + [[https://www.emacswiki.org/emacs/SmoothScrolling#h5o-1][EmacsWiki: Smooth Scrolling]]
   + [[https://stackoverflow.com/questions/1128927/how-to-scroll-line-by-line-in-gnu-emacs/1128948#1128948][How to scroll line by line in GNU Emacs? - Stack Overflow]]
 
-#+begin_src emacs-lisp :tangle lisp/11xx-pixel-scroll.el
+#+begin_src emacs-lisp
 (setup pixel-scroll
   ;; (:only-if (display-graphic-p))
   (pixel-scroll-precision-mode)
@@ -3025,21 +2842,13 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
            mouse-wheel-scroll-amount '(1 ((shift) . 1)) ; one line at a time
            mouse-wheel-progressive-speed nil ; don't accelerate scrolling
            mouse-wheel-follow-mouse 't)) ; scroll window under mouse
-
-(provide '11xx-pixel-scroll)
 #+end_src
 
 ** 11xx-navigation.el: Controlling Emacs
 
-#+begin_src emacs-lisp :tangle lisp/11xx-navigation.el :noweb yes
-<<11xx-navigation-def>>
-
-(provide '11xx-navigation)
-#+end_src
-
 *** def
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-navigation-def
+:header-args:emacs-lisp: :noweb-ref 11xx-navigation
 :END:
 
 **** Navigation
