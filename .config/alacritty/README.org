@@ -7,7 +7,7 @@
 
 #+begin_src toml
 # only full paths are supported https://github.com/alacritty/alacritty/pull/7690
-import = [ "~/.config/alacritty/themes/neron-light.toml" ]
+import = [ "~/.config/alacritty/themes/neron-dark.toml" ]
 
 [env]
 TERM = "xterm-256color"
@@ -34,41 +34,35 @@ style = "Regular"
 
 [keyboard]
 bindings = [
-{ action = "Paste", key = "Y", mode = "~Vi", mods = "Control|Alt" }
-, { action = "Copy", key = "W", mods = "Control|Alt" }
-, { action = "none", key = "Paste" }
-, { action = "none", key = "Copy" }
-, { action = "none", key = "Home", mode = "~Alt", mods = "Shift" }
-, { action = "none", key = "End", mode = "~Alt", mods = "Shift" }
-, { action = "none", key = "F", mode = "~Search", mods = "Control|Shift" }
-, { action = "none", key = "B", mode = "~Search", mods = "Control|Shift" }
-, { action = "none", key = "C", mode = "Vi|~Search", mods = "Control|Shift" }
-, { action = "none", key = "Insert", mods = "Shift" }
-# , { action = "none", key = "Key0", mods = "Control" }
-# , { action = "none", key = "Equals", mods = "Control" }
-# , { action = "none", key = "Plus", mods = "Control" }
-, { action = "none", key = "NumpadAdd", mods = "Control" }
-, { action = "none", key = "Minus", mods = "Control" }
-, { action = "none", key = "NumpadSubtract", mods = "Control" }
-, ]
+{ action = "Paste", key = "Y", mode = "~Vi", mods = "Control|Alt" },
+{ action = "Copy", key = "W", mods = "Control|Alt" },
+{ action = "none", key = "Paste" },
+{ action = "none", key = "Copy" },
+{ action = "none", key = "Home", mode = "~Alt", mods = "Shift" },
+{ action = "none", key = "End", mode = "~Alt", mods = "Shift" },
+{ action = "none", key = "F", mode = "~Search", mods = "Control|Shift" },
+{ action = "none", key = "B", mode = "~Search", mods = "Control|Shift" },
+{ action = "none", key = "C", mode = "Vi|~Search", mods = "Control|Shift" },
+{ action = "none", key = "Insert", mods = "Shift" },
+{ action = "none", key = "NumpadAdd", mods = "Control" },
+{ action = "none", key = "Minus", mods = "Control" },
+{ action = "none", key = "NumpadSubtract", mods = "Control" }
+]
 
 [mouse]
 bindings = [
-{ action = "Paste", mouse = "Middle" }
-, { action = "Copy", mouse = "Right" }
+{ action = "Paste", mouse = "Middle" },
+{ action = "Copy", mouse = "Right" }
 ]
 
 [scrolling]
 history = 10000
 multiplier = 3
 
-[window.dimensions]
-columns = 236
-lines = 50
-
-[window.padding]
-x = 12
-y = 12
+[window]
+dimensions = { columns = 236, lines = 50 }
+padding = { x = 12, y = 12 }
+# opacity = 0.92
 #+end_src
 
 * Themes
