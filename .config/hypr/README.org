@@ -373,13 +373,15 @@ bind = $mainMod, backspace, exec, foot
 # bind = $mainMod, K, cyclenext, prev
 
 bind = $mainMod, H, movefocus, l
-bind = $mainMod, L, movefocus, r
-bind = $mainMod, K, movefocus, u
 bind = $mainMod, J, movefocus, d
+bind = $mainMod, K, movefocus, u
+bind = $mainMod, L, movefocus, r
 bind = $mainMod, H, movecursortocorner, 1
-bind = $mainMod, L, movecursortocorner, 1
-bind = $mainMod, K, movecursortocorner, 1
 bind = $mainMod, J, movecursortocorner, 1
+bind = $mainMod, K, movecursortocorner, 1
+bind = $mainMod, L, movecursortocorner, 1
+bind = $mainMod, P, cyclenext, prev
+bind = $mainMod, N, cyclenext, next
 
 # bind = $mainMod, H, exec, hyprctl --batch 'dispatch movefocus l; dispatch movecursortocorner 1'
 # bind = $mainMod, L, exec, hyprctl --batch 'dispatch movefocus r; dispatch movecursortocorner 1'
