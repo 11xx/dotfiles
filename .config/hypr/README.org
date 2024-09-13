@@ -53,7 +53,7 @@ exec-once = hypridle
 
 exec-once = hypr-dynamic-float-bitwarden-unlock-firefox # script, hack
 
-exec-once = hyprpm reload -n # Load plugins
+# exec-once = hyprpm reload -n # Load plugins
 
 # exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6
 
