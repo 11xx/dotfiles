@@ -837,14 +837,11 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 [[https://wiki.haskell.org/Emacs/Unicode_symbols][Emacs/Unicode symbols - HaskellWiki]]
 # [2023-03-21 Tue 14:35:47 -03]
 #+begin_src emacs-lisp
-(setup (:package haskell-mode)
-  ;; (:option haskell-process-path-ghci "ghci-9.2.2"  ; this is for ghcup versioned ghc & ghci binaries.
-  ;; haskell-process-args-ghci '("-ferror-spans")
-  ;; )
-  (setq haskell-font-lock-symbols nil) ; disable the bad built-in font ligatures solution.
-
-  (:bind "C-c C-v" haskell-cabal-visit-file)
+(setup (:package haskell-mode haskell-ts-mode)
+  ;; (:package haskell-snippets) ; yasnippets
+  ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   )
+
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 #+end_src
 
@@ -2502,14 +2499,18 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 )
 #+end_src
 
-**** YASnippet
+**** DONE DISABLED YASnippet                                 :noexport:ignore:
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+
 - [[https://github.com/joaotavora/yasnippet][joaotavora/yasnippet: A template system for Emacs]].
 - [[https://joaotavora.github.io/yasnippet/snippet-development.html][Writing snippets]]
 #+begin_src emacs-lisp
 (setup (:package yasnippet)
   (:hide-mode yas-minor-mode)
-  (:package haskell-snippets)
-  (yas-global-mode))
+  ;; (yas-global-mode)
+  )
 #+end_src
 - Haskell provided snippets are:
   + new  - newtype
@@ -2567,7 +2568,11 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
 - [[https://github.com/typescript-language-server/typescript-language-server][typescript-language-server]]
 - [[https://github.com/haskell/haskell-language-server#readme][haskell-language-server]]
 
-***** LSP
+***** DONE DISABLED LSP                                       :ignore:noexport:
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+
 - [[https://emacs-lsp.github.io/lsp-mode/page/performance/#use-plists-for-deserialization][Performance - LSP Mode - LSP support for Emacs#Use =plists= for deserialization]]
   + Set environment variable
     : export LSP_USE_PLISTS=true

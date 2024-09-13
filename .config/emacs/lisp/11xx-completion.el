@@ -225,10 +225,6 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
 )
-(setup (:package yasnippet)
-  (:hide-mode yas-minor-mode)
-  (:package haskell-snippets)
-  (yas-global-mode))
 (setup (:package tempel)
 
   ;; Require trigger prefix before template name when completing.
@@ -256,17 +252,6 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; (global-tempel-abbrev-mode)
   (:with-hook prog-mode-hook text-mode-hook
               (:hook tempel-setup-capf)))
-(setq lsp-use-plists t)
-(setup (:package lsp-mode lsp-ui)
-  ;; LSP Language server starter packages
-  (:package lsp-haskell)
-
-  (:option lsp-idle-delay 0 ; 0.5 ; 0.1
-           lsp-keymap-prefix "C-c l"
-           lsp-log-io nil)
-
-  (setq lsp-ui-doc-enable nil) ; set to nil for better performance
-  ) ; "(setup lsp-mode..." ends here
 (setup eglot ; built-in since Emacs 29
   (:option eglot-send-changes-idle-time 0.2)
   (:with-feature eldoc ; eglot uses eldoc for ui documentation

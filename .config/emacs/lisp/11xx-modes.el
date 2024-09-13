@@ -1,13 +1,10 @@
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:package (systemd :url "https://github.com/pdbrown/systemd-mode")))
-(setup (:package haskell-mode)
-  ;; (:option haskell-process-path-ghci "ghci-9.2.2"  ; this is for ghcup versioned ghc & ghci binaries.
-  ;; haskell-process-args-ghci '("-ferror-spans")
-  ;; )
-  (setq haskell-font-lock-symbols nil) ; disable the bad built-in font ligatures solution.
-
-  (:bind "C-c C-v" haskell-cabal-visit-file)
+(setup (:package haskell-mode haskell-ts-mode)
+  ;; (:package haskell-snippets) ; yasnippets
+  ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   )
+
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 (setup (:package yaml-mode))
 (setup (:package pkgbuild-mode))
