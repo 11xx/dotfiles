@@ -53,7 +53,7 @@ number."
               (lambda (frame)
                 (with-selected-frame frame
                   (f/set-font))))
-  (add-hook 'after-init-hook
+  (add-hook 'elpaca-after-init-hook
             (lambda () (f/set-font))))
 ;; end set font
 (setopt cursor-type 'box
@@ -74,7 +74,7 @@ number."
         show-paren-delay 0.01
         show-paren-style 'parenthesis)
 
-(setup (:package rainbow-delimiters)
+(setup (:elpaca rainbow-delimiters)
   (:hook-into emacs-lisp-mode))
 (add-to-list 'custom-theme-load-path (concat user-emacs-directory "themes/"))
 (defun on-after-init ()
@@ -90,12 +90,11 @@ number."
   (unless (display-graphic-p frame)
     (set-face-background 'default "unspecified-bg" frame)))
 (add-hook 'after-make-frame-functions #'on-frame-open)
-(use-package auto-dark
-  :ensure t
-  :init (auto-dark-mode t)
-  :custom ((auto-dark-dark-theme 'neron-dark)
-           (auto-dark-light-theme 'neron-light))
-  :delight)
+(setup (:elpaca auto-dark)
+  (setopt auto-dark-dark-theme 'neron-dark
+          auto-dark-light-theme 'neron-light)
+  (auto-dark-mode t)
+  (:hide-mode))
 (setup ibuffer
   (:option ibuffer-show-empty-filter-groups nil
            ibuffer-saved-filter-groups (quote
@@ -111,8 +110,8 @@ number."
   (:hook-into prog-mode text-mode)
     (:option display-fill-column-indicator-column 79)
     (display-fill-column-indicator-mode 1))
-(setup (:package doom-modeline)
-  (:hook-into after-init)
+(setup (:elpaca doom-modeline)
+  (:hook-into elpaca-after-init-hook)
   (:option doom-modeline-height 15
            doom-modeline-buffer-encoding nil
            ;; display-time-format '%H:%M'
@@ -121,7 +120,7 @@ number."
            doom-modeline-enable-word-count nil ; Performance
            ))
 (set-window-margins nil 1)
-(setup (:package fira-code-mode)
+(setup (:elpaca fira-code-mode)
   (:only-if (display-graphic-p))
   (:hook-into prog-mode)
   (unless (display-graphic-p) ; redundant with :only-if?

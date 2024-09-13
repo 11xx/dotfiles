@@ -34,7 +34,7 @@ The app is chosen from your OS's preference."
 (setup dired
   (:load-after dired)
   ;; #TODO-test dired-before-readin-hook
-  (:package dired-rainbow
+  (:elpaca dired-rainbow
             dired-hide-dotfiles
             dired-narrow
             dired-subtree

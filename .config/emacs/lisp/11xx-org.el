@@ -8,7 +8,7 @@
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-;; (setup (:package org-contrib))
+;; (setup (:elpaca org-contrib))
 
 (use-package org
   :bind (:map org-mode-map
@@ -139,12 +139,12 @@
   :custom ((org-appear-autolinks 'just-brackets)) ; nil is default
   :hook org-mode)
 (setopt org-fold-core-style 'text-properties)
-(setup (:package htmlize)
+(setup (:elpaca htmlize)
   (setopt org-html-htmlize-output-type 'css ; 'inline-css
            htmlize-html-charset "UTF-8")
   (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
                                    (:foreground nil :background nil))))
-(setup (:package org-modern)
+(setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
   (:hook-into org-mode))
 

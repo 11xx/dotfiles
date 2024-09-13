@@ -39,13 +39,255 @@ Add subdirectory to load path containing custom modules.
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
-** Package initialize & setup.el
+** Elpaca package manager bootstrap & setup.el
 #+begin_src emacs-lisp
-(require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-(package-initialize)
-(unless package-archive-contents
-  (package-refresh-contents))
+(defvar elpaca-installer-version 0.7)
+(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                              :ref nil :depth 1
+                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                              :build (:not elpaca--activate-package)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+       (build (expand-file-name "elpaca/" elpaca-builds-directory))
+       (order (cdr elpaca-order))
+       (default-directory repo))
+  (add-to-list 'load-path (if (file-exists-p build) build repo))
+  (unless (file-exists-p repo)
+    (make-directory repo t)
+    (when (< emacs-major-version 28) (require 'subr-x))
+    (condition-case-unless-debug err
+        (if-let ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                 ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                 ,@(when-let ((depth (plist-get order :depth)))
+                                                     (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                 ,(plist-get order :repo) ,repo))))
+                 ((zerop (call-process "git" nil buffer t "checkout"
+                                       (or (plist-get order :ref) "--"))))
+                 (emacs (concat invocation-directory invocation-name))
+                 ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                       "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                 ((require 'elpaca))
+                 ((elpaca-generate-autoloads "elpaca" repo)))
+            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+          (error "%s" (with-current-buffer buffer (buffer-string))))
+      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+  (unless (require 'elpaca-autoloads nil t)
+    (require 'elpaca)
+    (elpaca-generate-autoloads "elpaca" repo)
+    (load "./elpaca-autoloads")))
+(add-hook 'after-init-hook #'elpaca-process-queues)
+(elpaca `(,@elpaca-order))
+
+;; install setup.el
+(elpaca setup (require 'setup))
+(elpaca-wait)
+#+end_src
+
+also disable packge.el as early as possible in early-init.el
+#+begin_src emacs-lisp :tangle early-init.el
+(setq package-enable-at-startup nil)
+#+end_src
+*** 11xx-setup.el
+#+begin_src emacs-lisp :tangle lisp/11xx-setup.el :noweb yes
+;; -*- lexical-binding: t; -*-
+;; (require '11xx-package)
+
+<<setup-el-install>>
+<<setup-el-def>>
+
+(provide '11xx-setup)
+#+end_src
+
+- [[https://www.emacswiki.org/emacs/SetupEl#h5o-26][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
+#+begin_src emacs-lisp :tangle no :noweb-ref setup-el-install
+(defun my-protect-setup (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+                                          (pp (quote ,expansion))))
+                         :error)))))
+
+(advice-add 'setup :filter-return #'my-protect-setup)
+#+end_src
+
+
+**** =setup.el=
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref setup-el-def
+:END:
+- See:
+  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
+  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
+
+***** =setup.el= additional macros
+
+****** DONE :package
+- [[https://www.emacswiki.org/emacs/SetupEl#h5o-24][EmacsWiki: Setup El#Package-vc support]]
+#+begin_src emacs-lisp :tangle no :noweb-ref dummy
+(setup-define :package
+  (lambda (package)
+    (if (consp package)
+        `(unless (and (package-installed-p ',(car package))
+                      (package-vc-p (cadr (assoc ',(car package)
+                                                 (package--alist)))))
+           (package-vc-install
+            ,(if (consp (cdr package))
+                 `',(car package)
+               `(list ',(car package) ,@(cdr package)))))
+      `(unless (package-installed-p ',package)
+         (unless (memq ',package package-archive-contents)
+           (package-refresh-contents))
+         (package-install ',package))))
+  :documentation "Install PACKAGE if it hasn't been installed yet.
+The first PACKAGE can be used to deduce the feature context.  If
+PACKAGE is a cons-cell, then the it will be interpreted as a
+package specification that will be passed to
+`package-vc-install'."
+  :repeatable t
+  :shorthand (lambda (form)
+               (if (consp (cadr form)) (caadr form) (cadr form))))
+#+end_src
+
+****** :elpaca
+[[https://www.emacswiki.org/emacs/SetupEl#:~:text=Using-,elpaca,-Elpaca%20is%20an][EmacsWiki: Setup El]]
+#+begin_src emacs-lisp
+(defun setup-wrap-to-install-package (body _name)
+  "Wrap BODY in an `elpaca' block if necessary.
+The body is wrapped in an `elpaca' block if `setup-attributes'
+contains an alist with the key `elpaca'."
+  (if (assq 'elpaca setup-attributes)
+      `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
+    body))
+;; Add the wrapper function
+(add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+(setup-define :elpaca
+  (lambda (order &rest recipe)
+    (push (cond
+           ((eq order t) `(elpaca . ,(setup-get 'feature)))
+           ((eq order nil) '(elpaca . nil))
+           (`(elpaca . (,order ,@recipe))))
+          setup-attributes)
+    ;; If the macro wouldn't return nil, it would try to insert the result of
+    ;; `push' which is the new value of the modified list. As this value usually
+    ;; cannot be evaluated, it is better to return nil which the byte compiler
+    ;; would optimize away anyway.
+    nil)
+  :documentation "Install ORDER with `elpaca'.
+The ORDER can be used to deduce the feature context."
+  :shorthand #'cadr)
+#+end_src
+
+****** :local-or-package
+from https://www.emacswiki.org/emacs/SetupEl#h5o-18
+
+#+begin_src emacs-lisp
+(setup-define :local-or-package
+  (lambda (feature-or-package)
+    `(unless (locate-file ,(symbol-name feature-or-package)
+                          load-path
+                          (get-load-suffixes))
+       (:elpaca ,feature-or-package)))
+  :documentation "Install PACKAGE if it is not available locally.
+This macro can be used as NAME, and it will replace itself with
+the first PACKAGE."
+  :repeatable t
+  :shorthand #'cadr)
+#+end_src
+
+****** :disabled
+from https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
+#+begin_src emacs-lisp
+(setup-define :disabled
+  (lambda ()
+    `,(setup-quit))
+  :documentation "Always stop evaluating the body.")
+#+end_src
+
+****** :advise
+[[https://www.emacswiki.org/emacs/SetupEl#h5o-11][Add advice]]
+
+Simplify the definition of [[https://www.emacswiki.org/emacs/Advice][Advice]]:
+#+begin_src emacs-lisp
+(setup-define :advise
+    (lambda (symbol where function)
+      `(advice-add ',symbol ,where ,function))
+  :documentation "Add a piece of advice on a function.
+See `advice-add' for more details."
+  :after-loaded t
+  :debug '(sexp sexp function-form)
+  :ensure '(nil nil func)
+  :repeatable t)
+#+end_src
+
+****** :load-after
+#+begin_src emacs-lisp
+(setup-define :load-after
+  (lambda (&rest features)
+    (let ((body `(require ',(setup-get 'feature))))
+      (dolist (feature (nreverse features))
+        (setq body `(with-eval-after-load ',feature ,body)))
+      body))
+  :documentation "Load the current feature after FEATURES.")
+#+end_src
+
+****** :hide-mode
+#+begin_src emacs-lisp
+(setup-define :hide-mode
+  (lambda (&optional mode)
+    (let* ((mode (or mode (setup-get 'mode)))
+           (mode (if (string-match-p "-mode\\'" (symbol-name mode))
+                     mode
+                   (intern (format "%s-mode" mode)))))
+      `(setq minor-mode-alist
+             (delq (assq ',mode minor-mode-alist)
+                   minor-mode-alist))))
+  :documentation "Hide the mode-line lighter of the current mode.
+Alternatively, MODE can be specified manually, and override the
+current mode."
+  :after-loaded t)
+#+end_src
+
+****** :put-enable
+#+begin_src emacs-lisp
+(setup-define :put-enable
+  (lambda (commands)
+    `(put ',commands 'disabled nil))
+  :documentation "Enable disabled COMMANDS."
+  :after-loaded t
+  :repeatable t)
+#+end_src
+
+****** :face
+#+begin_src emacs-lisp
+(setup-define :face
+  (lambda (face spec) `(custom-set-faces (quote (,face ,spec))))
+  :documentation "Customize FACE to SPEC."
+  :signature '(face spec ...)
+  :debug '(setup)
+  :repeatable t
+  :after-loaded t)
+#+end_src
+
+****** :autoload
+#+begin_src emacs-lisp
+(setup-define :autoload
+  (lambda (func)
+    (let ((fn (if (memq (car-safe func) '(quote function))
+                  (cadr func)
+                func)))
+      `(unless (fboundp (quote ,fn))
+         (autoload (function ,fn) ,(symbol-name (setup-get 'feature)) nil t))))
+  :documentation "Autoload COMMAND if not already bound."
+  :repeatable t
+  :signature '(FUNC ...))
 #+end_src
 
 ** init-no-littering: Keep user-emacs-directory clean
@@ -67,7 +309,7 @@ Add subdirectory to load path containing custom modules.
              (convert-standard-filename
               (expand-file-name "var/eln-cache/" user-emacs-directory)))
 
-(setup (:package no-littering)
+(setup (:elpaca no-littering)
   (:require no-littering))
 
 (provide 'init-no-littering)
@@ -137,7 +379,6 @@ Backup & auto-save
 (provide 'init-backup-auto-save)
 #+end_src
 
-
 ** Native compilation settings
 #+begin_src emacs-lisp
 (setopt native-comp-jit-compilation t
@@ -147,29 +388,29 @@ Backup & auto-save
 
 ** Load custom config
 #+begin_src emacs-lisp
-(use-package 11xx-defaults)
-(use-package 11xx-completion)
+(setup 11xx-defaults)
+(setup 11xx-completion)
 
-(use-package 11xx-ui
-  :after frame)
+(setup 11xx-ui
+  (:load-after frame))
 
-(use-package 11xx-navigation)
+(setup 11xx-navigation)
 
-(use-package 11xx-half-scroll
-  :after frame)
+(setup 11xx-half-scroll
+  (:load-after frame))
 
-(use-package 11xx-pixel-scroll
-  :after frame)
+(setup 11xx-pixel-scroll
+  (:load-after frame))
 
-(use-package 11xx-dired
-  :after dired)
+(setup 11xx-dired
+  (:load-after dired))
 
-(use-package 11xx-magit
-  :after dired)
+(setup 11xx-magit
+  (:load-after dired))
 
-(use-package 11xx-gc)
-(use-package 11xx-org)
-(use-package 11xx-modes)
+(setup 11xx-gc)
+(setup 11xx-org)
+(setup 11xx-modes)
 #+end_src
 
 ** Startup report
@@ -200,193 +441,9 @@ Increase Garbage Collection threshold:
 #+begin_src emacs-lisp :tangle lisp/11xx-gc.el
 ;; -*- lexical-binding: t; -*-
 (setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
-(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
+(add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 
 (provide '11xx-gc)
-#+end_src
-
-** 11xx-setup.el
-#+begin_src emacs-lisp :tangle lisp/11xx-setup.el :noweb yes
-;; -*- lexical-binding: t; -*-
-;; (require '11xx-package)
-
-<<setup-el-install>>
-<<setup-el-def>>
-
-(provide '11xx-setup)
-#+end_src
-
-Install =setup.el=.
-- Snippet from [[https://git.sr.ht/~pkal/emacs-init/tree/master/item/init.el#L17][~pkal/emacs-init (master): init.el - sourcehut git]].
-#+begin_src emacs-lisp :noweb-ref setup-el-install
-(eval-when-compile
-  (when after-init-time
-    (package-initialize))
-  (require 'setup nil t))
-
-(unless (package-installed-p 'setup)
-  (package-install 'setup))
-#+end_src
-
-- [[https://www.emacswiki.org/emacs/SetupEl#h5o-26][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
-#+begin_src emacs-lisp :noweb-ref setup-el-install
-(defun my-protect-setup (expansion)
-  "Wrap `setup' output with `condition-case'."
-  (let ((err (gensym "setup-err")))
-    `(condition-case ,err
-   ,expansion
-       (error
-  (display-warning 'setup (concat "Problem in config: "
-          (error-message-string ,err)
-          ": \n"
-          (with-output-to-string
-                                          (pp (quote ,expansion))))
-                         :error)))))
-
-(advice-add 'setup :filter-return #'my-protect-setup)
-#+end_src
-
-
-*** =setup.el=
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref setup-el-def
-:END:
-- See:
-  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
-  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
-
-**** =setup.el= additional macros
-
-***** :package
-- [[https://www.emacswiki.org/emacs/SetupEl#h5o-24][EmacsWiki: Setup El#Package-vc support]]
-#+begin_src emacs-lisp
-(setup-define :package
-  (lambda (package)
-    (if (consp package)
-        `(unless (and (package-installed-p ',(car package))
-                      (package-vc-p (cadr (assoc ',(car package)
-                                                 (package--alist)))))
-           (package-vc-install
-            ,(if (consp (cdr package))
-                 `',(car package)
-               `(list ',(car package) ,@(cdr package)))))
-      `(unless (package-installed-p ',package)
-         (unless (memq ',package package-archive-contents)
-           (package-refresh-contents))
-         (package-install ',package))))
-  :documentation "Install PACKAGE if it hasn't been installed yet.
-The first PACKAGE can be used to deduce the feature context.  If
-PACKAGE is a cons-cell, then the it will be interpreted as a
-package specification that will be passed to
-`package-vc-install'."
-  :repeatable t
-  :shorthand (lambda (form)
-               (if (consp (cadr form)) (caadr form) (cadr form))))
-#+end_src
-
-***** :local-or-package
-from https://www.emacswiki.org/emacs/SetupEl#h5o-18
-
-#+begin_src emacs-lisp
-(setup-define :local-or-package
-  (lambda (feature-or-package)
-    `(unless (locate-file ,(symbol-name feature-or-package)
-                          load-path
-                          (get-load-suffixes))
-       (:package ,feature-or-package)))
-  :documentation "Install PACKAGE if it is not available locally.
-This macro can be used as NAME, and it will replace itself with
-the first PACKAGE."
-  :repeatable t
-  :shorthand #'cadr)
-#+end_src
-
-***** :disabled
-from https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
-#+begin_src emacs-lisp
-(setup-define :disabled
-  (lambda ()
-    `,(setup-quit))
-  :documentation "Always stop evaluating the body.")
-#+end_src
-
-***** :advise
-[[https://www.emacswiki.org/emacs/SetupEl#h5o-11][Add advice]]
-
-Simplify the definition of [[https://www.emacswiki.org/emacs/Advice][Advice]]:
-#+begin_src emacs-lisp
-(setup-define :advise
-    (lambda (symbol where function)
-      `(advice-add ',symbol ,where ,function))
-  :documentation "Add a piece of advice on a function.
-See `advice-add' for more details."
-  :after-loaded t
-  :debug '(sexp sexp function-form)
-  :ensure '(nil nil func)
-  :repeatable t)
-#+end_src
-
-***** :load-after
-#+begin_src emacs-lisp
-(setup-define :load-after
-  (lambda (&rest features)
-    (let ((body `(require ',(setup-get 'feature))))
-      (dolist (feature (nreverse features))
-        (setq body `(with-eval-after-load ',feature ,body)))
-      body))
-  :documentation "Load the current feature after FEATURES.")
-#+end_src
-
-***** :hide-mode
-#+begin_src emacs-lisp
-(setup-define :hide-mode
-  (lambda (&optional mode)
-    (let* ((mode (or mode (setup-get 'mode)))
-           (mode (if (string-match-p "-mode\\'" (symbol-name mode))
-                     mode
-                   (intern (format "%s-mode" mode)))))
-      `(setq minor-mode-alist
-             (delq (assq ',mode minor-mode-alist)
-                   minor-mode-alist))))
-  :documentation "Hide the mode-line lighter of the current mode.
-Alternatively, MODE can be specified manually, and override the
-current mode."
-  :after-loaded t)
-#+end_src
-
-***** :put-enable
-#+begin_src emacs-lisp
-(setup-define :put-enable
-  (lambda (commands)
-    `(put ',commands 'disabled nil))
-  :documentation "Enable disabled COMMANDS."
-  :after-loaded t
-  :repeatable t)
-#+end_src
-
-***** :face
-#+begin_src emacs-lisp
-(setup-define :face
-  (lambda (face spec) `(custom-set-faces (quote (,face ,spec))))
-  :documentation "Customize FACE to SPEC."
-  :signature '(face spec ...)
-  :debug '(setup)
-  :repeatable t
-  :after-loaded t)
-#+end_src
-
-***** :autoload
-#+begin_src emacs-lisp
-(setup-define :autoload
-  (lambda (func)
-    (let ((fn (if (memq (car-safe func) '(quote function))
-                  (cadr func)
-                func)))
-      `(unless (fboundp (quote ,fn))
-         (autoload (function ,fn) ,(symbol-name (setup-get 'feature)) nil t))))
-  :documentation "Autoload COMMAND if not already bound."
-  :repeatable t
-  :signature '(FUNC ...))
 #+end_src
 
 ** 11xx-defaults.el: New defaults
@@ -560,16 +617,16 @@ current mode."
   =camelCase= cursor movement):
   + [[https://github.com/jpkotta/syntax-subword/blob/master/syntax-subword.el][syntax-subword/syntax-subword.el at master · jpkotta/syntax-subword]]
 #+begin_src emacs-lisp
-(setup (:package syntax-subword)
+(setup (:elpaca syntax-subword)
   (:hide-mode global-subword-mode)
-  (add-hook 'after-init-hook #'global-syntax-subword-mode))
+  (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
 #+end_src
 # ;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
 # ;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
 # ;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
 
 #+begin_src emacs-lisp
-(setup (:package ace-window)
+(setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
   (:global "M-o" ace-window))
 
@@ -588,7 +645,7 @@ current mode."
   :ensure t
   :defer 10
   ;; (:hide-mode)
-  ;; :hook (after-init-hook)
+  ;; :hook ('elpaca-after-init-hook)
   :config
   (setopt which-key-idle-delay 2.0))
 
@@ -735,7 +792,7 @@ Defined in Emacs setup
 **** Async
 [[https://github.com/jwiegley/emacs-async][jwiegley/emacs-async: Simple library for asynchronous processing in Emacs]]
 #+begin_src emacs-lisp
-(setup (:package async))
+(setup (:elpaca async))
 #+end_src
 
 ***** =detached.el=
@@ -745,7 +802,7 @@ Install the AUR =dtach= package, or the newer fork =dtach-ng=.
 Note that by default =dired= don't provide the full path to the =dtach= command.
 The full path is required.
 #+begin_src emacs-lisp
-(setup (:package detached)
+(setup (:elpaca detached)
   (:global
    ;; Replace `async-shell-command' with `detached-shell-command'
    [remap async-shell-command] detached-shell-command
@@ -829,7 +886,7 @@ Custom mode files should sit here.
 ***** Systemd
 Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated repo]], better for use with native-comp.
 #+begin_src emacs-lisp
-(setup (:package (systemd :url "https://github.com/pdbrown/systemd-mode")))
+(setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 #+end_src
 # :files ("*.txt" "systemd.el" (:exclude ".git"))
 
@@ -837,8 +894,8 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 [[https://wiki.haskell.org/Emacs/Unicode_symbols][Emacs/Unicode symbols - HaskellWiki]]
 # [2023-03-21 Tue 14:35:47 -03]
 #+begin_src emacs-lisp
-(setup (:package haskell-mode haskell-ts-mode)
-  ;; (:package haskell-snippets) ; yasnippets
+(setup (:elpaca haskell-mode haskell-ts-mode)
+  ;; (:elpaca haskell-snippets) ; yasnippets
   ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   )
 
@@ -847,28 +904,28 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 ***** YAML
 #+begin_src emacs-lisp
-(setup (:package yaml-mode))
+(setup (:elpaca yaml-mode))
 #+end_src
 
 ***** PKGBUILD
 #+begin_src emacs-lisp
-(setup (:package pkgbuild-mode))
+(setup (:elpaca pkgbuild-mode))
 #+end_src
 
 ***** PowerShell
 # [2024-01-14 Sun 13:58:20 -03:00] @winr58
 #+begin_src emacs-lisp
-(setup (:package powershell))
+(setup (:elpaca powershell))
 #+end_src
 
 ***** Ansible
 #+begin_src emacs-lisp
-(setup (:package ansible ansible-doc ansible-vault))
+(setup (:elpaca ansible ansible-doc ansible-vault))
 #+end_src
 
 ***** =yuck-mode=: Specifically for EWW's (bar) config file
 #+begin_src emacs-lisp
-(setup (:package yuck-mode))
+(setup (:elpaca yuck-mode))
 #+end_src
 
 **** Minor modes
@@ -915,7 +972,7 @@ Additional Tree-Sitter content
 
 ***** Colour highlighting
 #+begin_src emacs-lisp
-(setup (:package rainbow-mode)
+(setup (:elpaca rainbow-mode)
   (:hook-into css-mode))
 #+end_src
 
@@ -983,7 +1040,7 @@ or use a list:
 #+begin_src emacs-lisp
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
-(setup eshell (:package eshell-git-prompt eshell-syntax-highlighting)
+(setup eshell (:elpaca eshell-git-prompt eshell-syntax-highlighting)
        (setopt eshell-hist-ignoredups t
                eshell-scroll-to-bottom-on-input t
                eshell-history-size 10000
@@ -996,7 +1053,7 @@ or use a list:
 ***** eterm-256color
 256color for =term-mode=
 #+begin_src emacs-lisp
-(setup term (:package eterm-256color)
+(setup term (:elpaca eterm-256color)
        (:option explicit-shell-file-name "bash")
        (:with-mode eterm-256color-mode
          (:hook-into term-mode)))
@@ -1004,7 +1061,7 @@ or use a list:
 
 ***** vterm
 #+begin_src emacs-lisp
-(setup (:package multi-vterm))
+(setup (:elpaca multi-vterm))
 #+end_src
 
 **** Coding
@@ -1022,7 +1079,7 @@ or use a list:
 [[https://docs.emmet.io/cheat-sheet/][Emmet Cheat Sheet]] [2022-04-02 Sat 15:54:53]
 ******* Emmet
 #+begin_src emacs-lisp
-(setup (:package emmet-mode)
+(setup (:elpaca emmet-mode)
   ;; (:with-map emmet-mode-keymap
   ;;     (:bind ))
   (:hook-into html-mode))
@@ -1040,7 +1097,7 @@ or use a list:
 
 
 #+begin_src emacs-lisp
-(setup (:package web-mode)
+(setup (:elpaca web-mode)
   ;; (add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
   ;; (add-to-list 'auto-mode-alist '("\\.php\\'" . web-mode))
   ;; (add-to-list 'auto-mode-alist '("\\.[agj]sp\\'" . web-mode))
@@ -1067,7 +1124,7 @@ or use a list:
 ****** Javascript
 Javascript related packages
 #+begin_src emacs-lisp
-(setup (:package typescript-mode)
+(setup (:elpaca typescript-mode)
   (:option typescript-indent-level 2)
   (:hook-into js-mode-hook))
 #+end_src
@@ -1186,7 +1243,7 @@ to conflict with it.
 :header-args:emacs-lisp: :noweb-ref dummy :tangle no
 :END:
 #+begin_src emacs-lisp
-(setup (:package rust-mode))
+(setup (:elpaca rust-mode))
 ;; rustic
 #+end_src
 
@@ -1194,13 +1251,13 @@ Install Org Babel rust library:
 *NOTE*: this requires the program =rust-script= (available in standard
 Arch repos).
 #+begin_src emacs-lisp
-(setup (:package ob-rust)
+(setup (:elpaca ob-rust)
   (:load-after org))
 #+end_src
 
 ***** Lua
 #+begin_src emacs-lisp
-(setup (:package lua-mode))
+(setup (:elpaca lua-mode))
 #+end_src
 
 ***** Special Languages
@@ -1420,7 +1477,7 @@ It uses `make-directory' PARENTS argument 't'."
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-;; (setup (:package org-contrib))
+;; (setup (:elpaca org-contrib))
 
 (use-package org
   :bind (:map org-mode-map
@@ -1590,7 +1647,7 @@ appear when hovered.
   + [[https://emacs.stackexchange.com/questions/3374/set-the-background-of-org-exported-code-blocks-according-to-theme/3512#3512][org mode - Set the background of org-exported <code> blocks according to theme - Emacs Stack Exchange]]
   + [[https://melpa.org/#/htmlize][htmlize - MELPA]]
 #+begin_src emacs-lisp
-(setup (:package htmlize)
+(setup (:elpaca htmlize)
   (setopt org-html-htmlize-output-type 'css ; 'inline-css
            htmlize-html-charset "UTF-8")
   (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
@@ -1610,7 +1667,7 @@ appear when hovered.
 
 **** Prettify Org Mode
 #+begin_src emacs-lisp
-(setup (:package org-modern)
+(setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
   (:hook-into org-mode))
 #+end_src
@@ -1627,7 +1684,7 @@ appear when hovered.
 ;; org-auto-tangle: Org babel tangle file on save
 ;; [[https://github.com/yilkalargaw/org-auto-tangle][yilkalargaw/org-auto-tangle: a simple emacs package to allow org file tangling upon save]]
 #+begin_src emacs-lisp
-(setup (:package org-auto-tangle)
+(setup (:elpaca org-auto-tangle)
   (:require org-auto-tangle)
   (:hook org-auto-tangle-mode))
 #+end_src
@@ -1946,7 +2003,7 @@ NOTE: =dired-async= is provided by the =async= package.
 (setup dired
   (:load-after dired)
   ;; #TODO-test dired-before-readin-hook
-  (:package dired-rainbow
+  (:elpaca dired-rainbow
             dired-hide-dotfiles
             dired-narrow
             dired-subtree
@@ -2097,7 +2154,7 @@ NOTE: =dired-async= is provided by the =async= package.
     # #wizard
 
 #+begin_src emacs-lisp
-(setup (:package magit)
+(setup (:elpaca magit)
   ;; For dotfiles
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
     (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
@@ -2216,7 +2273,7 @@ t
   # [2022-02-24 Thu 00:01:03]
 
 #+begin_src emacs-lisp :noweb yes
-(setup (:package vertico)
+(setup (:elpaca vertico)
   (defun f/minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.
 With argument ARG, do this that many times."
@@ -2265,7 +2322,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 
   <<vertico-minibuffer-settings>>
 
-  (:with-hook after-init-hook
+  (:with-hook 'elpaca-after-init-hook
     (:hook vertico-mode)))
 #+end_src
 
@@ -2317,13 +2374,13 @@ Have =M-x= commands history across sessions
   (put 'file-name-history                     'history-length 1000)
   ;; # [2022-11-09 Wed 17:15:35 -03]
 
-  (:hook-into after-init))
+  (:hook-into elpaca-after-init-hook))
 #+end_src
 
 **** Orderless
 [[https://github.com/oantolin/orderless#style-dispatchers][Style dispatchers]]
 #+begin_src emacs-lisp
-(setup (:package orderless)
+(setup (:elpaca orderless)
   (:option completion-category-defaults nil
            ;; served well completion-styles '(substring orderless flex)
            completion-styles '(orderless initials substring basic)
@@ -2352,8 +2409,8 @@ Have =M-x= commands history across sessions
 - [[https://github.com/minad/marginalia/][marginalia github]]
 #+begin_src emacs-lisp
 ;; Enable richer annotations using the Marginalia package
-(setup (:package marginalia)
-  (:hook-into after-init)
+(setup (:elpaca marginalia)
+  (:hook-into elpaca-after-init-hook)
   ;; Either bind `marginalia-cycle` globally or only in the minibuffer
   ;; (:bind "M-A" marginalia-cycle)
   (:with-map minibuffer-local-map
@@ -2365,7 +2422,7 @@ Have =M-x= commands history across sessions
 **** Consult
 [[https://github.com/minad/consult#use-package-example][Example configuration for Consult]]
 #+begin_src emacs-lisp
-(setup (:package consult)
+(setup (:elpaca consult)
   (:global "C-s" consult-line ;; Was search-forward
            "C-x b" consult-buffer ;; Was switch-to-buffer
            "C-r" consult-history ;; #TODO-ithink was isearch-backward
@@ -2388,7 +2445,7 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 **** Embark
 [[https://github.com/oantolin/embark#quick-start][Embark#Quick start]]
 #+begin_src emacs-lisp
-(setup (:package embark embark-consult)
+(setup (:elpaca embark embark-consult)
   (:load-after consult)
   (:global "C-." embark-act
            ;; "C-;" embark-dwim
@@ -2408,8 +2465,7 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 **** Corfu
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
 #+begin_src emacs-lisp
-(setup (:package corfu
-                 corfu-terminal)
+(setup (:elpaca corfu corfu-terminal)
 
   (:with-map corfu-map
     (:bind "C-SPC" corfu-insert-separator)
@@ -2424,7 +2480,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
            corfu-preview-current nil)
 
-  ;; (:with-hook after-init-hook
+  ;; (:with-hook 'elpaca-after-init-hook
   ;;   (:hook global-corfu-mode))
   (global-corfu-mode 1)
 
@@ -2445,7 +2501,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 #+end_src
 
 #+begin_src emacs-lisp
-(setup (:package prescient corfu-prescient)
+(setup (:elpaca prescient corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
     (:hook corfu-prescient-mode))
@@ -2507,7 +2563,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 - [[https://github.com/joaotavora/yasnippet][joaotavora/yasnippet: A template system for Emacs]].
 - [[https://joaotavora.github.io/yasnippet/snippet-development.html][Writing snippets]]
 #+begin_src emacs-lisp
-(setup (:package yasnippet)
+(setup (:elpaca yasnippet)
   (:hide-mode yas-minor-mode)
   ;; (yas-global-mode)
   )
@@ -2533,7 +2589,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 [[https://github.com/minad/tempel][minad/tempel: TempEl - Simple templates for Emacs]].
 See the example template file: [[https://github.com/minad/tempel#template-file-format][minad/tempel: TempEl - Simple templates for Emacs]].
 #+begin_src emacs-lisp
-(setup (:package tempel)
+(setup (:elpaca tempel)
 
   ;; Require trigger prefix before template name when completing.
   ;; (:option tempel-trigger-prefix "<")
@@ -2584,9 +2640,9 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
   + [[https://github.com/emacs-lsp/lsp-mode/issues/837][Moving cursor is very slow · Issue #837 · emacs-lsp/lsp-mode]]
 #+begin_src emacs-lisp
 (setq lsp-use-plists t)
-(setup (:package lsp-mode lsp-ui)
+(setup (:elpaca lsp-mode lsp-ui)
   ;; LSP Language server starter packages
-  (:package lsp-haskell)
+  (:elpaca lsp-haskell)
 
   (:option lsp-idle-delay 0 ; 0.5 ; 0.1
            lsp-keymap-prefix "C-c l"
@@ -2602,7 +2658,7 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
 (setup eglot ; built-in since Emacs 29
   (:option eglot-send-changes-idle-time 0.2)
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    ;; (:package eldoc-box)
+    ;; (:elpaca eldoc-box)
     ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
     (:option eldoc-idle-delay 0.1))
   )
@@ -2627,7 +2683,7 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 
 [[https://github.com/manateelazycat/lsp-bridge#installation][manateelazycat/lsp-bridge: A blazingly fast LSP client for Emacs]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(setup (:package pyenv-mode))
+(setup (:elpaca pyenv-mode))
 
 (let (python-shell-virtualenv-root "./.python-venv")
   (pythonic-activate)
@@ -2638,7 +2694,7 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 
 (package-vc-install '(lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge"))
 
-(setup (:package (lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge")))
+(setup (:elpaca lsp-bridge :host github :repo "manateelazycat/lsp-bridge"))
 #+end_src
 Before testing disable Corfu or any other completion.
 Run with =lsp-bridge-mode=.
@@ -2654,7 +2710,7 @@ See [[*Corfu][Corfu]].
 ** Syntax Check
 ***** Flycheck
 #+begin_src emacs-lisp
-(setup (:package flycheck))
+(setup (:elpaca flycheck))
 #+end_src
 ** 11xx-ui.el: User Interface settings
 
@@ -2730,7 +2786,7 @@ number."
               (lambda (frame)
                 (with-selected-frame frame
                   (f/set-font))))
-  (add-hook 'after-init-hook
+  (add-hook 'elpaca-after-init-hook
             (lambda () (f/set-font))))
 ;; end set font
 #+end_src
@@ -2764,7 +2820,7 @@ number."
         show-paren-delay 0.01
         show-paren-style 'parenthesis)
 
-(setup (:package rainbow-delimiters)
+(setup (:elpaca rainbow-delimiters)
   (:hook-into emacs-lisp-mode))
 #+end_src
 
@@ -2821,12 +2877,11 @@ Load theme based on Dark or Light system theme:
     #+end_example
 
 #+begin_src emacs-lisp
-(use-package auto-dark
-  :ensure t
-  :init (auto-dark-mode t)
-  :custom ((auto-dark-dark-theme 'neron-dark)
-           (auto-dark-light-theme 'neron-light))
-  :delight)
+(setup (:elpaca auto-dark)
+  (setopt auto-dark-dark-theme 'neron-dark
+          auto-dark-light-theme 'neron-light)
+  (auto-dark-mode t)
+  (:hide-mode))
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
 
@@ -2865,8 +2920,8 @@ Load theme based on Dark or Light system theme:
 and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modelines_besides_doom/][2020 Modelines besides Doom? : emacs]]
 # [2022-05-07 Sat 03:45:54]
 #+begin_src emacs-lisp
-(setup (:package doom-modeline)
-  (:hook-into after-init)
+(setup (:elpaca doom-modeline)
+  (:hook-into elpaca-after-init-hook)
   (:option doom-modeline-height 15
            doom-modeline-buffer-encoding nil
            ;; display-time-format '%H:%M'
@@ -2902,7 +2957,7 @@ Fira Code Symbol externally.
 # [2022-05-30 Mon 13:53:19 -03]
 # b [2023-06-19 Mon 15:52:18 -03]
 #+begin_src emacs-lisp
-(setup (:package fira-code-mode)
+(setup (:elpaca fira-code-mode)
   (:only-if (display-graphic-p))
   (:hook-into prog-mode)
   (unless (display-graphic-p) ; redundant with :only-if?
@@ -2964,7 +3019,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 (setup pixel-scroll
   ;; (:only-if (display-graphic-p))
   (pixel-scroll-precision-mode)
-  (:hook-into after-init)
+  (:hook-into elpaca-after-init-hook)
   (:option pixel-scroll-precision-use-momentum t
            pixel-scroll-precision-large-scroll-height 5.0
            mouse-wheel-scroll-amount '(1 ((shift) . 1)) ; one line at a time
@@ -3001,7 +3056,7 @@ wizard [[https://emacs.stackexchange.com/questions/5371/how-to-change-emacs-wind
 
 Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/TransposeFrame][EmacsWiki: Transpose Frame]]):
 #+begin_src emacs-lisp
-(setup (:package transpose-frame)
+(setup (:elpaca transpose-frame)
   (defun f/rotate-frame-clockwise-or-default ()
     "Rotate frame clockwise if more than one frame exists; otherwise, execute default command."
     (interactive)
@@ -3026,7 +3081,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 **** Multiple Cursors
 ~multiple-cursors~
 #+begin_src emacs-lisp
-(setup (:package multiple-cursors)
+(setup (:elpaca multiple-cursors)
   (:global "C-S-c C-S-c" mc/edit-lines
            "C-<" mc/mark-previous-like-this
            "C->" mc/mark-next-like-this
@@ -3083,7 +3138,7 @@ For math and chemestry equations and notations.
 Install auctex for a better, faster backend:
 [[https://karthinks.com/software/fast-latex-previews-in-org-mode/][Fast Latex previews in Org-mode | Karthinks]]
 #+begin_src emacs-lisp
-(:package auctex)
+(:elpaca auctex)
 #+end_src
 
 **** Customize LaTeX preview image size
@@ -3111,7 +3166,7 @@ LaTeX preview in org-mode:
 - [[https://github.com/io12/org-fragtog][io12/org-fragtog: Automatically toggle Org mode LaTeX fragment previews as the cursor enters and exits them]]
 - See "=LaTeX previews=" heading: [[https://lucidmanager.org/productivity/ricing-org-mode/][Ricing Org Mode: A Beautiful Writing Environment]]
 #+begin_src emacs-lisp
-(setup (:package org-fragtog))
+(setup (:elpaca org-fragtog))
 #+end_src
 
 *** Keyboard macros
@@ -3127,7 +3182,7 @@ API keys can be generated from https://platform.openai.com/account/api-keys
   + [[https://github.com/karthink/gptel][karthink/gptel: A no-frills ChatGPT client for Emacs]]
 # [2023-06-23 Fri 13:14:22 -03]
 #+begin_src emacs-lisp
-(setup (:package gptel)
+(setup (:elpaca gptel)
   (:require auth-source) ; seems necessary, for some reason setup.el
                          ; and straght load before it.
   (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")

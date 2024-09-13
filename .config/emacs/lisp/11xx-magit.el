@@ -1,4 +1,4 @@
-(setup (:package magit)
+(setup (:elpaca magit)
   ;; For dotfiles
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
     (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))

@@ -1,7 +1,7 @@
 (setup pixel-scroll
   ;; (:only-if (display-graphic-p))
   (pixel-scroll-precision-mode)
-  (:hook-into after-init)
+  (:hook-into elpaca-after-init-hook)
   (:option pixel-scroll-precision-use-momentum t
            pixel-scroll-precision-large-scroll-height 5.0
            mouse-wheel-scroll-amount '(1 ((shift) . 1)) ; one line at a time

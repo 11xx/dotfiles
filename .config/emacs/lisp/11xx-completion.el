@@ -1,6 +1,6 @@
 (require '11xx-setup)
 
-(setup (:package vertico)
+(setup (:elpaca vertico)
   (defun f/minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.
 With argument ARG, do this that many times."
@@ -56,7 +56,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                                          cursor-intangible
                                          t face minibuffer-prompt))
 
-  (:with-hook after-init-hook
+  (:with-hook 'elpaca-after-init-hook
     (:hook vertico-mode)))
 (setopt read-extended-command-predicate #'command-completion-default-include-p
         enable-recursive-minibuffers t
@@ -91,8 +91,8 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   (put 'file-name-history                     'history-length 1000)
   ;; # [2022-11-09 Wed 17:15:35 -03]
 
-  (:hook-into after-init))
-(setup (:package orderless)
+  (:hook-into elpaca-after-init-hook))
+(setup (:elpaca orderless)
   (:option completion-category-defaults nil
            ;; served well completion-styles '(substring orderless flex)
            completion-styles '(orderless initials substring basic)
@@ -116,22 +116,22 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   (:advise company-capf--candidates :around #'just-one-face)
   )
 ;; Enable richer annotations using the Marginalia package
-(setup (:package marginalia)
-  (:hook-into after-init)
+(setup (:elpaca marginalia)
+  (:hook-into elpaca-after-init-hook)
   ;; Either bind `marginalia-cycle` globally or only in the minibuffer
   ;; (:bind "M-A" marginalia-cycle)
   (:with-map minibuffer-local-map
     (:bind "M-A" marginalia-cycle))
   (setopt marginalia-align 'left
           marginalia-field-width 120))
-(setup (:package consult)
+(setup (:elpaca consult)
   (:global "C-s" consult-line ;; Was search-forward
            "C-x b" consult-buffer ;; Was switch-to-buffer
            "C-r" consult-history ;; #TODO-ithink was isearch-backward
            "C-c o s" consult-org-heading
            ))
 ;; note: consult-outline & consult-org-heading
-(setup (:package embark embark-consult)
+(setup (:elpaca embark embark-consult)
   (:load-after consult)
   (:global "C-." embark-act
            ;; "C-;" embark-dwim
@@ -146,8 +146,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                  (window-parameters (mode-line-format . none))))
   ;; (:hook embark-collect-mode consult-preview-at-point-mode)
   )
-(setup (:package corfu
-                 corfu-terminal)
+(setup (:elpaca corfu corfu-terminal)
 
   (:with-map corfu-map
     (:bind "C-SPC" corfu-insert-separator)
@@ -162,7 +161,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
            corfu-preview-current nil)
 
-  ;; (:with-hook after-init-hook
+  ;; (:with-hook 'elpaca-after-init-hook
   ;;   (:hook global-corfu-mode))
   (global-corfu-mode 1)
 
@@ -180,7 +179,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
-(setup (:package prescient corfu-prescient)
+(setup (:elpaca prescient corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
     (:hook corfu-prescient-mode))
@@ -225,7 +224,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
 )
-(setup (:package tempel)
+(setup (:elpaca tempel)
 
   ;; Require trigger prefix before template name when completing.
   ;; (:option tempel-trigger-prefix "<")
@@ -255,7 +254,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 (setup eglot ; built-in since Emacs 29
   (:option eglot-send-changes-idle-time 0.2)
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    ;; (:package eldoc-box)
+    ;; (:elpaca eldoc-box)
     ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
     (:option eldoc-idle-delay 0.1))
   )

@@ -116,10 +116,10 @@
                messages-buffer-mode-hook
                diff-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
-(setup (:package syntax-subword)
+(setup (:elpaca syntax-subword)
   (:hide-mode global-subword-mode)
-  (add-hook 'after-init-hook #'global-syntax-subword-mode))
-(setup (:package ace-window)
+  (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
+(setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
   (:global "M-o" ace-window))
 
@@ -138,7 +138,7 @@
   :ensure t
   :defer 10
   ;; (:hide-mode)
-  ;; :hook (after-init-hook)
+  ;; :hook ('elpaca-after-init-hook)
   :config
   (setopt which-key-idle-delay 2.0))
 
@@ -157,8 +157,8 @@
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
 (load custom-file 'noerror 'nomessage)
-(setup (:package async))
-(setup (:package detached)
+(setup (:elpaca async))
+(setup (:elpaca detached)
   (:global
    ;; Replace `async-shell-command' with `detached-shell-command'
    [remap async-shell-command] detached-shell-command

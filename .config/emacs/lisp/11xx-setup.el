@@ -1,13 +1,6 @@
 ;; -*- lexical-binding: t; -*-
 ;; (require '11xx-package)
 
-(eval-when-compile
-  (when after-init-time
-    (package-initialize))
-  (require 'setup nil t))
-
-(unless (package-installed-p 'setup)
-  (package-install 'setup))
 (defun my-protect-setup (expansion)
   "Wrap `setup' output with `condition-case'."
   (let ((err (gensym "setup-err")))
@@ -22,34 +15,36 @@
                          :error)))))
 
 (advice-add 'setup :filter-return #'my-protect-setup)
-(setup-define :package
-  (lambda (package)
-    (if (consp package)
-        `(unless (and (package-installed-p ',(car package))
-                      (package-vc-p (cadr (assoc ',(car package)
-                                                 (package--alist)))))
-           (package-vc-install
-            ,(if (consp (cdr package))
-                 `',(car package)
-               `(list ',(car package) ,@(cdr package)))))
-      `(unless (package-installed-p ',package)
-         (unless (memq ',package package-archive-contents)
-           (package-refresh-contents))
-         (package-install ',package))))
-  :documentation "Install PACKAGE if it hasn't been installed yet.
-The first PACKAGE can be used to deduce the feature context.  If
-PACKAGE is a cons-cell, then the it will be interpreted as a
-package specification that will be passed to
-`package-vc-install'."
-  :repeatable t
-  :shorthand (lambda (form)
-               (if (consp (cadr form)) (caadr form) (cadr form))))
+(defun setup-wrap-to-install-package (body _name)
+  "Wrap BODY in an `elpaca' block if necessary.
+The body is wrapped in an `elpaca' block if `setup-attributes'
+contains an alist with the key `elpaca'."
+  (if (assq 'elpaca setup-attributes)
+      `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
+    body))
+;; Add the wrapper function
+(add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+(setup-define :elpaca
+  (lambda (order &rest recipe)
+    (push (cond
+           ((eq order t) `(elpaca . ,(setup-get 'feature)))
+           ((eq order nil) '(elpaca . nil))
+           (`(elpaca . (,order ,@recipe))))
+          setup-attributes)
+    ;; If the macro wouldn't return nil, it would try to insert the result of
+    ;; `push' which is the new value of the modified list. As this value usually
+    ;; cannot be evaluated, it is better to return nil which the byte compiler
+    ;; would optimize away anyway.
+    nil)
+  :documentation "Install ORDER with `elpaca'.
+The ORDER can be used to deduce the feature context."
+  :shorthand #'cadr)
 (setup-define :local-or-package
   (lambda (feature-or-package)
     `(unless (locate-file ,(symbol-name feature-or-package)
                           load-path
                           (get-load-suffixes))
-       (:package ,feature-or-package)))
+       (:elpaca ,feature-or-package)))
   :documentation "Install PACKAGE if it is not available locally.
 This macro can be used as NAME, and it will replace itself with
 the first PACKAGE."

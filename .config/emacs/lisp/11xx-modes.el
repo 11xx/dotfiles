@@ -1,19 +1,19 @@
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
-(setup (:package (systemd :url "https://github.com/pdbrown/systemd-mode")))
-(setup (:package haskell-mode haskell-ts-mode)
-  ;; (:package haskell-snippets) ; yasnippets
+(setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
+(setup (:elpaca haskell-mode haskell-ts-mode)
+  ;; (:elpaca haskell-snippets) ; yasnippets
   ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   )
 
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
-(setup (:package yaml-mode))
-(setup (:package pkgbuild-mode))
-(setup (:package powershell))
-(setup (:package ansible ansible-doc ansible-vault))
-(setup (:package yuck-mode))
+(setup (:elpaca yaml-mode))
+(setup (:elpaca pkgbuild-mode))
+(setup (:elpaca powershell))
+(setup (:elpaca ansible ansible-doc ansible-vault))
+(setup (:elpaca yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
-(setup (:package rainbow-mode)
+(setup (:elpaca rainbow-mode)
   (:hook-into css-mode))
 (define-minor-mode sensitive-mode
   "For sensitive files like password lists.
@@ -47,7 +47,7 @@ Null prefix argument turns off the mode."
         (auto-save-mode 1))))
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
-(setup eshell (:package eshell-git-prompt eshell-syntax-highlighting)
+(setup eshell (:elpaca eshell-git-prompt eshell-syntax-highlighting)
        (setopt eshell-hist-ignoredups t
                eshell-scroll-to-bottom-on-input t
                eshell-history-size 10000
@@ -55,20 +55,20 @@ Null prefix argument turns off the mode."
        (:with-hook eshell-first-time-mode-hook
          (:hook (lambda() (add-hook 'eshell-pre-command-hook 'eshell-save-some-history)
                   (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
-(setup term (:package eterm-256color)
+(setup term (:elpaca eterm-256color)
        (:option explicit-shell-file-name "bash")
        (:with-mode eterm-256color-mode
          (:hook-into term-mode)))
-(setup (:package multi-vterm))
+(setup (:elpaca multi-vterm))
 ;; Make shebang (#!) file executable when saved
 (add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p)
-(setup (:package emmet-mode)
+(setup (:elpaca emmet-mode)
   ;; (:with-map emmet-mode-keymap
   ;;     (:bind ))
   (:hook-into html-mode))
 (setup css
   (:option css-indent-offset 2))
-(setup (:package web-mode)
+(setup (:elpaca web-mode)
   ;; (add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
   ;; (add-to-list 'auto-mode-alist '("\\.php\\'" . web-mode))
   ;; (add-to-list 'auto-mode-alist '("\\.[agj]sp\\'" . web-mode))
@@ -90,7 +90,7 @@ Null prefix argument turns off the mode."
                   web-mode-enable-auto-opening t
                   web-mode-enable-auto-pairing t
                   web-mode-enable-auto-indentation t)))
-(setup (:package typescript-mode)
+(setup (:elpaca typescript-mode)
   (:option typescript-indent-level 2)
   (:hook-into js-mode-hook))
 (setup cc-mode
@@ -148,7 +148,7 @@ using the function `compile' build a command like:
 (with-eval-after-load 'cc-mode
   (define-key c-mode-base-map (kbd "C-c '") #'f/c-comp-and-run)
   (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
-(setup (:package lua-mode))
+(setup (:elpaca lua-mode))
 (setup picard-mode)
 
 (provide '11xx-modes)
