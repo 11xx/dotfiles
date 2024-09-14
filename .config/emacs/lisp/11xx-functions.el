@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (defun f/mark-whole-word (&optional arg allow-extend)
   "Like `mark-word', but select whole words and skips over whitespace.
 If you use a negative prefix ARG then select words backward.

@@ -3011,8 +3011,9 @@ retrieve the password.
 * File Local Variables                                             :noexport:
 # Local Variables:
 # eval: (add-hook 'after-save-hook (lambda () (org-babel-tangle)) nil t)
+# eval: (add-hook 'org-babel-post-tangle-hook (lambda nil (add-file-local-variable-prop-line 'lexical-binding t) (save-buffer)) nil nil)
 # End:
-
+# note that this may add a lexical:t prop to unwanted files. FIXME?
 - [[https://www.reddit.com/r/orgmode/comments/jy8fuc/orgbabeltangle_on_save/][org-babel-tangle on save? : r/orgmode]]
 - [[https://gitlab.com/joseph8th/literatemacs/-/blob/master/README.org?ref_type=heads&plain=1#L1915][README.org · master · Joseph E. Edwards VIII / literatemacs · GitLab]]
 - [[https://web.archive.org/web/20230117073433/https://github.com/joseph8th/literatemacs#conclusion][GitHub - joseph8th/literatemacs: My literate Emacs config]]
@@ -3024,7 +3025,6 @@ retrieve the password.
             (add-file-local-variable-prop-line 'lexical-binding t)
             (save-buffer))
           nil nil)
-
-(setq org-babel-post-tangle-hook nil)
+;; (setq org-babel-post-tangle-hook nil)
 ;; (makunbound 'org-babel-post-tangle-hook)
 #+end_src

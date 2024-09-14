@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 
 (defvar elpaca-installer-version 0.7)
