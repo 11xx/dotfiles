@@ -389,6 +389,7 @@ Backup & auto-save
 <<11xx-dired>>
 <<11xx-magit>>
 <<11xx-org-setup>>
+<<11xx-modes>>
 #+end_src
 
 ** Startup report
@@ -824,7 +825,8 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 [[https://wiki.haskell.org/Emacs/Unicode_symbols][Emacs/Unicode symbols - HaskellWiki]]
 # [2023-03-21 Tue 14:35:47 -03]
 #+begin_src emacs-lisp
-(setup (:elpaca haskell-mode haskell-ts-mode)
+(elpaca haskell-mode)
+(setup (:elpaca haskell-ts-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   )
@@ -970,7 +972,8 @@ or use a list:
 #+begin_src emacs-lisp
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
-(setup eshell (:elpaca eshell-git-prompt eshell-syntax-highlighting)
+(setup eshell (:elpaca eshell-syntax-highlighting)
+       (:elpaca eshell-git-prompt)
        (setopt eshell-hist-ignoredups t
                eshell-scroll-to-bottom-on-input t
                eshell-history-size 10000
@@ -1882,49 +1885,6 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 
 NOTE: =dired-async= is provided by the =async= package.
 #+begin_src emacs-lisp
-(setup (:elpaca dired-rainbow)
-  (require 'dired-rainbow)
-  ;; * `dired-rainbow-define` - add face by file extension
-  ;; * `dired-rainbow-define-chmod` - add face by file permissions
-  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
-  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-  (dired-rainbow-define log              "#d2a022" ("log"))
-  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-  ;; How it works:
-  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-  ;; can be individually customized on a theme file, overriding the
-  ;; default FACE-PROPS. E.g.:
-  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-  ;; is created.
-  )
-
-(setup (:elpaca dired-narrow))
-(setup (:elpaca dired-subtree))
-
-(setup (:elpaca dired-efap)
-  (:bind "r" dired-efap)
-  (setopt dired-efap-initial-filename-selection nil))
-
-(setup (:elpaca all-the-icons-dired)
-  (:hook-into dired-mode))
-
 (setup dired
   ;; (:elpaca dired-rainbow) ; bugged on elpaca?
   ;; (:elpaca dired-hacks-utils)
@@ -2008,6 +1968,49 @@ NOTE: =dired-async= is provided by the =async= package.
   ) ; "(setup dired..." ends here
 
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
+
+(setup (:elpaca dired-rainbow)
+  (require 'dired-rainbow)
+  ;; * `dired-rainbow-define` - add face by file extension
+  ;; * `dired-rainbow-define-chmod` - add face by file permissions
+  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
+  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
+  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
+  (dired-rainbow-define log              "#d2a022" ("log"))
+  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
+  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
+  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
+  ;; How it works:
+  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
+  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
+  ;; can be individually customized on a theme file, overriding the
+  ;; default FACE-PROPS. E.g.:
+  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
+  ;; is created.
+  )
+
+(setup (:elpaca dired-narrow))
+(setup (:elpaca dired-subtree))
+
+(setup (:elpaca dired-efap)
+  (:bind "r" dired-efap)
+  (setopt dired-efap-initial-filename-selection nil))
+
+(setup (:elpaca all-the-icons-dired)
+  (:hook-into dired-mode))
 #+end_src
 
 ** 11xx-magit.el
@@ -2519,6 +2522,8 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 (use-package lsp-bridge
   :vc (:url "manateelazycat/lsp-bridge"))
 
+(setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"))
+
 (package-vc-install '(lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge"))
 
 (setup (:elpaca lsp-bridge :host github :repo "manateelazycat/lsp-bridge"))
@@ -2923,22 +2928,6 @@ Usage
   (message "Free as in Freedom!"))
 #+end_example
 
-*** Startup report
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle early-init.el
-:END:
-Deufn [[https://youtu.be/9i_9hse_Y08?t=234]] |
-This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
-# ;; https://blog.d46.us/advanced-emacs-startup/
-
-#+begin_src emacs-lisp
-(add-hook 'emacs-startup-hook
-     (lambda ()
-       (message "*** Emacs loaded in %s seconds with %d garbage collections."
-                (emacs-init-time "%.2f")
-                gcs-done)))
-#+end_src
-https://blog.d46.us/advanced-emacs-startup/
 
 *** LaTeX
 For math and chemestry equations and notations.
@@ -2983,9 +2972,6 @@ LaTeX preview in org-mode:
 (setup (:elpaca org-fragtog))
 #+end_src
 
-*** Keyboard macros
-#+INCLUDE: macros.org
-
 *** ChatGPT
 API keys can be generated from https://platform.openai.com/account/api-keys
 
@@ -2997,8 +2983,7 @@ API keys can be generated from https://platform.openai.com/account/api-keys
 # [2023-06-23 Fri 13:14:22 -03]
 #+begin_src emacs-lisp
 (setup (:elpaca gptel)
-  (:require auth-source) ; seems necessary, for some reason setup.el
-                         ; and straght load before it.
+  ;; (:require auth-source) ; seems necessary, for some reason setup.el
   (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
            gptel-default-mode 'org-mode))
 #+end_src

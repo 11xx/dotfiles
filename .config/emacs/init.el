@@ -883,49 +883,6 @@ The app is chosen from your OS's preference."
                   (shell-quote-argument (file-truename default-directory)))))
 
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
-(setup (:elpaca dired-rainbow)
-  (require 'dired-rainbow)
-  ;; * `dired-rainbow-define` - add face by file extension
-  ;; * `dired-rainbow-define-chmod` - add face by file permissions
-  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
-  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-  (dired-rainbow-define log              "#d2a022" ("log"))
-  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-  ;; How it works:
-  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-  ;; can be individually customized on a theme file, overriding the
-  ;; default FACE-PROPS. E.g.:
-  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-  ;; is created.
-  )
-
-(setup (:elpaca dired-narrow))
-(setup (:elpaca dired-subtree))
-
-(setup (:elpaca dired-efap)
-  (:bind "r" dired-efap)
-  (setopt dired-efap-initial-filename-selection nil))
-
-(setup (:elpaca all-the-icons-dired)
-  (:hook-into dired-mode))
-
 (setup dired
   ;; (:elpaca dired-rainbow) ; bugged on elpaca?
   ;; (:elpaca dired-hacks-utils)
@@ -1009,6 +966,49 @@ The app is chosen from your OS's preference."
   ) ; "(setup dired..." ends here
 
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
+
+(setup (:elpaca dired-rainbow)
+  (require 'dired-rainbow)
+  ;; * `dired-rainbow-define` - add face by file extension
+  ;; * `dired-rainbow-define-chmod` - add face by file permissions
+  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
+  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
+  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
+  (dired-rainbow-define log              "#d2a022" ("log"))
+  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
+  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
+  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
+  ;; How it works:
+  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
+  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
+  ;; can be individually customized on a theme file, overriding the
+  ;; default FACE-PROPS. E.g.:
+  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
+  ;; is created.
+  )
+
+(setup (:elpaca dired-narrow))
+(setup (:elpaca dired-subtree))
+
+(setup (:elpaca dired-efap)
+  (:bind "r" dired-efap)
+  (setopt dired-efap-initial-filename-selection nil))
+
+(setup (:elpaca all-the-icons-dired)
+  (:hook-into dired-mode))
 (setup-elpaca transient) ; keyboard menu for magit.
 ;; fix elpaca version mismatch
 ;; See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
@@ -1235,6 +1235,160 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 (setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
   (:hook-into org-mode))
+(add-to-list 'load-path (concat user-emacs-directory "modes"))
+(setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
+(elpaca haskell-mode)
+(setup (:elpaca haskell-ts-mode)
+  ;; (:elpaca haskell-snippets) ; yasnippets
+  ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
+  )
+
+(add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
+(setup (:elpaca yaml-mode))
+(setup (:elpaca pkgbuild-mode))
+(setup (:elpaca powershell))
+(setup (:elpaca ansible ansible-doc ansible-vault))
+(setup (:elpaca yuck-mode))
+(add-to-list 'treesit-extra-load-path
+             (expand-file-name "tree-sitter" user-emacs-directory))
+(setup (:elpaca rainbow-mode)
+  (:hook-into css-mode))
+(define-minor-mode sensitive-mode
+  "For sensitive files like password lists.
+It disables backup creation and auto saving.
+
+With no argument, this command toggles the mode.
+Non-null prefix argument turns on the mode.
+Null prefix argument turns off the mode."
+  ;; The initial value.
+  :init-value nil
+  ;; The indicator for the mode line.
+  :lighter " Sensitive"
+  ;; The minor mode bindings.
+  :keymap nil
+  ;; added keywords instead of deprecated positional arguments:
+  ;; fix for "Warning: Use keywords rather than deprecated positional
+  ;; arguments to `define-minor-mode'" # [2022-11-11 Fri 16:09:40 -03]
+  ;; See the commits from [[https://github.com/purcell/emacs.d/issues/780][Use keywords rather than positional arguments to define-minor-mode · Issue #780 · purcell/emacs.d]]
+
+  (if (symbol-value sensitive-mode)
+      (progn
+        ;; disable backups
+        (set (make-local-variable 'backup-inhibited) t)
+        ;; disable auto-save
+        (if auto-save-default
+            (auto-save-mode -1)))
+                                        ;resort to default value of backup-inhibited
+    (kill-local-variable 'backup-inhibited)
+                                        ;resort to default auto save setting
+    (if auto-save-default
+        (auto-save-mode 1))))
+;; 'eshell-output-filter-functions void variable means that eshell has to be
+;; started once first.
+(setup eshell (:elpaca eshell-syntax-highlighting)
+       (:elpaca eshell-git-prompt)
+       (setopt eshell-hist-ignoredups t
+               eshell-scroll-to-bottom-on-input t
+               eshell-history-size 10000
+               eshell-buffer-maximum-lines 2048)
+       (:with-hook eshell-first-time-mode-hook
+         (:hook (lambda() (add-hook 'eshell-pre-command-hook 'eshell-save-some-history)
+                  (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
+(setup term (:elpaca eterm-256color)
+       (:option explicit-shell-file-name "bash")
+       (:with-mode eterm-256color-mode
+         (:hook-into term-mode)))
+(setup (:elpaca multi-vterm))
+;; Make shebang (#!) file executable when saved
+(add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p)
+(setup (:elpaca emmet-mode)
+  ;; (:with-map emmet-mode-keymap
+  ;;     (:bind ))
+  (:hook-into html-mode))
+(setup css
+  (:option css-indent-offset 2))
+(setup (:elpaca web-mode)
+  ;; (add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.php\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.[agj]sp\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.mustache\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.djhtml\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.scss\\'" . web-mode))
+  ;; (add-to-list 'auto-mode-alist '("\\.css\\'" . web-mode))
+  ;; (:hook-into html-mode css-mode)
+  (:hook (:option web-mode-markup-indent-offset 2
+                  web-mode-css-indent-offset 2
+                  web-mode-code-indent-offset 2
+                  web-mode-markup-indent-offset 2
+                  web-mode-style-padding 2
+                  web-mode-script-padding 2
+                  web-mode-enable-auto-closing t
+                  web-mode-enable-auto-opening t
+                  web-mode-enable-auto-pairing t
+                  web-mode-enable-auto-indentation t)))
+(setup (:elpaca typescript-mode)
+  (:option typescript-indent-level 2)
+  (:hook-into js-mode-hook))
+(setup cc-mode
+  (:disabled)
+  ;; (electric-pair-local-mode -1) ;; #manual-smartparens
+  ;; (smartparens-mode) ;; #manual-smartparens
+  )
+(defun f/gcc-compile-current-file ()
+  "Compile current file with gcc.
+
+Get the current buffer's filename with the function `buffer-file-name' and
+using the function `compile' build a command like:
+   \"gcc -o filename.c.out /path/to/filename.c\""
+  (interactive)
+  (defvar-local fullpath-filename (file-truename (buffer-file-name))
+    "Get filename of the current buffer")
+  (let ((filename (file-name-nondirectory fullpath-filename)))
+    (if (string= (file-name-extension filename) "c")
+        (compile (concat "gcc -o " (shell-quote-argument
+                                    (file-name-base filename)) ".out"
+                                    " "
+                                    (shell-quote-argument filename))))
+    (if (string= (file-name-extension filename) "cpp")
+        (compile (concat "g++ -o " (shell-quote-argument
+                                    (file-name-base filename)) ".out"
+                                    " "
+                                    (shell-quote-argument filename)))))
+  (message (concat "\"" fullpath-filename ".out\"")))
+(add-hook 'compilation-finish-functions
+          (lambda (buf strg)
+            (let ((win  (get-buffer-window buf 'visible)))
+              (when win (delete-window win)))))
+(defun f/run-executable-in-floating-terminal (exe-file)
+  "Open Alacritty with class=float and run executable EXE-FILE."
+  (interactive)
+  (message "Opening executable file: " exe-file ".")
+  (shell-command
+   (concat
+    "alacritty --class=float"
+    " "
+    "--option window.dimensions.columns=\"${w:-80}\""
+    " "
+    "window.dimensions.lines=\"${h:-20}\""
+    " "
+    "--command sh -c " (shell-quote-argument
+                        (concat exe-file " | bat --paging=always")))))
+;; removed --hold bc bat paging holds the terminal until othewise [2022-04-24 Sun 14:41:04]
+(defun f/c-comp-and-run()
+  "Compile current C/C++ file and run it in the terminal."
+  (interactive)
+  (f/run-executable-in-floating-terminal
+   ;; (f/gcc-compile-current-file v-local/compiled-file-out)
+   (f/gcc-compile-current-file)
+   ))
+(with-eval-after-load 'cc-mode
+  (define-key c-mode-base-map (kbd "C-c '") #'f/c-comp-and-run)
+  (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
+(setup (:elpaca lua-mode))
+(setup picard-mode)
 
 (add-hook 'emacs-startup-hook
   (lambda ()
