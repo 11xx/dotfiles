@@ -388,6 +388,7 @@ Backup & auto-save
 <<11xx-pixel-scroll>>
 <<11xx-dired>>
 <<11xx-magit>>
+<<11xx-org-setup>>
 #+end_src
 
 ** Startup report
@@ -465,8 +466,10 @@ Increase Garbage Collection threshold:
    "S-C-<down>"   shrink-window
    "S-C-<up>"     enlarge-window
    ;; Cursor
-   "C-M-d" backward-delete-char ; was down-list
-   "M-D"   backward-kill-word
+   ;; "C-M-d" backward-delete-char ; was down-list
+   "C-M-d" delete-pair ; was down-list
+   ;; "M-D"   backward-kill-word
+   "M-D"   delete-pair
    ;; "M-h"          backward-delete-char ; was `mark-paragraph' global
    ;; "M-H"          backward-kill-word ; was `mark-paragraph' global, separate override may be necessary for local maps
    "M-." forward-list
@@ -1382,7 +1385,7 @@ It uses `make-directory' PARENTS argument 't'."
 
 *** Org setup
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref org-setup
+:header-args:emacs-lisp: :noweb-ref 11xx-org-setup
 :END:
 
 [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#auto-show-markup-symbols][Auto-show Markup Symbols]] | [[https://stackoverflow.com/questions/10969617/hiding-markup-elements-in-org-mode/10970665#10970665][Hiding markup elements in org-mode]]
@@ -1390,6 +1393,7 @@ It uses `make-directory' PARENTS argument 't'."
 [[https://emacs.stackexchange.com/questions/50216/org-mode-code-block-parentheses-mismatch/68321#68321][org babel - org-mode code block parentheses mismatch - Emacs Stack Exchange]]
 # [2022-05-14 Sat 20:54:33]
 #+begin_src emacs-lisp
+(require '11xx-org-functions)
 ;; (setup org
 ;;   ;; Disable angle bracket syntax highlighting/matching
 ;;   (:hook (lambda()
@@ -1398,38 +1402,39 @@ It uses `make-directory' PARENTS argument 't'."
 
 ;; (setup (:elpaca org-contrib))
 
-(use-package org
-  :bind (:map org-mode-map
-   ("C-c C-;" . org-babel-repeat-previous-src-block)
-   ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
-   ("C-M-p" . org-previous-visible-heading) ; was `backward-list'
-   ("C-M-n" . org-next-visible-heading) ; was `forward-list'
-   ("C-c o t l" . org-toggle-link-display)
-   ;; Meta indentation ; `S' for Shift not working for some reason
-   ("M-F" . org-metaright)
-   ("M-B" . org-metaleft)
-   ("M-P" . org-metaup)
-   ("M-N" . org-metadown)
-   ;; Cursor
-   ;; "C-M-d" ; was down-list
-   ("C-M-d" . backward-delete-char) ; was down-list
-   ("M-D" . backward-kill-word)
-   ;; "M-h"   backward-delete-char ; was `org-mark-element'
-   ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
-   ("C-c o p" . org-kill-full-outline-path))
+(setup org
+  (:with-map org-mode-map
+    (:bind
+     "C-c C-;" org-babel-repeat-previous-src-block
+     ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
+     "C-M-p" org-previous-visible-heading ; was `backward-list'
+     "C-M-n" org-next-visible-heading ; was `forward-list'
+     "C-c o t l" org-toggle-link-display
+     ;; Meta indentation ; `S' for Shift not working for some reason
+     "M-F" org-metaright
+     "M-B" org-metaleft
+     "M-P" org-metaup
+     "M-N" org-metadown
+     ;; Cursor
+     ;; "C-M-d" ; was down-list
+     "C-M-d" backward-delete-char ; was down-list
+     "M-D" backward-kill-word
+     ;; "M-h"   backward-delete-char ; was `org-mark-element'
+     ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
+     "C-c o p" org-kill-full-outline-path))
+
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
-  :bind (("C-c o l" . org-store-link)
-         ("C-c o a" . org-agenda)
-         ("C-c o c" . org-capture))
+  (:global "C-c o l" org-store-link
+           "C-c o a" org-agenda
+           "C-c o c" org-capture)
 
-  :config
   ;; Move this to file local
   (org-babel-do-load-languages
    'org-babel-load-languages
    (append org-babel-load-languages
-           '((haskell . t)
+           '((haskell t)
              ;; (async   . t) ; from ob-async
              (shell   . t)
              (C       . t))))
@@ -1495,24 +1500,21 @@ It uses `make-directory' PARENTS argument 't'."
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(use-package visual-fill-column
-  :ensure t
-  :after org
-  :custom ((visual-fill-column-width 130) ; use with `display-fill-column-indicator-mode'
-           (visual-fill-column-center-text t))
-  :hook org-mode)
+(setup-elpaca visual-fill-column
+  (:load-after org)
+  (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
+          visual-fill-column-center-text t)
+  (:hook-into org-mode))
 
-(use-package org-bulletproof
-  :ensure t
-  :after org
-  :hook org-mode)
-
-;; usage in local file variables: `eval: (add-hook 'before-save-hook #'org-gfm-export-to-markdown nil t)'
-(use-package ox-gfm
-  :ensure t
-  :after org)
+(setup-elpaca org-bulletproof
+  (:load-after org)
+  (:hook-into org-mode))
 #+end_src
-
+# ;; usage in local file variables: `eval: (add-hook 'before-save-hook #'org-gfm-export-to-markdown nil t)'
+# ;; (use-package ox-gfm
+# ;;   :ensure t
+# ;;   :after org)
+#
 # ;; (:with-mode org-num-mode
 # ;;   (:load-after org)
 # ;;   (:hook-into org-mode))
@@ -1542,12 +1544,11 @@ with =C-c C-e=.
 Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
 #+begin_src emacs-lisp
-(use-package org-appear
-  :ensure t
-  :after org
+(setup-elpaca org-appear
+  (:load-after org)
   ;; Toggle for links display set in (setup org)
-  :custom ((org-appear-autolinks 'just-brackets)) ; nil is default
-  :hook org-mode)
+  (setopt org-appear-autolinks 'just-brackets) ; nil is default
+  (:hook-into org-mode))
 #+end_src
 - NOTE: setting =org-fold-core-style= to ='text-properties= in
   =early-init.el= to make sure it is defined before Org Mode is loaded
@@ -1592,7 +1593,11 @@ appear when hovered.
 #+end_src
 
 ** 11xx-org-functions.el
+#+begin_src emacs-lisp
+<<org-functions>>
 
+(provide '11xx-org-functions)
+#+end_src
 *** Org functions
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref org-functions
