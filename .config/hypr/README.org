@@ -31,8 +31,10 @@ workspace = 5, persistent:true
 workspace = 6, persistent:true
 workspace = 7, persistent:true
 workspace = 8, persistent:true
-workspace = 9, persistent:true
+workspace = 9, persistent:true, gapsin:0, gapsout:0, border:true, rounding:false
 workspace = 10, persistent:true
+
+windowrulev2 = bordercolor rgb(ff00aa) 0deg rgb(000000) 0deg, onworkspace:9
 #+end_src
 
 ** Startup
