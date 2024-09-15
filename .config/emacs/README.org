@@ -1,10 +1,9 @@
+:PROPERTIES:
+:header-args:emacs-lisp: :export both :mkdirp yes :results drawer :cache yes :noweb no-export
+:END:
 #+title: Emacs "init" config file
 #+author: 11xx
-#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes :noweb tangle
-
 # #+STARTUP: hidestars
-
-# #+auto_tangle: t
 
 # Export as HTML
 #+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
@@ -92,7 +91,54 @@ Install pkal's =setup.el= and define its macros
 #+begin_src emacs-lisp
 (elpaca setup (require 'setup))
 (elpaca-wait)
+#+end_src
 
+*** 11xx-setup.l
+
+- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=the%20above%20example-,transforming%20configuration%20errors%20into%20warnings,-This%20code%20transforms][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
+#+begin_src emacs-lisp :noweb-ref
+(defun setup-config-error-into-warning (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+            (pp (quote ,expansion))))
+                   :error)))))
+
+(advice-add 'setup :filter-return #'setup-config-error-into-warning)
+#+end_src
+
+
+**** =setup.el=
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref setup-el
+:END:
+- See:
+  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
+  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
+
+***** =setup.el= additional macros
+
+****** :elpaca
+- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=elpaca%20is%20an%20elisp%20package%20manager.][EmacsWiki/Setup El#Elpaca]]
+
+Two ways of using elpaca with these macros:
+: (setup-elpaca package-name)
+or
+: (setup (:elpaca package-name))
+also note that elpaca isn't really compatible with setup's lists so
+instead of multiple packages being assigned to the same macro,
+multiple macro calls have to be used, e.g.:
+: (setup (:elpaca package-name1))
+: (setup (:elpaca package-name2))
+
+This macro is a replacement for =(setup)= that uses elpaca to install packages.
+#+begin_src emacs-lisp
 (defmacro setup-elpaca (order &rest body)
   "Execute BODY in `setup' declaration after ORDER is finished.
 If the :disabled keyword is present in body, the package is completely ignored.
@@ -114,39 +160,9 @@ The expansion is a string indicating the package has been disabled."
                     ,@body)))))
 #+end_src
 
-*** 11xx-setup.l
-
-- [[https://www.emacswiki.org/emacs/SetupEl#h5o-26][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
-#+begin_src emacs-lisp :noweb-ref
-(defun my-protect-setup (expansion)
-  "Wrap `setup' output with `condition-case'."
-  (let ((err (gensym "setup-err")))
-    `(condition-case ,err
-   ,expansion
-       (error
-  (display-warning 'setup (concat "Problem in config: "
-          (error-message-string ,err)
-          ": \n"
-          (with-output-to-string
-                                          (pp (quote ,expansion))))
-                         :error)))))
-
-(advice-add 'setup :filter-return #'my-protect-setup)
-#+end_src
-
-
-**** =setup.el=
-:PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref setup-el
-:END:
-- See:
-  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
-  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
-
-***** =setup.el= additional macros
-
-****** :elpaca
-[[https://www.emacswiki.org/emacs/SetupEl#:~:text=Using-,elpaca,-Elpaca%20is%20an][EmacsWiki/Setup El#Elpaca]]
+This method uses =setup='s internal keyword and defines =:elpaca= for
+installing packages or if using =(:elpaca nil)= Elpaca won't install but
+still allow execution of BODY.
 #+begin_src emacs-lisp
 (defun setup-wrap-to-install-package (body _name)
   "Wrap BODY in an `elpaca' block if necessary.
@@ -155,8 +171,10 @@ contains an alist with the key `elpaca'."
   (if (assq 'elpaca setup-attributes)
       `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
     body))
+
 ;; Add the wrapper function
 (add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+
 (setup-define :elpaca
   (lambda (order &rest recipe)
     (push (cond
@@ -368,6 +386,7 @@ Backup & auto-save
 #+begin_src emacs-lisp
 ;; (setup (:with-hook elpaca-after-init-hook
 ;;          (:hook (lambda()
+;;                   (require '11xx-gc)
 ;;                   (require '11xx-defaults)
 ;;                   (require '11xx-completion)
 ;;                   (require '11xx-ui)
@@ -376,10 +395,10 @@ Backup & auto-save
 ;;                   (require '11xx-pixel-scroll)
 ;;                   (require '11xx-dired)
 ;;                   (require '11xx-magit)
-;;                   (require '11xx-gc)
 ;;                   (require '11xx-org)
 ;;                   (require '11xx-modes)))))
 
+<<garbage-collection>>
 <<new-defaults>>
 <<11xx-completion>>
 <<11xx-ui>>
@@ -407,13 +426,13 @@ Backup & auto-save
 
 
 * 11xx config
-:PROPERTIES:
-:header-args:emacs-lisp: :mkdirp yes :export tangle :cache yes
-:END:
-
 Personal config modularized into "pseudo-packages"
 
 ** gc.el: Garbage colletion
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref garbage-collection
+:END:
+
 Increase Garbage Collection threshold:
 - [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
 - [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
@@ -2709,6 +2728,54 @@ Load theme based on Dark or Light system theme:
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
 
+***** Prevent white flashbang on startup
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
+:END:
+src [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]].
+
+When starting a fresh Emacs instance the frame may display a white background
+for a few moments. To fix this simply change the default =background-color=
+from the =early-init.el= file, just so it loads before the frame is created:
+# "#17191a"
+#+begin_example
+(add-to-list 'default-frame-alist '(background-color . "#222222"))
+#+end_example
+# [2022-12-02 Fri 21:23:24 -03]
+
+****** Set initial background color based on system's color scheme
+# pcase example from [[https://www.reddit.com/r/emacs/comments/108kwyl/comment/j3w5j88/?context=3][New package: Darkman integration with Emacs. : emacs]]
+Before loading the theme
+#+begin_src emacs-lisp
+(require 'dbus nil t)
+(defun is-dark-color-scheme-dbus ()
+  ;; copy of 'auto-dark--is-dark-mode-dbus' from 'auto-dark.el'.
+  "Read color-scheme from org.freedesktop.portal.Settings appearance interface."
+  (eq 1 (caar (dbus-ignore-errors
+                (dbus-call-method
+                 :session
+                 "org.freedesktop.portal.Desktop"
+                 "/org/freedesktop/portal/desktop"
+                 "org.freedesktop.portal.Settings" "Read"
+                 "org.freedesktop.appearance" "color-scheme")))))
+
+(if (is-dark-color-scheme-dbus)
+    (progn (set-frame-parameter nil 'alpha-background 10)
+           (add-to-list 'default-frame-alist '(alpha-background . 10))
+           (add-to-list 'default-frame-alist `(background-color . "#222222"))
+           (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))
+
+  (progn (set-frame-parameter nil 'alpha-background 10)
+         (add-to-list 'default-frame-alist '(alpha-background . 10))
+         (add-to-list 'default-frame-alist `(background-color . "#ffffff"))
+         (add-to-list 'default-frame-alist `(foreground-color . "#333333"))))
+
+;; reset transparency
+(add-hook 'elpaca-after-init-hook
+          (lambda()
+            (set-frame-parameter nil 'alpha-background 100)
+            (add-to-list 'default-frame-alist '(alpha-background . 100))))
+#+end_src
 **** ibuffer mode
 [[https://www.reddit.com/r/emacs/comments/19xwk3/comment/c8sg4rq/?utm_source=share&utm_medium=web2x&context=3][wizard src]] | [[http://martinowen.net/blog/2010/02/03/tips-for-emacs-ibuffer.html][Tips for using Emacs Ibuffer]]
 #+begin_src emacs-lisp

@@ -43,6 +43,21 @@
 (elpaca setup (require 'setup))
 (elpaca-wait)
 
+(defun setup-config-error-into-warning (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+            (pp (quote ,expansion))))
+                   :error)))))
+
+(advice-add 'setup :filter-return #'setup-config-error-into-warning)
+
 (defmacro setup-elpaca (order &rest body)
   "Execute BODY in `setup' declaration after ORDER is finished.
 If the :disabled keyword is present in body, the package is completely ignored.
@@ -63,21 +78,6 @@ The expansion is a string indicating the package has been disabled."
                          (elpaca--first order))
                     ,@body)))))
 
-(defun my-protect-setup (expansion)
-  "Wrap `setup' output with `condition-case'."
-  (let ((err (gensym "setup-err")))
-    `(condition-case ,err
-   ,expansion
-       (error
-  (display-warning 'setup (concat "Problem in config: "
-          (error-message-string ,err)
-          ": \n"
-          (with-output-to-string
-                                          (pp (quote ,expansion))))
-                         :error)))))
-
-(advice-add 'setup :filter-return #'my-protect-setup)
-
 (defun setup-wrap-to-install-package (body _name)
   "Wrap BODY in an `elpaca' block if necessary.
 The body is wrapped in an `elpaca' block if `setup-attributes'
@@ -85,8 +85,10 @@ contains an alist with the key `elpaca'."
   (if (assq 'elpaca setup-attributes)
       `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
     body))
+
 ;; Add the wrapper function
 (add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+
 (setup-define :elpaca
   (lambda (order &rest recipe)
     (push (cond
@@ -235,6 +237,7 @@ current mode."
 
 ;; (setup (:with-hook elpaca-after-init-hook
 ;;          (:hook (lambda()
+;;                   (require '11xx-gc)
 ;;                   (require '11xx-defaults)
 ;;                   (require '11xx-completion)
 ;;                   (require '11xx-ui)
@@ -243,10 +246,11 @@ current mode."
 ;;                   (require '11xx-pixel-scroll)
 ;;                   (require '11xx-dired)
 ;;                   (require '11xx-magit)
-;;                   (require '11xx-gc)
 ;;                   (require '11xx-org)
 ;;                   (require '11xx-modes)))))
 
+(setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
+(add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 (setup emacs
   ;; Keybindings
   (:global
