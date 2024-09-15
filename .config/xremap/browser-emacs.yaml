@@ -1,8 +1,8 @@
 # Credit: https://github.com/mooz/xkeysnail/blob/bf3c93b4fe6efd42893db4e6588e5ef1c4909cfb/example/config.py#L62-L125
 keymap:
-  - name: Emacs
+  - name: Browser Emacs
     application:
-      only: [firefox, vivaldi-stable]
+      only: [firefox, vivaldi-stable, com.chatterino.chatterino]
     exact_match: true # required for not conflicting with
                       # SUPER+MOD+[...]  that would otherwise be
                       # interpreted by the window manager
