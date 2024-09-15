@@ -1,6 +1,6 @@
 #+title: Emacs "init" config file
 #+author: 11xx
-#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes :noweb yes
+#+PROPERTY: header-args :export both :mkdirp yes :results drawer :cache yes :noweb tangle
 
 # #+STARTUP: hidestars
 
@@ -438,7 +438,7 @@ Increase Garbage Collection threshold:
   + *Use of lamba():* Usually the use of ~(lambda()...)~ around this
     config was tested and caused problems when not using it.
 
-#+begin_src emacs-lisp :noweb yes
+#+begin_src emacs-lisp
 (setup emacs
   ;; Keybindings
   (:global
@@ -2136,7 +2136,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   + https://systemcrafters.cc/live-streams/may-21-2021/
   # [2022-02-24 Thu 00:01:03]
 
-#+begin_src emacs-lisp :noweb yes
+#+begin_src emacs-lisp
 (setup (:elpaca vertico)
   (defun f/minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.
