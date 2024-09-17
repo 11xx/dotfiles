@@ -1009,7 +1009,8 @@ The app is chosen from your OS's preference."
 (setup (:elpaca dired-subtree))
 
 (setup (:elpaca dired-efap)
-  (:bind "r" dired-efap)
+  (:with-map dired-mode-map
+    (:bind "r" dired-efap))
   (setopt dired-efap-initial-filename-selection nil))
 
 (setup (:elpaca all-the-icons-dired)
