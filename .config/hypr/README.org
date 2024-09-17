@@ -586,12 +586,10 @@ theme directory should be installed preferably user-local in
 # because Linux is easy 😿
 
 # Cursor theme names are their directory names
-$XCursorTheme = Oxygen_Yellow
-$hyprcursorTheme = Oxygen_Yellow
-# $XCursorTheme = BreezeX-RosePine
-# $hyprcursorTheme = rose-pine-hyprcursor
-$XCursorSize = 20
-$hyprcursorSize = 22 # 2px difference from what I could tell
+$XCursorTheme = simp1e-amber-neron
+$hyprcursorTheme = simp1e-amber-neron
+$XCursorSize = 30
+$hyprcursorSize = 30
 
 # hyprcursor
 exec-once = hyprctl setcursor '$hyprcursorTheme' $hyprcursorSize
@@ -601,6 +599,7 @@ env = HYPRCURSOR_SIZE, $hyprcursorSize
 # xcursor
 exec-once = gsettings set org.gnome.desktop.interface cursor-theme '$XCursorTheme'
 exec-once = gsettings set org.gnome.desktop.interface cursor-size $XCursorSize
+env = XCURSOR_THEME, $XCursorTheme
 env = XCURSOR_SIZE, $XCursorSize
 #+end_src
 
