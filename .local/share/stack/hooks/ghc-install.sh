@@ -18,10 +18,7 @@ __newPath=$(
          )
 unset __newPath
 
-ghcup() {
-    XDG_BIN_HOME=$GHCUP_BIN_DIR ghcup "$@"
-}
-
+alias ghcup="XDG_BIN_HOME=$GHCUP_BIN_DIR ghcup"
 
 case $HOOK_GHC_TYPE in
     bindist)
