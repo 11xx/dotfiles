@@ -15,19 +15,22 @@
                  "org.freedesktop.portal.Settings" "Read"
                  "org.freedesktop.appearance" "color-scheme")))))
 
+;; (set-face-attribute 'default nil :foreground 'unspecified)
+;; (set-face-attribute 'default nil :background 'unspecified)
+
+;; the most useless nitpick
+(defun f/early-init--set-faces (fg bg alpha)
+  (set-frame-parameter nil 'alpha-background alpha)
+  (add-to-list 'initial-frame-alist `(alpha-background . ,alpha))
+  (add-to-list 'initial-frame-alist `(background-color . ,bg))
+  (add-to-list 'initial-frame-alist `(foreground-color . ,fg)))
+
 (if (is-dark-color-scheme-dbus)
-    (progn (set-frame-parameter nil 'alpha-background 10)
-           (add-to-list 'default-frame-alist '(alpha-background . 10))
-           (add-to-list 'default-frame-alist `(background-color . "#222222"))
-           (add-to-list 'default-frame-alist `(foreground-color . "#a6a8a9")))
+    (f/early-init--set-faces "#333333" "#ffffff" 10)
+  (f/early-init--set-faces "#eeeeee" "#222222" 10))
 
-  (progn (set-frame-parameter nil 'alpha-background 10)
-         (add-to-list 'default-frame-alist '(alpha-background . 10))
-         (add-to-list 'default-frame-alist `(background-color . "#ffffff"))
-         (add-to-list 'default-frame-alist `(foreground-color . "#333333"))))
-
-;; reset transparency
+;; reset faces
 (add-hook 'elpaca-after-init-hook
-          (lambda()
-            (set-frame-parameter nil 'alpha-background 100)
-            (add-to-list 'default-frame-alist '(alpha-background . 100))))
+          (lambda() (set-face-attribute 'default nil :foreground 'unspecified)
+            (set-face-attribute 'default nil :background 'unspecified)
+            (set-frame-parameter nil 'alpha-background nil)))
