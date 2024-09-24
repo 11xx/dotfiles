@@ -581,7 +581,9 @@ theme directory should be installed preferably user-local in
 =$XDG_DATA_HOME/icons= or alternatively system-wide in =/usr/share/icons/=.
 
 - Cursor themes
+  + [[https://codeberg.org/useless-utils/simp1e-amber-hyprcursor][Codeberg/useless-utils/simp1e-amber-hyprcursor: A gold-yellow hyprcursor]]
   + [[https://github.com/rose-pine/cursor][GitHub - rose-pine/cursor: Soho vibes for Cursors]]
+  + [[https://github.com/ndom91/rose-pine-hyprcursor][ndom91/rose-pine-hyprcursor: BreezeX RosePine for Hyprcursor]]
 #+begin_src conf
 # because Linux is easy 😿
 
@@ -1087,8 +1089,6 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
            :reserve (struts :distance "30px" :side "top")
-           ;; :windowtype "dock" ; x11
-           ;; :wm-ignore false ; x11
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
@@ -1191,39 +1191,43 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           ;; :truncate-left true
           )))
 
+(include "mpd.yuck")
+
+#+end_src
+
+#+begin_src yuck :tangle (tdir "mpd.yuck")
 (defvar mpd-current-poll-state-1st true)
 
-;; (defvar dummy-json
-;;   '{"Title":"Waiting", "AlbumArtist":"for MPD", "Album":"to start", "duration":0, "elapsed":0}')
-
-;; This creates junk in the log file if there's nothing playing
-;; because the widgets that depend on it cannot parse it's value.
 (defpoll mpd-current-json-1st-instance
          :interval "1s"
          :run-while mpd-current-poll-state-1st
-         :initial "{}"  ; dummy json until it loads the executable:
+         ;; dummy json until it loads the executable:
+         :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","album_artist":"","album":""}}'
          "mpd-current-json")
 
 (defwidget seconds-to-length-format-hours [secs]
-           (label :text {secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
-(defwidget seconds-to-length-format-minutes [secs]
-           (label :text "${(secs / 60) < 10 ? '0' : ''}${round(secs / 60, 0)}"))
-(defwidget seconds-to-length-format-seconds [secs]
-           (label :text "${(secs % 60) < 10 ? '0' : ''}${round(secs % 60, 0)}"))
+           (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
 
-(defwidget seconds-to-length [secs ?min-width]
+(defwidget seconds-to-length-format-minutes [secs]
+           (label :text { (secs / 60) < 10 ?
+                          "0${round(secs / 60, 0)}" :
+                          "${round(secs / 60, 0)}" }))
+
+(defwidget seconds-to-length-format-seconds [secs]
+           (label :text { (secs % 60) < 10 ?
+                          "0${round(secs % 60, 0)}" :
+                          "${round(secs % 60, 0)}" }))
+
+(defwidget seconds-to-length [secs]
            (box
             :space-evenly false
-            :style "min-width: ${min-width > 0 ? min-width : 0}px;"
             (seconds-to-length-format-hours :secs secs)
             (seconds-to-length-format-minutes :secs secs)
             ":"
-            (seconds-to-length-format-seconds :secs secs))
-           )
+            (seconds-to-length-format-seconds :secs secs)))
 
 (defwidget mpd-current-nth-instance [curr-json ?icon]
            (box
-            ;; :spacing 10
             :space-evenly false
 
             (label :class "mpd-current-icon" :text icon)
@@ -1238,7 +1242,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
             ;; Artist: if album_artist is empty, use Artist
             (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
                    :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
-                          curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
+                                    curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
 
             ;; Title Artist separator
             (label :class "mpd-current-artist-separator" :text "·")
@@ -1253,10 +1257,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
             (box :spacing 2
                  :class "mpd-current-meta-field mpd-current-meta-field-elapsed"
                  :space-evenly false
-                 (seconds-to-length :min-width 40 ; fix (some of) the text wiggle, prolly font-dependant
-                                    :secs {curr-json.status.elapsed})
+                 (seconds-to-length :secs {curr-json.status.elapsed})
                  (label :text "/" :class "mpd-time-sep")
-                 (seconds-to-length :min-width 43 :secs {curr-json.status.duration})
+                 (seconds-to-length :secs {curr-json.status.duration})
                  (circular-progress :class "mpd-circular-progress"
                                     :width 20
                                     :height 20
@@ -1266,8 +1269,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                                     :valign "center"))))
 
 (defwidget mpd-current-1st-wrap []
-           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}
-                                     :icon ""))
+           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}))
 
 (defvar mpd-expand-bool true)
 (defwidget mpd-current []
@@ -1276,12 +1278,12 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :orientation "h"
                 :valign "center"
                 (mpd-current-1st-wrap)))
-
 #+end_src
 
 The following noweb variable is workaround for eww on hyprland not
 scaling properly on a scaled secondary/side monitor where 100% will
 not cover the width of the scaled monitor.
+- See [[https://github.com/elkowar/eww/issues/1110][elkowar/eww/Issue#1110]]
 #+NAME: eww-width-scaling-hyprland-second-monitor
 #+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :exports none :tangle no
 awk -F, '{print $3}' monitors.conf | awk NF | sort | tail -1 | awk -Fx '{print $1}'

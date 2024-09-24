@@ -1,0 +1,82 @@
+(defvar mpd-current-poll-state-1st true)
+
+(defpoll mpd-current-json-1st-instance
+         :interval "1s"
+         :run-while mpd-current-poll-state-1st
+         ;; dummy json until it loads the executable:
+         :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","album_artist":"","album":""}}'
+         "mpd-current-json")
+
+(defwidget seconds-to-length-format-hours [secs]
+           (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
+
+(defwidget seconds-to-length-format-minutes [secs]
+           (label :text { (secs / 60) < 10 ?
+                          "0${round(secs / 60, 0)}" :
+                          "${round(secs / 60, 0)}" }))
+
+(defwidget seconds-to-length-format-seconds [secs]
+           (label :text { (secs % 60) < 10 ?
+                          "0${round(secs % 60, 0)}" :
+                          "${round(secs % 60, 0)}" }))
+
+(defwidget seconds-to-length [secs]
+           (box
+            :space-evenly false
+            (seconds-to-length-format-hours :secs secs)
+            (seconds-to-length-format-minutes :secs secs)
+            ":"
+            (seconds-to-length-format-seconds :secs secs)))
+
+(defwidget mpd-current-nth-instance [curr-json ?icon]
+           (box
+            :space-evenly false
+
+            (label :class "mpd-current-icon" :text icon)
+            ;; Title
+            (label :class "mpd-current-meta-field mpd-current-meta-field-title"
+                   :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
+                   :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
+
+            ;; Title Artist separator
+            (label :class "mpd-current-artist-separator" :text "·")
+
+            ;; Artist: if album_artist is empty, use Artist
+            (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
+                   :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
+                                    curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
+
+            ;; Title Artist separator
+            (label :class "mpd-current-artist-separator" :text "·")
+
+            ;; Album
+            (label :class "mpd-current-meta-field mpd-current-meta-field-album"
+                   :limit-width 50
+                   :text {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""}
+                   :tooltip {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""})
+
+            ;; Elapsed/Duration
+            (box :spacing 2
+                 :class "mpd-current-meta-field mpd-current-meta-field-elapsed"
+                 :space-evenly false
+                 (seconds-to-length :secs {curr-json.status.elapsed})
+                 (label :text "/" :class "mpd-time-sep")
+                 (seconds-to-length :secs {curr-json.status.duration})
+                 (circular-progress :class "mpd-circular-progress"
+                                    :width 20
+                                    :height 20
+                                    :value {curr-json.status.elapsed_percent}
+                                    :thickness 4
+                                    :start-at 70
+                                    :valign "center"))))
+
+(defwidget mpd-current-1st-wrap []
+           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}))
+
+(defvar mpd-expand-bool true)
+(defwidget mpd-current []
+           (box :class "mpd-current-box"
+                :space-evenly false
+                :orientation "h"
+                :valign "center"
+                (mpd-current-1st-wrap)))
