@@ -346,6 +346,12 @@ current mode."
 ;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
 ;;   :config
 ;;   (smartparens-global-mode 1))
+
+;; [[https://github.com/progfolio/.emacs.d/blob/master/init.org#:~:text=pgtk-use-im-context-on-new-connection][.emacs.d/init.org at master · progfolio/.emacs.d]]
+;; [[https://www.reddit.com/r/emacs/comments/osscfd/pgtk_emacswaylandgnome_no_shiftspace/][PGTK Emacs/Wayland/Gnome: No shift-space : r/emacs]]
+;; "Prevent GTK from stealing Shift + Space"
+(pgtk-use-im-context nil)
+(setopt pgtk-use-im-context-on-new-connection nil)
 (setup whitespace
   (:hide-mode)
   (:hook-into prog-mode text-mode)
@@ -555,16 +561,16 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; (:hook embark-collect-mode consult-preview-at-point-mode)
   )
 (setup (:elpaca corfu)
-       (:elpaca corfu-terminal)
+  (:global "<tab>" completion-at-point)
 
   (:with-map corfu-map
-    (:bind "C-SPC" corfu-insert-separator)
+    (:bind "M-SPC" corfu-insert-separator)
     (:unbind "C-n"
              "C-p"))
   (:option corfu-cycle t
-           corfu-auto t
+           ;; corfu-auto t
            corfu-auto-delay 0.1
-           corfu-auto-prefix 2
+           corfu-auto-prefix 4
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
@@ -572,12 +578,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 
   ;; (:with-hook 'elpaca-after-init-hook
   ;;   (:hook global-corfu-mode))
-  (global-corfu-mode 1)
-
-
-  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
-  (unless (display-graphic-p)
-    (corfu-terminal-mode 1))
+  ;; (global-corfu-mode 1)
 
   ;; enable corfu on minibuffers like eval-expression
   (defun corfu-enable-in-minibuffer ()
@@ -588,6 +589,11 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
+
+(setup-elpaca corfu-terminal
+  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
+  (unless (display-graphic-p)
+    (corfu-terminal-mode 1)))
 (setup (:elpaca prescient)
        (:elpaca corfu-prescient)
   (:load-after corfu)
@@ -664,8 +670,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
     ;; (:elpaca eldoc-box)
     ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.1))
-  )
+    (:option eldoc-idle-delay 0.1)))
 ;;; UI
 (menu-bar-mode -1)    ; Disable menu bar
 (tool-bar-mode -1)    ; Disable toolbar
@@ -1109,7 +1114,10 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-;; (setup (:elpaca org-contrib))
+(setup (:elpaca org-contrib)
+  (:load-after org)
+  (require 'org-eldoc))
+;; `org-eldoc' shows the inherited code block properties.
 
 (setup org
   (:with-map org-mode-map
@@ -1205,7 +1213,10 @@ With prefix ARG, prompt for additional arguments to pass to the command."
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
-   org-src-window-setup 'current-window))
+   org-src-window-setup 'current-window)
+
+  (:with-mode eldoc
+    (:hook-into org-mode)))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
@@ -1243,17 +1254,29 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   (:hook-into org-mode))
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
-(elpaca haskell-mode)
+(setup-elpaca haskell-mode)
+(setup-elpaca lsp-haskell
+  (:load-after eglot)
+  (with-eval-after-load 'haskell-ts-mode
+    (haskell-ts-setup-eglot)))
 (setup (:elpaca haskell-ts-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
-  )
+  (defun org-babel-execute:haskell-ts (body params)
+    "Execute a block of c-ts code with Org Babel."
+    (org-babel-execute:haskell body params))
+
+  ;; use haskell-mode indentation instead
+  (setopt haskell-ts-use-indent nil)
+  (add-hook 'haskell-ts-mode-hook #'haskell-indentation-mode))
 
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 (setup (:elpaca yaml-mode))
 (setup (:elpaca pkgbuild-mode))
 (setup (:elpaca powershell))
-(setup (:elpaca ansible ansible-doc ansible-vault))
+(setup (:elpaca ansible))
+(setup (:elpaca ansible-vault))
+(setup-elpaca ansible-doc)
 (setup (:elpaca yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
@@ -1343,6 +1366,10 @@ Null prefix argument turns off the mode."
   ;; (electric-pair-local-mode -1) ;; #manual-smartparens
   ;; (smartparens-mode) ;; #manual-smartparens
   )
+
+(defun org-babel-execute:c-ts (body params)
+  "Execute a block of c-ts code with Org Babel."
+  (org-babel-execute:C body params))
 (defun f/gcc-compile-current-file ()
   "Compile current file with gcc.
 

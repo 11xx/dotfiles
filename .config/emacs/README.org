@@ -540,6 +540,12 @@ Increase Garbage Collection threshold:
 ;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
 ;;   :config
 ;;   (smartparens-global-mode 1))
+
+;; [[https://github.com/progfolio/.emacs.d/blob/master/init.org#:~:text=pgtk-use-im-context-on-new-connection][.emacs.d/init.org at master · progfolio/.emacs.d]]
+;; [[https://www.reddit.com/r/emacs/comments/osscfd/pgtk_emacswaylandgnome_no_shiftspace/][PGTK Emacs/Wayland/Gnome: No shift-space : r/emacs]]
+;; "Prevent GTK from stealing Shift + Space"
+(pgtk-use-im-context nil)
+(setopt pgtk-use-im-context-on-new-connection nil)
 #+end_src
 
 - Show whitespace but disable in some modes
@@ -842,14 +848,22 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 # :files ("*.txt" "systemd.el" (:exclude ".git"))
 
 ***** Haskell
-[[https://wiki.haskell.org/Emacs/Unicode_symbols][Emacs/Unicode symbols - HaskellWiki]]
-# [2023-03-21 Tue 14:35:47 -03]
 #+begin_src emacs-lisp
-(elpaca haskell-mode)
+(setup-elpaca haskell-mode)
+(setup-elpaca lsp-haskell
+  (:load-after eglot)
+  (with-eval-after-load 'haskell-ts-mode
+    (haskell-ts-setup-eglot)))
 (setup (:elpaca haskell-ts-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
-  )
+  (defun org-babel-execute:haskell-ts (body params)
+    "Execute a block of c-ts code with Org Babel."
+    (org-babel-execute:haskell body params))
+
+  ;; use haskell-mode indentation instead
+  (setopt haskell-ts-use-indent nil)
+  (add-hook 'haskell-ts-mode-hook #'haskell-indentation-mode))
 
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 #+end_src
@@ -872,7 +886,9 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 ***** Ansible
 #+begin_src emacs-lisp
-(setup (:elpaca ansible ansible-doc ansible-vault))
+(setup (:elpaca ansible))
+(setup (:elpaca ansible-vault))
+(setup-elpaca ansible-doc)
 #+end_src
 
 ***** =yuck-mode=: Specifically for EWW's (bar) config file
@@ -1100,6 +1116,13 @@ Javascript related packages
   ;; (electric-pair-local-mode -1) ;; #manual-smartparens
   ;; (smartparens-mode) ;; #manual-smartparens
   )
+
+#+end_src
+
+#+begin_src emacs-lisp
+(defun org-babel-execute:c-ts (body params)
+  "Execute a block of c-ts code with Org Babel."
+  (org-babel-execute:C body params))
 #+end_src
 
 ****** TODO Compile helper functions
@@ -1423,7 +1446,10 @@ It uses `make-directory' PARENTS argument 't'."
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-;; (setup (:elpaca org-contrib))
+(setup (:elpaca org-contrib)
+  (:load-after org)
+  (require 'org-eldoc))
+;; `org-eldoc' shows the inherited code block properties.
 
 (setup org
   (:with-map org-mode-map
@@ -1519,7 +1545,10 @@ It uses `make-directory' PARENTS argument 't'."
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
-   org-src-window-setup 'current-window))
+   org-src-window-setup 'current-window)
+
+  (:with-mode eldoc
+    (:hook-into org-mode)))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
@@ -1533,10 +1562,11 @@ It uses `make-directory' PARENTS argument 't'."
   (:load-after org)
   (:hook-into org-mode))
 #+end_src
+
+# auto generate/export markdown version of the current org file, GitHub-flavored
 # ;; usage in local file variables: `eval: (add-hook 'before-save-hook #'org-gfm-export-to-markdown nil t)'
-# ;; (use-package ox-gfm
-# ;;   :ensure t
-# ;;   :after org)
+# (setup (:elpaca ox-gfm)
+#   (:load-after org))
 #
 # ;; (:with-mode org-num-mode
 # ;;   (:load-after org)
@@ -2347,16 +2377,16 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
 #+begin_src emacs-lisp
 (setup (:elpaca corfu)
-       (:elpaca corfu-terminal)
+  (:global "<tab>" completion-at-point)
 
   (:with-map corfu-map
-    (:bind "C-SPC" corfu-insert-separator)
+    (:bind "M-SPC" corfu-insert-separator)
     (:unbind "C-n"
              "C-p"))
   (:option corfu-cycle t
-           corfu-auto t
+           ;; corfu-auto t
            corfu-auto-delay 0.1
-           corfu-auto-prefix 2
+           corfu-auto-prefix 4
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
@@ -2364,12 +2394,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 
   ;; (:with-hook 'elpaca-after-init-hook
   ;;   (:hook global-corfu-mode))
-  (global-corfu-mode 1)
-
-
-  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
-  (unless (display-graphic-p)
-    (corfu-terminal-mode 1))
+  ;; (global-corfu-mode 1)
 
   ;; enable corfu on minibuffers like eval-expression
   (defun corfu-enable-in-minibuffer ()
@@ -2380,6 +2405,11 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
+
+(setup-elpaca corfu-terminal
+  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
+  (unless (display-graphic-p)
+    (corfu-terminal-mode 1)))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -2511,8 +2541,7 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
     ;; (:elpaca eldoc-box)
     ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.1))
-  )
+    (:option eldoc-idle-delay 0.1)))
 #+end_src
 
 ****** Performance
@@ -2531,6 +2560,18 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
   #   : python -m venv .\.python-venv
   #   : .\.python-venv\Scripts\pip.exe install epc orjson sexpdata six setuptools paramiko rapidfuzz
   # + Install Now set the python venv root inside Emacs:
+- Or on Arch Linux install:
+  : pacman -S python-orjson python-six python-setuptools python-paramiko python-rapidfuzz --needed
+  : paru -S python-epc python-sexpdata --needed
+
+#+begin_src emacs-lisp :noweb-ref dummy :tangle no
+(setup-elpaca yasnippet)
+(setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
+                          :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
+                          :build (:not compile))
+  ;;(global-lsp-bridge-mode)
+  )
+#+end_src
 
 [[https://github.com/manateelazycat/lsp-bridge#installation][manateelazycat/lsp-bridge: A blazingly fast LSP client for Emacs]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
@@ -2544,6 +2585,17 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
   :vc (:url "manateelazycat/lsp-bridge"))
 
 (setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"))
+
+(setup-elpaca yasnippet)
+(setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
+                          :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
+                          :build (:not compile))
+  ;;(global-lsp-bridge-mode)
+  )
+(elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
+                          :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
+                          :build (:not compile)))
+;; ~/.config/emacs/elpaca/builds/lsp-bridge/
 
 (package-vc-install '(lsp-bridge :url "https://github.com/manateelazycat/lsp-bridge"))
 
@@ -3001,7 +3053,11 @@ Usage
 #+end_example
 
 
-*** LaTeX
+*** TODO LaTeX
+
+- See [[https://abode.karthinks.com/org-latex-preview/][=org-latex-preview=: Set up and troubleshooting]]
+  # [2024-09-18 Wed 19:39:19 -03] @ak
+
 For math and chemestry equations and notations.
 # [2022-12-07 Wed 09:15:05 -03]
 
