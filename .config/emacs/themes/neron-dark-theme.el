@@ -117,6 +117,8 @@ read it before opening a new issue about your will.")
                 (c/yellow  "#b8aa07" "#afaf00" "yellow")                ; official yellow
                 (c/blue    "#69aaff" "#5fafff" "blue")
                 (c/cursor  "#4455bb" "#5f5faf" "blue")                  ;; :inverse-video nil
+                ;; (c/cursor  "#5f5faf" "#5f5faf" "blue")                  ;; :inverse-video nil
+                ;; (c/cursor "#9ca5d8")
                 (c/warning "#d2a022" "#d7af00" "red")                   ;both
                                                                         ;; Other colors
                 (c/invisible-fg "#707070" "#5f5f5f" "white")            ; "invisible" foreground colour
@@ -135,7 +137,7 @@ read it before opening a new issue about your will.")
                 ))
 
       (faces '(;; default / basic faces
-               (cursor :background ,c/cursor :foreground ,c/fg)
+               (cursor :background ,c/cursor :foreground ,c/fg :inverse t)
                (default :background ,c/bg :foreground ,c/fg)
                (default-italic :slant italic)
                (error :foreground ,c/red)
@@ -143,7 +145,7 @@ read it before opening a new issue about your will.")
                (fringe :background ,c/bg) ; had bg2
                ;; modeline
                ;; (doom-modeline-buffer-modified :weight bold)
-               (mode-line :background ,c/current) ; had bg2
+               (mode-line :background ,c/bg-616) ; had bg2
                ;; (mode-line-active)
                ;; (mode-line-emphasis)
                (mode-line-inactive :backgroun ,c/bg)
@@ -162,9 +164,9 @@ read it before opening a new issue about your will.")
                (custom-button-pressed :inherit custom-buttom)
 
                (shadow :foreground ,c/comment)
-               (highlight :background ,c/current)
-               (match :inherit highlight)
-               (region :inherit match)
+               (highlight :foreground ,c/bg :background ,c/comment :weight bold :inverse t)
+               (match :foreground "white" :slant italic)
+               (region :foreground "white" :background ,c/current)
                (window-divider :foreground ,c/bg) ; had bg2
                (window-divider-first-pixel :foreground ,c/bg) ; had bg2
                (vertical-border :foreground ,c/bg) ; had bg2 ; window/buffer divider line
@@ -202,7 +204,8 @@ read it before opening a new issue about your will.")
                ;; (sh-heredoc undefined)
                (sh-quoted-exec :foreground ,c/red)
                ;; vertico
-               (vertico-current :background ,c/current)
+               ;; (vertico-current :foreground "white" :background ,c/cursor :weight bold)
+               (vertico-current :foreground "white" :background "#333333" :slant o :weight bold)
                ;; consult
                ;; (consult-preview-match )
                ;; orderless
@@ -217,21 +220,25 @@ read it before opening a new issue about your will.")
                (corfu-current :inherit vertico-current)
                ;; (corfu-annotations)
                ;; (corfu-deprecated)
+               (orderless-match-face-0 :foreground "white" :slant italic)
+
+               (marginalia-documentation :inherit font-lock-string-face)
+
                ;; org
                (org-block :background ,c/bg-616)
                (org-block-begin-line :inherit org-block :foreground ,c/invisible-fg)
                (org-block-end-line :inherit org-block-begin-line)
                (org-date :foreground ,c/cyan)
-               (outline-1 :extend t :foreground ,c/pink :weight bold)
-               (outline-2 :extend t :foreground ,c/green :weight bold)
-               (outline-3 :extend t :foreground ,c/cyan :weight bold)
-               (outline-4 :extend t :foreground ,c/red :weight bold)
-               (outline-5 :extend t :foreground ,c/purple :weight bold)
-               (outline-6 :extend t :foreground ,c/pink :weight bold)
-               (outline-7 :extend t :foreground ,c/green :weight bold)
-               (outline-8 :extend t :foreground ,c/cyan :weight bold)
+               (outline-1 :extend t :foreground ,c/pink :weight bold :height 200)
+               (outline-2 :extend t :foreground ,c/green :weight bold :height 180)
+               (outline-3 :extend t :foreground ,c/cyan :weight bold :height 160)
+               (outline-4 :extend t :foreground ,c/red :weight bold :height 140)
+               (outline-5 :extend t :foreground ,c/purple :weight bold :height 130)
+               (outline-6 :extend t :foreground ,c/pink :weight bold :height 120)
+               (outline-7 :extend t :foreground ,c/green :weight bold :height 110)
+               (outline-8 :extend t :foreground ,c/cyan :weight bold :height 100)
                (org-verbatim :foreground ,c/warning)
-               (org-code :inherit org-block)
+               (org-code :foreground ,c/warning)
                (org-drawer :foreground ,c/invisible-fg)
                (org-ellipsis :foreground unspecified)
                ;; (org-num-face :foreground unspecified :height 80)
@@ -288,8 +295,6 @@ read it before opening a new issue about your will.")
                ;; dired-efap / rename
                ;; (dired-efap-face :height 140 :box (:line-width 2 :color "grey20" :style pressed-button))
 
-
-
                ;; tree-sitter
                (tree-sitter-hl-face:attribute :inherit font-lock-constant-face)
                (tree-sitter-hl-face:comment :inherit font-lock-comment-face)
@@ -299,8 +304,7 @@ read it before opening a new issue about your will.")
                (tree-sitter-hl-face:escape :foreground ,c/pink)
                (tree-sitter-hl-face:function :inherit font-lock-function-name-face)
                (tree-sitter-hl-face:function.builtin :inherit font-lock-builtin-face)
-               (tree-sitter-hl-face:function.call :inherit font-lock-function-name-face
-                                                  :weight normal)
+               (tree-sitter-hl-face:function.call :inherit font-lock-function-name-face :weight normal)
                (tree-sitter-hl-face:function.macro :inherit font-lock-preprocessor-face)
                (tree-sitter-hl-face:function.special :inherit font-lock-preprocessor-face)
                (tree-sitter-hl-face:keyword :inherit font-lock-keyword-face)
@@ -314,8 +318,7 @@ read it before opening a new issue about your will.")
                (tree-sitter-hl-face:type :inherit font-lock-type-face)
                (tree-sitter-hl-face:type.parameter :foreground ,c/pink)
                (tree-sitter-hl-face:variable :inherit font-lock-variable-name-face)
-               (tree-sitter-hl-face:variable.parameter :inherit tree-sitter-hl-face:variable
-                                                       :weight normal)
+               (tree-sitter-hl-face:variable.parameter :inherit tree-sitter-hl-face:variable :weight normal)
                ;; web-mode
                (web-mode-builtin-face :inherit font-lock-builtin-face)
                (web-mode-comment-face :inherit font-lock-comment-face)
@@ -379,7 +382,7 @@ read it before opening a new issue about your will.")
                ;; (diff-header :foreground "#e5e7e8" :background "#4f4e51") ;; 1282 -> 666
                ;; (diff-file-header :inherit diff-header :background "#092147")
                (diff-header :background "#092147")
-               (diff-file-header :inherit diff-header :foreground "#e5e7e8")
+               (diff-file-header :inherit diff-header)
                (diff-added :background "#022900")
                ;; (diff-indicator-added :inherit diff-added :foreground "#91ff93") ;; 1282
                ;; (diff-indicator-added :inherit diff-added :foreground "#00c241") ;; custom foreground
@@ -387,8 +390,8 @@ read it before opening a new issue about your will.")
                (diff-removed :background ,c/bg-diff-removed)
                ;; (diff-indicator-removed :inherit diff-removed :foreground "#ff8287") ;; custom foreground
                (diff-indicator-removed :inherit diff-removed :foreground ,c/red)
-               (diff-refine-added :inherit diff-added :foreground "#e5e7e8") ;; 1282
-               (diff-refine-removed :inherit diff-removed :foreground "#e5e7e8") ;; 1282
+               (diff-refine-added :inherit diff-added) ;; 1282
+               (diff-refine-removed :inherit diff-removed) ;; 1282
                ;; (diff-error :background ,c/)
                ;; (diff-index :background ,c/)
                ;; (diff-header :background ,c/)
@@ -415,8 +418,8 @@ read it before opening a new issue about your will.")
                (magit-diff-removed :inherit diff-removed)
                (magit-diffstat-removed :inherit diff-indicator-removed)
                (magit-diff-removed-highlight :inherit diff-removed)
-               (magit-section-highlight :inherit highlight)
-               (magit-diff-context-highlight :background ,c/bg-616)
+               (magit-section-highlight :background ,c/current)
+               (magit-diff-context-highlight :background ,c/current)
                (magit-diff-hunk-heading :inherit diff-header)
                (magit-diff-hunk-heading-highlight :inherit magit-diff-hunk-heading)
 
