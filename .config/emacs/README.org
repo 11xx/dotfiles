@@ -22,6 +22,8 @@ Send errors to *Backtrace*, only set to true while debugging
 
 * References
 Here are some complete configuration examples:
+
+- [[https://github.com/progfolio/.emacs.d/blob/master/init.org][progfolio's .emacs.d/init.org]]
 - [[https://github.com/angrybacon/dotemacs/blob/master/dotemacs.org][angrybacon's dotemacs]]
 - [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org][David Wilson's Emacs Configuration]]
 - [[https://tecosaur.github.io/emacs-config/config.html][tecosaur's Doom Emacs Configuration]]
