@@ -68,6 +68,8 @@ alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
+alias c="bat"
+# alias b="bat"
 #+end_src
 
 ** wine
@@ -1102,14 +1104,7 @@ eval "$(atuin init zsh)"
 [[https://github.com/ajeetdsouza/zoxide][GitHub - ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
 
 #+begin_src bash
-eval "$(zoxide init zsh)"
-#+end_src
-
-After init the command "=z=" is bound to the zoxide command. So alias =cd=
-to it.
-#+begin_src bash
-alias cd=z
-alias c=z
+eval "$(zoxide init zsh --cmd cd)"
 #+end_src
 
 *** Source setup modules

@@ -38,6 +38,8 @@ alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
+alias c="bat"
+# alias b="bat"
 
 alias suwine="sudo -su wineuser"
 

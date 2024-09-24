@@ -249,10 +249,7 @@ setopt histignorealldups
 
 eval "$(atuin init zsh)"
 
-eval "$(zoxide init zsh)"
-
-alias cd=z
-alias c=z
+eval "$(zoxide init zsh --cmd cd)"
 
 __setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
 if test -d "${__setupModulesDir}"; then
