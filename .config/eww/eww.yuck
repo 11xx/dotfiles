@@ -140,10 +140,22 @@
          :initial "{}"  ; dummy json until it loads the executable:
          "mpd-current-json")
 
+(defwidget seconds-to-length-format-hours [secs]
+           (label :text {secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
+(defwidget seconds-to-length-format-minutes [secs]
+           (label :text "${(secs / 60) < 10 ? '0' : ''}${round(secs / 60, 0)}"))
+(defwidget seconds-to-length-format-seconds [secs]
+           (label :text "${(secs % 60) < 10 ? '0' : ''}${round(secs % 60, 0)}"))
+
 (defwidget seconds-to-length [secs ?min-width]
-           (label
+           (box
+            :space-evenly false
             :style "min-width: ${min-width > 0 ? min-width : 0}px;"
-            :text "${secs >= 3600 ? "${jq(secs / 3600, 'floor')}:" : "" }${jq(secs / 60, 'floor') < 10 ? "0" : ""}${jq(secs / 60, 'floor')}:${jq(secs % 60, 'floor') < 10 ? "0" : ""}${jq(secs % 60, 'floor')}"))
+            (seconds-to-length-format-hours :secs secs)
+            (seconds-to-length-format-minutes :secs secs)
+            ":"
+            (seconds-to-length-format-seconds :secs secs))
+           )
 
 (defwidget mpd-current-nth-instance [curr-json ?icon]
            (box
@@ -184,7 +196,6 @@
                  (circular-progress :class "mpd-circular-progress"
                                     :width 20
                                     :height 20
-                                    ;; :value {jq(curr-json.status.elapsed / curr-json.status.duration * 100, "floor")}
                                     :value {curr-json.status.elapsed_percent}
                                     :thickness 4
                                     :start-at 70
