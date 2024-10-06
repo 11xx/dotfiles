@@ -666,12 +666,35 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; (global-tempel-abbrev-mode)
   (:with-hook prog-mode-hook text-mode-hook
               (:hook tempel-setup-capf)))
+(setq lsp-use-plists t)
+;; (setup (:elpaca lsp-haskell))
+(setup (:elpaca lsp-ui)
+  ;; (:option lsp-ui-doc-show-with-cursor t
+  ;;          lsp-ui-doc-delay 0.5)
+  )
+(setup (:elpaca lsp-mode)
+  ;; LSP Language server starter packages
+  (:option lsp-idle-delay 0.1 ; 0.5 ; 0.1
+           lsp-keymap-prefix "C-c l"
+           lsp-log-io nil)
+
+  ;; (setq lsp-ui-doc-enable nil) ; set to nil for better performance
+  ) ; "(setup lsp-mode..." ends here
+(setup (:elpaca flycheck))
+(setup (:elpaca eldoc-box))
 (setup eglot ; built-in since Emacs 29
-  (:option eglot-send-changes-idle-time 0.2)
+  (:option eglot-send-changes-idle-time 0.01)
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    ;; (:elpaca eldoc-box)
-    ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.1)))
+    (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
+    (:option eldoc-idle-delay 0.01)
+    (:with-feature eldoc-box
+      ;; prefixes eldoc-box- to options
+      (:option* doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n") ; code \u2501
+                clear-with-C-g t))
+    (:with-feature whitespace
+      ;; Disable `show-trailing-whitespace' in eldox box hover childframe
+      (:with-hook (eldoc-box-buffer-hook)
+        (:hook (lambda() (setq-local show-trailing-whitespace nil)))))))
 ;;; UI
 (menu-bar-mode -1)    ; Disable menu bar
 (tool-bar-mode -1)    ; Disable toolbar
@@ -794,14 +817,6 @@ number."
            doom-modeline-enable-word-count nil ; Performance
            ))
 (set-window-margins nil 1)
-(setup (:elpaca fira-code-mode)
-  (:only-if (display-graphic-p))
-  (:hook-into prog-mode)
-  (unless (display-graphic-p) ; redundant with :only-if?
-    (fira-code-mode -1))
-  (with-eval-after-load 'fira-code-mode
-    (dolist (ligature '("-}"))
-      (add-to-list 'fira-code-mode-disabled-ligatures ligature))))
 (setup (:elpaca transpose-frame)
   (defun f/rotate-frame-clockwise-or-default ()
     "Rotate frame clockwise if more than one frame exists; otherwise, execute default command."
@@ -1256,13 +1271,14 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 (setup-elpaca haskell-mode)
-(setup-elpaca lsp-haskell
-  (:load-after eglot)
-  (with-eval-after-load 'haskell-ts-mode
-    (haskell-ts-setup-eglot)))
+(setup-elpaca lsp-haskell ;; also set in lsp-mode section
+  (with-eval-after-load 'eglot
+    (with-eval-after-load 'haskell-ts-mode
+      (haskell-ts-setup-eglot))))
 (setup (:elpaca haskell-ts-mode)
+  (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
-  ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
   (defun org-babel-execute:haskell-ts (body params)
     "Execute a block of c-ts code with Org Babel."
     (org-babel-execute:haskell body params))
