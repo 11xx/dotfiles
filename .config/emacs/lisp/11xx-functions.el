@@ -109,5 +109,18 @@ It uses `make-directory' PARENTS argument 't'."
 
 ;; Handy key definition
 (define-key global-map "\M-Q" 'unfill-paragraph)
+(defun filter-list-any (source-list filter-list)
+  "Filter out items from SOURCE-LIST that are found in FILTER-LIST."
+  (let ((hash-table (make-hash-table :test 'equal))
+        result)
+    ;; Populate the hash table with elements from the filter list
+    (dolist (item filter-list)
+      (puthash item t hash-table))
+    ;; Build the result list by filtering out items in the hash table
+    (dolist (item source-list)
+      (unless (gethash item hash-table)
+        (push item result)))
+    ;; The result list is built in reverse order, so reverse it
+    (nreverse result)))
 
 (provide '11xx-functions)

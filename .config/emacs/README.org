@@ -1433,6 +1433,24 @@ It uses `make-directory' PARENTS argument 't'."
 (define-key global-map "\M-Q" 'unfill-paragraph)
 #+end_src
 
+**** Filter any matching list item from a list
+# ;; from chatgpt: function for filtering items from a list using a list
+#+begin_src emacs-lisp
+(defun filter-list-any (source-list filter-list)
+  "Filter out items from SOURCE-LIST that are found in FILTER-LIST."
+  (let ((hash-table (make-hash-table :test 'equal))
+        result)
+    ;; Populate the hash table with elements from the filter list
+    (dolist (item filter-list)
+      (puthash item t hash-table))
+    ;; Build the result list by filtering out items in the hash table
+    (dolist (item source-list)
+      (unless (gethash item hash-table)
+        (push item result)))
+    ;; The result list is built in reverse order, so reverse it
+    (nreverse result)))
+#+end_src
+
 ** 11xx-org.el: Org Mode
 - Reffs:
   + [[https://www.youtube.com/watch?v=VcgjTEa0kU4][Emacs From Scratch #5 - Org Mode Basics]]
@@ -1659,6 +1677,7 @@ appear when hovered.
 
 (provide '11xx-org-functions)
 #+end_src
+
 *** Org functions
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref org-functions
@@ -1867,6 +1886,70 @@ a limit of 530, more than that and lisp nesting will overflow."
         (length-of-string 6))
     (expt number-of-characters length-of-string))
   #+end_example
+
+**** Get list of tangle files that match extension
+#+begin_src emacs-lisp
+(defun org-babel-get-tangle-files-by-ext (&optional ext)
+  "Returns a list of unique filenames to be tangled that end with the specified EXT.
+
+If EXT is not provided, default to \".el\".
+
+This function parses all code blocks in the current Org buffer, identifies
+those that contain the `:tangle' header argument (inherited or directly) and
+collects the tangle filenames of those that end with the specified EXT.
+
+Note that for this `string-suffix-p' is used to search for an EXT in the
+format `.EXT' (with a period) so if a period isn't provided it is added and
+if it was it is kept.
+
+Example:
+
+(org-babel-get-tangle-files-by-ext \"el\")"
+  (let ((tangle-files '())
+        (tangle-files-ext (concat "." (if ext (string-trim-left ext "\\.")
+                                        ".el"))))
+    (org-element-map (org-element-parse-buffer) 'src-block
+      (lambda (src-block)
+        (let* ((info (org-babel-get-src-block-info t src-block))
+               (header-args (nth 2 info))
+               (tangle (cdr (assoc :tangle header-args))))
+          (when (and tangle
+                     (stringp tangle)
+                     (string-suffix-p tangle-files-ext tangle t))
+            (push tangle tangle-files)))))
+    (delete-dups tangle-files)))
+#+end_src
+
+**** Add lexical-binding property to tangle files
+The following functions together with
+=org-babel-get-tangle-files-by-ext= can be used for adding
+=lexical-binding: t= to tangled files automatically without having to
+add them as a header in the code blocks. Example usage with local file
+variables:
+
+: # eval: (add-hook 'org-babel-tangle-finished-hook #'org-babel-tangle-add-lexical-prop-to-el-tangled-files nil nil)
+Note that using ='org-babel-tangle-finished-hook= is important because
+=org-babel-get-tangle-files-by-ext=, the function that gets the target
+tangle files, needs to read the right buffer/Org document and that
+hook is triggered after tangling is finished and Emacs' focus is back
+in the source Org buffer so it can get the list.
+
+#+begin_src emacs-lisp
+(defun add-lexical-binding-prop (file)
+  "Add `lexical-binding: t' prop to FILE without disrupting open buffers."
+  (let ((buffer (get-buffer (find-file-noselect file))))
+    (with-current-buffer buffer
+      (add-file-local-variable-prop-line 'lexical-binding t nil)
+      (save-buffer))
+    (unless (get-buffer-window buffer 'visible)
+      (kill-buffer buffer))))
+
+(defun org-babel-tangle-add-lexical-prop-to-el-tangled-files()
+  (dolist (file (let ((source-list (org-babel-get-tangle-files-by-ext "el"))
+                      (filter-list '(".dir-locals.el")))
+                  (filter-list-any source-list filter-list)))
+    (add-lexical-binding-prop file)))
+#+end_src
 
 ** 11xx-dired.el
 :PROPERTIES:
@@ -3151,69 +3234,11 @@ retrieve the password.
 
 # crazy hack just not to have lexical-binding prop code blocks at the top 😿
 #+BEGIN_src emacs-lisp :tangle .dir-locals.el
-((org-mode . ((eval . (defun add-lexical-binding-prop (file)
-                        "Add `lexical-binding: t' prop to FILE without disrupting open buffers."
-                        (let ((buffer (get-buffer (find-file-noselect file))))
-                          (with-current-buffer buffer
-                            (add-file-local-variable-prop-line 'lexical-binding t nil)
-                            (save-buffer))
-                          (unless (get-buffer-window buffer 'visible)
-                            (kill-buffer buffer)))))
 
-              (eval . (defun org-babel-get-tangle-files-by-ext (&optional ext)
-                        "Returns a list of unique filenames to be tangled that end with the specified EXT.
-
-If EXT is not provided, default to \".el\".
-
-This function parses all code blocks in the current Org buffer, identifies
-those that contain the `:tangle' header argument (inherited or directly) and
-collects the tangle filenames of those that end with the specified EXT.
-
-Note that for this `string-suffix-p' is used to search for an EXT in the
-format `.EXT' (with a period) so if a period isn't provided it is added and
-if it was it is kept.
-
-Example:
-
-(org-babel-get-tangle-files-by-ext \"el\")"
-                        (let ((tangle-files '())
-                              (tangle-files-ext (concat "." (if ext (string-trim-left ext "\\.")
-                                                              ".el"))))
-                          (org-element-map (org-element-parse-buffer) 'src-block
-                            (lambda (src-block)
-                              (let* ((info (org-babel-get-src-block-info t src-block))
-                                     (header-args (nth 2 info))
-                                     (tangle (cdr (assoc :tangle header-args))))
-                                (when (and tangle
-                                           (stringp tangle)
-                                           (string-suffix-p tangle-files-ext tangle t))
-                                  (push tangle tangle-files)))))
-                          (delete-dups tangle-files))))
-
-              (eval . (defun f/tangle-lex-prop()
-                        (dolist (file (let ((source-list (org-babel-get-tangle-files-by-ext "el"))
-                                            (filter-list '(".dir-locals.el")))
-                                        (filter-list-with-hash-table source-list filter-list)))
-                          (add-lexical-binding-prop file))))
-
-              ;; from chatgpt: function for filtering items from a list using a list
-              (eval . (defun filter-list-with-hash-table (source-list filter-list)
-                        "Filter out items from SOURCE-LIST that are found in FILTER-LIST."
-                        (let ((hash-table (make-hash-table :test 'equal))
-                              result)
-                          ;; Populate the hash table with elements from the filter list
-                          (dolist (item filter-list)
-                            (puthash item t hash-table))
-                          ;; Build the result list by filtering out items in the hash table
-                          (dolist (item source-list)
-                            (unless (gethash item hash-table)
-                              (push item result)))
-                          ;; The result list is built in reverse order, so reverse it
-                          (nreverse result)))))))
 #+end_src
 
 
 # Local Variables:
-# eval: (add-hook 'org-babel-tangle-finished-hook #'f/tangle-lex-prop nil nil)
+# eval: (add-hook 'org-babel-tangle-finished-hook #'org-babel-tangle-add-lexical-prop-to-el-tangled-files nil nil)
 # eval: (add-hook 'after-save-hook (lambda nil (org-babel-tangle)) nil t)
 # End:
