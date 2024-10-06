@@ -1,4 +1,4 @@
-;; source https://www.emacswiki.org/emacs/HalfScrolling
+;; source https://www.emacswiki.org/emacs/HalfScrolling  -*- lexical-binding: t; -*-
 (defun window-half-height ()
   (max 1 (/ (1- (window-height (selected-window))) 2)))
 
@@ -25,14 +25,5 @@
 
 (keymap-global-set "<remap> <scroll-up-command>" #'scroll-up-div)
 (keymap-global-set "<remap> <scroll-down-command>" #'scroll-down-div)
-;; [next] good-scroll-up-full-screen
-;; [prior] good-scroll-down-full-screen
-;; Scroll
-;; [remap scroll-up-command] scroll-up-half
-
-;; [remap scroll-down-command] scroll-down-half
-
-;; [remap scroll-up-command] pixel-scroll-up
-;; [remap scroll-down-command] pixel-scroll-down
 
 (provide '11xx-half-scroll)

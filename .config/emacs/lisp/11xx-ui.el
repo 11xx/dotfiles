@@ -1,4 +1,4 @@
-;;; UI
+;;; UI  -*- lexical-binding: t; -*-
 (menu-bar-mode -1)    ; Disable menu bar
 (tool-bar-mode -1)    ; Disable toolbar
 ;; (ALARM-EMACS27-conflict): scroll-bar-mode is void on emacs-nox
@@ -120,13 +120,5 @@ number."
            doom-modeline-enable-word-count nil ; Performance
            ))
 (set-window-margins nil 1)
-(setup (:elpaca fira-code-mode)
-  (:only-if (display-graphic-p))
-  (:hook-into prog-mode)
-  (unless (display-graphic-p) ; redundant with :only-if?
-    (fira-code-mode -1))
-  (with-eval-after-load 'fira-code-mode
-    (dolist (ligature '("-}"))
-      (add-to-list 'fira-code-mode-disabled-ligatures ligature))))
 
 (provide '11xx-ui)

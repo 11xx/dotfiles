@@ -1,47 +1,49 @@
 ;; -*- lexical-binding: t; -*-
-
 (require '11xx-org-functions)
-
 ;; (setup org
 ;;   ;; Disable angle bracket syntax highlighting/matching
 ;;   (:hook (lambda()
 ;;            (modify-syntax-entry ?< "." org-mode-syntax-table)
 ;;            (modify-syntax-entry ?> "." org-mode-syntax-table))))
 
-;; (setup (:elpaca org-contrib))
+(setup (:elpaca org-contrib)
+  (:load-after org)
+  (require 'org-eldoc))
+;; `org-eldoc' shows the inherited code block properties.
 
-(use-package org
-  :bind (:map org-mode-map
-   ("C-c C-;" . org-babel-repeat-previous-src-block)
-   ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
-   ("C-M-p" . org-previous-visible-heading) ; was `backward-list'
-   ("C-M-n" . org-next-visible-heading) ; was `forward-list'
-   ("C-c o t l" . org-toggle-link-display)
-   ;; Meta indentation ; `S' for Shift not working for some reason
-   ("M-F" . org-metaright)
-   ("M-B" . org-metaleft)
-   ("M-P" . org-metaup)
-   ("M-N" . org-metadown)
-   ;; Cursor
-   ;; "C-M-d" ; was down-list
-   ("C-M-d" . backward-delete-char) ; was down-list
-   ("M-D" . backward-kill-word)
-   ;; "M-h"   backward-delete-char ; was `org-mark-element'
-   ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
-   ("C-c o p" . org-kill-full-outline-path))
+(setup org
+  (:with-map org-mode-map
+    (:bind
+     "C-c C-;" org-babel-repeat-previous-src-block
+     ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
+     "C-M-p" org-previous-visible-heading ; was `backward-list'
+     "C-M-n" org-next-visible-heading ; was `forward-list'
+     "C-c o t l" org-toggle-link-display
+     ;; Meta indentation ; `S' for Shift not working for some reason
+     "M-F" org-metaright
+     "M-B" org-metaleft
+     "M-P" org-metaup
+     "M-N" org-metadown
+     ;; Cursor
+     ;; "C-M-d" ; was down-list
+     "C-M-d" backward-delete-char ; was down-list
+     "M-D" backward-kill-word
+     ;; "M-h"   backward-delete-char ; was `org-mark-element'
+     ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
+     "C-c o p" org-kill-full-outline-path))
+
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
-  :bind (("C-c o l" . org-store-link)
-         ("C-c o a" . org-agenda)
-         ("C-c o c" . org-capture))
+  (:global "C-c o l" org-store-link
+           "C-c o a" org-agenda
+           "C-c o c" org-capture)
 
-  :config
   ;; Move this to file local
   (org-babel-do-load-languages
    'org-babel-load-languages
    (append org-babel-load-languages
-           '((haskell . t)
+           '((haskell t)
              ;; (async   . t) ; from ob-async
              (shell   . t)
              (C       . t))))
@@ -103,26 +105,22 @@
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
-   org-src-window-setup 'current-window))
+   org-src-window-setup 'current-window)
+
+  (:with-mode eldoc
+    (:hook-into org-mode)))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(use-package visual-fill-column
-  :ensure t
-  :after org
-  :custom ((visual-fill-column-width 130) ; use with `display-fill-column-indicator-mode'
-           (visual-fill-column-center-text t))
-  :hook org-mode)
+(setup-elpaca visual-fill-column
+  (:load-after org)
+  (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
+          visual-fill-column-center-text t)
+  (:hook-into org-mode))
 
-(use-package org-bulletproof
-  :ensure t
-  :after org
-  :hook org-mode)
-
-;; usage in local file variables: `eval: (add-hook 'before-save-hook #'org-gfm-export-to-markdown nil t)'
-(use-package ox-gfm
-  :ensure t
-  :after org)
+(setup-elpaca org-bulletproof
+  (:load-after org)
+  (:hook-into org-mode))
 (defun f/org-export-dispatch-disable-whitespace-mode (&rest args)
   "Disable `whitespace-mode' for the Org Export Dispatch Buffer."
   (let ((buf (get-buffer "*Org Export Dispatcher*")))
@@ -132,12 +130,11 @@
 
 (advice-add 'org-export--dispatch-action
             :before #'f/org-export-dispatch-disable-whitespace-mode)
-(use-package org-appear
-  :ensure t
-  :after org
+(setup-elpaca org-appear
+  (:load-after org)
   ;; Toggle for links display set in (setup org)
-  :custom ((org-appear-autolinks 'just-brackets)) ; nil is default
-  :hook org-mode)
+  (setopt org-appear-autolinks 'just-brackets) ; nil is default
+  (:hook-into org-mode))
 (setopt org-fold-core-style 'text-properties)
 (setup (:elpaca htmlize)
   (setopt org-html-htmlize-output-type 'css ; 'inline-css

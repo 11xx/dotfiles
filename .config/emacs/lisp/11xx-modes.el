@@ -1,18 +1,35 @@
+;; -*- lexical-binding: t; -*-
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
-(setup (:elpaca haskell-mode haskell-ts-mode)
+(setup-elpaca haskell-mode)
+(setup-elpaca lsp-haskell ;; also set in lsp-mode section
+  (with-eval-after-load 'eglot
+    (with-eval-after-load 'haskell-ts-mode
+      (haskell-ts-setup-eglot))))
+(setup (:elpaca haskell-ts-mode)
+  (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
-  ;; (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
-  )
+  (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
+  (defun org-babel-execute:haskell-ts (body params)
+    "Execute a block of c-ts code with Org Babel."
+    (org-babel-execute:haskell body params))
+
+  ;; use haskell-mode indentation instead
+  (setopt haskell-ts-use-indent nil)
+  (add-hook 'haskell-ts-mode-hook #'haskell-indentation-mode))
 
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 (setup (:elpaca yaml-mode))
 (setup (:elpaca pkgbuild-mode))
 (setup (:elpaca powershell))
-(setup (:elpaca ansible ansible-doc ansible-vault))
+(setup (:elpaca ansible))
+(setup (:elpaca ansible-vault))
+(setup-elpaca ansible-doc)
 (setup (:elpaca yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
+
+(setopt treesit-font-lock-level 4)
 (setup (:elpaca rainbow-mode)
   (:hook-into css-mode))
 (define-minor-mode sensitive-mode
@@ -47,7 +64,8 @@ Null prefix argument turns off the mode."
         (auto-save-mode 1))))
 ;; 'eshell-output-filter-functions void variable means that eshell has to be
 ;; started once first.
-(setup eshell (:elpaca eshell-git-prompt eshell-syntax-highlighting)
+(setup eshell (:elpaca eshell-syntax-highlighting)
+       (:elpaca eshell-git-prompt)
        (setopt eshell-hist-ignoredups t
                eshell-scroll-to-bottom-on-input t
                eshell-history-size 10000
@@ -98,6 +116,10 @@ Null prefix argument turns off the mode."
   ;; (electric-pair-local-mode -1) ;; #manual-smartparens
   ;; (smartparens-mode) ;; #manual-smartparens
   )
+
+(defun org-babel-execute:c-ts (body params)
+  "Execute a block of c-ts code with Org Babel."
+  (org-babel-execute:C body params))
 (defun f/gcc-compile-current-file ()
   "Compile current file with gcc.
 

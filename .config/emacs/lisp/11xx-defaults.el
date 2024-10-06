@@ -1,8 +1,4 @@
-(require '11xx-setup)
-(require '11xx-functions)
-(require 'init-no-littering)
-
-(require 'utf-8-default)
+;; -*- lexical-binding: t; -*-
 (setup emacs
   ;; Keybindings
   (:global
@@ -30,8 +26,10 @@
    "S-C-<down>"   shrink-window
    "S-C-<up>"     enlarge-window
    ;; Cursor
-   "C-M-d" backward-delete-char ; was down-list
-   "M-D"   backward-kill-word
+   ;; "C-M-d" backward-delete-char ; was down-list
+   "C-M-d" delete-pair ; was down-list
+   ;; "M-D"   backward-kill-word
+   "M-D"   delete-pair
    ;; "M-h"          backward-delete-char ; was `mark-paragraph' global
    ;; "M-H"          backward-kill-word ; was `mark-paragraph' global, separate override may be necessary for local maps
    "M-." forward-list
@@ -114,7 +112,8 @@
                eshell-mode-hook
                completion-list-mode-hook
                messages-buffer-mode-hook
-               diff-mode-hook)
+               diff-mode-hook
+               messages-buffer-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
 (setup (:elpaca syntax-subword)
   (:hide-mode global-subword-mode)
@@ -124,36 +123,30 @@
   (:global "M-o" ace-window))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
-(use-package helpful
-  :ensure t
+(setup (:elpaca helpful)
   ;; Helpful.el
-  :bind
-  (([remap describe-function] . helpful-callable)
-   ([remap describe-command] . helpful-command)
-   ([remap describe-variable] . helpful-variable)
-   ([remap describe-key] . helpful-key)
-   ([remap describe-symbol] . helpful-symbol)))
+  (:global
+   [remap describe-function] helpful-callable
+   [remap describe-command] helpful-command
+   [remap describe-variable] helpful-variable
+   [remap describe-key] helpful-key
+   [remap describe-symbol] helpful-symbol))
 
-(use-package which-key
-  :ensure t
-  :defer 10
-  ;; (:hide-mode)
-  ;; :hook ('elpaca-after-init-hook)
-  :config
+(setup (:elpaca which-key)
+  ;; :defer 10
   (setopt which-key-idle-delay 2.0))
 
 
-(use-package jump-char
-  :after kmacro ; bc I only use this for macro-ing anyway
-  :ensure t
-  :bind
-  (("C-c j f" . jump-char-forward)
-   ("C-c j b" . jump-char-backward)
-   ("C-c j m f" . jump-char-forward-set-mark)
-   ("C-c j m b" . jump-char-backward-set-mark)))
+(setup (:elpaca jump-char)
+  (:load-after kmacro) ; bc I only use this for macro-ing anyway
 
-(use-package delight
-  :ensure t)
+  (:global
+   "C-c j f" jump-char-forward
+   "C-c j b" jump-char-backward
+   "C-c j m f" jump-char-forward-set-mark
+   "C-c j m b" jump-char-backward-set-mark))
+
+(setup (:elpaca delight))
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
 (load custom-file 'noerror 'nomessage)

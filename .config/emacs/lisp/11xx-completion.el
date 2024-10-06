@@ -1,5 +1,4 @@
-(require '11xx-setup)
-
+;; -*- lexical-binding: t; -*-
 (setup (:elpaca vertico)
   (defun f/minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.
@@ -18,7 +17,6 @@ Like `kill-word' but doesn't add deleted words to kill ring."
 Like `kill-line' but doesn't add deleted characters to kill ring."
     (interactive "p")
     (delete-region (point) (progn (end-of-line arg) (point))))
-
   ;; prevent cursor on minibuffer
   (:with-hook minibuffer-setup-hook
     (:hook cursor-intangible-mode))
@@ -47,6 +45,10 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
            vertico-cycle t)
 
+  ;; vertico-minibuffer-settings
+  ;; - Hide commands in M-x which do not work in the current mode.
+  ;; # Emacs 28
+  ;; - Vertico commands are hidden in normal buffers.
   (setopt read-extended-command-predicate #'command-completion-default-include-p
           enable-recursive-minibuffers t
           completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
@@ -55,17 +57,8 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                                          t
                                          cursor-intangible
                                          t face minibuffer-prompt))
-
   (:with-hook 'elpaca-after-init-hook
     (:hook vertico-mode)))
-(setopt read-extended-command-predicate #'command-completion-default-include-p
-        enable-recursive-minibuffers t
-        completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
-        ;; Do not allow the cursor in the minibuffer prompt
-        minibuffer-prompt-properties '(read-only
-                                       t
-                                       cursor-intangible
-                                       t face minibuffer-prompt))
 ;; Persist history over Emacs restarts. Vertico sorts by history position.
 (setup savehist
   (:option savehist-additional-variables '(kill-ring
@@ -131,7 +124,8 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            "C-c o s" consult-org-heading
            ))
 ;; note: consult-outline & consult-org-heading
-(setup (:elpaca embark embark-consult)
+(setup (:elpaca embark)
+       (:elpaca embark-consult)
   (:load-after consult)
   (:global "C-." embark-act
            ;; "C-;" embark-dwim
@@ -146,16 +140,17 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                  (window-parameters (mode-line-format . none))))
   ;; (:hook embark-collect-mode consult-preview-at-point-mode)
   )
-(setup (:elpaca corfu corfu-terminal)
+(setup (:elpaca corfu)
+  (:global "<tab>" completion-at-point)
 
   (:with-map corfu-map
-    (:bind "C-SPC" corfu-insert-separator)
+    (:bind "M-SPC" corfu-insert-separator)
     (:unbind "C-n"
              "C-p"))
   (:option corfu-cycle t
-           corfu-auto t
+           ;; corfu-auto t
            corfu-auto-delay 0.1
-           corfu-auto-prefix 2
+           corfu-auto-prefix 4
            ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
            ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
@@ -163,12 +158,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 
   ;; (:with-hook 'elpaca-after-init-hook
   ;;   (:hook global-corfu-mode))
-  (global-corfu-mode 1)
-
-
-  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
-  (unless (display-graphic-p)
-    (corfu-terminal-mode 1))
+  ;; (global-corfu-mode 1)
 
   ;; enable corfu on minibuffers like eval-expression
   (defun corfu-enable-in-minibuffer ()
@@ -179,34 +169,38 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
-(setup (:elpaca prescient corfu-prescient)
+
+(setup-elpaca corfu-terminal
+  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
+  (unless (display-graphic-p)
+    (corfu-terminal-mode 1)))
+(setup (:elpaca prescient)
+       (:elpaca corfu-prescient)
   (:load-after corfu)
   (:with-hook corfu-mode-hook
     (:hook corfu-prescient-mode))
   (:option prescient-persist-mode t))
 ;; Add extensions
-(use-package cape
-  :ensure t
+(setup (:elpaca cape)
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
-  :bind (("C-c p p" . completion-at-point) ;; capf
-         ("C-c p t" . complete-tag)        ;; etags
-         ("C-c p d" . cape-dabbrev)        ;; or dabbrev-completion
-         ("C-c p h" . cape-history)
-         ("C-c p f" . cape-file)
-         ("C-c p k" . cape-keyword)
-         ("C-c p s" . cape-elisp-symbol)
-         ("C-c p e" . cape-elisp-block)
-         ("C-c p a" . cape-abbrev)
-         ("C-c p l" . cape-line)
-         ("C-c p w" . cape-dict)
-         ("C-c p :" . cape-emoji)
-         ("C-c p \\" . cape-tex)
-         ("C-c p _" . cape-tex)
-         ("C-c p ^" . cape-tex)
-         ("C-c p &" . cape-sgml)
-         ("C-c p r" . cape-rfc1345))
-  :init
+  (:global "C-c p p" completion-at-point ;; capf
+           "C-c p t" complete-tag        ;; etags
+           "C-c p d" cape-dabbrev        ;; or dabbrev-completion
+           "C-c p h" cape-history
+           "C-c p f" cape-file
+           "C-c p k" cape-keyword
+           "C-c p s" cape-elisp-symbol
+           "C-c p e" cape-elisp-block
+           "C-c p a" cape-abbrev
+           "C-c p l" cape-line
+           "C-c p w" cape-dict
+           "C-c p :" cape-emoji
+           "C-c p \\" cape-tex
+           "C-c p _" cape-tex
+           "C-c p ^" cape-tex
+           "C-c p &" cape-sgml
+           "C-c p r" cape-rfc1345)
   ;; Add to the global default value of `completion-at-point-functions' which is
   ;; used by `completion-at-point'.  The order of the functions matters, the
   ;; first function returning a result wins.  Note that the list of buffer-local
@@ -223,7 +217,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;;(add-to-list 'completion-at-point-functions #'cape-dict)
   ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
-)
+  )
 (setup (:elpaca tempel)
 
   ;; Require trigger prefix before template name when completing.
@@ -251,12 +245,34 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; (global-tempel-abbrev-mode)
   (:with-hook prog-mode-hook text-mode-hook
               (:hook tempel-setup-capf)))
-(setup eglot ; built-in since Emacs 29
-  (:option eglot-send-changes-idle-time 0.2)
-  (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    ;; (:elpaca eldoc-box)
-    ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.1))
+(setq lsp-use-plists t)
+;; (setup (:elpaca lsp-haskell))
+(setup (:elpaca lsp-ui)
+  ;; (:option lsp-ui-doc-show-with-cursor t
+  ;;          lsp-ui-doc-delay 0.5)
   )
+(setup (:elpaca lsp-mode)
+  ;; LSP Language server starter packages
+  (:option lsp-idle-delay 0.1 ; 0.5 ; 0.1
+           lsp-keymap-prefix "C-c l"
+           lsp-log-io nil)
+
+  ;; (setq lsp-ui-doc-enable nil) ; set to nil for better performance
+  ) ; "(setup lsp-mode..." ends here
+(setup (:elpaca flycheck))
+(setup (:elpaca eldoc-box))
+(setup eglot ; built-in since Emacs 29
+  (:option eglot-send-changes-idle-time 0.01)
+  (:with-feature eldoc ; eglot uses eldoc for ui documentation
+    (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
+    (:option eldoc-idle-delay 0.01)
+    (:with-feature eldoc-box
+      ;; prefixes eldoc-box- to options
+      (:option* doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n") ; code \u2501
+                clear-with-C-g t))
+    (:with-feature whitespace
+      ;; Disable `show-trailing-whitespace' in eldox box hover childframe
+      (:with-hook (eldoc-box-buffer-hook)
+        (:hook (lambda() (setq-local show-trailing-whitespace nil)))))))
 
 (provide '11xx-completion)

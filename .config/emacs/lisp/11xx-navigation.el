@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (setup (:elpaca transpose-frame)
   (defun f/rotate-frame-clockwise-or-default ()
     "Rotate frame clockwise if more than one frame exists; otherwise, execute default command."

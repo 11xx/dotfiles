@@ -400,57 +400,7 @@ Backup & auto-save
         native-comp-async-report-warnings-errors 'silent)
 #+end_src
 
-** TODO Load custom config
-#+begin_src emacs-lisp
-;; (setup (:with-hook elpaca-after-init-hook
-;;          (:hook (lambda()
-;;                   (require '11xx-gc)
-;;                   (require '11xx-defaults)
-;;                   (require '11xx-completion)
-;;                   (require '11xx-ui)
-;;                   (require '11xx-navigation)
-;;                   (require '11xx-half-scroll)
-;;                   (require '11xx-pixel-scroll)
-;;                   (require '11xx-dired)
-;;                   (require '11xx-magit)
-;;                   (require '11xx-org)
-;;                   (require '11xx-modes)))))
-
-<<garbage-collection>>
-<<new-defaults>>
-(require 'utf-8-default)
-<<11xx-completion>>
-<<11xx-ui>>
-<<11xx-navigation>>
-<<11xx-half-scroll>>
-<<11xx-pixel-scroll>>
-<<11xx-dired>>
-<<11xx-magit>>
-<<11xx-org-setup>>
-<<11xx-modes>>
-#+end_src
-
-** Startup report
-- https://blog.d46.us/advanced-emacs-startup/
-  Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
-  # This don't work on ALARM Emacs 27 (ALARM-EMACS27-conflict)
-  # #TODO-Remove old? # [2024-03-18 Mon 20:12:21 -03] @ak
-#+begin_src emacs-lisp
-(add-hook 'emacs-startup-hook
-  (lambda ()
-    (message "*** Emacs loaded in %s seconds with %d garbage collections."
-             (emacs-init-time "%.2f")
-             gcs-done)))
-#+end_src
-
-
-* 11xx config
-Personal config modularized into "pseudo-packages"
-
-** gc.el: Garbage colletion
-:PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref garbage-collection
-:END:
+** Garbage colletion
 
 Increase Garbage Collection threshold:
 - [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
@@ -460,11 +410,53 @@ Increase Garbage Collection threshold:
 (add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 #+end_src
 
+** Startup report
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle early-init.el
+:END:
+
+- https://blog.d46.us/advanced-emacs-startup/
+  Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
+#+begin_src emacs-lisp
+(add-hook 'emacs-startup-hook
+  (lambda ()
+    (message "*** Emacs loaded in %s seconds with %d garbage collections."
+             (emacs-init-time "%.2f")
+             gcs-done)))
+#+end_src
+
+
+** Load config
+#+begin_src emacs-lisp
+(require 'utf-8-default)
+(require '11xx-defaults)
+(require '11xx-completion)
+(require '11xx-ui)
+(require '11xx-navigation)
+(require '11xx-half-scroll)
+(require '11xx-pixel-scroll)
+(require '11xx-dired)
+(require '11xx-magit)
+(require '11xx-org)
+(require '11xx-modes)
+#+end_src
+
+* 11xx config
+Personal config modularized into "pseudo-packages"
+
 ** 11xx-defaults.el: New defaults
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-defaults.el :noweb yes
+:END:
+#+begin_src emacs-lisp
+<<new-defaults>>
+
+(provide '11xx-defaults)
+#+end_src
 
 *** emacs new defaults def
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref new-defaults
+:header-args:emacs-lisp+: :noweb-ref new-defaults :tangle no
 :END:
 **** Emacs setup
 - Notes:
@@ -844,10 +836,19 @@ or
 # [2022-11-08 Tue 17:10:44 -03]
 
 ** TODO 11xx-modes.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-modes.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-modes>>
+
+(provide '11xx-modes)
+#+end_src
 
 *** Modes
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-modes
+:header-args:emacs-lisp+: :noweb-ref 11xx-modes :tangle no
 :END:
 
 **** Edit Modes
@@ -1465,18 +1466,29 @@ It uses `make-directory' PARENTS argument 't'."
 #+end_src
 
 ** 11xx-org.el: Org Mode
-- Reffs:
-  + [[https://www.youtube.com/watch?v=VcgjTEa0kU4][Emacs From Scratch #5 - Org Mode Basics]]
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-org.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-org-setup>>
+
+(provide '11xx-org)
+#+end_src
+
 
 *** Org setup
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-org-setup
+:header-args:emacs-lisp+: :noweb-ref 11xx-org-setup :tangle no
 :END:
 
-[[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#auto-show-markup-symbols][Auto-show Markup Symbols]] | [[https://stackoverflow.com/questions/10969617/hiding-markup-elements-in-org-mode/10970665#10970665][Hiding markup elements in org-mode]]
+- See:
+  + [[https://www.youtube.com/watch?v=VcgjTEa0kU4][Emacs From Scratch #5 - Org Mode Basics]]
+  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#auto-show-markup-symbols][Auto-show Markup Symbols]]
+  + [[https://stackoverflow.com/questions/10969617/hiding-markup-elements-in-org-mode/10970665#10970665][Hiding markup elements in org-mode]]
+  + [[https://emacs.stackexchange.com/questions/50216/org-mode-code-block-parentheses-mismatch/68321#68321][org babel - org-mode code block parentheses mismatch - Emacs Stack Exchange]]
+    # [2022-05-14 Sat 20:54:33]
 
-[[https://emacs.stackexchange.com/questions/50216/org-mode-code-block-parentheses-mismatch/68321#68321][org babel - org-mode code block parentheses mismatch - Emacs Stack Exchange]]
-# [2022-05-14 Sat 20:54:33]
 #+begin_src emacs-lisp
 (require '11xx-org-functions)
 ;; (setup org
@@ -1685,6 +1697,9 @@ appear when hovered.
 #+end_src
 
 ** 11xx-org-functions.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-org-functions.el
+:END:
 #+begin_src emacs-lisp
 <<org-functions>>
 
@@ -1967,11 +1982,18 @@ in the source Org buffer so it can get the list.
 ** 11xx-dired.el
 :PROPERTIES:
 :CUSTOM_ID: orgid-wlgppl
+:header-args:emacs-lisp+: :tangle lisp/11xx-dired.el
 :END:
+
+#+begin_src emacs-lisp
+<<11xx-dired>>
+
+(provide '11xx-dired)
+#+end_src
 
 *** Dired
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-dired
+:header-args:emacs-lisp+: :noweb-ref 11xx-dired :tangle no
 :END:
 
 **** Dired functions
@@ -2169,10 +2191,19 @@ NOTE: =dired-async= is provided by the =async= package.
 #+end_src
 
 ** 11xx-magit.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-magit.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-magit>>
+
+(provide '11xx-magit)
+#+end_src
 
 *** Magit
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-magit
+:header-args:emacs-lisp+: :noweb-ref 11xx-magit :tangle no
 :END:
 
 - See
@@ -2273,10 +2304,20 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 #+end_src
 
 ** 11xx-completion.el: Completion frakework, Minibuffer
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-completion.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-completion>>
+
+(provide '11xx-completion)
+#+end_src
+
 
 *** def
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-completion
+:header-args:emacs-lisp+: :noweb-ref 11xx-completion :tangle no
 :END:
 
 - [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6mfh7/?utm_source=share&utm_medium=web2x&context=3][what are Vertico, Consult, Marginalia, Embark]]
@@ -2728,12 +2769,21 @@ Remembers used completion items and put them up.
 ***** Prescient with Corfu
 See [[*Corfu][Corfu]].
 
-
 ** 11xx-ui.el: User Interface settings
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-ui.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-ui>>
+
+(provide '11xx-ui)
+#+end_src
+
 
 *** User Interface
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-ui
+:header-args:emacs-lisp+: :noweb-ref 11xx-ui :tangle no
 :END:
 
 **** Change UI modes
@@ -3058,7 +3108,7 @@ Fira Code Symbol externally.
 
 ** 11xx-half-scroll.el
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-half-scroll
+:header-args:emacs-lisp+: :tangle lisp/11xx-half-scroll.el :noweb-ref 11xx-half-scroll
 :END:
 
 Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswiki.org/Half Scrolling]]
@@ -3090,6 +3140,8 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 
 (keymap-global-set "<remap> <scroll-up-command>" #'scroll-up-div)
 (keymap-global-set "<remap> <scroll-down-command>" #'scroll-down-div)
+
+(provide '11xx-half-scroll)
 #+end_src
 # ;; [next] good-scroll-up-full-screen
 # ;; [prior] good-scroll-down-full-screen
@@ -3100,7 +3152,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 # ;; [remap scroll-down-command] pixel-scroll-down
 ** 11xx-pixel-scroll.el: Smooth scrolling
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-pixel-scroll
+:header-args:emacs-lisp+: :tangle lisp/11xx-pixel-scroll.el :noweb-ref 11xx-pixel-scroll
 :END:
 - See
   + [[https://www.emacswiki.org/emacs/SmoothScrolling#h5o-1][EmacsWiki: Smooth Scrolling]]
@@ -3116,13 +3168,24 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
            mouse-wheel-scroll-amount '(1 ((shift) . 1)) ; one line at a time
            mouse-wheel-progressive-speed nil ; don't accelerate scrolling
            mouse-wheel-follow-mouse 't)) ; scroll window under mouse
+
+(provide '11xx-pixel-scroll)
 #+end_src
 
 ** 11xx-navigation.el: Controlling Emacs
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-navigation.el
+:END:
+
+#+begin_src emacs-lisp
+<<11xx-navigation>>
+
+(provide '11xx-navigation)
+#+end_src
 
 *** def
 :PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-navigation
+:header-args:emacs-lisp+: :noweb-ref 11xx-navigation :tangle no
 :END:
 
 **** Navigation

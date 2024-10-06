@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (setup pixel-scroll
   ;; (:only-if (display-graphic-p))
   (pixel-scroll-precision-mode)

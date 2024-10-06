@@ -1,5 +1,4 @@
-(require '11xx-setup)
-
+;; -*- lexical-binding: t; -*-
 (defun dired-find-alternate-file-up ()
   "Sames as `dired-find-alternate-file' but go up one directory instead."
   (interactive)
@@ -32,21 +31,17 @@ The app is chosen from your OS's preference."
 
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
 (setup dired
-  (:load-after dired)
-  ;; #TODO-test dired-before-readin-hook
-  (:elpaca dired-rainbow
-            dired-hide-dotfiles
-            dired-narrow
-            dired-subtree
-            dired-efap
-            all-the-icons-dired
-            diredfl
-            ;; dired-single
-            ;; joseph-single-dired
-            ;; obsoleted by `dired-kill-when-opening-new-dired-buffer'
-            )
+  ;; (:elpaca dired-rainbow) ; bugged on elpaca?
+  ;; (:elpaca dired-hacks-utils)
+  (:elpaca diredfl)
 
-  (:also-load dired-x dired-aux)
+  ;; #TODO-test dired-before-readin-hook
+
+  ;; dired-single
+  ;; joseph-single-dired
+  ;; obsoleted by `dired-kill-when-opening-new-dired-buffer'
+
+  (:require dired-x dired-aux)
   (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
            ls-lisp-dirs-first t ;; show directories on top of the list
            ;; delete-by-moving-to-trash t ;; move to trash instead of hard deleting
@@ -68,40 +63,6 @@ The app is chosen from your OS's preference."
          ;; dired-hide-dotfiles-mode
          auto-revert-mode
          diredfl-mode)
-
-  (:also-load dired-rainbow)
-  (:with-feature dired-rainbow
-    ;; * `dired-rainbow-define` - add face by file extension
-    ;; * `dired-rainbow-define-chmod` - add face by file permissions
-    (dired-rainbow-define-chmod directory  "#69aaff" "d.*")
-    (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-    (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-    (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-    (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-    (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-    (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-    (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-    (dired-rainbow-define log              "#d2a022" ("log"))
-    (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-    (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-    (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-    (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-    (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-    (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-    (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-    (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-    (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-    (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-    (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-    ;; How it works:
-    ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-    ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-    ;; can be individually customized on a theme file, overriding the
-    ;; default FACE-PROPS. E.g.:
-    ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-    ;; is created.
-    )
-
 
   ;; Enable disabled commands
   (:put-enable dired-find-alternate-file)
@@ -136,15 +97,6 @@ The app is chosen from your OS's preference."
          ;; [remap dired-up-directory] dired-single-up-directory ;; was M-x dired-do-redisplay
          )
 
-  ;; dired-efap
-  (:bind "r" dired-efap)
-  (:with-feature dired-efap
-    (:option dired-efap-initial-filename-selection nil))
-
-  (:with-feature all-the-icons-dired
-    (:load-after dired)
-    (:hook-into dired-mode))
-
   ;; (eval-after-load 'dired '(progn (require 'joseph-single-dired)))
   ;; (:with-feature joseph-single-dired
   ;;   (:load-after dired))
@@ -161,5 +113,49 @@ The app is chosen from your OS's preference."
   ) ; "(setup dired..." ends here
 
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
+
+(setup (:elpaca dired-rainbow)
+  (require 'dired-rainbow)
+  ;; * `dired-rainbow-define` - add face by file extension
+  ;; * `dired-rainbow-define-chmod` - add face by file permissions
+  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
+  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
+  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
+  (dired-rainbow-define log              "#d2a022" ("log"))
+  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
+  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
+  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
+  ;; How it works:
+  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
+  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
+  ;; can be individually customized on a theme file, overriding the
+  ;; default FACE-PROPS. E.g.:
+  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
+  ;; is created.
+  )
+
+(setup (:elpaca dired-narrow))
+(setup (:elpaca dired-subtree))
+
+(setup (:elpaca dired-efap)
+  (:with-map dired-mode-map
+    (:bind "r" dired-efap))
+  (setopt dired-efap-initial-filename-selection nil))
+
+(setup (:elpaca all-the-icons-dired)
+  (:hook-into dired-mode))
 
 (provide '11xx-dired)

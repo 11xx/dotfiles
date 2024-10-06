@@ -1,5 +1,4 @@
 ;; -*- lexical-binding: t; -*-
-
 (defun org-babel-repeat-previous-src-block ()
   "Copy previous src block excluding the content."
   (interactive)
@@ -135,5 +134,48 @@ a limit of 530, more than that and lisp nesting will overflow."
     (if (= 0 n) ""
       (concat (substring alpha i (1+ i))
               (random-string-g-to-z (1- n))))))
+(defun org-babel-get-tangle-files-by-ext (&optional ext)
+  "Returns a list of unique filenames to be tangled that end with the specified EXT.
+
+If EXT is not provided, default to \".el\".
+
+This function parses all code blocks in the current Org buffer, identifies
+those that contain the `:tangle' header argument (inherited or directly) and
+collects the tangle filenames of those that end with the specified EXT.
+
+Note that for this `string-suffix-p' is used to search for an EXT in the
+format `.EXT' (with a period) so if a period isn't provided it is added and
+if it was it is kept.
+
+Example:
+
+(org-babel-get-tangle-files-by-ext \"el\")"
+  (let ((tangle-files '())
+        (tangle-files-ext (concat "." (if ext (string-trim-left ext "\\.")
+                                        ".el"))))
+    (org-element-map (org-element-parse-buffer) 'src-block
+      (lambda (src-block)
+        (let* ((info (org-babel-get-src-block-info t src-block))
+               (header-args (nth 2 info))
+               (tangle (cdr (assoc :tangle header-args))))
+          (when (and tangle
+                     (stringp tangle)
+                     (string-suffix-p tangle-files-ext tangle t))
+            (push tangle tangle-files)))))
+    (delete-dups tangle-files)))
+(defun add-lexical-binding-prop (file)
+  "Add `lexical-binding: t' prop to FILE without disrupting open buffers."
+  (let ((buffer (get-buffer (find-file-noselect file))))
+    (with-current-buffer buffer
+      (add-file-local-variable-prop-line 'lexical-binding t nil)
+      (save-buffer))
+    (unless (get-buffer-window buffer 'visible)
+      (kill-buffer buffer))))
+
+(defun org-babel-tangle-add-lexical-prop-to-el-tangled-files()
+  (dolist (file (let ((source-list (org-babel-get-tangle-files-by-ext "el"))
+                      (filter-list '(".dir-locals.el")))
+                  (filter-list-any source-list filter-list)))
+    (add-lexical-binding-prop file)))
 
 (provide '11xx-org-functions)
