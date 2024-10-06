@@ -180,6 +180,18 @@ current mode."
   :repeatable t
   :signature '(FUNC ...))
 
+(setup-define :option*
+  (lambda (name val)
+    `(customize-set-variable
+      ',(intern (format "%s-%s" (setup-get 'feature) name))
+      ,val
+      ,(format "Set for %s's setup block" (setup-get 'feature))))
+  :documentation "Set the option NAME to VAL.
+NAME is not the name of the option itself, but of the option with
+the feature prefix."
+  :debug '(sexp form)
+  :repeatable t)
+
 (elpaca no-littering (require 'no-littering))
 (elpaca-wait)
 

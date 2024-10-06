@@ -299,6 +299,21 @@ current mode."
   :signature '(FUNC ...))
 #+end_src
 
+****** =:option*= prefix-less alternative to =:option=
+#+begin_src emacs-lisp
+(setup-define :option*
+  (lambda (name val)
+    `(customize-set-variable
+      ',(intern (format "%s-%s" (setup-get 'feature) name))
+      ,val
+      ,(format "Set for %s's setup block" (setup-get 'feature))))
+  :documentation "Set the option NAME to VAL.
+NAME is not the name of the option itself, but of the option with
+the feature prefix."
+  :debug '(sexp form)
+  :repeatable t)
+#+end_src
+
 ** init-no-littering: Keep user-emacs-directory clean
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref no-littering
