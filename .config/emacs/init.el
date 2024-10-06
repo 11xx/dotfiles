@@ -346,12 +346,6 @@ current mode."
 ;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
 ;;   :config
 ;;   (smartparens-global-mode 1))
-
-;; [[https://github.com/progfolio/.emacs.d/blob/master/init.org#:~:text=pgtk-use-im-context-on-new-connection][.emacs.d/init.org at master · progfolio/.emacs.d]]
-;; [[https://www.reddit.com/r/emacs/comments/osscfd/pgtk_emacswaylandgnome_no_shiftspace/][PGTK Emacs/Wayland/Gnome: No shift-space : r/emacs]]
-;; "Prevent GTK from stealing Shift + Space"
-(pgtk-use-im-context nil)
-(setopt pgtk-use-im-context-on-new-connection nil)
 (setup whitespace
   (:hide-mode)
   (:hook-into prog-mode text-mode)
