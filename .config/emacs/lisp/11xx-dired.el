@@ -31,16 +31,6 @@ The app is chosen from your OS's preference."
 
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
 (setup dired
-  ;; (:elpaca dired-rainbow) ; bugged on elpaca?
-  ;; (:elpaca dired-hacks-utils)
-  (:elpaca diredfl)
-
-  ;; #TODO-test dired-before-readin-hook
-
-  ;; dired-single
-  ;; joseph-single-dired
-  ;; obsoleted by `dired-kill-when-opening-new-dired-buffer'
-
   (:require dired-x dired-aux)
   (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
            ls-lisp-dirs-first t ;; show directories on top of the list
@@ -61,15 +51,10 @@ The app is chosen from your OS's preference."
 
   (:hook dired-hide-details-mode
          ;; dired-hide-dotfiles-mode
-         auto-revert-mode
-         diredfl-mode)
+         auto-revert-mode)
 
   ;; Enable disabled commands
   (:put-enable dired-find-alternate-file)
-
-  ;; [remap dired-find-file] dired-single-buffer
-  ;; [remap dired-mouse-find-file-other-window] dired-single-buffer-mouse
-  ;; [remap dired-up-directory] dired-single-up-directory
 
   (defun f/dired-find-home ()
     (interactive)
@@ -90,16 +75,7 @@ The app is chosen from your OS's preference."
          "l" dired-find-file
          "SPC" dired-mark
          "~" f/dired-find-home
-
-         ;; ;; dired-single was not working on Emacs 28+ but `joseph-single-dired' is.
-         ;; [remap dired-find-file] dired-single-buffer
-         ;; [remap dired-mouse-find-file-other-window] dired-single-buffer-mouse
-         ;; [remap dired-up-directory] dired-single-up-directory ;; was M-x dired-do-redisplay
          )
-
-  ;; (eval-after-load 'dired '(progn (require 'joseph-single-dired)))
-  ;; (:with-feature joseph-single-dired
-  ;;   (:load-after dired))
 
   ;; show current directory in the header
   (defun f/dired-dir-header-line ()
@@ -107,8 +83,6 @@ The app is chosen from your OS's preference."
     (interactive)
     (setq-local header-line-format
                 '((:eval (abbreviate-file-name default-directory)))))
-  ;; my/dired-dir-header-line
-
   (add-hook 'dired-mode-hook 'f/dired-dir-header-line)
   ) ; "(setup dired..." ends here
 
@@ -157,5 +131,8 @@ The app is chosen from your OS's preference."
 
 (setup (:elpaca all-the-icons-dired)
   (:hook-into dired-mode))
+
+(setup (:elpaca diredfl)
+  (add-hook 'dired-mode-hook #'diredfl-mode))
 
 (provide '11xx-dired)
