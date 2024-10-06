@@ -18,7 +18,7 @@
            :monitor "DELL P2418D"
            :geometry (geometry :x "0px"
                                :y "0px"
-                               :width "2048px"
+                               :width "2560px"
                                :height "26px"
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
