@@ -1435,7 +1435,7 @@ Fail short if =ghcup= is not found
 #+begin_src shell
 ! is_command ghcup && {
     printf '%s: ghcup not found. Skipping...\n' "$0" >&2
-    exit 1
+    return 1
 }
 #+end_src
 
@@ -1449,7 +1449,7 @@ to =XDG_BIN_HOME= so with alias it is possible to override where it
 installs and manages its files.
 #+begin_src shell
 is_command prepend_path &&
-    prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
+    prepend_path "${GHCUP_BIN_DIR}"
 #+end_src
 - Arch Linux Note: When building a PKGBUILD, its build process uses
   the running shell's PATH, so it may try to use GHCup's binaries and
@@ -1487,7 +1487,18 @@ To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
 alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'  (ref:ghcup-alias-bin-anchor)
 #+end_src
 
-
+Define some functions for working with Arch Linux's PKGBUILDs using
+system PATH
+#+begin_src shell
+ghcup_remove_bin_dir_from_path() {
+    export PATH=$(printf '%s\n' "$PATH" | sed "s,${GHCUP_BIN_DIR}:,,")
+}
+#+end_src
+# - Install Arch Linux packages for using arch-hs:
+#   + ghc
+#   + ghc-libs
+#   + cabal-install
+#   + arch-hs-git
 
 *** Stack integration with GHCup
 :PROPERTIES:

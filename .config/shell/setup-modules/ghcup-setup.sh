@@ -1,13 +1,13 @@
 #!/usr/bin/echo 'This is a source only file.'
 ! is_command ghcup && {
     printf '%s: ghcup not found. Skipping...\n' "$0" >&2
-    exit 1
+    return 1
 }
 
 GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
 
 is_command prepend_path &&
-    prepend_path "${XDG_BIN_HOME%/*}/ghcup-bin"
+    prepend_path "${GHCUP_BIN_DIR}"
 
 __newPath=$(
     printf '%s\n' "$PATH" |
@@ -25,3 +25,7 @@ unset __newPath
 export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
 
 alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'
+
+ghcup_remove_bin_dir_from_path() {
+    export PATH=$(printf '%s\n' "$PATH" | sed "s,${GHCUP_BIN_DIR}:,,")
+}
