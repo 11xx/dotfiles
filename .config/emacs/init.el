@@ -376,7 +376,8 @@ the feature prefix."
                eshell-mode-hook
                completion-list-mode-hook
                messages-buffer-mode-hook
-               diff-mode-hook)
+               diff-mode-hook
+               messages-buffer-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
 (setup (:elpaca syntax-subword)
   (:hide-mode global-subword-mode)
@@ -1303,6 +1304,8 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 (setup (:elpaca yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
+
+(setopt treesit-font-lock-level 4)
 (setup (:elpaca rainbow-mode)
   (:hook-into css-mode))
 (define-minor-mode sensitive-mode

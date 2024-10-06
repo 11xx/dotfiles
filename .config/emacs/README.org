@@ -580,7 +580,8 @@ Increase Garbage Collection threshold:
                eshell-mode-hook
                completion-list-mode-hook
                messages-buffer-mode-hook
-               diff-mode-hook)
+               diff-mode-hook
+               messages-buffer-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
 #+end_src
 
@@ -954,6 +955,8 @@ Additional Tree-Sitter content
 #+begin_src emacs-lisp
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
+
+(setopt treesit-font-lock-level 4)
 #+end_src
 
 ***** Colour highlighting
@@ -2999,6 +3002,9 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
   # [2023-06-06 07:35:53]
 
 **** Fira Code ligatures minor mode
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
 [[https://melpa.org/#/fira-code-mode][fira-code-mode - MELPA]]
 
 Display code ligatures using supported font symbols.
@@ -3014,15 +3020,40 @@ Fira Code Symbol externally.
 
 # [2022-05-30 Mon 13:53:19 -03]
 # b [2023-06-19 Mon 15:52:18 -03]
+
 #+begin_src emacs-lisp
 (setup (:elpaca fira-code-mode)
-  (:only-if (display-graphic-p))
   (:hook-into prog-mode)
-  (unless (display-graphic-p) ; redundant with :only-if?
-    (fira-code-mode -1))
-  (with-eval-after-load 'fira-code-mode
-    (dolist (ligature '("-}"))
-      (add-to-list 'fira-code-mode-disabled-ligatures ligature))))
+  (require 'fira-code-mode)
+  (dolist (ligature '("-}"))
+    (add-to-list 'fira-code-mode-disabled-ligatures ligature)))
+#+end_src
+- Note: It doesn't work properly on terminal
+
+**** ligature.el
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+# this doesnt work as "secondary" just for ligatures, or i couldn't figure out
+- [[https://github.com/tonsky/FiraCode/wiki/Emacs-instructions#using-ligatureel][Emacs instructions · tonsky/FiraCode Wiki]]
+#+begin_src emacs-lisp
+(setup-elpaca ligature
+  ;; Enable the www ligature in every possible major mode
+  (ligature-set-ligatures 't '("www"))
+
+  ;; Enable ligatures in programming modes
+  (ligature-set-ligatures 'prog-mode '("www" "**" "***" "**/" "*>" "*/" "\\\\" "\\\\\\" "{-" "::"
+                                       ":::" ":=" "!!" "!=" "!==" "-}" "----" "-->" "->" "->>"
+                                       "-<" "-<<" "-~" "#{" "#[" "##" "###" "####" "#(" "#?" "#_"
+                                       "#_(" ".-" ".=" ".." "..<" "..." "?=" "??" ";;" "/*" "/**"
+                                       "/=" "/==" "/>" "//" "///" "&&" "||" "||=" "|=" "|>" "$>" "^="
+                                       "++" "+++" "+>" "=:=" "==" "===" "==>" "=>" "=>>" "<="
+                                       "=<<" "=/=" ">-" ">=" ">=>" ">>" ">>-" ">>=" ">>>" "<*"
+                                       "<*>" "<|" "<|>" "<$" "<$>" "<!--" "<-" "<--" "<->" "<+"
+                                       "<+>" "<=" "<==" "<=>" "<=<" "<>" "<<" "<<-" "<<=" "<<<"
+                                       "<~" "<~~" "</" "</>" "~@" "~-" "~>" "~~" "~~>" "%%"))
+
+  (global-ligature-mode t))
 #+end_src
 
 ** 11xx-half-scroll.el
