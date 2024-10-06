@@ -54,4 +54,4 @@ multiplier = 3
 [window]
 dimensions = { columns = 236, lines = 50 }
 padding = { x = 12, y = 12 }
-opacity = 0.92
+# opacity = 0.92
