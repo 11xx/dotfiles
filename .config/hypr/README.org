@@ -144,7 +144,7 @@ general {
 *** Cursor
 #+begin_src conf
 cursor {
-    inactive_timeout = 1
+    inactive_timeout = 0
 }
 #+end_src
 
@@ -648,7 +648,7 @@ decoration {
 #+NAME: hyprland-animations-conf
 #+begin_src conf :tangle animations.conf
 animations {
-    enabled = true
+    enabled = false
     # animation=NAME,ONOFF,SPEED,CURVE[,STYLE]
     animation = windows     , 1, 2, default, popin
     animation = windowsOut  , 1, 2, default
