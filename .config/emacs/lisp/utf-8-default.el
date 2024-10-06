@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (prefer-coding-system 'utf-8-unix)
 (setopt x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
         default-process-coding-system '(utf-8-unix . utf-8-unix))
@@ -13,5 +14,7 @@
 (set-terminal-coding-system 'utf-8-unix)
 
 (set-locale-environment "en.UTF-8")
+
+(set-charset-priority 'unicode)
 
 (provide 'utf-8-default)

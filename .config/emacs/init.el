@@ -419,6 +419,7 @@ current mode."
    [remap detached-open-session] detached-consult-session)
   (:option detached-show-output-on-attach t)
   (detached-init))
+(require 'utf-8-default)
 (setup (:elpaca vertico)
   (defun f/minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.

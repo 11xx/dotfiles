@@ -24,6 +24,7 @@ Send errors to *Backtrace*, only set to true while debugging
 Here are some complete configuration examples:
 
 - [[https://github.com/progfolio/.emacs.d/blob/master/init.org][progfolio's .emacs.d/init.org]]
+- [[https://github.com/garyo/emacs-config][garyo/emacs-config: Emacs configuration]]
 - [[https://github.com/angrybacon/dotemacs/blob/master/dotemacs.org][angrybacon's dotemacs]]
 - [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org][David Wilson's Emacs Configuration]]
 - [[https://tecosaur.github.io/emacs-config/config.html][tecosaur's Doom Emacs Configuration]]
@@ -402,6 +403,7 @@ Backup & auto-save
 
 <<garbage-collection>>
 <<new-defaults>>
+(require 'utf-8-default)
 <<11xx-completion>>
 <<11xx-ui>>
 <<11xx-navigation>>
@@ -781,6 +783,9 @@ The full path is required.
 #+end_src
 
 ** utf-8-default.el: Use UTF-8 for all character encoding
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/utf-8-default.el :noweb-ref utf-8-default
+:END:
 Encoding, pretty much anything other than strictly english ascii
 writing requires a different encoding. So use UTF-8 as the
 default encoding.
@@ -793,7 +798,6 @@ default encoding.
   + [[https://stackoverflow.com/questions/20723229/how-to-reset-emacs-to-save-files-in-utf-8-unix-character-encoding/26401113#26401113][linux - How to reset emacs to save files in utf-8-unix character encoding? - Stack Overflow]]
   + [[https://skybert.net/craftsmanship/utf-8-for-the-impatient/][UTF-8 for the Impatient | skybert.net]]
 # do this especially on Windows, else python output problem
-
 #+begin_src emacs-lisp
 (prefer-coding-system 'utf-8-unix)
 (setopt x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING)
@@ -810,6 +814,10 @@ default encoding.
 (set-terminal-coding-system 'utf-8-unix)
 
 (set-locale-environment "en.UTF-8")
+
+(set-charset-priority 'unicode)
+
+(provide 'utf-8-default)
 #+end_src
 # ;; (set-language-environment "UTF-8") ; maybe this is not for coding system :p
 #
