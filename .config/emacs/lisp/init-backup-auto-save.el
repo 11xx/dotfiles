@@ -1,16 +1,18 @@
+;; -*- lexical-binding: t; -*-
 (require '11xx-functions)
 
 (defvar v/backup-directory
   (expand-file-name "backups"
                     (expand-file-name "var" user-emacs-directory))
   "Custom backup-files directory.")
-(f/check-make-directory v/backup-directory)
 
 ;; Auto-save directory variable
 (defvar v/auto-save-directory
   (expand-file-name "auto-save"
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
+
+(f/check-make-directory v/backup-directory)
 (f/check-make-directory v/auto-save-directory)
 
 ;; ;; add random number to auto save file list
@@ -34,6 +36,6 @@
         auto-save-timeout 1   ; number of seconds idle time before auto-save (default: 30)
         auto-save-interval 200) ; number of keystrokes between auto-saves (default: 300)
 
-(setopt create-lockfiles nil)
-
 (provide 'init-backup-auto-save)
+
+(setopt create-lockfiles nil)

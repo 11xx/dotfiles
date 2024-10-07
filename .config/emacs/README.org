@@ -42,12 +42,26 @@ Add subdirectory to load path containing custom modules.
 #+end_src
 
 ** Elpaca package manager bootstrap & setup.el
-First disable =packge.el= as early as possible in =early-init.el=
+First disable =package.el= as early as possible in =early-init.el=
 #+begin_src emacs-lisp :tangle early-init.el
 (setq package-enable-at-startup nil)
 #+end_src
 
 Bootstrap elpaca
+#+begin_src emacs-lisp
+(require 'elpaca-bootstrap)
+#+end_src
+
+Install setup with Elpaca and define macros
+#+begin_src emacs-lisp
+(require '11xx-setup)
+#+end_src
+
+*** elpaca-bootstrap.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/elpaca-bootstrap.el
+:END:
+
 #+begin_src emacs-lisp
 (defvar elpaca-installer-version 0.7)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
@@ -88,15 +102,33 @@ Bootstrap elpaca
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
+(provide 'elpaca-bootstrap)
 #+end_src
+
+*** 11xx-setup.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-setup.el
+:END:
+
+#+begin_src emacs-lisp
+<<setup-el>>
+
+(provide '11xx-setup)
+#+end_src
+
+**** =setup.el=
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref setup-el :tangle no
+:END:
+- See:
+  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
+  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
 
 Install pkal's =setup.el= and define its macros
 #+begin_src emacs-lisp
 (elpaca setup (require 'setup))
 (elpaca-wait)
 #+end_src
-
-*** 11xx-setup.l
 
 - [[https://www.emacswiki.org/emacs/SetupEl#:~:text=the%20above%20example-,transforming%20configuration%20errors%20into%20warnings,-This%20code%20transforms][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
 #+begin_src emacs-lisp :noweb-ref
@@ -115,15 +147,6 @@ Install pkal's =setup.el= and define its macros
 
 (advice-add 'setup :filter-return #'setup-config-error-into-warning)
 #+end_src
-
-
-**** =setup.el=
-:PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref setup-el
-:END:
-- See:
-  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
-  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
 
 ***** =setup.el= additional macros
 
@@ -314,9 +337,29 @@ the feature prefix."
   :repeatable t)
 #+end_src
 
-** init-no-littering: Keep user-emacs-directory clean
+
+
+
+** Clean Emacs directory
+#+begin_src emacs-lisp
+(require 'clean-emacs-user-directory)
+#+end_src
+
+*** Clean Emacs directory
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref no-littering
+:header-args:emacs-lisp+: :tangle lisp/clean-emacs-user-directory.el
+:END:
+
+#+begin_src emacs-lisp
+(require 'init-no-littering)
+(require 'init-backup-auto-save)
+
+(provide 'clean-emacs-user-directory)
+#+end_src
+
+*** init-no-littering.el: Keep user-emacs-directory clean
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/init-no-littering.el :noweb-ref no-littering
 :END:
 
 #+begin_src emacs-lisp
@@ -331,13 +374,15 @@ the feature prefix."
 (add-to-list 'native-comp-eln-load-path
              (convert-standard-filename
               (expand-file-name "eln-cache" no-littering-var-directory)))
-#+end_src
-** Require dependencies
-#+begin_src emacs-lisp
-(require '11xx-functions)
+
+(provide 'init-no-littering)
 #+end_src
 
-** init-backup-auto-save.el: Move back-up and auto-save files
+*** init-backup-auto-save.el: Move back-up and auto-save files
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/init-backup-auto-save.el
+:END:
+
 Backup & auto-save
 - See
   + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
@@ -347,6 +392,8 @@ Backup & auto-save
   + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
 
 #+begin_src emacs-lisp
+(require '11xx-functions)
+
 (defvar v/backup-directory
   (expand-file-name "backups"
                     (expand-file-name "var" user-emacs-directory))
@@ -381,6 +428,8 @@ Backup & auto-save
         auto-save-default t    ; auto-save every buffer that visits a file
         auto-save-timeout 1   ; number of seconds idle time before auto-save (default: 30)
         auto-save-interval 200) ; number of keystrokes between auto-saves (default: 300)
+
+(provide 'init-backup-auto-save)
 #+end_src
 - *NOTE* about =.#filename@=: They're lock files and are meant to be
   alongside the file being edited until a save occurs.
@@ -425,9 +474,9 @@ Increase Garbage Collection threshold:
              gcs-done)))
 #+end_src
 
-
 ** Load config
 #+begin_src emacs-lisp
+(require '11xx-functions)
 (require 'utf-8-default)
 (require '11xx-defaults)
 (require '11xx-completion)
@@ -443,7 +492,6 @@ Increase Garbage Collection threshold:
 
 * 11xx config
 Personal config modularized into "pseudo-packages"
-
 ** 11xx-defaults.el: New defaults
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle lisp/11xx-defaults.el :noweb yes

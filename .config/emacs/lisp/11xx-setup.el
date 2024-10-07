@@ -1,20 +1,25 @@
 ;; -*- lexical-binding: t; -*-
-;; (require '11xx-package)
-
-(defun my-protect-setup (expansion)
-  "Wrap `setup' output with `condition-case'."
-  (let ((err (gensym "setup-err")))
-    `(condition-case ,err
-   ,expansion
-       (error
-  (display-warning 'setup (concat "Problem in config: "
-          (error-message-string ,err)
-          ": \n"
-          (with-output-to-string
-                                          (pp (quote ,expansion))))
-                         :error)))))
-
-(advice-add 'setup :filter-return #'my-protect-setup)
+(elpaca setup (require 'setup))
+(elpaca-wait)
+(defmacro setup-elpaca (order &rest body)
+  "Execute BODY in `setup' declaration after ORDER is finished.
+If the :disabled keyword is present in body, the package is completely ignored.
+This happens regardless of the value associated with :disabled.
+The expansion is a string indicating the package has been disabled."
+  (declare (indent 1))
+  (if (memq :disabled body)
+      (format "%S :disabled by -setup" order)
+    (let ((o order))
+      (when-let ((ensure (cl-position :ensure body)))
+        (setq o (if (null (nth (1+ ensure) body)) nil order)
+              body (append (cl-subseq body 0 ensure)
+                           (cl-subseq body (+ ensure 2)))))
+      `(elpaca ,o (setup
+                      ,(if-let (((memq (car-safe order) '(quote \`)))
+                                (feature (flatten-tree order)))
+                           (cadr feature)
+                         (elpaca--first order))
+                    ,@body)))))
 (defun setup-wrap-to-install-package (body _name)
   "Wrap BODY in an `elpaca' block if necessary.
 The body is wrapped in an `elpaca' block if `setup-attributes'
@@ -22,8 +27,10 @@ contains an alist with the key `elpaca'."
   (if (assq 'elpaca setup-attributes)
       `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
     body))
+
 ;; Add the wrapper function
 (add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+
 (setup-define :elpaca
   (lambda (order &rest recipe)
     (push (cond
@@ -106,5 +113,16 @@ current mode."
   :documentation "Autoload COMMAND if not already bound."
   :repeatable t
   :signature '(FUNC ...))
+(setup-define :option*
+  (lambda (name val)
+    `(customize-set-variable
+      ',(intern (format "%s-%s" (setup-get 'feature) name))
+      ,val
+      ,(format "Set for %s's setup block" (setup-get 'feature))))
+  :documentation "Set the option NAME to VAL.
+NAME is not the name of the option itself, but of the option with
+the feature prefix."
+  :debug '(sexp form)
+  :repeatable t)
 
 (provide '11xx-setup)
