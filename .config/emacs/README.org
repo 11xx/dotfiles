@@ -2037,7 +2037,7 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 #+begin_src emacs-lisp
 ;; default terminal application path
 (defvar v/terminal (getenv "TERMINAL")
-  "The default terminal environment vairable.")
+  "The default terminal as in the TERMINAL environment variable.")
 ;;; function to open new terminal window at current directory
 (defun tmtxt/open-current-dir-in-terminal ()
   "Open current directory in 'dired-mode' in terminal application."

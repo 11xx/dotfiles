@@ -17,7 +17,7 @@ The app is chosen from your OS's preference."
      file-list)))
 ;; default terminal application path
 (defvar v/terminal (getenv "TERMINAL")
-  "The default terminal environment vairable.")
+  "The default terminal as in the TERMINAL environment variable.")
 ;;; function to open new terminal window at current directory
 (defun tmtxt/open-current-dir-in-terminal ()
   "Open current directory in 'dired-mode' in terminal application."
