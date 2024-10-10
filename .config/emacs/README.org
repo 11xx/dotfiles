@@ -916,11 +916,13 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 ***** Haskell
 #+begin_src emacs-lisp
-(setup-elpaca haskell-mode)
-(setup-elpaca lsp-haskell ;; also set in lsp-mode section
-  (with-eval-after-load 'eglot
-    (with-eval-after-load 'haskell-ts-mode
-      (haskell-ts-setup-eglot))))
+(setup (:elpaca haskell-mode))
+
+(setup (:elpaca lsp-haskell) ;; also set in lsp-mode section
+  (:require eglot haskell-ts-mode)
+  (:load-after eglot haskell-ts-mode)
+      (haskell-ts-setup-eglot))
+
 (setup (:elpaca haskell-ts-mode)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
@@ -956,7 +958,7 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 #+begin_src emacs-lisp
 (setup (:elpaca ansible))
 (setup (:elpaca ansible-vault))
-(setup-elpaca ansible-doc)
+(setup (:elpaca ansible-doc))
 #+end_src
 
 ***** =yuck-mode=: Specifically for EWW's (bar) config file
@@ -1651,13 +1653,13 @@ It uses `make-directory' PARENTS argument 't'."
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(setup-elpaca visual-fill-column
+(setup (:elpaca visual-fill-column)
   (:load-after org)
   (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
           visual-fill-column-center-text t)
   (:hook-into org-mode))
 
-(setup-elpaca org-bulletproof
+(setup (:elpaca org-bulletproof)
   (:load-after org)
   (:hook-into org-mode))
 #+end_src
@@ -1696,7 +1698,7 @@ with =C-c C-e=.
 Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
 #+begin_src emacs-lisp
-(setup-elpaca org-appear
+(setup (:elpaca org-appear)
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (setopt org-appear-autolinks 'just-brackets) ; nil is default
@@ -2239,10 +2241,10 @@ NOTE: =dired-async= is provided by the =async= package.
     # #wizard
 
 #+begin_src emacs-lisp
-(setup-elpaca transient) ; keyboard menu for magit.
+(setup (:elpaca transient)) ; keyboard menu for magit.
 ;; fix elpaca version mismatch
 ;; See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
-(setup-elpaca magit
+(setup (:elpaca magit)
   ;; For dotfiles
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
     (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
@@ -2576,7 +2578,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
 
-(setup-elpaca corfu-terminal
+(setup (:elpaca corfu-terminal)
   ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
   (unless (display-graphic-p)
     (corfu-terminal-mode 1)))
@@ -2747,7 +2749,7 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
   : paru -S python-epc python-sexpdata --needed
 
 #+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(setup-elpaca yasnippet)
+(setup (:elpaca yasnippet))
 (setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
                           :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
                           :build (:not compile))
@@ -2768,7 +2770,7 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 
 (setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"))
 
-(setup-elpaca yasnippet)
+(setup (:elpaca yasnippet))
 (setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
                           :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
                           :build (:not compile))
@@ -2972,8 +2974,9 @@ Load theme based on Dark or Light system theme:
 
 ***** Prevent white flashbang on startup
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
+:header-args:emacs-lisp: :tangle no :noweb-ref dummy
 :END:
+# :header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
 src [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]].
 
 When starting a fresh Emacs instance the frame may display a white background
@@ -3112,7 +3115,7 @@ Fira Code Symbol externally.
 # this doesnt work as "secondary" just for ligatures, or i couldn't figure out
 - [[https://github.com/tonsky/FiraCode/wiki/Emacs-instructions#using-ligatureel][Emacs instructions · tonsky/FiraCode Wiki]]
 #+begin_src emacs-lisp
-(setup-elpaca ligature
+(setup (:elpaca ligature)
   ;; Enable the www ligature in every possible major mode
   (ligature-set-ligatures 't '("www"))
 

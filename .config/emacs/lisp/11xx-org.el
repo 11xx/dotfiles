@@ -112,13 +112,13 @@
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(setup-elpaca visual-fill-column
+(setup (:elpaca visual-fill-column)
   (:load-after org)
   (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
           visual-fill-column-center-text t)
   (:hook-into org-mode))
 
-(setup-elpaca org-bulletproof
+(setup (:elpaca org-bulletproof)
   (:load-after org)
   (:hook-into org-mode))
 (defun f/org-export-dispatch-disable-whitespace-mode (&rest args)
@@ -130,7 +130,7 @@
 
 (advice-add 'org-export--dispatch-action
             :before #'f/org-export-dispatch-disable-whitespace-mode)
-(setup-elpaca org-appear
+(setup (:elpaca org-appear)
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (setopt org-appear-autolinks 'just-brackets) ; nil is default

@@ -1,11 +1,13 @@
 ;; -*- lexical-binding: t; -*-
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
-(setup-elpaca haskell-mode)
-(setup-elpaca lsp-haskell ;; also set in lsp-mode section
-  (with-eval-after-load 'eglot
-    (with-eval-after-load 'haskell-ts-mode
-      (haskell-ts-setup-eglot))))
+(setup (:elpaca haskell-mode))
+
+(setup (:elpaca lsp-haskell) ;; also set in lsp-mode section
+  (:require eglot haskell-ts-mode)
+  (:load-after eglot haskell-ts-mode)
+      (haskell-ts-setup-eglot))
+
 (setup (:elpaca haskell-ts-mode)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
@@ -24,7 +26,7 @@
 (setup (:elpaca powershell))
 (setup (:elpaca ansible))
 (setup (:elpaca ansible-vault))
-(setup-elpaca ansible-doc)
+(setup (:elpaca ansible-doc))
 (setup (:elpaca yuck-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))

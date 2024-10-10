@@ -1,8 +1,8 @@
 ;; -*- lexical-binding: t; -*-
-(setup-elpaca transient) ; keyboard menu for magit.
+(setup (:elpaca transient)) ; keyboard menu for magit.
 ;; fix elpaca version mismatch
 ;; See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
-(setup-elpaca magit
+(setup (:elpaca magit)
   ;; For dotfiles
   (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
     (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))

@@ -170,7 +170,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
 
-(setup-elpaca corfu-terminal
+(setup (:elpaca corfu-terminal)
   ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
   (unless (display-graphic-p)
     (corfu-terminal-mode 1)))
