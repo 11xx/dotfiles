@@ -598,8 +598,8 @@ theme directory should be installed preferably user-local in
 # because Linux is easy 😿
 
 # Cursor theme names are their directory names
-$XCursorTheme = simp1e-amber-neron
-$hyprcursorTheme = simp1e-amber-neron
+$XCursorTheme = simp1e-amber
+$hyprcursorTheme = simp1e-amber
 $XCursorSize = 30
 $hyprcursorSize = 30
 
