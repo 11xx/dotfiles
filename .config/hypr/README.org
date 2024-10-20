@@ -37,6 +37,17 @@ workspace = 10, persistent:true
 windowrulev2 = bordercolor rgb(ff00aa) 0deg rgb(000000) 0deg, onworkspace:9
 #+end_src
 
+*** No gaps with only a single window in the workspace
+- [[https://wiki.hyprland.org/Configuring/Workspace-Rules/#smart-gaps][Workspace Rules – Hyprland Wiki]]
+
+Replacement for =no_gaps_when_only=, see
+[[https://github.com/hyprwm/Hyprland/pull/8072][hyprwm/Hyprland/Pull Request #8072/layouts: Nuke no_gaps_when_only by vaxerski]].
+#+begin_src conf
+workspace = w[t1], gapsin:0, gapsout:0, border:1
+workspace = w[tg1], gapsin:0, gapsout:0, border:1
+workspace = f[1], gapsin:0, gapsout:0, border:1
+#+end_src
+
 ** Startup
 # exec-once = waybar & hyprpaper & firefox
 #+begin_src conf
@@ -166,7 +177,6 @@ dwindle {
     pseudotile = true # master switch for pseudotiling. Enabling is bound to mainMod + P in the keybinds section below
     preserve_split = true # you probably want this
     force_split = 2 # 0 -> split follows mouse, 1 -> always split to the left (new = left or top) 2 -> always split to the right (new = right or bottom)
-    no_gaps_when_only = 2 # (default: disabled - 0) no border - 1, with border - 2 [0/1/2]
     # use_active_for_splits = true
 }
 #+end_src
