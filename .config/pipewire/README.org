@@ -1,0 +1,136 @@
+#+TITLE: Pipewire user configuration
+# moved [2024-10-20 Sun 21:11:49 -03] @ak
+
+See [[https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/Config-PipeWire#configuration-file-pipewireconf][Config PipeWire · Wiki · PipeWire / pipewire · GitLab]]
+
+* Pipewire dynamic sample rate & higher audio quality
+- [[https://discovery.endeavouros.com/audio/audiophile/2022/01/#:~:text=By%20default%20PipeWire%20sets%20a%20global%20sample%20rate%20of%2048kHz.][Audiophile – Discovery]]
+- [[https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/1523][A request for comments (#1523) · Issues · PipeWire / pipewire · GitLab]]
+- [[https://www.reddit.com/r/linuxquestions/comments/rwprmd/any_tips_for_getting_the_best_audio_quality_from/][Any tips for getting the best audio quality from Pipewire? : r/linuxquestions]]
+- [[https://www.pclinuxos.com/forum/index.php?topic=161424.0][How to make PipeWire Sound even better]]
+- [[https://discuss.getsol.us/d/10357-how-to-upgrade-sound-output-quality][How to upgrade sound output quality - Solus Forum]]
+- [[https://wiki.archlinux.org/title/PipeWire#Sound_quality_(resampling_quality)][PipeWire - ArchWiki]]
+
+Edit the lines from =pipewire.conf= to the desired values e.g.
+#+begin_example
+default.clock.rate          = 192000
+default.clock.allowed-rates = [ 44100 48000 88200 96000 176400 192000 352800 384000 705600 768000 ]
+#+end_example
+# [2023-03-13 Mon 03:45:52 -03]
+# #default.clock.rate          = 48000
+
+To check which sampling rates are supported natively, run:
+: grep 'Rates:' /proc/asound/card0/stream0 | uniq
+To get a list accepted by =default.clock.allowed-rates=:
+: grep 'Rates:' /proc/asound/card0/stream0 | uniq | sed -E 's/(^\s*Rates:\s|,)//g'
+- See
+  + [[https://unix.stackexchange.com/questions/493929/pulseaudio-how-to-determine-native-sample-rates-and-bit-depths-supported-by-ha][PulseAudio: How to determine native sample rates and bit depths, supported by hardware? - Unix & Linux Stack Exchange]] \\
+    # [2023-03-28 Tue 13:47:36 -03]
+  + [[#orgid-hrtmur][pipewire.conf]]
+
+Then set =resample.quality = 15= on both [[#orgid-nnjzys][pipewire-pulse.conf]] and
+[[#orgid-xozths][client.conf]].
+
+Sample rates can be changed manually with:
+: pw-metadata -n settings 0 clock.force-rate 48000
+- See
+  [[https://www.reddit.com/r/linuxaudio/comments/unutlu/how_to_change_sample_rate_in_pipewire/][how to change sample rate in pipewire : linuxaudio]]
+
+- After changes, restart =pipewire= and =pipewire-pulse=:
+  : systemctl --user restart pipewire pipewire-pulse
+
+#+INCLUDE: "~/org/arch-linux.org::#orgid-uzjjim"
+
+* =pipewire.conf=
+:PROPERTIES:
+:header-args:conf: :tangle "pipewire.conf.d/20-quality.conf" :mkdirp yes
+:CUSTOM_ID: orgid-hrtmur
+:END:
+The default example file can be found in:
+: /usr/share/pipewire/pipewire.conf
+
+As stated in the header comments of the =pipewire.conf= file:
+#+begin_quote
+It is also possible to place a file with an updated section in
+=/etc/pipewire/pipewire.conf.d/= for system-wide changes or in
+=~/.config/pipewire/pipewire.conf.d/= for local changes.
+#+end_quote
+
+#+begin_src conf :noweb yes
+context.properties = {
+    ## Configure properties in the system.
+    link.max-buffers                      = 64
+
+    ## Properties for the DSP configuration.
+    default.clock.rate          = 48000
+    default.clock.allowed-rates = [ <<card0-supported-sampling-rates-pipewire-list()>> ]
+}
+#+end_src
+
+#+NAME: card0-supported-sampling-rates-pipewire-list
+#+begin_src shell :tangle no
+grep 'Rates:' /proc/asound/card0/stream0 | uniq | sed -E 's/(^\s*Rates:\s|,)//; s/,//g'
+#+end_src
+
+* =client.conf=
+:PROPERTIES:
+:header-args:conf: :tangle "client.conf.d/20-quality.conf" :mkdirp yes
+:CUSTOM_ID: orgid-xozths
+:END:
+
+- [[https://docs.pipewire.org/page_man_pipewire-client_conf_5.html][PipeWire: client.conf]]
+
+The default example file can be found in:
+: /usr/share/pipewire/client.conf
+
+Copy and edit this file in =/etc/pipewire= for system-wide changes
+or in =~/.config/pipewire= for user-local changes.
+
+As stated in the header comment of the =client.conf= file:
+#+begin_quote
+It is also possible to place a file with an updated section in
+=/etc/pipewire/client.conf.d/= for system-wide changes or in
+=~/.config/pipewire/client.conf.d/= for local changes.
+#+end_quote
+
+- [[https://wiki.archlinux.org/title/PipeWire#Sound_quality_(resampling_quality)][According the the Arch Wiki]] the maximum =resample.quality= value
+  is =14=.
+#+begin_src conf
+stream.properties = {
+    resample.quality      = 14
+}
+#+end_src
+
+* =pipewire-pulse.conf=
+:PROPERTIES:
+:header-args:conf: :tangle "pipewire-pulse.conf.d/20-quality.conf" :mkdirp yes
+:CUSTOM_ID: orgid-nnjzys
+:END:
+
+- [[https://docs.pipewire.org/page_man_pipewire-pulse_conf_5.html][PipeWire: pipewire-pulse.conf]]
+
+The default example file can be found in:
+: /usr/share/pipewire/pipewire-pulse.conf
+
+Copy and edit this file in =/etc/pipewire= for system-wide changes
+or in =~/.config/pipewire= for user-local changes.
+
+As stated in the header comments of the =pipewire-pulse.conf= file:
+#+begin_quote
+It is also possible to place a file with an updated section in
+=/etc/pipewire/pipewire-pulse.conf.d/= for system-wide changes or in
+=~/.config/pipewire/pipewire-pulse.conf.d/= for user-local changes.
+#+end_quote
+
+- [[https://wiki.archlinux.org/title/PipeWire#Sound_quality_(resampling_quality)][According the the Arch Wiki]] the maximum =resample.quality= value
+  is =14=.
+#+begin_src conf
+stream.properties = {
+    resample.quality      = 14
+}
+#+end_src
+
+* COMMENT Local file variables
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:
