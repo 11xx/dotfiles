@@ -22,7 +22,8 @@
 
 (add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
 (setup (:elpaca yaml-mode))
-(setup (:elpaca pkgbuild-mode))
+(setup (:elpaca pkgbuild-mode)
+  (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
 (setup (:elpaca powershell))
 (setup (:elpaca ansible))
 (setup (:elpaca ansible-vault))

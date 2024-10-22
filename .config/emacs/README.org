@@ -945,7 +945,8 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 ***** PKGBUILD
 #+begin_src emacs-lisp
-(setup (:elpaca pkgbuild-mode))
+(setup (:elpaca pkgbuild-mode)
+  (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
 #+end_src
 
 ***** PowerShell
