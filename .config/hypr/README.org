@@ -85,7 +85,6 @@ exec-once = hypr-eww-restart-on-monitor-change # script
 #+begin_src conf
 env = XDG_SESSION_TYPE,wayland
 env = XDG_CURRENT_DESKTOP,Hyprland
-env = XDG_SESSION_TYPE,wayland
 env = XDG_SESSION_DESKTOP,Hyprland
 #+end_src
 
@@ -202,13 +201,6 @@ misc {
      new_window_takes_over_fullscreen = 2
 
      # focus_on_activate = true
-}
-#+end_src
-
-*** Debug
-#+begin_src conf
-debug {
-      overlay = false
 }
 #+end_src
 
@@ -764,7 +756,7 @@ decoration {
 ** =nvidia.conf=: Nvidia-specific settings for Hyprland
 # Nvidia support
 #+begin_src conf :tangle nvidia.conf
-env = LIBVA_DRIVER_NAME,nvidia
+# env = LIBVA_DRIVER_NAME,nvidia
 env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 
 env = GBM_BACKEND,nvidia-drm
