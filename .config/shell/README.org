@@ -1570,6 +1570,7 @@ alias vot='git --git-dir="$HOME/.local/vault.git" --work-tree="$HOME"'
 :END:
 #+begin_src shell
 alias m='ncmpcpp --config="$XDG_CONFIG_HOME/mpd/ncmpcpp-config" --bindings="$XDG_CONFIG_HOME/mpd/ncmpcpp-bindings"'
+alias mm='rmpc'
 #+end_src
 # MPD
 # alias mpcl='mpc -p 7777'
