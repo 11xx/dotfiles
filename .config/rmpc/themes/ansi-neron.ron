@@ -1,6 +1,9 @@
+#![enable(implicit_some)]
+#![enable(unwrap_newtypes)]
+#![enable(unwrap_variant_newtypes)]
 (
     album_art_position: Left,
-    album_art_width_percent: 40,
+    album_art_width_percent: 5,
     default_album_art_path: None,
     show_song_table_header: true,
     draw_borders: true,
@@ -15,15 +18,15 @@
         inactive_style: (),
     ),
     highlighted_item_style: (fg: "blue", modifiers: "Bold"),
-    current_item_style: (fg: "black", bg: "blue", modifiers: "Bold"),
-    borders_style: (fg: "blue"),
+    current_item_style: (fg: "white", bg: "green", modifiers: "Bold"),
+    borders_style: (fg: "black"),
     highlight_border_style: (fg: "blue"),
     symbols: (song: "S", dir: "D", marker: "M"),
     progress_bar: (
-        symbols: ["-", ">", " "],
-        track_style: (fg: "#1e2030"),
+        symbols: ["━", "⭘", "─"],
+        track_style: (fg: "cyan"),
         elapsed_style: (fg: "blue"),
-        thumb_style: (fg: "blue", bg: "#1e2030"),
+        thumb_style: (fg: "blue", bg: "black"),
     ),
     scrollbar: (
         symbols: ["│", "█", "▲", "▼"],
