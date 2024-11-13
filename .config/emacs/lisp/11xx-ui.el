@@ -64,6 +64,11 @@ number."
         use-dialog-box nil)
 (setup display-line-numbers
   ;; disable line numbers for some modes
+
+  (:option* grow-only t) ;; prevents difference between 10s, 100s,
+                         ;; etc, line numbers from ;; flicker-pushing
+                         ;; content to the side.
+
   (:hook-into prog-mode text-mode html-mode)
   (:with-hook (term-mode-hook
                shell-mode-hook
