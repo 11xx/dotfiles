@@ -26,3 +26,4 @@
 (require '11xx-magit)
 (require '11xx-org)
 (require '11xx-modes)
+(require 'llm-ai-assistants)

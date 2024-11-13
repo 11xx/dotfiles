@@ -488,6 +488,7 @@ Increase Garbage Collection threshold:
 (require '11xx-magit)
 (require '11xx-org)
 (require '11xx-modes)
+(require 'llm-ai-assistants)
 #+end_src
 
 * 11xx config
@@ -3263,6 +3264,81 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
            "C-c C-<" mc/mark-all-like-this))
 #+end_src
 
+
+** llm-ai-assistants.el: Large Language Models (LLM) AI Assistants
+:PROPERTIES:
+:header-args:emacs-lisp+: :noweb-ref llm-ai-assistants-setup
+:END:
+
+#+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/llm-ai-assistants.el
+<<llm-ai-assistants-setup>>
+
+(provide 'llm-ai-assistants)
+#+end_src
+
+*** gptel
+- See
+  + [[https://www.reddit.com/r/emacs/comments/14glmqc/use_emacs_as_a_chatgpt_app/][Use emacs as a ChatGPT app : emacs]]
+    that links [[https://www.armindarvish.com/en/post/use_emacs_as_a_chatgpt_client/][Use Emacs as a ChatGPT App from Anywhere on Your System | /\r|\/|i|\|]]
+  + [[https://github.com/karthink/gptel][karthink/gptel: A no-frills ChatGPT client for Emacs]]
+  + ChatGPT API keys can be generated from
+    https://platform.openai.com/account/api-keys
+# [2023-06-23 Fri 13:14:22 -03]
+#+begin_src emacs-lisp
+(setup (:elpaca gptel)
+  ;; (:require auth-source) ; seems necessary, for some reason setup.el
+  (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
+           gptel-default-mode 'org-mode)
+
+
+  (gptel-make-ollama "Ollama"             ;Any name of your choosing
+    :host "localhost:11434"               ;Where it's running
+    :stream t                             ;Stream responses
+    :models '(mistral:latest              ;List of models
+              granite-code:8b
+              granite-code:20b
+              llama3.2
+              qwen2.5-coder
+              qwen2.5-coder:7b-instruct-q8_0
+              yi-coder
+              codellama:7b
+              deepseek-coder-v2:16b)))
+#+end_src
+# test chat:
+The =auth-source-pick-first-password= function is used to
+retrieve passwords from the Emacs auth-source database. To add an entry
+to the authinfo file:
+
+1. Open or create your authinfo file (typically =~/.authinfo= or
+   =~/.authinfo.gpg=).
+2. Add an entry in the format:
+   =machine HOSTNAME login USERNAME password PASSWORD=. Replace
+   =HOSTNAME= with the target host, =USERNAME= with your account
+   username (or use =*= as a wildcard), and =PASSWORD= with the
+   corresponding password.
+3. In your Emacs configuration or code, use
+   =(setq gptel-api-key (auth-source-pick-first-password :host "openai.com"))=
+   to retrieve the password associated with the host "openai.com".
+   Adjust the host as needed.
+
+Remember to consider the security implications of using a wildcard
+character for the username, as it allows any username to match and
+retrieve the password.
+
+
+*** Aider
+- [[https://github.com/tninja/aider.el][tninja/aider.el: aider emacs plugin for https://github.com/paul-gauthier/aider]]
+- [[https://github.com/Aider-AI/aider][Aider-AI/aider: aider is AI pair programming in your terminal]]
+#+begin_src emacs-lisp
+(setup (:elpaca aider :host github :repo "tninja/aider.el" :files ("aider.el"))
+  (setq aider-program (expand-file-name "venv/bin/aider" (xdg-user-dir "DESKTOP"))
+        aider-args '("--model" "ollama/qwen2.5-coder:7b-instruct-q8_0"))
+  (setenv "OLLAMA_API_BASE" "http://127.0.0.1:11434")
+  ;; (setenv "OPENAI_API_KEY" <your-openai-api-key>)
+  ;; Optional: Set a key binding for the transient menu
+  (keymap-global-set "C-c a" #'aider-transient-menu))
+#+end_src
+
 * REST
 
 *** Platform check
@@ -3331,42 +3407,6 @@ LaTeX preview in org-mode:
 #+begin_src emacs-lisp
 (setup (:elpaca org-fragtog))
 #+end_src
-
-*** ChatGPT
-API keys can be generated from https://platform.openai.com/account/api-keys
-
-**** gptel
-- See
-  + [[https://www.reddit.com/r/emacs/comments/14glmqc/use_emacs_as_a_chatgpt_app/][Use emacs as a ChatGPT app : emacs]]
-    that links [[https://www.armindarvish.com/en/post/use_emacs_as_a_chatgpt_client/][Use Emacs as a ChatGPT App from Anywhere on Your System | /\r|\/|i|\|]]
-  + [[https://github.com/karthink/gptel][karthink/gptel: A no-frills ChatGPT client for Emacs]]
-# [2023-06-23 Fri 13:14:22 -03]
-#+begin_src emacs-lisp
-(setup (:elpaca gptel)
-  ;; (:require auth-source) ; seems necessary, for some reason setup.el
-  (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
-           gptel-default-mode 'org-mode))
-#+end_src
-# test chat:
-The =auth-source-pick-first-password= function is used to
-retrieve passwords from the Emacs auth-source database. To add an entry
-to the authinfo file:
-
-1. Open or create your authinfo file (typically =~/.authinfo= or
-   =~/.authinfo.gpg=).
-2. Add an entry in the format:
-   =machine HOSTNAME login USERNAME password PASSWORD=. Replace
-   =HOSTNAME= with the target host, =USERNAME= with your account
-   username (or use =*= as a wildcard), and =PASSWORD= with the
-   corresponding password.
-3. In your Emacs configuration or code, use
-   =(setq gptel-api-key (auth-source-pick-first-password :host "openai.com"))=
-   to retrieve the password associated with the host "openai.com".
-   Adjust the host as needed.
-
-Remember to consider the security implications of using a wildcard
-character for the username, as it allows any username to match and
-retrieve the password.
 
 * .dir-locals.el and File Local Variables                          :noexport:
 - [[https://www.reddit.com/r/orgmode/comments/jy8fuc/orgbabeltangle_on_save/][org-babel-tangle on save? : r/orgmode]]
