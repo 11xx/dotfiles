@@ -149,6 +149,14 @@ do case $1 in
    esac; shift; done
 ")
 
+haskell-mode haskell-ts-mode
+
+(setuphs
+ "import Distribution.Simple"
+ n
+ "main = defaultMain")
+
+
 ;; Local Variables:
 ;; mode: lisp-data
 ;; outline-regexp: "[a-z]"
