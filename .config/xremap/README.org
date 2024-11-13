@@ -20,7 +20,12 @@ https://raw.githubusercontent.com/k0kubun/xremap/master/example/emacs.yml
 keymap:
   - name: Browser Emacs
     application:
-      only: [firefox, vivaldi-stable, com.chatterino.chatterino, thorium-browser]
+      only:
+        - firefox
+        - vivaldi-stable
+        - com.chatterino.chatterino
+        - thorium-browser
+        - org.musicbrainz.Picard
     exact_match: true # required for not conflicting with
                       # SUPER+MOD+[...]  that would otherwise be
                       # interpreted by the window manager
@@ -97,6 +102,22 @@ keymap:
           # C-x u (undo)
           u: [C-z, { set_mark: false }]
 #+end_src
+** Systemd
+
+#+begin_src systemd :tangle (expand-file-name "systemd/user/xremap.service" (xdg-config-home))
+[Unit]
+Description=Keyboard remapper (custom configuration)
+
+[Service]
+Type=exec
+ExecStart=sh -c '%h/.local/bin/xremap-default'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+#+end_src
+
 
 * Launcher script
 #+begin_src shell :tangle (concat (xdg-bin-home) "/xremap-default") :tangle-mode o755
@@ -108,4 +129,3 @@ notify() {
 
 trap notify INT QUIT TSTP TERM KILL EXIT
 #+end_src
-

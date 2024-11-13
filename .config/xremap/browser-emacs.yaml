@@ -2,7 +2,12 @@
 keymap:
   - name: Browser Emacs
     application:
-      only: [firefox, vivaldi-stable, com.chatterino.chatterino, thorium-browser]
+      only:
+        - firefox
+        - vivaldi-stable
+        - com.chatterino.chatterino
+        - thorium-browser
+        - org.musicbrainz.Picard
     exact_match: true # required for not conflicting with
                       # SUPER+MOD+[...]  that would otherwise be
                       # interpreted by the window manager
