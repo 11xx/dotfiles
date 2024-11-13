@@ -156,9 +156,9 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
            corfu-preview-current nil)
 
-  ;; (:with-hook 'elpaca-after-init-hook
-  ;;   (:hook global-corfu-mode))
-  ;; (global-corfu-mode 1)
+  (:with-hook 'elpaca-after-init-hook
+    (:hook global-corfu-mode))
+  (global-corfu-mode 1)
 
   ;; enable corfu on minibuffers like eval-expression
   (defun corfu-enable-in-minibuffer ()
@@ -264,12 +264,14 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 (setup eglot ; built-in since Emacs 29
   (:option eglot-send-changes-idle-time 0.01)
   (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.01)
+    ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
+    (:option eldoc-idle-delay 0.01
+             eldoc-echo-area-prefer-doc-buffer t) ; e.g. display doc on a second monitor
     (:with-feature eldoc-box
       ;; prefixes eldoc-box- to options
       (:option* doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n") ; code \u2501
-                clear-with-C-g t))
+                clear-with-C-g t
+                max-pixel-height 1400))
     (:with-feature whitespace
       ;; Disable `show-trailing-whitespace' in eldox box hover childframe
       (:with-hook (eldoc-box-buffer-hook)
