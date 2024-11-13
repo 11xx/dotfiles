@@ -837,6 +837,27 @@ The full path is required.
   (detached-init))
 #+end_src
 
+**** TRAMP
+Fix connecting to a GUIX system, e.g. when given the errors:
+: Tramp: Opening connection nil for user@192.168.xx.xx using ssh...done
+: File error: Couldn't find a proper `ls' command
+: tramp-error: Couldn't find a proper `ls' command
+#+begin_src emacs-lisp
+(setup tramp
+  (:require tramp)
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+#+end_src
+#+begin_quote
+Basically, since Guix doesn't store =ls= in the normal FHS-like location
+(it's not =/bin/ls=), TRAMP can't find it by default. There's a symbol
+called =tramp-own-remote-path= that (I think) is supposed to use the
+login shell's environment to grab a path and find the commands TRAMP
+needs.
+
+--- [[https://www.reddit.com/r/GUIX/comments/uco6fg/comment/i6c407x/][emacs multihop sudo fails with guix : r/GUIX]]
+#+end_quote
+# (Retrieved at [2024-11-12 Tue 01:14])
+
 ** utf-8-default.el: Use UTF-8 for all character encoding
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/utf-8-default.el :noweb-ref utf-8-default

@@ -166,5 +166,8 @@
    [remap detached-open-session] detached-consult-session)
   (:option detached-show-output-on-attach t)
   (detached-init))
+(setup tramp
+  (:require tramp)
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
 (provide '11xx-defaults)
