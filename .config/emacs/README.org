@@ -1007,6 +1007,15 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 (setup (:elpaca yuck-mode))
 #+end_src
 
+***** Rust Object Notation (ron)
+- Used by
+  + [[https://github.com/mierak/rmpc][mierak/rmpc]] \\
+    /"A configurable, terminal based Media Player Client with album art
+    support via various terminal image protocols."/
+#+begin_src emacs-lisp
+(setup (:elpaca ron-mode))
+#+end_src
+
 **** Minor modes
 
 ***** TODO Tree-Sitter Syntax Highlighting

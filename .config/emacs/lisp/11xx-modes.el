@@ -43,6 +43,7 @@
 (setup (:elpaca ansible-vault))
 (setup (:elpaca ansible-doc))
 (setup (:elpaca yuck-mode))
+(setup (:elpaca ron-mode))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
 
