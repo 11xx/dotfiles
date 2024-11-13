@@ -875,7 +875,7 @@ source = enable-tearing.conf
 
 #+begin_src conf
 listener {
-    timeout = 900 # 15m
+    timeout = 300 # 5m
     on-timeout = hyprctl dispatch dpms off
     on-resume = hyprctl dispatch dpms on
 }
