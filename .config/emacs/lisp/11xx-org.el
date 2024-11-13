@@ -54,7 +54,8 @@
               (modify-syntax-entry ?> "." org-mode-syntax-table)))
   ;; Additional templates for `org-insert-structure-template'
   (dolist (begin
-           '(("sh" . "src shell")
+           '(;; code
+             ("sh" . "src shell")
              ("el" . "src emacs-lisp")
              ("py" . "src python")
              ("js" . "src javascript")
@@ -62,7 +63,10 @@
              ("cc" . "src conf")
              ("hs" . "src haskell")
              ("sd" . "src systemd")
-             ("y" . "src yaml")))
+             ("y" . "src yaml")
+             ;; org special
+             ("sa" . "seealso")
+             ))
     (add-to-list 'org-structure-template-alist begin))
 
   (setopt
