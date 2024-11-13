@@ -14,25 +14,25 @@
     modal_background_color: None,
     tab_bar: (
         enabled: true,
-        active_style: (fg: "black", bg: "blue", modifiers: "Bold"),
+        active_style: (fg: "black", bg: "yellow", modifiers: "Bold"),
         inactive_style: (),
     ),
-    highlighted_item_style: (fg: "blue", modifiers: "Bold"),
-    current_item_style: (fg: "white", bg: "green", modifiers: "Bold"),
+    highlighted_item_style: (fg: "magenta", modifiers: "Bold"),
+    current_item_style: (fg: None, bg: "yellow", modifiers: "Bold"),
     borders_style: (fg: "black"),
     highlight_border_style: (fg: "blue"),
     symbols: (song: "S", dir: "D", marker: "M"),
     progress_bar: (
-        symbols: ["━", "⭘", "─"],
-        track_style: (fg: "cyan"),
-        elapsed_style: (fg: "blue"),
-        thumb_style: (fg: "blue", bg: "black"),
+        symbols: ["━", "┑", "─"],
+        track_style: (fg: "gray"),
+        elapsed_style: (fg: "gray"),
+        thumb_style: (fg: "gray", bg: None),
     ),
     scrollbar: (
         symbols: ["│", "█", "▲", "▼"],
         track_style: (),
         ends_style: (),
-        thumb_style: (fg: "blue"),
+        thumb_style: (fg: "magenta"),
     ),
     song_table_format: [
         (

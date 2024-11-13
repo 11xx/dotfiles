@@ -72,16 +72,17 @@
             "J":       MoveDown,
             "K":       MoveUp,
             "/":       EnterSearch,
+            "<C-s>":   EnterSearch,
             "<C-c>":   Close,
             "<Esc>":   Close,
-            "<Del>": Delete,
+            "<C-g>":   Close,
+            "<Del>":   Delete,
         },
         queue: {
-            "<Del>":       DeleteAll,
             "<CR>":    Play,
-            "<C-s>":   Save,
+            "<C-A-s>": Save,
             "a":       AddToPlaylist,
-            "d":       Delete,
+            "<Del>":   Delete,
             "i":       ShowInfo,
         },
     ),
@@ -102,9 +103,19 @@
         (
             name: "Queue",
             border_type: None,
+
             pane: Split(
                 direction: Horizontal,
-                panes: [(size: "40%", pane: Pane(AlbumArt)), (size: "60%", pane: Pane(Queue))],
+
+                panes: [
+                    (size: "20%", pane: Split(
+                            direction: Vertical,
+                            panes: [
+                                (size: "80%", pane: Pane(Directories)),
+                                (size: "20%", pane: Pane(AlbumArt))
+                            ])),
+                    (size: "80%", pane: Pane(Queue))
+                ],
             ),
         ),
         (
