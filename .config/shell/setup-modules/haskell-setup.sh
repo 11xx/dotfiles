@@ -29,3 +29,22 @@ alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'
 ghcup_remove_bin_dir_from_path() {
     export PATH=$(printf '%s\n' "$PATH" | sed "s,${GHCUP_BIN_DIR}:,,")
 }
+
+cabal_install_copy() {
+    cabal install \
+          --overwrite-policy=always \
+          --install-method=copy \
+          "$@"
+}
+
+cabal_install_copy_dir() {
+    cabal_install_copy \
+        --installdir="${cabalInstallDir:-dist}" \
+        --enable-profiling \
+        --enable-executable-profiling \
+        "$@"
+}
+
+alias cinstall=cabal_install_copy
+alias cidist=cabal_install_copy_dir
+alias ci.='cabalInstallDir=. cabal_install_copy_dir'

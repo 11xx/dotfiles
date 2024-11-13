@@ -146,14 +146,6 @@ Commands to be runned as root configured not to ask for password.
 alias rgboff='sudo openrgb --device 0 -m off; sudo openrgb --device 1 -m off;'
 #+end_src
 
-** Haskell
-#+begin_src shell
-# I think --install-method=copy --enable-executable-static are default now
-alias cidist='cabal install --overwrite-policy=always --installdir=dist'
-alias ci.='cabal install --overwrite-policy=always --installdir=.'
-# alias cabal-exe-minimal="cabal init -nm -l Unlicense --main-is=Main.hs --source-dir='' --application-dir='' --exe -x ''; cp $HOME/Code/UNLICENSE"
-#+end_src
-
 ** Tools & Utilities
 *** Xorg
 # wayland lul # [2023-09-22 Fri 12:46:26 -03]
@@ -1427,11 +1419,12 @@ else
 fi
 #+end_src
 
-** GHCup
+** Haskell
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/ghcup-setup.sh
+:header-args:shell: :tangle setup-modules/haskell-setup.sh
 :END:
 
+*** GHCup
 Fail short if =ghcup= is not found
 #+begin_src shell
 ! is_command ghcup && {
@@ -1501,7 +1494,7 @@ ghcup_remove_bin_dir_from_path() {
 #   + cabal-install
 #   + arch-hs-git
 
-*** Stack integration with GHCup
+**** Stack integration with GHCup
 :PROPERTIES:
 :header-args:shell: :tangle (expand-file-name "stack/hooks/ghc-install.sh" (xdg-data-home)) :tangle-mode o755 :shebang #!/bin/sh :mkdirp yes
 :END:
@@ -1550,6 +1543,29 @@ case $HOOK_GHC_TYPE in
         exit 2
         ;;
 esac
+#+end_src
+
+*** Aliases for Haskell tools
+- [[https://vrom911.github.io/blog/haskell-aliases][Haskell Aliases]]
+#+begin_src shell
+cabal_install_copy() {
+    cabal install \
+          --overwrite-policy=always \
+          --install-method=copy \
+          "$@"
+}
+
+cabal_install_copy_dir() {
+    cabal_install_copy \
+        --installdir="${cabalInstallDir:-dist}" \
+        --enable-profiling \
+        --enable-executable-profiling \
+        "$@"
+}
+
+alias cinstall=cabal_install_copy
+alias cidist=cabal_install_copy_dir
+alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 #+end_src
 
 ** Vault
