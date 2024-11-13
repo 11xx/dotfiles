@@ -652,7 +652,11 @@ Personal config modularized into "pseudo-packages"
 #+begin_src emacs-lisp
 (setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
-  (:global "M-o" ace-window))
+  (:global "M-o" ace-window)
+
+  ;; https://github.com/abo-abo/ace-window?tab=readme-ov-file#aw-keys
+  (setopt aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)
+          aw-scope 'frame))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
 (setup (:elpaca helpful)
