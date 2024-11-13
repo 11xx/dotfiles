@@ -46,7 +46,7 @@ anpoa 'z:autojump' # using with zoxide
 # NNN_PLUG_OFFICIAL='d:dragdrop;F:fzopen;i:imgview;p:preview-tui'
 NNN_PLUG="$NNN_PLUG_COMMANDS;$NNN_PLUG_OFFICIAL"
 export NNN_PLUG
-# export NNN_TRASH=1
+export NNN_TRASH=1
 
 # BLK="04" CHR="04" DIR="04" EXE="00" REG="00" HARDLINK="00" SYMLINK="06" MISSING="00" ORPHAN="01" FIFO="0F" SOCK="0F" OTHER="02"
 # export NNN_FCOLORS="0404040404040404"
@@ -64,6 +64,11 @@ export NNN_OPENER="$OPENER"
 export NNN_FALLBACK_OPENER="$OPENER"
 # Hidden files on top
 export LC_COLLATE="C"
+
+# used by plugins
+export NNN_PREVIEWIMGPROG=chafa
+export NNN_PAGER=$PAGER
+export NNN_TERMINAL=$TERMINAL
 
 
 # include hidden files on 'r'ename
