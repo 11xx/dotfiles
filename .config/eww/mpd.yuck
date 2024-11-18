@@ -35,6 +35,7 @@
             (label :class "mpd-current-icon" :text icon)
             ;; Title
             (label :class "mpd-current-meta-field mpd-current-meta-field-title"
+                   :limit-width 50
                    :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
                    :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
 
@@ -43,8 +44,11 @@
 
             ;; Artist: if album_artist is empty, use Artist
             (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
+                   :limit-width 50
                    :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
-                                    curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
+                                    curr-json.tags.artist != "null" ? curr-json.tags.artist : ""}
+                   :tooltip {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
+                                       curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
 
             ;; Title Artist separator
             (label :class "mpd-current-artist-separator" :text "·")
@@ -68,7 +72,8 @@
                                     :value {curr-json.status.elapsed_percent}
                                     :thickness 4
                                     :start-at 70
-                                    :valign "center"))))
+                                    :valign "center"
+                                    :tooltip "${curr-json.status.elapsed_percent}%"))))
 
 (defwidget mpd-current-1st-wrap []
            (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}))
