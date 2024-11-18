@@ -869,13 +869,14 @@ source = enable-tearing.conf
 
 * =hypridle.conf=: Idle management daemon
 :PROPERTIES:
-:header-args:conf: :tangle hypridle.conf
+:header-args:conf: :tangle hypridle.conf :comments org
 :END:
 - [[https://wiki.hyprland.org/Hypr-Ecosystem/hypridle/][hypridle – Hyprland Wiki]]
 
-#+begin_src conf
+- Monitor DPMS and brightness for hypridle ::
+#+begin_src conf :noweb tangle
 listener {
-    timeout = 300 # 5m
+    timeout = 600 # 10m
     on-timeout = hyprctl dispatch dpms off
     on-resume = hyprctl dispatch dpms on
 }
