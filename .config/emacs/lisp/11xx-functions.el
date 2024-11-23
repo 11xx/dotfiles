@@ -122,5 +122,22 @@ It uses `make-directory' PARENTS argument 't'."
         (push item result)))
     ;; The result list is built in reverse order, so reverse it
     (nreverse result)))
+(defun filter-list-any-string-prefix (source-list filter-list)
+  "Filter out items from SOURCE-LIST that match any prefix in FILTER-LIST.
+
+Example:
+
+   (filter-list-any-string-prefix
+     '(\"--fruit=banana\" \"orange\" \"cherry\" \"--veggie=potato\")
+     '(\"--fruit\" \"--veggie\"))
+   => '(\"orange\" \"cherry\")"
+  (let (result)
+    (dolist (item source-list)
+      (unless (seq-some
+               (lambda (prefix)
+                 (string-prefix-p prefix item))
+               filter-list)
+        (push item result)))
+    (nreverse result)))
 
 (provide '11xx-functions)

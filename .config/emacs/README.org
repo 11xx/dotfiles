@@ -1571,6 +1571,28 @@ It uses `make-directory' PARENTS argument 't'."
     (nreverse result)))
 #+end_src
 
+**** Filter list items that match any prefix from a list
+#+begin_src emacs-lisp
+(defun filter-list-any-string-prefix (source-list filter-list)
+  "Filter out items from SOURCE-LIST that match any prefix in FILTER-LIST.
+
+Example:
+
+   (filter-list-any-string-prefix
+     '(\"--fruit=banana\" \"orange\" \"cherry\" \"--veggie=potato\")
+     '(\"--fruit\" \"--veggie\"))
+   => '(\"orange\" \"cherry\")"
+  (let (result)
+    (dolist (item source-list)
+      (unless (seq-some
+               (lambda (prefix)
+                 (string-prefix-p prefix item))
+               filter-list)
+        (push item result)))
+    (nreverse result)))
+#+end_src
+# (filter-list-any-prefix '("--fruit=banana" "orange" "cherry" "--veggie=potato") '("--fruit" "--veggie"))
+
 ** 11xx-org.el: Org Mode
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-org.el
