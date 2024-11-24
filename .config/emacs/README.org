@@ -2331,6 +2331,7 @@ NOTE: =dired-async= is provided by the =async= package.
 
 #+begin_src emacs-lisp
 (setup (:elpaca magit)
+  (require 'dired)
   (defun dired-git-add (&optional arg)
     "Execute 'git add' command for current or marked files in Dired mode.
 With prefix ARG, prompt for additional arguments to pass to the command."
@@ -2345,19 +2346,18 @@ With prefix ARG, prompt for additional arguments to pass to the command."
       (message "Git add command completed:\n%s" output)))
   (keymap-set dired-mode-map "C-c g g a" #'dired-git-add)
 
-  (:with-feature magit-status-bare
-    (require 'magit-status-bare)
+  (require 'magit-status-bare)
+  (keymap-global-unset "C-x g") ; unbind default `magit-status'
+  (:global "C-x g g" magit-status-default)
+  ;; (keymap-global-set "C-x g g" #'magit-status-default)
 
-    (keymap-global-unset "C-x g") ; unbind default `magit-status'
-    (:global "C-x g g" magit-status-default)
-
-    (magit-status-bare :git-dir "~/.local/dotfiles.git/"
-                       :work-tree (getenv "HOME")
-                       :key-bind "C-x g d")
-    (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
-                        :work-tree (getenv "HOME")
-                        :key-bind "C-c g d a")
-    (require '11xx-vot)))
+  (magit-status-bare :git-dir "~/.local/dotfiles.git/"
+                     :work-tree (getenv "HOME")
+                     :key-bind "C-x g d")
+  (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
+                      :work-tree (getenv "HOME")
+                      :key-bind "C-c g d a")
+  (require '11xx-vot))
 #+end_src
 
 *** magit-status-bare
@@ -2371,6 +2371,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
 
+;;;###autoload
 (defun magit-status-default ()
   "Wrapper for `magit-status' without \"--git-dir\" or \"--work-tree\" CLI args.
 
@@ -2395,6 +2396,7 @@ flags. Then replace the keybind for `magit-status'."
                                     '("--git-dir" "--work-tree")))
   (call-interactively #'magit-status))
 
+;;;###autoload
 (defun magit-status-bare (&rest args)
   "Configure Magit to operate on a bare repository using ARGS.
 
@@ -2423,6 +2425,7 @@ ARGS is a property list that supports the following keys:
                                (magit-status-bare :git-dir expanded-git-dir :work-tree expanded-work-tree))))
       (call-interactively 'magit-status))))
 
+;;;###autoload
 (defun dired-git-add-bare (&rest args)
   "Add files to a bare repository from Dired using ARGS.
 

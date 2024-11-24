@@ -3,6 +3,7 @@
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
 
+;;;###autoload
 (defun magit-status-default ()
   "Wrapper for `magit-status' without \"--git-dir\" or \"--work-tree\" CLI args.
 
@@ -27,6 +28,7 @@ flags. Then replace the keybind for `magit-status'."
                                     '("--git-dir" "--work-tree")))
   (call-interactively #'magit-status))
 
+;;;###autoload
 (defun magit-status-bare (&rest args)
   "Configure Magit to operate on a bare repository using ARGS.
 
@@ -55,6 +57,7 @@ ARGS is a property list that supports the following keys:
                                (magit-status-bare :git-dir expanded-git-dir :work-tree expanded-work-tree))))
       (call-interactively 'magit-status))))
 
+;;;###autoload
 (defun dired-git-add-bare (&rest args)
   "Add files to a bare repository from Dired using ARGS.
 
