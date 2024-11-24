@@ -85,6 +85,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   (keymap-set dired-mode-map "C-c g d a" #'f/dired-bare-git-add-dotfiles)
   (keymap-set dired-mode-map "C-c g g a" #'f/dired-git-add)
 
-  (require '11xx-vot))
+  (require '11xx-vot)
+  (require 'magit-status-bare))
 
 (provide '11xx-magit)

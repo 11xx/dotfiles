@@ -2409,62 +2409,84 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   (keymap-set dired-mode-map "C-c g d a" #'f/dired-bare-git-add-dotfiles)
   (keymap-set dired-mode-map "C-c g g a" #'f/dired-git-add)
 
-  (require '11xx-vot))
+  (require '11xx-vot)
+  (require 'magit-status-bare))
 #+end_src
 
-*** magit-bare-status
+*** magit-status-bare
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle lisp/magit-bare-status.el
+:header-args:emacs-lisp: :tangle lisp/magit-status-bare.el
 :END:
+
 #+begin_src emacs-lisp
+;; NOTE: This requires lexical-binding = t
 (require 'magit)
 (require 'dired)
 
 (defun magit-status-bare (&rest args)
-  "Setup Magit for a bare repository using ARGS.
-ARGS should include:
-- :git-dir (required) - The path to the bare Git directory.
-- :work-tree (required) - The path to the work tree.
-- :key-binding (optional) - Key binding for invoking this function."
+  "Configure Magit to operate on a bare repository using ARGS.
+
+ARGS is a property list that supports the following keys:
+- `:git-dir'     (required) Path to a bare Git directory.
+- `:work-tree'   (required) Path to the repository's worktree.
+- `:key-bind'    (optional) Set a global key binding. If
+  provided, the key binding is set, but the function is not
+  executed."
   (interactive)
   (let* ((git-dir (plist-get args :git-dir))
          (work-tree (plist-get args :work-tree))
-         (key-binding (plist-get args :key-binding))
+         (key-binding (plist-get args :key-bind))
          (git-dir-arg (concat "--git-dir=" (expand-file-name git-dir)))
          (work-tree-arg (concat "--work-tree=" (expand-file-name work-tree)))
          (magit-git-global-arguments (append (eval (car (get 'magit-git-global-arguments 'standard-value)))
                                              (list git-dir-arg work-tree-arg))))
 
-    (when key-binding
-      (keymap-global-set key-binding (lambda () (interactive) (magit-status-bare :git-dir git-dir :work-tree work-tree))))
-    (call-interactively 'magit-status)))
+    (if (key-valid-p key-binding)
+        (keymap-global-set key-binding
+                           (let ((expanded-git-dir git-dir)
+                                 (expanded-work-tree work-tree))
+                             (lambda ()
+                               (interactive)
+                               (magit-status-bare :git-dir expanded-git-dir :work-tree expanded-work-tree))))
+      (call-interactively 'magit-status))))
 
 (defun dired-bare-git-add (&rest args)
   "Add files to a bare repository from Dired using ARGS.
-ARGS should include:
-- :git-dir (required) - The path to the bare Git directory.
-- :work-tree (required) - The path to the work tree.
-- :key-binding (optional) - Key binding for invoking this function in `dired-mode-map`."
+
+ARGS is a property list that supports the following keys:
+- `:git-dir'       (required) The absolute path to the bare Git directory.
+- `:work-tree'     (required) The absolute path to the repository's worktree.
+- `:key-bind'      (optional) A key binding to invoke this function
+  in `dired-mode-map`. If provided, the key binding is set, but
+  the function is not executed."
   (interactive)
   (let* ((git-dir (plist-get args :git-dir))
          (work-tree (plist-get args :work-tree))
-         (key-binding (plist-get args :key-binding))
+         (key-binding (plist-get args :key-bind))
          (git-dir-arg (concat "--git-dir=" (expand-file-name git-dir)))
          (work-tree-arg (concat "--work-tree=" (expand-file-name work-tree))))
-    (when key-binding
-      (keymap-set dired-mode-map key-binding
-                  (lambda (&optional arg)
-                    (interactive "P")
-                    (let* ((files (dired-get-marked-files nil arg))
-                           (git-cmd (mapconcat 'identity (list "git" git-dir-arg work-tree-arg) " "))
-                           (output (mapconcat (lambda (file)
-                                                (shell-command-to-string
-                                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                                              files "\n")))
-                      (message "Git add command completed:\n%s" output)))))))
 
-(provide 'magit-bare-status)
+    (if (key-valid-p key-binding)
+        ;; Set the key binding without executing the function
+        (keymap-set dired-mode-map key-binding
+                    (lambda (&optional arg)
+                      (interactive "P")
+                      (dired-bare-git-add :git-dir git-dir :work-tree work-tree)))
+      ;; Execute the function
+      (let* ((files (dired-get-marked-files nil nil))
+             (git-cmd (mapconcat 'identity (list "git" git-dir-arg work-tree-arg) " "))
+             (output (mapconcat (lambda (file)
+                                  (shell-command-to-string
+                                   (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                                files "\n")))
+        (message "Git add command completed:\n%s" output)))))
+
+
+(provide 'magit-status-bare)
 #+end_src
+
+: (magit-status-bare :git-dir "~/.local/dotfiles.git/" :work-tree "~" :key-bind "C-M-g d")
+: (dired-bare-git-add :git-dir "~/.local/dotfiles.git/" :work-tree "~" :key-bind "C-M-g a")
 
 ** 11xx-completion.el: Completion frakework, Minibuffer
 :PROPERTIES:
