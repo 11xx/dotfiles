@@ -3469,7 +3469,8 @@ retrieve the password.
   (setenv "OLLAMA_API_BASE" "http://127.0.0.1:11434")
   ;; (setenv "OPENAI_API_KEY" <your-openai-api-key>)
   ;; Optional: Set a key binding for the transient menu
-  (keymap-global-set "C-c a" #'aider-transient-menu))
+  ;; (keymap-global-set "C-c a" #'aider-transient-menu)
+  )
 #+end_src
 
 * REST
