@@ -2324,76 +2324,14 @@ NOTE: =dired-async= is provided by the =async= package.
 
 #+begin_src emacs-lisp
 (setup (:elpaca transient)) ; keyboard menu for magit.
-;; fix elpaca version mismatch
-;; See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
+#+end_src
+- Fix elpaca version mismatch
+  + See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
+
+
+#+begin_src emacs-lisp
 (setup (:elpaca magit)
-  ;; For dotfiles
-  (defvar v/magit-git-global-arguments--bare-git-dir-dotfiles
-    (concat "--git-dir=" (expand-file-name "~/.local/dotfiles.git/"))
-    "Git command argument pointing to the location of the bare git repository to track dotfiles.")
-
-  (defvar v/magit-git-global-arguments--bare-work-tree-dotfiles
-    (concat "--work-tree=" (expand-file-name "~"))
-    "Git command argument location of the git repository's work directory to track files.")
-
-  (defvar v/magit-git-global-arguments--remove-list
-    (list v/magit-git-global-arguments--bare-git-dir-dotfiles
-          v/magit-git-global-arguments--bare-work-tree-dotfiles)
-    "List containing variables to be removed when running
-`magit-status' with custom `magit-git-global-arguments'.")
-
-  ;; use maggit on git bare repos like dotfiles repos, don't forget to
-  ;; change `v/magit-git-global-arguments--bare-git-dir-dotfiles' and `v/magit-git-global-arguments--bare-work-tree-dotfiles' to your needs
-  (defun f/magit-status-bare-dotfiles ()
-    "set --git-dir and --work-tree in `magit-git-global-arguments' to `v/magit-git-global-arguments--bare-git-dir-dotfiles' and `v/magit-git-global-arguments--bare-work-tree-dotfiles' and calls `magit-status'"
-    (interactive)
-    (require 'magit-git)
-
-    ;; Cleanup before adding again in case another function similar to
-    ;; this one but with different arguments was used previously.
-    (dolist (var v/magit-git-global-arguments--remove-list)
-      (when var
-        (setq magit-git-global-arguments (remove var magit-git-global-arguments))))
-    (add-to-list 'magit-git-global-arguments v/magit-git-global-arguments--bare-git-dir-dotfiles)
-    (add-to-list 'magit-git-global-arguments v/magit-git-global-arguments--bare-work-tree-dotfiles)
-    (call-interactively 'magit-status))
-
-  (defun f/magit-status ()
-    "Removes --git-dir and --work-tree in `magit-git-global-arguments' and calls `magit-status'."
-    (interactive)
-    (require 'magit-git)
-    (dolist (var v/magit-git-global-arguments--remove-list)
-      (when var
-        (setq magit-git-global-arguments (remove var magit-git-global-arguments))))
-    (call-interactively 'magit-status))
-
-  (keymap-global-unset "C-x g") ; unbind default `magit-status'
-  (:global
-   ;; [remap magit-status] f/magit-status
-   "C-x g g" f/magit-status
-   "C-x g d" f/magit-status-bare-dotfiles)
-
-  ;; **** Git add to bare repo from dired
-  (defun f/dired-bare-git-add-dotfiles (&optional arg)
-    "Execute 'git add' command for current or marked files in Dired mode.
-With prefix ARG, prompt for additional arguments to pass to the command."
-    (interactive "P")
-    (let* ((files (dired-get-marked-files nil arg))
-           (git-cmd-list (append '("git")
-                                 (list
-                                  v/magit-git-global-arguments--bare-git-dir-dotfiles
-                                  v/magit-git-global-arguments--bare-work-tree-dotfiles)))
-           (git-cmd (mapconcat #'concat git-cmd-list " "))
-           (output (mapconcat (lambda (file)
-                                (shell-command-to-string
-                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                              files
-                              "\n")))
-      (message "Git add command completed:\n%s" output)))
-
-  ;; for normal git actions
-  ;; **** Git add to bare repo from dired
-  (defun f/dired-git-add (&optional arg)
+  (defun dired-git-add (&optional arg)
     "Execute 'git add' command for current or marked files in Dired mode.
 With prefix ARG, prompt for additional arguments to pass to the command."
     (interactive "P")
@@ -2405,12 +2343,21 @@ With prefix ARG, prompt for additional arguments to pass to the command."
                               files
                               "\n")))
       (message "Git add command completed:\n%s" output)))
+  (keymap-set dired-mode-map "C-c g g a" #'dired-git-add)
 
-  (keymap-set dired-mode-map "C-c g d a" #'f/dired-bare-git-add-dotfiles)
-  (keymap-set dired-mode-map "C-c g g a" #'f/dired-git-add)
+  (:with-feature magit-status-bare
+    (require 'magit-status-bare)
 
-  (require '11xx-vot)
-  (require 'magit-status-bare))
+    (keymap-global-unset "C-x g") ; unbind default `magit-status'
+    (:global "C-x g g" magit-status-default)
+
+    (magit-status-bare :git-dir "~/.local/dotfiles.git/"
+                       :work-tree (getenv "HOME")
+                       :key-bind "C-x g d")
+    (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
+                        :work-tree (getenv "HOME")
+                        :key-bind "C-c g d a")
+    (require '11xx-vot)))
 #+end_src
 
 *** magit-status-bare
@@ -2422,6 +2369,31 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 ;; NOTE: This requires lexical-binding = t
 (require 'magit)
 (require 'dired)
+(require '11xx-functions) ; filter-list-any-string-prefix
+
+(defun magit-status-default ()
+  "Wrapper for `magit-status' without \"--git-dir\" or \"--work-tree\" CLI args.
+
+Magit relies on `magit-git-global-arguments' for passing to git
+command-line arguments, normally it's not necessary to customize
+it but when invoking `magit-status' for a bare git repository is
+desired `magit-git-global-arguments' needs to include the
+`--git-dir=<dir>' and `--work-tree=<dir>' options. Though there's
+a problem with this approach: Customizing
+`magit-git-global-arguments' needs to change it globally because
+even though `magit-status' may work when called inside a `let',
+other commands inside the magit buffer will also read from the
+same variable, but if the new values have not been set globally
+commands like `magit-stage' will not work because they will be
+missing `--git-dir' and `--work-tree'. A hacky way of doing it is
+having a version for the bare git function calls that include the
+custom flags, and this version that removes the custom
+flags. Then replace the keybind for `magit-status'."
+  (interactive)
+  (setq magit-git-global-arguments (filter-list-any-string-prefix
+                                    magit-git-global-arguments
+                                    '("--git-dir" "--work-tree")))
+  (call-interactively #'magit-status))
 
 (defun magit-status-bare (&rest args)
   "Configure Magit to operate on a bare repository using ARGS.
@@ -2438,8 +2410,9 @@ ARGS is a property list that supports the following keys:
          (key-binding (plist-get args :key-bind))
          (git-dir-arg (concat "--git-dir=" (expand-file-name git-dir)))
          (work-tree-arg (concat "--work-tree=" (expand-file-name work-tree)))
-         (magit-git-global-arguments (append (eval (car (get 'magit-git-global-arguments 'standard-value)))
-                                             (list git-dir-arg work-tree-arg))))
+         )
+    (setq magit-git-global-arguments (append (eval (car (get 'magit-git-global-arguments 'standard-value)))
+                                             (list git-dir-arg work-tree-arg)))
 
     (if (key-valid-p key-binding)
         (keymap-global-set key-binding
@@ -2450,15 +2423,15 @@ ARGS is a property list that supports the following keys:
                                (magit-status-bare :git-dir expanded-git-dir :work-tree expanded-work-tree))))
       (call-interactively 'magit-status))))
 
-(defun dired-bare-git-add (&rest args)
+(defun dired-git-add-bare (&rest args)
   "Add files to a bare repository from Dired using ARGS.
 
 ARGS is a property list that supports the following keys:
 - `:git-dir'       (required) The absolute path to the bare Git directory.
 - `:work-tree'     (required) The absolute path to the repository's worktree.
-- `:key-bind'      (optional) A key binding to invoke this function
-  in `dired-mode-map`. If provided, the key binding is set, but
-  the function is not executed."
+- `:key-bind'      (optional) Set a key binding to invoke this
+  function in `dired-mode-map'. If provided, the key binding is
+  set, but the function is not executed."
   (interactive)
   (let* ((git-dir (plist-get args :git-dir))
          (work-tree (plist-get args :work-tree))
@@ -2471,7 +2444,7 @@ ARGS is a property list that supports the following keys:
         (keymap-set dired-mode-map key-binding
                     (lambda (&optional arg)
                       (interactive "P")
-                      (dired-bare-git-add :git-dir git-dir :work-tree work-tree)))
+                      (dired-git-add-bare :git-dir git-dir :work-tree work-tree)))
       ;; Execute the function
       (let* ((files (dired-get-marked-files nil nil))
              (git-cmd (mapconcat 'identity (list "git" git-dir-arg work-tree-arg) " "))
@@ -2484,9 +2457,6 @@ ARGS is a property list that supports the following keys:
 
 (provide 'magit-status-bare)
 #+end_src
-
-: (magit-status-bare :git-dir "~/.local/dotfiles.git/" :work-tree "~" :key-bind "C-M-g d")
-: (dired-bare-git-add :git-dir "~/.local/dotfiles.git/" :work-tree "~" :key-bind "C-M-g a")
 
 ** 11xx-completion.el: Completion frakework, Minibuffer
 :PROPERTIES:
