@@ -11,7 +11,7 @@
 (setup (:elpaca haskell-ts-mode)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
-  (add-to-list 'auto-mode-alist '("\\(.*\\.hs\\|.*\\.lhs\\)\\'" . haskell-ts-mode))
+  (:file-match "*.hs" "*.lhs")
   (defun org-babel-execute:haskell-ts (body params)
     "Execute a block of c-ts code with Org Babel."
     (org-babel-execute:haskell body params))
@@ -29,12 +29,13 @@
                (= (buffer-size) 0)) ;; Only if the buffer is empty
       (insert "import Distribution.Simple\nmain = defaultMain\n")
       (save-buffer)))
-  (add-hook 'find-file-hooks #'haskell-setup-hs-initialize))
+  (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
 
-(add-to-list 'auto-mode-alist '("\\(stack\\.yaml\\|package\\.yaml\\)\\'" . haskell-cabal-mode))
+  (:with-mode haskell-cabal-mode
+    (:file-match "stack.yaml" "package.yaml"))
 
-;; hoogle
-(setopt haskell-hoogle-port-number "4141")
+  ;; hoogle
+  (setopt haskell-hoogle-port-number "4141"))
 (setup (:elpaca yaml-mode))
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
