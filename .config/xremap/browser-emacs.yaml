@@ -7,6 +7,7 @@ keymap:
         - vivaldi-stable
         - com.chatterino.chatterino
         - thorium-browser
+        - Thorium-browser # X11
         - org.musicbrainz.Picard
     exact_match: true # required for not conflicting with
                       # SUPER+MOD+[...]  that would otherwise be
