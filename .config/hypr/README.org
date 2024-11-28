@@ -1514,7 +1514,7 @@ spacesJq (){
 
 spacesJaq() {
     WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jaq 'map({key: .id | tostring, value: .windows}) | from_entries')
-    seq 1 10 | jaq --arg windows "${WORKSPACE_WINDOWS}" --slurp --color never -c 'map(tostring) | map({id: ., windows: (($windows | fromjson)[.]//0)})'
+    seq 1 10 | jaq --arg windows "${WORKSPACE_WINDOWS}" --slurp -M -c 'map(tostring) | map({id: ., windows: (($windows | fromjson)[.]//0)})'
 }
 
 if [ -n "${__usingjaq}" ]; then
