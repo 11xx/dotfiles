@@ -488,6 +488,18 @@ bind = $mainMod, F, fullscreen, 1
 source = ./catchall-reset-submap.conf
 submap = reset
 
+bind = $mainMod, W, submap, wm-actions-group
+submap = wm-actions-group
+bind = , T, togglegroup
+bind = , H, moveintogroup, l
+bind = , J, moveintogroup, d
+bind = , K, moveintogroup, u
+bind = , L, moveintogroup, r
+source = ./catchall-reset-submap.conf
+submap = reset
+bind = $mainMod CTRL ALT, N, changegroupactive
+
+
 # Media keys
 # the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode
 # is to use lower case for keysyms, it it stops working capitalized y'know
