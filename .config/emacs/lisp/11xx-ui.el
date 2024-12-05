@@ -63,6 +63,7 @@ number."
         auto-hscroll-mode 'current-line ; nano-like line horizontal scrolling ; https://emacs.stackexchange.com/questions/40864/scroll-only-current-line-when-truncating-lines
         use-dialog-box nil)
 (setup display-line-numbers
+  (:disabled)
   ;; disable line numbers for some modes
 
   (:option* grow-only t) ;; prevents difference between 10s, 100s,

@@ -3026,6 +3026,7 @@ number."
 **** Display line numbers
 #+begin_src emacs-lisp
 (setup display-line-numbers
+  (:disabled)
   ;; disable line numbers for some modes
 
   (:option* grow-only t) ;; prevents difference between 10s, 100s,
