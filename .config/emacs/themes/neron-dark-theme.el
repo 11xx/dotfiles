@@ -443,6 +443,9 @@ read it before opening a new issue about your will.")
 
                ;; Flycheck errors
                (flycheck-error :underline (:style wave :color ,c/pink))
+
+               ;; Package-manager interactive UI
+               (elpaca-finished :foreground ,c/green :weight bold)
                )))
 
   (apply #'custom-theme-set-faces 'neron-dark
