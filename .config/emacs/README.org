@@ -1595,6 +1595,24 @@ Example:
 #+end_src
 # (filter-list-any-prefix '("--fruit=banana" "orange" "cherry" "--veggie=potato") '("--fruit" "--veggie"))
 
+**** Platform check
+Define macro for checking if =system-type= is =type=, if so, evaluate
+body.
+- [[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
+#+begin_src emacs-lisp
+(defmacro with-system (type &rest body)
+  "Evaluate BODY if `system-type' equals TYPE."
+  (declare (indent defun))
+  `(when (eq system-type ',type)
+     ,@body))
+#+end_src
+# around # [2023-12-10  01:20:49 -03] @winr58
+Usage
+#+begin_example
+(with-system gnu/linux
+  (message "Free as in Freedom!"))
+#+end_example
+
 ** 11xx-org.el: Org Mode
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-org.el
@@ -3479,7 +3497,7 @@ retrieve the password.
   )
 #+end_src
 
-** pdf-viewer-config.el
+** 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]
 - [[https://github.com/vedang/pdf-tools][vedang/pdf-tools: Emacs support library for PDF files.]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/11xx-pdf-viewer.el
@@ -3504,31 +3522,13 @@ should be available but running =pdf-tools-install= may be necessary:
 or eval =(pdf-tools-install)=, it returns nil if it successfully detects
 a working executable.
 - See [[https://github.com/politza/pdf-tools/issues/288][pdf-info-check-epdfinfo: pdf-info-epdfinfo-program is not executable · Issue #288 · politza/pdf-tools]]
-* REST
 
-*** Platform check
-Define macro for checking if =system-type= is =type=, if so, evaluate
-body.
-- [[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
-#+begin_src emacs-lisp
-(defmacro with-system (type &rest body)
-  "Evaluate BODY if `system-type' equals TYPE."
-  (declare (indent defun))
-  `(when (eq system-type ',type)
-     ,@body))
-#+end_src
-# around # [2023-12-10  01:20:49 -03] @winr58
-Usage
-#+begin_example
-(with-system gnu/linux
-  (message "Free as in Beer")
-  (message "Free as in Freedom!"))
-#+end_example
+** 11xx-latex.el: LaTeX config
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-latex.el
+:END:
 
-
-*** TODO LaTeX
-
-- See [[https://abode.karthinks.com/org-latex-preview/][=org-latex-preview=: Set up and troubleshooting]]
+- See [[https://abode.karthinks.com/org-latex-preview/][org-latex-preview: Set up and troubleshooting]]
   # [2024-09-18 Wed 19:39:19 -03] @ak
 
 For math and chemestry equations and notations.
