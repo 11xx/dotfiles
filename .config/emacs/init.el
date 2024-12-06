@@ -27,3 +27,4 @@
 (require '11xx-org)
 (require '11xx-modes)
 (require 'llm-ai-assistants)
+(require '11xx-pdf-viewer)

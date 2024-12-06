@@ -495,6 +495,7 @@ Increase Garbage Collection threshold:
 (require '11xx-org)
 (require '11xx-modes)
 (require 'llm-ai-assistants)
+(require '11xx-pdf-viewer)
 #+end_src
 
 * 11xx config
@@ -3478,6 +3479,31 @@ retrieve the password.
   )
 #+end_src
 
+** pdf-viewer-config.el
+- [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]
+- [[https://github.com/vedang/pdf-tools][vedang/pdf-tools: Emacs support library for PDF files.]]
+#+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/11xx-pdf-viewer.el
+(setup (:elpaca org-pdftools))
+(setup (:elpaca pdf-tools)
+  (pdf-tools-install)
+  (:with-map pdf-view-mode-map
+    (:bind "j" pdf-view-next-line-or-next-page
+           "k" pdf-view-previous-line-or-previous-page
+           ))
+  (:with-hook pdf-view-mode-hook
+    (:hook pdf-view-themed-minor-mode)))
+
+(provide '11xx-pdf-viewer)
+#+end_src
+
+*** Troubleshooting
+Getting =[...]: pdf-info-epdfinfo-program is not executable= means
+epdfinfo was not built. Having installed from MELPA or NonGNU ELPA it
+should be available but running =pdf-tools-install= may be necessary:
+: M-x pdf-tools-install
+or eval =(pdf-tools-install)=, it returns nil if it successfully detects
+a working executable.
+- See [[https://github.com/politza/pdf-tools/issues/288][pdf-info-check-epdfinfo: pdf-info-epdfinfo-program is not executable · Issue #288 · politza/pdf-tools]]
 * REST
 
 *** Platform check
