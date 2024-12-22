@@ -278,9 +278,9 @@ windowrulev2 = suppressevent maximize, class:.*
   + [[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
   Blur notifications and bars
 #+begin_src conf
-blurls = notifications
-blurls = wob
-blurls = launcher
+layerrule = blur, notifications
+layerrule = blur, wob
+layerrule = blur, launcher
 #+end_src
 
 - Layer Rules
