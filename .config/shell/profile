@@ -110,13 +110,6 @@ export CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
 export RANDFILE=${XDG_CACHE_HOME}/rnd
 export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
 
-export MANPAGER="bat" # or "less -R --use-color -Dd+r -Du+b"
-export LESSOPEN="| /usr/bin/source-highlight-esc.sh %s"
-export LESS='-R --use-color -Dd+r$Du+b'
-export SYSTEMD_COLORS=256
-export TERM='xterm-256color' # TrueColor output
-export COLORTERM='truecolor'
-
 #export READER="zatura"
 export GIT_EDITOR='emacs-minimal -t git-floatWMRULE'
 export ALTERNATE_EDITOR='emacs-minimal -nw'

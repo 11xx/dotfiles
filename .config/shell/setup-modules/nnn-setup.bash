@@ -42,8 +42,6 @@ anpoa 'p:preview-tui'
 anpoa 'z:autojump' # using with zoxide
 
 ## nnn = https://github.com/jarun/nnn/wiki/Usage#configuration
-# NNN_PLUG_COMMANDS='0:!sacdx $nnn;m:!mediainfo-color $nnn;q:!audio-quality-info $nnn;E:!echo-files $nnn;o:launch4nnn;x:xtosubdir4nnn;s:dusum4nnn;a:!archive "$nnn";c:!archive -11 "$nnn";r:rclone-gcrypt-to-local4nnn'
-# NNN_PLUG_OFFICIAL='d:dragdrop;F:fzopen;i:imgview;p:preview-tui'
 NNN_PLUG="$NNN_PLUG_COMMANDS;$NNN_PLUG_OFFICIAL"
 export NNN_PLUG
 export NNN_TRASH=1

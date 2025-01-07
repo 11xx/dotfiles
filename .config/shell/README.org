@@ -1,6 +1,8 @@
 #+title: Shell configurations
 #+description: General configuration defaults for all used shells.
 
+#+html_head: <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
+
 - Basic shell references:
   + [[https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html][3.5.3 Shell Parameter Expansion]]
   + [[https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html][3.4.2 Special Parameters]]
@@ -12,11 +14,6 @@
 :END:
 
 [[https://www.youtube.com/watch?v=4v4Mcncvsac][Shell Aliases Every Linux User Needs - YouTube]]
-
-** Grub
-#+begin_src shell
-alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'
-#+end_src
 
 ** Pacman & Paru
 #+begin_src shell
@@ -43,8 +40,9 @@ alias pacfy='/usr/bin/pacman -Fy'
 #+begin_src shell
 alias sd="systemctl"
 alias sdu="systemctl --user"
-alias cheers='sudo systemctl start radarr sonarr prowlarr sabnzbd qbittorrent-nox jellyfin cmedia cmedia-merger'
 alias suspend='systemctl suspend'
+alias cdsd='cd /etc/systemd/system'
+alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
 #+end_src
 
 ** sudo vs doas
@@ -69,12 +67,7 @@ alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
 alias c="bat"
-# alias b="bat"
-#+end_src
-
-** wine
-#+begin_src shell
-alias suwine="sudo -su wineuser"
+alias b="bat"
 #+end_src
 
 ** Navigation & listing
@@ -82,8 +75,6 @@ alias suwine="sudo -su wineuser"
 alias l='eza -lag --color=auto --group-directories-first --time-style long-iso'
 alias lt='l -T'
 # alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
-alias cdsd='cd /etc/systemd/system'
-alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
 alias cdc='cd "$XDG_CONFIG_HOME"'
 alias cds='cd "$XDG_DATA_HOME"'
 alias cdcc='cd "$XDG_CACHE_HOME"'
@@ -106,13 +97,6 @@ alias ......='cd ../../../../..'
 ** Directory
 #+begin_src shell
 alias mkdir='mkdir -pv'
-#+end_src
-
-** Colours
-#+begin_src shell
-alias diff='diff --color=auto'
-alias grep='grep --color=auto'
-alias ip='ip -color=auto'
 #+end_src
 
 ** Git
@@ -355,16 +339,6 @@ export RANDFILE=${XDG_CACHE_HOME}/rnd
 export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
 #+end_src
 
-** Terminal Colors
-#+begin_src shell
-export MANPAGER="bat" # or "less -R --use-color -Dd+r -Du+b"
-export LESSOPEN="| /usr/bin/source-highlight-esc.sh %s"
-export LESS='-R --use-color -Dd+r$Du+b'
-export SYSTEMD_COLORS=256
-export TERM='xterm-256color' # TrueColor output
-export COLORTERM='truecolor'
-#+end_src
-
 ** Default Apps
 Commands
 #+begin_src shell
@@ -469,8 +443,9 @@ export LSP_USE_PLISTS=true
 #+begin_src bash
 if [ "$(tty)" = "/dev/tty1" ] # check if it is the first tty login
 then
-    echo 'Autostart of window manager disabled.'
-    # pgrep "$WM" || "$WM"
+    # echo 'Autostart of window manager disabled.'
+    pgrep '^'"$WM"'$' && printf '"%s" is already running. Skipping its startup...\n' "$WM" && return
+    exec "$WM"
     # sx
 fi
 #+end_src
@@ -505,13 +480,6 @@ If not interactive don't load configuration file.
 [[ $- != *i* ]] && return
 #+end_src
 
-*** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
-#+begin_src bash
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
-    source "$XDG_CONFIG_HOME"/shell/profile
-#+end_src
-
 *** powerlevel10k
 - See
   + [[https://github.com/romkatv/powerlevel10k#instant-prompt][romkatv/powerlevel10k#instant-prompt]]
@@ -532,26 +500,19 @@ fi
 #+end_src
 
 *** Colours
+:PROPERTIES:
+:CUSTOM_ID: orgid-wzokjz
+:END:
 https://github.com/garabik/grc
 Install =grc=.
-
-#+begin_src bash
-autoload -U colors && colors
+- NOTE: Add this to =.zprofile= for correct order of sourcing.
+  + See [[https://github.com/garabik/grc/issues/220][zsh not sourcing the grc.zsh despite everything been set correctly · Issue #220 · garabik/grc]]
+#+begin_src bash :tangle no :noweb-ref grc-zsh-source
 [[ -z $DEBUG ]] && [[ -s "/etc/grc.zsh" ]] && source /etc/grc.zsh
 #+end_src
 
-Source =LS_COLORS=. Some programs support it but default to something
-else when =LS_COLORS= is unset, e.g. =fd=. See [[https://github.com/sharkdp/fd/issues/368][Issue #368 · sharkdp/fd]].
 #+begin_src bash
-# use if check rather than <(..) redirection to save some startup ms
-LS_COLORS_ENV_FILE=${XDG_DATA_HOME}/LS_COLORS_ENV
-if [[ ! -s ${LS_COLORS_ENV_FILE} ]]; then
-    dircolors > "${LS_COLORS_ENV_FILE}"
-    source "${LS_COLORS_ENV_FILE}"
-else
-    source "${LS_COLORS_ENV_FILE}"
-fi
-# source <(dircolors)
+autoload -U colors && colors
 #+end_src
 
 **** TODO Customize how commands are highlighted using =zsh-syntax-highlighting=
@@ -1102,17 +1063,8 @@ eval "$(zoxide init zsh --cmd cd)"
 
 *** Source setup modules
 Modularized setup files sourcing
-
 #+begin_src bash
-__setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
-if test -d "${__setupModulesDir}"; then
-    for module in "${__setupModulesDir}"/*.sh \
-                  "${__setupModulesDir}"/*.bash; do
-        test -r "$module" && . "$module"
-    done
-    unset module
-fi
-unset __setupModulesDir
+source "$XDG_CONFIG_HOME"/shell/setup-modules-source.sh
 #+end_src
 
 *** Notes
@@ -1149,6 +1101,13 @@ For some reason, specially on bigger configs split between [[*TRAMP/dumb termina
 [[ $- != *i* ]] && return
 #+end_src
 
+*** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
+#+begin_src bash
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
+    source "$XDG_CONFIG_HOME"/shell/profile
+#+end_src
+
 *** ZDOTDIR
 =$ZDOTDIR= is the environment variable that tells ZSH where to search for its
 configuration files.
@@ -1171,6 +1130,63 @@ export ZDOTDIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell"
 :END:
 Files meant for sourcing, modulating the shell config and centralizing
 program-specific setting into their own files.
+
+Source this script to source the files in the modules directory, e.g.:
+: . "$XDG_CONFIG_HOME"/shell/setup-modules-source.sh
+#+begin_src sh :tangle setup-modules-source.sh
+__setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
+if test -d "${__setupModulesDir}"; then
+    for module in "${__setupModulesDir}"/*.sh \
+                  "${__setupModulesDir}"/*.bash; do
+        test -r "$module" && . "$module"
+    done
+    unset module
+fi
+unset __setupModulesDir
+#+end_src
+
+** Shell colors
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/colors.sh
+:END:
+
+Source =LS_COLORS=. Some programs support it but default to something
+else when =LS_COLORS= is unset, e.g. =fd=. See [[https://github.com/sharkdp/fd/issues/368][Issue #368 · sharkdp/fd]].
+#+begin_src bash
+LS_COLORS_ENV_FILE=${XDG_DATA_HOME}/LS_COLORS_ENV
+if [ ! -s "${LS_COLORS_ENV_FILE}" ]; then
+    dircolors > "${LS_COLORS_ENV_FILE}"
+    source "${LS_COLORS_ENV_FILE}"
+else
+    source "${LS_COLORS_ENV_FILE}"
+fi
+#+end_src
+
+aliases
+#+begin_src shell
+alias diff='diff --color=auto'
+alias grep='grep --color=auto'
+alias ip='ip -color=auto'
+#+end_src
+
+environment variables
+#+begin_src shell
+export MANPAGER="bat" # or "less -R --use-color -Dd+r -Du+b"
+#+end_src
+
+#+begin_src shell
+export LESSOPEN="| /usr/bin/source-highlight-esc.sh %s"
+export LESS='-R --use-color -Dd+g$Du+m'
+#+end_src
+See the meaning of the =-D/--color= flags:
+: man less | less +/'-Dxcolor or --color=xcolor'
+# : man less | sed -n '/-Dxcolor or --color=xcolor/,/-e or --quit-at-eof/p' | $PAGER
+
+#+begin_src shell
+export SYSTEMD_COLORS=256
+export TERM='xterm-256color' # TrueColor output
+export COLORTERM='truecolor'
+#+end_src
 
 ** nnn file manager
 
@@ -1607,7 +1623,6 @@ wineDefaultPrefixDir=${XDG_DATA_HOME}/wine/prefixes/default
 alias winedef="WINEPREFIX=${wineDefaultPrefixDir} wine"
 unset wineDefaultPrefixDir
 #+end_src
-
 
 ** GTK & Qt: Uniform look & live theme change
 :PROPERTIES:

@@ -10,10 +10,6 @@ fi
 
 [[ $- != *i* ]] && return
 
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-[[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
-    source "$XDG_CONFIG_HOME"/shell/profile
-
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -26,17 +22,6 @@ fi
 [[ ! -f "${ZDOTDIR}"/.p10k.zsh ]] || source "${ZDOTDIR}"/.p10k.zsh
 
 autoload -U colors && colors
-[[ -z $DEBUG ]] && [[ -s "/etc/grc.zsh" ]] && source /etc/grc.zsh
-
-# use if check rather than <(..) redirection to save some startup ms
-LS_COLORS_ENV_FILE=${XDG_DATA_HOME}/LS_COLORS_ENV
-if [[ ! -s ${LS_COLORS_ENV_FILE} ]]; then
-    dircolors > "${LS_COLORS_ENV_FILE}"
-    source "${LS_COLORS_ENV_FILE}"
-else
-    source "${LS_COLORS_ENV_FILE}"
-fi
-# source <(dircolors)
 
 unsetopt beep
 bindkey -e # set emacs mode
@@ -251,12 +236,4 @@ eval "$(atuin init zsh)"
 
 eval "$(zoxide init zsh --cmd cd)"
 
-__setupModulesDir=$XDG_CONFIG_HOME/shell/setup-modules
-if test -d "${__setupModulesDir}"; then
-    for module in "${__setupModulesDir}"/*.sh \
-                  "${__setupModulesDir}"/*.bash; do
-        test -r "$module" && . "$module"
-    done
-    unset module
-fi
-unset __setupModulesDir
+source "$XDG_CONFIG_HOME"/shell/setup-modules-source.sh

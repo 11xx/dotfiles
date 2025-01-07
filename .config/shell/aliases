@@ -1,5 +1,3 @@
-alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'
-
 alias pac='sudo /usr/bin/pacman -S'
 alias pacss='/usr/bin/pacman -Ss'
 alias pacssq='/usr/bin/pacman -Ssq'
@@ -20,8 +18,9 @@ alias pacfy='/usr/bin/pacman -Fy'
 
 alias sd="systemctl"
 alias sdu="systemctl --user"
-alias cheers='sudo systemctl start radarr sonarr prowlarr sabnzbd qbittorrent-nox jellyfin cmedia cmedia-merger'
 alias suspend='systemctl suspend'
+alias cdsd='cd /etc/systemd/system'
+alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
 
 # alias sudo='doas'
 alias doas=sudo
@@ -39,15 +38,11 @@ alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
 alias c="bat"
-# alias b="bat"
-
-alias suwine="sudo -su wineuser"
+alias b="bat"
 
 alias l='eza -lag --color=auto --group-directories-first --time-style long-iso'
 alias lt='l -T'
 # alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
-alias cdsd='cd /etc/systemd/system'
-alias cdsdu='cd "$XDG_CONFIG_HOME"/systemd/user'
 alias cdc='cd "$XDG_CONFIG_HOME"'
 alias cds='cd "$XDG_DATA_HOME"'
 alias cdcc='cd "$XDG_CACHE_HOME"'
@@ -66,10 +61,6 @@ alias ......='cd ../../../../..'
 
 alias mkdir='mkdir -pv'
 
-alias diff='diff --color=auto'
-alias grep='grep --color=auto'
-alias ip='ip -color=auto'
-
 alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
 
 alias alarm='ssh -p 1111 alarm@alarm'
@@ -81,11 +72,6 @@ alias pl='patool list'
 alias xs='xtosubdir'
 
 alias rgboff='sudo openrgb --device 0 -m off; sudo openrgb --device 1 -m off;'
-
-# I think --install-method=copy --enable-executable-static are default now
-alias cidist='cabal install --overwrite-policy=always --installdir=dist'
-alias ci.='cabal install --overwrite-policy=always --installdir=.'
-# alias cabal-exe-minimal="cabal init -nm -l Unlicense --main-is=Main.hs --source-dir='' --application-dir='' --exe -x ''; cp $HOME/Code/UNLICENSE"
 
 alias gamma1='xrandr --output HDMI1 --gamma 1'
 alias gamma1.2='xrandr --output HDMI1 --gamma 1.222'
