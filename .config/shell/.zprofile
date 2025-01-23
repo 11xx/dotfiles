@@ -1,7 +1,16 @@
 if [ "$(tty)" = "/dev/tty1" ] # check if it is the first tty login
 then
-    # echo 'Autostart of window manager disabled.'
-    pgrep '^'"$WM"'$' && printf '"%s" is already running. Skipping its startup...\n' "$WM" && return
+    [[ -f $WM_LOCKFILE ]] &&
+        printf '"%s" lockfile present, skipping WM "%s" restart...\n' "$WM_LOCKFILE" "$WM" >&2 &&
+        return
+
+    WM_LOCKFILE=${XDG_RUNTIME_DIR:-/tmp}/wmstart.lock
+
+    pgrep '^'"$WM"'$' &&
+        printf '"%s" is already running. Skipping its startup...\n' "$WM" &&
+        return
+
+    touch "${WM_LOCKFILE}"
+
     exec "$WM"
-    # sx
 fi
