@@ -126,39 +126,38 @@ text = "#18251b"
 #+begin_src toml
 [colors.primary]
 background = "#ffffff"
-bright_foreground = "#f6f6f6"
-foreground = "#545e62"
+bright_foreground = "#8f8c8c"
+foreground = "#5a5d5c"
 
 [colors.normal]
-black = "#000000"
-blue = "#1e5ca8"
+black = "#5a5d5c"
+blue = "#1e5ca8" # #0656c6
 cyan = "#006861"
 green = "#316900"
 magenta = "#b30071"
 red = "#ba0d0d"
-# white = "#929595" wrong contrast
 white = "#5e5c5a"
-yellow = "#755800" # much better
+yellow = "#755800"
 
-[colors.bright]
-black = "#908c8c" # halved so 3.33
-blue = "#0656c6"
-cyan = "#63abff"
-green = "#00ffaa" # "#1c6b00"
-magenta = "#9107D1"
-red = "#f66151"
-white = "#ffffff"
-yellow = "#615f12"
+[colors.bright] # halved so 3.33
+black = "#908c8c"
+blue = "#4c8ee5"
+cyan = "#009d9d"
+green = "#49a000" # "#1c6b00"
+magenta = "#ff30b0"
+red = "#f35656"
+white = "#8f8c8c"
+yellow = "#b28600"
 
-[colors.dim]
-black = "#cccccc"
-blue = "#1e5ca8"
-cyan = "#1694ab"
-green = "#456600" # "#529f05" # #376647
-magenta = "#8c465e"
-red = "#cb7370"
-white = "#7d8380"
-yellow = "#725740"
+[colors.dim] # 6.16
+black = "#5c6360"
+blue = "#1f61b2"
+cyan = "#006e63"
+green = "#326f00" # "#529f05" # #376647
+magenta = "#bc0078"
+red = "#c40d0e"
+white = "#636160"
+yellow = "#7b5d00"
 
 
 [colors.cursor]
@@ -238,3 +237,7 @@ text = "#ffffff"
 # "white": "#929595",
 # "yellow": "#615F0B"
 # },
+
+# light
+# # "#636160" # 616
+# #715272 666
