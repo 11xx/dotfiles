@@ -1,0 +1,228 @@
+#+PROPERTY: header-args :mkdirp yes
+
+# moved # [2024-02-18 Sun 21:33:18 -03] @ak
+* Systemd environment variables
+
+Systemd don't share environment variables with the login shell, for them to
+be available to services declarations need to be done in
+the ~$XDG_CONFIG_HOME/environment.d/*.conf~ files.
+
+*Files should end with the ~.conf~ extension.*
+
+- See
+  [[https://www.baeldung.com/linux/systemd-services-environment-variables][Setting Environment Variables for systemd Services | Baeldung on Linux]]
+  [[https://curiouscoding.nl/linux/environment-variables/][Environment variables done once · CuriousCoding]]
+  # [2023-02-24 Fri 14:39:55 -03]
+
+# *NOTE:* The function ~f/xdg-home-envvar~ is defined in =init.el=
+** xdg.conf
+:PROPERTIES:
+:header-args:conf: :tangle (expand-file-name "environment.d/20-xdg.conf" (xdg-config-home))
+:END:
+
+#+BEGIN_SRC conf
+XDG_DATA_HOME=$HOME/.local/share
+XDG_CACHE_HOME=$HOME/.local/cache
+XDG_CONFIG_HOME=$HOME/.config
+XDG_STATE_HOME=$HOME/.local/state
+XDG_BIN_HOME=$HOME/.local/bin
+PATH=$PATH:$XDG_BIN_HOME
+#+END_SRC
+
+** =test-env-var.service=
+:PROPERTIES:
+:header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/test-env-vars.service")
+:END:
+#+begin_src systemd
+[Unit]
+Description=Test environment variables in */environment.d
+
+[Service]
+Type=oneshot
+ExecStart=notify-send "Path" $PATH
+ExecStart=notify-send "Data Home" $XDG_DATA_HOME
+ExecStart=notify-send "Cache Home" $XDG_CACHE_HOME
+ExecStart=notify-send "Config Home" $XDG_CONFIG_HOME
+ExecStart=notify-send "State Home" $XDG_STATE_HOME
+ExecStart=notify-send "Bin Home" $XDG_BIN_HOME
+# ExecStart=notify-send "Data Dirs" "$XDG_DATA_DIRS" # empty by default i gues
+Restart=no
+
+[Install]
+WantedBy=default.target
+#+end_src
+
+** =test-script-run.service=
+:PROPERTIES:
+:header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/test-script-run.service")
+:END:
+#+begin_src systemd
+[Unit]
+Description=Test script run failing just in systemd
+
+[Service]
+Environment=PATH=/usr/bin:/usr/local/bin:%h/.local/bin:test
+Type=oneshot
+ExecStart=notify-send PATH "$PATH"
+SyslogIdentifier=test-systemd-script-run
+
+# [Install]
+# WantedBy=default.target
+#+end_src
+
+* User Services
+** xremap
+#+INCLUDE: "../xremap/README.org::#orgid-iztysr" :only-contents t
+
+* Systemd: Notes
+- Systemd unit files can be easily generated using this utility: \\
+  [[https://techoverflow.net/2019/03/11/simple-online-systemd-service-generator/][Simple online systemd .service generator]]
+- [[https://www.freedesktop.org/software/systemd/man/systemd.unit.html][systemd.unit]]
+- [[https://askubuntu.com/questions/795226/how-to-list-all-enabled-services-from-systemctl/795242#795242][How to list all enabled services from systemctl?]]
+** Timers
+- See
+  + [[https://www.freedesktop.org/software/systemd/man/systemd.timer.html][systemd.timers]]
+  + [[https://silentlad.com/systemd-timers-oncalendar-(cron)-format-explained][Systemd timers onCalendar (cron) format explained]]
+
+Timer =OnCalendar== options may be specified more than once.
+- See [[https://unix.stackexchange.com/questions/461433/timer-with-multiple-oncalendar-moments][timer with multiple oncalendar moments]].
+
+# <2021-11-14 Sun 13:32>
+# included dotfiles repo [2025-01-23 Thu 02:49:45 -03] @ak
+
+** shell-init: error retrieving current directory [...]
+The error is:
+: shell-init: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
+/See [[https://stackoverflow.com/questions/29396928/shell-init-error-retrieving-current-directory-getcwd-the-usual-fixes-do-not][shell-init: error retrieving current directory: [...] - Stack Overflow]]/
+
+I think it is related to the =WorkingDirectory== property and running a
+shell script as a service: =cd='ing inside the script and not returning
+to the working directory may cause issues. So:
+- =cd='ing back bay me an option;
+- or using a subshell, see:
+  [[https://www.shellcheck.net/wiki/SC2103][shellcheck's SC2103 - Use a ( subshell ) to avoid having to cd back.]]
+# [2023-02-21 Tue 05:25:02 -03]
+** Automatically restart services
+- See
+  [[https://www.redhat.com/sysadmin/systemd-automate-recovery][Set up self-healing services with systemd | Enable Sysadmin]]
+  [[https://freshman.tech/snippets/linux/auto-restart-systemd-service/][How to automatically restart Linux services with Systemd]]
+  [[https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored/324297#324297][Systemd Restart=always is not honored - Unix & Linux Stack Exchange]]
+  # [2023-02-24 Fri 08:09:51 -03]
+relevant settings
+#+begin_example systemd
+[Unit]
+StartLimitIntervalSec=30
+StartLimitBurst=2
+OnFailure=my-app-recovery.service
+#+end_example
+
+#+begin_example systemd
+[Service]
+Restart=always
+# or
+Restart=on-failure
+#+end_example
+** Shell Script as Service
+[[https://www.funoracleapps.com/2022/02/run-shell-script-as-systemd-service-in.html][Run a Shell Script as Systemd Service in Linux]]
+# [2023-02-24 Fri 22:51:06 -03]
+** Services being stopped
+# The particular behaviour of a script being executaded without failures
+# when run manually but being interruped seemingly randomly as a systemd
+# service suggests that it is a systemd-related issue.
+When a script runs without failures during manual execution, but is
+interrupted randomly as a systemd service, it suggests that the issue
+could be related to systemd.
+
+User services seem to be the most affected.
+
+Based on =journalctl -r= logs looking like this around the time the
+services stopped:
+#+begin_example
+Feb 25 10:10:18 username systemd[685]: Stopped target Timers.
+Feb 25 10:10:18 username systemd[685]: Stopped target Sockets.
+Feb 25 10:10:18 username systemd[685]: Stopped target Paths.
+Feb 25 10:10:18 username systemd[685]: Stopped target Basic System.
+Feb 25 10:10:18 username systemd[685]: Stopped Service2 description.
+Feb 25 10:10:18 username systemd[685]: Stopped Service1 description.
+Feb 25 10:10:18 username systemd[685]: Stopping Service2 description...
+Feb 25 10:10:18 username systemd[685]: Stopping Service1 description...
+Feb 25 10:10:18 username systemd[685]: Stopped target Main User Target.
+Feb 25 10:10:18 username systemd[685]: Activating special unit Exit the Session...
+Feb 25 10:10:18 username systemd[1]: Stopping User Manager for UID 1000...
+Feb 25 10:10:08 username systemd-logind[437]: Removed session 1.
+Feb 25 10:10:08 username systemd-logind[437]: Session 1 logged out. Waiting for processes to exit.
+Feb 25 10:10:08 username systemd[1]: session-1.scope: Consumed 2.520s CPU time.
+Feb 25 10:10:08 username sshd[682]: pam_unix(sshd:session): session closed for user username
+Feb 25 10:10:08 username systemd[1]: session-1.scope: Deactivated successfully.
+Feb 25 10:10:08 username sshd[693]: Disconnected from user username 192.168.0.30 port 00000
+#+end_example
+This may indicate that using a remote machine with SSH and starting
+services within, after the SSH session for the respective user closes
+the previously started services may be stopped.
+- See
+  1. =loginctl= solution
+     [[https://www.freedesktop.org/software/systemd/man/loginctl.html#enable-linger%20USER%E2%80%A6][loginctl#enable-linger]]
+     [[https://superuser.com/questions/1312890/systemd-service-stops-when-closing-the-last-sftp-ssh-session][Systemd Service stops when closing the last SFTP / SSH Session - Super User]]
+     [[https://unix.stackexchange.com/questions/522545/systemd-shutting-down-when-terminal-is-closed/522554#522554][Systemd shutting down when terminal is closed - Unix & Linux Stack Exchange]]
+
+Tried solution #1:
+: sudo loginctl enable-linger <username>
+# [2023-02-25 Sat 12:07:25 -03]
+** Manually create and drop-in override for Systemd service
+- In the services directory =/etc/systemd/system/=, for system-wide
+  services, or =${XDG_CONFIG_HOME}/systemd/user= for user services;
+- create a directory with the same name as the service to be overridden
+  but with a =.d= added to the end, e.g. =my-app.service.d=
+- inside the =my-app.service.d= create a file with the =.conf= extension
+  containing the override changes, like would be done with =systemctl edit=.
+  The name =override.conf= is recommended.
+- After changes reload the daemon: =systemctl daemon-reload=
+- Restarting the service after reloading the daemon may be necessary:
+  : systemctl restart my-app.service
+- And to revert changes simply delete the =my-app.service.d= directory.
+
+# Source: Conversation with Bing, 3/10/2023(1) How do I override or configure systemd services? - Ask Ubuntu. https://askubuntu.com/questions/659267/how-do-i-override-or-configure-systemd-services Accessed 3/10/2023.
+# (2) Managing systemd services. https://www.jenkins.io/doc/book/system-administration/systemd-services/ Accessed 3/10/2023.
+# (3) Managing systemd services. https://www.jenkins.io/doc/book/system-administration/systemd-services/ Accessed 3/10/2023.
+# (4) How To Configure Separate Override.conf For Multiple MySQL Instances .... https://www.thegeekdiary.com/how-to-configure-separate-override-conf-for-multiple-mysql-instances-using-systemd/ Accessed 3/10/2023.
+# (5) How to override /etc/systemd/system.conf?. https://unix.stackexchange.com/questions/551463/how-to-override-etc-systemd-system-conf Accessed 3/10/2023.
+# (6) 2.5.9 Managing MySQL Server with systemd. https://dev.mysql.com/doc/refman/8.0/en/using-systemd.html Accessed 3/10/2023.
+** SyslogIdentifier not working
+See [[https://github.com/systemd/systemd/issues/8687][SyslogIdentifier not honored · Issue #8687 · systemd/systemd]]
+# [2023-05-17 Wed 20:00:52 -03]
+** Hibernate on swapfile (and btrfs) / "not enough swap space"
+# [2023-06-20 Tue 14:25:52 -03]
+- See
+  [[https://github.com/systemd/systemd/issues/15354#issuecomment-611077881][Failed to hibernate system via logind: Not enough swap space for hibernation · Issue #15354 · systemd/systemd]]
+  [[https://github.com/systemd/systemd/issues/15354#issuecomment-691622992][Failed to hibernate system via logind: Not enough swap space for hibernation · Issue #15354 · systemd/systemd]]
+  Note of [[https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Hibernation_into_swap_file][Power management/Suspend and hibernate - ArchWiki#Hibernation into swap file]]
+
+: sudo systemctl edit systemd-logind
+and add the lines:
+#+begin_example
+[Service]
+Environment=SYSTEMD_BYPASS_HIBERNATION_MEMORY_CHECK=1
+#+end_example
+or
+#+begin_example
+[Service]
+ProtectHome=read-only
+#+end_example
+** Scripts in Exec not found
+by default systemd's PATH only look into =/usr/bin= and =/usr/loca/bin=.
+Arch Linux respects =usr/loca/bin= so using that for personal scripts is
+the most supported way without customizing systemd's PATH, that is
+separate from the login shell one.
+# [2023-06-20 Tue 19:46:29 -03]
+** Use of empty =ExecStart==
+[[https://stackoverflow.com/questions/68817332/why-use-execstart-with-no-value-before-another-execstart-new-value-in-a-syst/68818218#68818218][Why use ExecStart= (with no value) before another ExecStart=/new/value in a systemd override? - Stack Overflow]]
+# [2023-09-11 Mon 01:30:30 -03]
+When using an =override.conf= setting =ExecStart== for a service file that
+already contains a =ExecStart==, the following error may be given:
+#+begin_example
+Failed to start servicename.service: Unit servicename.service has a bad unit file setting.
+See user logs and 'systemctl --user status servicename.service' for details.
+#+end_example
+so an empty =ExecStart== before the override e.g. =ExecStart=command= is
+to clear any conflicts since systemd only allows one ExecStart.
+
