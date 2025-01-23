@@ -1056,7 +1056,7 @@ setopt HIST_SAVE_NO_DUPS
 
 Shell history third party tool
 #+begin_src bash
-eval "$(atuin init zsh)"
+eval "$(atuin init zsh --disable-up-arrow)"
 #+end_src
 # set additional keybinds
 # actually use C-r for search and keep C-p default

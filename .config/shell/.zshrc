@@ -232,7 +232,7 @@ export SAVEHIST=10000000
 
 setopt histignorealldups
 
-eval "$(atuin init zsh)"
+eval "$(atuin init zsh --disable-up-arrow)"
 
 eval "$(zoxide init zsh --cmd cd)"
 
