@@ -114,6 +114,13 @@ border-size=2
 # border-color=#61bd00
 
 ** Default theme
+
+** Do Not Disturb mode
+#+begin_src conf
+[mode=dnd]
+invisible=1
+#+end_src
+
 * Troubleshooting
 ** Hyprland usage note
 When using blur on /Hyprland/ and margins on /mako/, set a Hyprland
