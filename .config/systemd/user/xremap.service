@@ -1,0 +1,12 @@
+[Unit]
+Description=Keyboard remapper (custom configuration)
+
+[Service]
+Type=exec
+ExecStart=sh -c '%h/.local/bin/xremap-default --service'
+Restart=always
+RestartSec=5
+SyslogIdentifier=xremap-emacs-browser
+
+[Install]
+WantedBy=default.target

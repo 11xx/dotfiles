@@ -103,7 +103,10 @@ keymap:
           # C-x u (undo)
           u: [C-z, { set_mark: false }]
 #+end_src
-** Systemd
+** Systemd user service
+:PROPERTIES:
+:CUSTOM_ID: orgid-iztysr
+:END:
 
 #+begin_src systemd :tangle (expand-file-name "systemd/user/xremap.service" (xdg-config-home))
 [Unit]
@@ -111,9 +114,10 @@ Description=Keyboard remapper (custom configuration)
 
 [Service]
 Type=exec
-ExecStart=sh -c '%h/.local/bin/xremap-default'
+ExecStart=sh -c '%h/.local/bin/xremap-default --service'
 Restart=always
 RestartSec=5
+SyslogIdentifier=xremap-emacs-browser
 
 [Install]
 WantedBy=default.target
@@ -122,11 +126,19 @@ WantedBy=default.target
 
 * Launcher script
 #+begin_src shell :tangle (concat (xdg-bin-home) "/xremap-default") :tangle-mode o755
-xremap ~/.config/xremap/browser-emacs.yaml --device 'SINO WEALTH USB KEYBOARD'
+cmd () {
+    xremap ~/.config/xremap/browser-emacs.yaml --device 'SINO WEALTH USB KEYBOARD'
+}
 
 notify() {
     notify-send -a "xremap-default script" "xremap killed" "restart it as necessary."
 }
+
+if [ "$1" = --service ]; then
+    cmd > /dev/null 2>&1
+else
+    cmd
+fi
 
 trap notify INT QUIT TSTP TERM KILL EXIT
 #+end_src
