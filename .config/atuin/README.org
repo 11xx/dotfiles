@@ -2,10 +2,22 @@
 /Example setup from shell readme:/
 #+INCLUDE: ~/.config/shell/README.org::#orgid-qromov
 
+* =config.toml=: atuin's config file
+:PROPERTIES:
+:header-args:toml: :tangle config.toml
+:END:
+
+- [[https://docs.atuin.sh/configuration/config/][Config | Atuin Docs]]
+#+begin_src toml
+style = "compact"
+show_preview = true
+enter_accept = false
+#+end_src
+
 * Notes
 ** Import Zsh history from custom file
 : HISTFILE=$(readlink -f ./history) atuin import zsh
 - where
   + =HISTFILE= is =zsh='s variable for setting the history file path.
-  + =./history= is the path of the file. Using =readlink -f= to expand the
-    path to a full path, for redundancy.
+  + =./history= is the path of the file. Using =readlink -f= expands the
+    input relative path to a full path, for redundancy.

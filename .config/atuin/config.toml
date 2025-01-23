@@ -1,5 +1,3 @@
-# [[https://docs.atuin.sh/configuration/config/][Config | Atuin Docs]]
-filter_mode_shell_up_key_binding = "session"
 style = "compact"
 show_preview = true
 enter_accept = false
