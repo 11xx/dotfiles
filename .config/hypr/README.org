@@ -174,8 +174,8 @@ xwayland {
 #+begin_src conf
 dwindle {
     # See https://wiki.hyprland.org/Configuring/Dwindle-Layout/ for more
-    pseudotile = true # master switch for pseudotiling. Enabling is bound to mainMod + P in the keybinds section below
-    preserve_split = true # you probably want this
+    pseudotile = true
+    preserve_split = true
     force_split = 2 # 0 -> split follows mouse, 1 -> always split to the left (new = left or top) 2 -> always split to the right (new = right or bottom)
     # use_active_for_splits = true
 }
@@ -797,6 +797,8 @@ source = nvidia.conf
 
 ** ~vrr.conf~: Variable Refresh Rate
 - [[https://wiki.archlinux.org/title/Variable_refresh_rate][Variable refresh rate - ArchWiki]]
+- VRR vs Immediate: [[https://github.com/hyprwm/Hyprland/issues/927#issuecomment-1771536802][Frame-perfect Games VRR (Adaptive sync) support · Issue #927 · hyprwm/Hyprland]]
+
 Note that (at least for NVIDIA variable refresh rate can work but only
 with one monitor on.
 #+begin_src conf :tangle vrr.conf
@@ -807,7 +809,6 @@ misc {
      vrr=2 # 0 - off, 1 - on, 2 - fullscreen only
 
      vfr=true
-     # test bc false conflicts w/ vrr? as of 2024-09-09
 }
 
 cursor {
@@ -876,6 +877,7 @@ windowrulev2 = immediate,class:^eldenring.exe$
 windowrulev2 = immediate,class:^gamescope$
 windowrulev2 = immediate,class:^steam_app_[0-9]+$
 windowrulev2 = immediate,class:^mpv$
+windowrulev2 = immediate,class:love,title:Freesync test
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
