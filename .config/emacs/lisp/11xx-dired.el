@@ -49,7 +49,7 @@ The app is chosen from your OS's preference."
            dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
            )
 
-  (:hook dired-hide-details-mode
+  (:hook ;; dired-hide-details-mode
          ;; dired-hide-dotfiles-mode
          auto-revert-mode)
 

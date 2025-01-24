@@ -2231,7 +2231,7 @@ NOTE: =dired-async= is provided by the =async= package.
            dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
            )
 
-  (:hook dired-hide-details-mode
+  (:hook ;; dired-hide-details-mode
          ;; dired-hide-dotfiles-mode
          auto-revert-mode)
 
