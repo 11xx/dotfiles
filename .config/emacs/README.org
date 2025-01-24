@@ -481,6 +481,7 @@ Increase Garbage Collection threshold:
 #+end_src
 
 ** Load config
+Personal config modularized into "pseudo-packages"
 #+begin_src emacs-lisp
 (require '11xx-functions)
 (require 'utf-8-default)
@@ -498,9 +499,7 @@ Increase Garbage Collection threshold:
 (require '11xx-pdf-viewer)
 #+end_src
 
-* 11xx config
-Personal config modularized into "pseudo-packages"
-** 11xx-defaults.el: New defaults
+* 11xx-defaults.el: New defaults
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle lisp/11xx-defaults.el :noweb yes
 :END:
@@ -510,11 +509,11 @@ Personal config modularized into "pseudo-packages"
 (provide '11xx-defaults)
 #+end_src
 
-*** emacs new defaults def
+** emacs new defaults def
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref new-defaults :tangle no
 :END:
-**** Emacs setup
+*** Emacs setup
 - Notes:
   + *Modes not starting:* Probably due to them being local-buffer specific.
     See [[https://stackoverflow.com/questions/22968922/function-defined-in-emacs-does-not-start-automatically][Function defined in .emacs does not start automatically]].
@@ -718,7 +717,7 @@ Personal config modularized into "pseudo-packages"
 (add-hook 'org-mode-hook #'endless/org-ispell)
 #+end_src
 
-***** Options/Variables
+**** Options/Variables
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref emacs-setup-options
 :END:
@@ -799,7 +798,7 @@ ring-bell-function 'ignore
 auto-window-vscroll nil
 #+end_src
 
-**** =custom.el= file
+*** =custom.el= file
 file to store ~customize~ options. This can be disabled but
 ~init.el~ will receive all generated code. It's also useful
 for preventing Org Babel Tangle to override =Customize= changes. [[https://stackoverflow.com/questions/5052088/what-is-custom-set-variables-and-faces-in-my-emacs/5058752#5058752][src]]
@@ -818,13 +817,13 @@ Defined in Emacs setup
 # ;;       (make-empty-file file)))
 # ;; (f/check-file-touch custom-file)
 
-**** Async
+*** Async
 [[https://github.com/jwiegley/emacs-async][jwiegley/emacs-async: Simple library for asynchronous processing in Emacs]]
 #+begin_src emacs-lisp
 (setup (:elpaca async))
 #+end_src
 
-***** =detached.el=
+**** =detached.el=
 [[https://git.sr.ht/~niklaseklund/detached.el][~niklaseklund/detached.el - sourcehut git]]
 
 Install the AUR =dtach= package, or the newer fork =dtach-ng=.
@@ -844,7 +843,7 @@ The full path is required.
   (detached-init))
 #+end_src
 
-**** TRAMP
+*** TRAMP
 Fix connecting to a GUIX system, e.g. when given the errors:
 : Tramp: Opening connection nil for user@192.168.xx.xx using ssh...done
 : File error: Couldn't find a proper `ls' command
@@ -865,7 +864,7 @@ needs.
 #+end_quote
 # (Retrieved at [2024-11-12 Tue 01:14])
 
-** utf-8-default.el: Use UTF-8 for all character encoding
+* utf-8-default.el: Use UTF-8 for all character encoding
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/utf-8-default.el :noweb-ref utf-8-default
 :END:
@@ -916,7 +915,7 @@ or
 : M-x add-file-local-variable RET coding RET utf-8 RET
 # [2022-11-08 Tue 17:10:44 -03]
 
-** TODO 11xx-modes.el
+* TODO 11xx-modes.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-modes.el
 :END:
@@ -927,27 +926,27 @@ or
 (provide '11xx-modes)
 #+end_src
 
-*** Modes
+** Modes
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-modes :tangle no
 :END:
 
-**** Edit Modes
-***** Add =modes= directory to Emacs path
+*** Edit Modes
+**** Add =modes= directory to Emacs path
 Custom mode files should sit here.
 # [2022-04-27 Wed 07:19:42]
 #+begin_src emacs-lisp
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 #+end_src
 
-***** Systemd
+**** Systemd
 Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated repo]], better for use with native-comp.
 #+begin_src emacs-lisp
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 #+end_src
 # :files ("*.txt" "systemd.el" (:exclude ".git"))
 
-***** Haskell
+**** Haskell
 #+begin_src emacs-lisp
 (setup (:elpaca haskell-mode))
 
@@ -986,36 +985,36 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
   (setopt haskell-hoogle-port-number "4141"))
 #+end_src
 
-***** YAML
+**** YAML
 #+begin_src emacs-lisp
 (setup (:elpaca yaml-mode))
 #+end_src
 
-***** PKGBUILD
+**** PKGBUILD
 #+begin_src emacs-lisp
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
 #+end_src
 
-***** PowerShell
+**** PowerShell
 # [2024-01-14 Sun 13:58:20 -03:00] @winr58
 #+begin_src emacs-lisp
 (setup (:elpaca powershell))
 #+end_src
 
-***** Ansible
+**** Ansible
 #+begin_src emacs-lisp
 (setup (:elpaca ansible))
 (setup (:elpaca ansible-vault))
 (setup (:elpaca ansible-doc))
 #+end_src
 
-***** =yuck-mode=: Specifically for EWW's (bar) config file
+**** =yuck-mode=: Specifically for EWW's (bar) config file
 #+begin_src emacs-lisp
 (setup (:elpaca yuck-mode))
 #+end_src
 
-***** Rust Object Notation (ron)
+**** Rust Object Notation (ron)
 - Used by
   + [[https://github.com/mierak/rmpc][mierak/rmpc]] \\
     /"A configurable, terminal based Media Player Client with album art
@@ -1024,9 +1023,9 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 (setup (:elpaca ron-mode))
 #+end_src
 
-**** Minor modes
+*** Minor modes
 
-***** TODO Tree-Sitter Syntax Highlighting
+**** TODO Tree-Sitter Syntax Highlighting
 [[https://emacs-tree-sitter.github.io/syntax-highlighting/][Tree-sitter Syntax Highlighting]]
 
 - Emacs 29+, using =treesit=
@@ -1068,16 +1067,16 @@ Additional Tree-Sitter content
 (setopt treesit-font-lock-level 4)
 #+end_src
 
-***** Colour highlighting
+**** Colour highlighting
 #+begin_src emacs-lisp
 (setup (:elpaca rainbow-mode)
   (:hook-into css-mode))
 #+end_src
 
-***** Custom minor modes
+**** Custom minor modes
 Expanding without packages
 
-****** =sensitive-mode=: Disable backup files on sensitive files
+***** =sensitive-mode=: Disable backup files on sensitive files
 wizard [[https://anirudhsasikumar.net/blog/2005.01.21.html][Disabling Backup and Auto-save in Emacs]],
 src [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][How do I control how Emacs makes backup files? - Stack Overflow]]
 # [2022-11-11 Fri 03:15:47 -03]
@@ -1129,10 +1128,10 @@ or use a list:
    auto-mode-alist))
 #+end_example
 
-**** Terminal modes
+*** Terminal modes
 [[https://www.youtube.com/watch?v=wa_wZIuT9Vw&t=2126s][Emacs From Scratch #9 - Learn to Love the Terminal Modes - YouTube]]
 # [2022-04-30 Sat 13:45:02]
-***** =eshell=: Emacs Lisp shell
+**** =eshell=: Emacs Lisp shell
 [[https://www.emacswiki.org/emacs/EshellAlias][EmacsWiki: Eshell Alias]]
 # [2022-05-03 Tue 17:49:09]
 #+begin_src emacs-lisp
@@ -1149,7 +1148,7 @@ or use a list:
                   (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
 #+end_src
 
-***** eterm-256color
+**** eterm-256color
 256color for =term-mode=
 #+begin_src emacs-lisp
 (setup term (:elpaca eterm-256color)
@@ -1158,14 +1157,14 @@ or use a list:
          (:hook-into term-mode)))
 #+end_src
 
-***** vterm
+**** vterm
 #+begin_src emacs-lisp
 (setup (:elpaca multi-vterm))
 #+end_src
 
-**** Coding
+*** Coding
 
-***** Make shebang (#!) file executable when saved
+**** Make shebang (#!) file executable when saved
 [[https://youtu.be/764zoG1TxVk?t=1845][emacs early-init.el and general tips and tricks - YouTube]]
 
 #+begin_src emacs-lisp
@@ -1173,10 +1172,10 @@ or use a list:
 (add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p)
 #+end_src
 
-***** Web
-****** HTML
+**** Web
+***** HTML
 [[https://docs.emmet.io/cheat-sheet/][Emmet Cheat Sheet]] [2022-04-02 Sat 15:54:53]
-******* Emmet
+****** Emmet
 #+begin_src emacs-lisp
 (setup (:elpaca emmet-mode)
   ;; (:with-map emmet-mode-keymap
@@ -1184,13 +1183,13 @@ or use a list:
   (:hook-into html-mode))
 #+end_src
 
-****** CSS/SCSS
+***** CSS/SCSS
 #+begin_src emacs-lisp
 (setup css
   (:option css-indent-offset 2))
 #+end_src
 
-****** Web-mode
+***** Web-mode
 [[https://timunkert.net/2021/12/emacs-setup.html][Emacs Setup for my Front-End Development Course with Calculus]] [2022-04-20 Wed 01:02:24]
 [[https://github.com/glynnforrest/emacs.d/blob/master/site-lisp/setup-web-mode.el][emacs.d/setup-web-mode.el at master · glynnforrest/emacs.d]] [2022-04-20 Wed 01:02:45]
 
@@ -1220,7 +1219,7 @@ or use a list:
                   web-mode-enable-auto-indentation t)))
 #+end_src
 
-****** Javascript
+***** Javascript
 Javascript related packages
 #+begin_src emacs-lisp
 (setup (:elpaca typescript-mode)
@@ -1228,7 +1227,7 @@ Javascript related packages
   (:hook-into js-mode-hook))
 #+end_src
 
-***** TODO Rust
+**** TODO Rust
 [[https://github.crookster.org/my-emacs-rust-language-config/][My Emacs Rust Language Config | David Crook]]
 # [2022-05-03 Tue 17:50:00]
 [[https://robert.kra.hn/posts/rust-emacs-setup/][Configuring Emacs for Rust development | Robert Krahn]]
@@ -1238,8 +1237,8 @@ Javascript related packages
 # :header-args:emacs-lisp: :noweb-ref export-preview
 # :END:
 
-**** TODO Languages
-***** DONE C
+*** TODO Languages
+**** DONE C
 #+begin_src emacs-lisp
 (setup cc-mode
   (:disabled)
@@ -1255,9 +1254,9 @@ Javascript related packages
   (org-babel-execute:C body params))
 #+end_src
 
-****** TODO Compile helper functions
+***** TODO Compile helper functions
 # #TODO update # [2024-03-18 Mon 22:34:43 -03] @ak
-******* Compile current C file
+****** Compile current C file
 The =(compile)= function already defines the workin directory as the same
 as the buffer's file location.
 #+begin_src emacs-lisp
@@ -1284,7 +1283,7 @@ using the function `compile' build a command like:
   (message (concat "\"" fullpath-filename ".out\"")))
 #+end_src
 
-******** Hide compilation info buffer
+******* Hide compilation info buffer
 wizard [[https://emacs.stackexchange.com/questions/62/hide-compilation-window/110#110][Hide *compilation* window - Emacs Stack Exchange]]
 # [2022-04-25 Mon 05:32:31]
 It continues open as =*compilation*=
@@ -1295,7 +1294,7 @@ It continues open as =*compilation*=
               (when win (delete-window win)))))
 #+end_src
 
-******* Floating terminal
+****** Floating terminal
 #+begin_src emacs-lisp
 (defun f/run-executable-in-floating-terminal (exe-file)
   "Open Alacritty with class=float and run executable EXE-FILE."
@@ -1316,7 +1315,7 @@ It continues open as =*compilation*=
 
 #+RESULTS:
 : f/run-executable-in-floating-terminal
-******* C compile current file and run in the terminal
+****** C compile current file and run in the terminal
 #+begin_src emacs-lisp
 (defun f/c-comp-and-run()
   "Compile current C/C++ file and run it in the terminal."
@@ -1327,7 +1326,7 @@ It continues open as =*compilation*=
    ))
 #+end_src
 
-****** C mode keybindings
+***** C mode keybindings
 [[https://tr.wikibooks.org/wiki/Emacs/Windows_%C4%B0%C3%A7in_Emacs_Dosyas%C4%B1][Emacs/Windows İçin Emacs Dosyası - Vikikitap: Özgür kütüphane]]
 # ;; keybindings for all supported languages.  We can put these in
 # ;; c-mode-base-map because c-mode-map, c++-mode-map, objc-mode-map,
@@ -1344,7 +1343,7 @@ to conflict with it.
   (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
 #+end_src
 
-***** TODO Rust
+**** TODO Rust
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref dummy :tangle no
 :END:
@@ -1361,21 +1360,21 @@ Arch repos).
   (:load-after org))
 #+end_src
 
-***** Lua
+**** Lua
 #+begin_src emacs-lisp
 (setup (:elpaca lua-mode))
 #+end_src
 
-***** Special Languages
+**** Special Languages
 Configuration for obscure scripting languages and such
 
-****** Picard
+***** Picard
 
 #+begin_src emacs-lisp
 (setup picard-mode)
 #+end_src
 
-** 11xx-functions.el: Utility functions
+* 11xx-functions.el: Utility functions
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-functions.el
 :END:
@@ -1386,18 +1385,18 @@ Configuration for obscure scripting languages and such
 (provide '11xx-functions)
 #+end_src
 
-*** Function definitions
+** Function definitions
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref 11xx-functions-el
 :END:
-**** Electric modes
+*** Electric modes
 [[https://www.emacswiki.org/emacs/ElectricPair][EmacsWiki: Electric Pair]]
 [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Auto_002dIndentation.html][24.7 Automatic indentation of code]]
 
 Electric pairs are like when a open parenthesis is inserted and the
 closing one is inserted automatically.
 
-**** Mark whole work
+*** Mark whole work
 #wizard src [[https://emacs.stackexchange.com/questions/35069/best-way-to-select-a-word/35072#35072][mark - Best way to select a word - Emacs Stack Exchange]]
 
 =mark-whole-word=, to replace the built-in =mark-word= function.
@@ -1436,7 +1435,7 @@ See `mark-word' for more."
     (mark-word arg allow-extend)))
 #+end_src
 
-**** Use tabs for indentation if needed
+*** Use tabs for indentation if needed
 See [[https://www.emacswiki.org/emacs/NoTabs#h5o-1][EmacsWiki: No Tabs]]
 #+begin_src emacs-lisp
 (defun f/infer-indentation-style ()
@@ -1453,7 +1452,7 @@ and if inconclusive, use current `indent-tabs-mode'."
 (add-hook 'prog-mode-hook #'f/infer-indentation-style)
 #+end_src
 
-**** Insert current timestamp
+*** Insert current timestamp
 #+begin_src emacs-lisp
 (defun f/current-timestamp-format ()
   "Return current timestamp and hostname in a formatted string."
@@ -1472,7 +1471,7 @@ and if inconclusive, use current `indent-tabs-mode'."
 ;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
 #+end_src
 
-**** Kill matching lines
+*** Kill matching lines
 [[https://www.emacswiki.org/emacs/KillMatchingLines][EmacsWiki: Kill Matching Lines]]
 # [2022-04-21 Thu 01:08:16]
 Delete lines with matching string and send them to killring
@@ -1504,7 +1503,7 @@ even beep.)"
     (flush-lines regexp rstart rend interactive)))
 #+end_src
 
-**** Check if directory exists and create it if not
+*** Check if directory exists and create it if not
 #+begin_src emacs-lisp :results code
 (defun f/check-make-directory (dir)
   "Check if DIR exists and create it if it doesn't.
@@ -1514,7 +1513,7 @@ It uses `make-directory' PARENTS argument 't'."
       (make-directory dir t)))
 #+end_src
 
-**** Return XDG home directories
+*** Return XDG home directories
 - =$XDG_BIN_HOME=
   #+begin_src emacs-lisp
 (defun xdg-bin-home ()
@@ -1529,7 +1528,7 @@ It uses `make-directory' PARENTS argument 't'."
   (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
   #+end_src
 
-**** Return file contents as string
+*** Return file contents as string
 #+begin_src emacs-lisp
 (defun f/read-file-contents (file-path)
   "Read the contents of the file at FILE-PATH and return it as a string."
@@ -1538,7 +1537,7 @@ It uses `make-directory' PARENTS argument 't'."
     (buffer-string)))
 #+end_src
 
-**** Unfill paragraph
+*** Unfill paragraph
 [[https://www.emacswiki.org/emacs/UnfillParagraph][EmacsWiki: Unfill Paragraph]]
 # [2023-06-23 Fri 13:28:42 -03]
 #+begin_src emacs-lisp
@@ -1555,7 +1554,7 @@ It uses `make-directory' PARENTS argument 't'."
 (define-key global-map "\M-Q" 'unfill-paragraph)
 #+end_src
 
-**** Filter any matching list item from a list
+*** Filter any matching list item from a list
 # ;; from chatgpt: function for filtering items from a list using a list
 #+begin_src emacs-lisp
 (defun filter-list-any (source-list filter-list)
@@ -1573,7 +1572,7 @@ It uses `make-directory' PARENTS argument 't'."
     (nreverse result)))
 #+end_src
 
-**** Filter list items that match any prefix from a list
+*** Filter list items that match any prefix from a list
 #+begin_src emacs-lisp
 (defun filter-list-any-string-prefix (source-list filter-list)
   "Filter out items from SOURCE-LIST that match any prefix in FILTER-LIST.
@@ -1595,7 +1594,7 @@ Example:
 #+end_src
 # (filter-list-any-prefix '("--fruit=banana" "orange" "cherry" "--veggie=potato") '("--fruit" "--veggie"))
 
-**** Platform check
+*** Platform check
 Define macro for checking if =system-type= is =type=, if so, evaluate
 body.
 - [[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
@@ -1613,7 +1612,7 @@ Usage
   (message "Free as in Freedom!"))
 #+end_example
 
-** 11xx-org.el: Org Mode
+* 11xx-org.el: Org Mode
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-org.el
 :END:
@@ -1625,7 +1624,7 @@ Usage
 #+end_src
 
 
-*** Org setup
+** Org setup
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-org-setup :tangle no
 :END:
@@ -1776,7 +1775,7 @@ Usage
 # ;;   (:hook-into org-mode))
 
 
-**** Disable show-trailing-whitespace on Org Export Dispatcher
+*** Disable show-trailing-whitespace on Org Export Dispatcher
 Hack for customizing the "Org Export Dispatch" buffer, the one triggered
 with =C-c C-e=.
 - See
@@ -1796,7 +1795,7 @@ with =C-c C-e=.
             :before #'f/org-export-dispatch-disable-whitespace-mode)
 #+end_src
 
-**** org-appear
+*** org-appear
 Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
 #+begin_src emacs-lisp
@@ -1816,8 +1815,8 @@ appear when hovered.
   (setopt org-fold-core-style 'text-properties)
   #+end_src
 
-**** Exporting
-***** htmlize
+*** Exporting
+**** htmlize
 - See
   + [[https://github.com/hniksic/emacs-htmlize][GitHub - hniksic/emacs-htmlize: Convert buffer text and decorations to HTML.]]
   + [[https://emacs.stackexchange.com/questions/3374/set-the-background-of-org-exported-code-blocks-according-to-theme/3512#3512][org mode - Set the background of org-exported <code> blocks according to theme - Emacs Stack Exchange]]
@@ -1841,14 +1840,14 @@ appear when hovered.
     face e.g.:
     : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
 
-**** Prettify Org Mode
+*** Prettify Org Mode
 #+begin_src emacs-lisp
 (setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
   (:hook-into org-mode))
 #+end_src
 
-** 11xx-org-functions.el
+* 11xx-org-functions.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-org-functions.el
 :END:
@@ -1858,12 +1857,12 @@ appear when hovered.
 (provide '11xx-org-functions)
 #+end_src
 
-*** Org functions
+** Org functions
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref org-functions
 :END:
 
-**** Copy previous source-block with header arguments
+*** Copy previous source-block with header arguments
 - [[https://emacs.stackexchange.com/questions/55890/is-it-possible-to-repeat-the-last-org-mode-source-blocks-headers/55894#55894][yasnippet - Is it possible to repeat the last org-mode source block's headers - Emacs Stack Exchange]]
   # #wizard
 - tip: [[https://stackoverflow.com/questions/5500035/set-custom-keybinding-for-specific-emacs-mode/14230685#14230685][How to add keybindig to specific mode]].
@@ -1893,7 +1892,7 @@ appear when hovered.
   (recenter-top-bottom))
 #+end_src
 
-**** tangle-dir with expand
+*** tangle-dir with expand
 - See
   + [[https://emacs.stackexchange.com/questions/19877/how-to-evaluate-elisp-code-contained-in-a-string/19878#19878][read - How to evaluate Elisp code contained in a string? - Emacs Stack Exchange]]
   + [[https://emacs.stackexchange.com/questions/46479/how-to-set-a-tangled-parent-directory-for-each-subtree-in-org-mode/55859#55859][How to set a tangled parent directory for each subtree in org mode?]]
@@ -1930,7 +1929,7 @@ buffer concatenated with the provided PATH."
   + Functions can be used in the =:tangle= header argument of a src code
     block, e.g. =:tangle (tdir "filename")=.
 
-**** Fix noweb substring syntax highlighting display in code blocks
+*** Fix noweb substring syntax highlighting display in code blocks
 Use either =<<= & =>>= (the default) or =«= & =»= (=0000AB= & =0000BB=), when
 syntax highlighting breaks such as shell code blocks that interpret
 =<<nowebname>>= as heredocs.
@@ -1964,7 +1963,7 @@ When matching, reference is stored in match group 1."
     (backward-char)))
 #+end_src
 
-**** Get full path of headings
+*** Get full path of headings
 # NVM there's (org-format-outline-path (org-get-outline-path t t) nil nil "/")
 #+begin_src emacs-lisp
 (defun org-get-full-outline-path ()
@@ -1984,7 +1983,7 @@ Wrapper for `org-get-full-outline-path'."
   (kill-new (org-get-full-outline-path)))
 #+end_src
 
-**** Insert CUSTOM_ID
+*** Insert CUSTOM_ID
 :PROPERTIES:
 :CUSTOM_ID: orgid-mqhvkq
 :END:
@@ -2036,7 +2035,7 @@ If a `\\[universal-argument]' prefix is present FORCE is set to t."
   inserted with =org-insert-link=.
   # [2024-03-19 Tue 23:19:34 -03] @ak
 
-**** Random characters string
+*** Random characters string
 :PROPERTIES:
 :CUSTOM_ID: orgid-vuivrg
 :END:
@@ -2067,7 +2066,7 @@ a limit of 530, more than that and lisp nesting will overflow."
     (expt number-of-characters length-of-string))
   #+end_example
 
-**** Get list of tangle files that match extension
+*** Get list of tangle files that match extension
 #+begin_src emacs-lisp
 (defun org-babel-get-tangle-files-by-ext (&optional ext)
   "Returns a list of unique filenames to be tangled that end with the specified EXT.
@@ -2100,7 +2099,7 @@ Example:
     (delete-dups tangle-files)))
 #+end_src
 
-**** Add lexical-binding property to tangle files
+*** Add lexical-binding property to tangle files
 The following functions together with
 =org-babel-get-tangle-files-by-ext= can be used for adding
 =lexical-binding: t= to tangled files automatically without having to
@@ -2131,7 +2130,7 @@ in the source Org buffer so it can get the list.
     (add-lexical-binding-prop file)))
 #+end_src
 
-** 11xx-dired.el
+* 11xx-dired.el
 :PROPERTIES:
 :CUSTOM_ID: orgid-wlgppl
 :header-args:emacs-lisp+: :tangle lisp/11xx-dired.el
@@ -2143,19 +2142,19 @@ in the source Org buffer so it can get the list.
 (provide '11xx-dired)
 #+end_src
 
-*** Dired
+** Dired
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-dired :tangle no
 :END:
 
-**** Dired functions
+*** Dired functions
 
-***** Single buffer dired
+**** Single buffer dired
 [[https://github.com/crocket/dired-single#recommended-keybindings][dired-single#recommended-keybindings]] | [[https://youtu.be/PMWwM8QJAtU?t=2182][Emacs From Scratch #10 - Effortless File Management with Dired@36:22]]
 
 Or the later =(setq dired-kill-when-opening-new-dired-buffer t)= in Emacs 28.1+.
 
-***** Dired up directory without opening new buffer
+**** Dired up directory without opening new buffer
 #+begin_src emacs-lisp
 (defun dired-find-alternate-file-up ()
   "Sames as `dired-find-alternate-file' but go up one directory instead."
@@ -2164,7 +2163,7 @@ Or the later =(setq dired-kill-when-opening-new-dired-buffer t)= in Emacs 28.1+.
 #+end_src
 
 
-***** dired open with external app
+**** dired open with external app
 [[https://emacs.stackexchange.com/questions/21796/dired-alternative-to-openwith-how-to-open-file-per-extension/21808#21808][wizard]]
 ~launch~ is a script xdg alternative located in ~~.local/bin~.
 #+begin_src emacs-lisp
@@ -2182,7 +2181,7 @@ The app is chosen from your OS's preference."
      file-list)))
 #+end_src
 
-***** Open Terminal here
+**** Open Terminal here
 [[https://truongtx.me/2013/09/13/emacs-dired-new-terminal-window-at-current-directory-on-macos][wizard src]]
 this gets the terminal name from the environment variable ~$TERMINAL~,
 if not set edit the code accordinly. Don't forget to edit the call flags!
@@ -2204,7 +2203,7 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
 #+end_src
 
-**** Dired setup
+*** Dired setup
 
 - [[https://writequit.org/denver-emacs/presentations/2016-05-24-elpy-and-dired.html][Using Dired as a file manager]]
 - [[https://www.youtube.com/watch?v=PMWwM8QJAtU][Emacs From Scratch #10 - Effortless File Management with Dired]]
@@ -2319,7 +2318,7 @@ NOTE: =dired-async= is provided by the =async= package.
   (add-hook 'dired-mode-hook #'diredfl-mode))
 #+end_src
 
-** 11xx-magit.el
+* 11xx-magit.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-magit.el
 :END:
@@ -2330,7 +2329,7 @@ NOTE: =dired-async= is provided by the =async= package.
 (provide '11xx-magit)
 #+end_src
 
-*** Magit
+** Magit
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-magit :tangle no
 :END:
@@ -2380,7 +2379,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
   (require '11xx-vot))
 #+end_src
 
-*** magit-status-bare
+** magit-status-bare
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle lisp/magit-status-bare.el
 :END:
@@ -2481,7 +2480,7 @@ ARGS is a property list that supports the following keys:
 (provide 'magit-status-bare)
 #+end_src
 
-** 11xx-completion.el: Completion frakework, Minibuffer
+* 11xx-completion.el: Completion frakework, Minibuffer
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-completion.el
 :END:
@@ -2493,14 +2492,14 @@ ARGS is a property list that supports the following keys:
 #+end_src
 
 
-*** def
+** def
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-completion :tangle no
 :END:
 
 - [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6mfh7/?utm_source=share&utm_medium=web2x&context=3][what are Vertico, Consult, Marginalia, Embark]]
 
-**** VERTico
+*** VERTico
 
 - See
   + [[https://github.com/minad/vertico][VERTical Interactive COmpletion - GitHub]]
@@ -2574,7 +2573,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
     (:hook vertico-mode)))
 #+end_src
 
-**** Savehist
+*** Savehist
 See https://www.reddit.com/r/emacs/comments/ie7g17/emacs_clipboard_between_sessions/
 [[https://help-gnu-emacs.gnu.narkive.com/LOddwNvQ/don-t-clear-kill-ring-when-restart-emacs][Don't clear kill-ring when restart emacs]]
 # [2022-11-09 Wed 17:02:36 -03]
@@ -2610,7 +2609,7 @@ Have =M-x= commands history across sessions
   (:hook-into elpaca-after-init-hook))
 #+end_src
 
-**** Orderless
+*** Orderless
 [[https://github.com/oantolin/orderless#style-dispatchers][Style dispatchers]]
 #+begin_src emacs-lisp
 (setup (:elpaca orderless)
@@ -2638,7 +2637,7 @@ Have =M-x= commands history across sessions
   )
 #+end_src
 
-**** Marginalia
+*** Marginalia
 - [[https://github.com/minad/marginalia/][marginalia github]]
 #+begin_src emacs-lisp
 ;; Enable richer annotations using the Marginalia package
@@ -2652,7 +2651,7 @@ Have =M-x= commands history across sessions
           marginalia-field-width 120))
 #+end_src
 
-**** Consult
+*** Consult
 [[https://github.com/minad/consult#use-package-example][Example configuration for Consult]]
 #+begin_src emacs-lisp
 (setup (:elpaca consult)
@@ -2675,7 +2674,7 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 (advice-add 'consult-org-heading :around #'consult--grep)
 #+end_example
 
-**** Embark
+*** Embark
 [[https://github.com/oantolin/embark#quick-start][Embark#Quick start]]
 #+begin_src emacs-lisp
 (setup (:elpaca embark)
@@ -2696,7 +2695,7 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
   )
 #+end_src
 
-**** Corfu
+*** Corfu
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
 #+begin_src emacs-lisp
 (setup (:elpaca corfu)
@@ -2744,7 +2743,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
   (:option prescient-persist-mode t))
 #+end_src
 
-**** Cape: Completion extensions!
+*** Cape: Completion extensions!
 - [[https://github.com/minad/cape][minad/cape: 🦸cape.el - Completion At Point Extensions]]
 - [[https://kisaragi-hiu.com/switching-to-corfu.html][Switching to Corfu - Kisaragi Hiu]].
 # [2022-12-01 Thu 01:46:10 -03]
@@ -2789,7 +2788,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
   )
 #+end_src
 
-**** TempEl
+*** TempEl
 [[https://github.com/minad/tempel][minad/tempel: TempEl - Simple templates for Emacs]].
 See the example template file: [[https://github.com/minad/tempel#template-file-format][minad/tempel: TempEl - Simple templates for Emacs]].
 #+begin_src emacs-lisp
@@ -2822,13 +2821,13 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
               (:hook tempel-setup-capf)))
 #+end_src
 
-**** Language Server Protocols (LSP)
+*** Language Server Protocols (LSP)
 *Arch packages:*
 - [[https://github.com/bash-lsp/bash-language-server][bash-language-server]]
 - [[https://github.com/typescript-language-server/typescript-language-server][typescript-language-server]]
 - [[https://github.com/haskell/haskell-language-server#readme][haskell-language-server]]
 
-***** lsp-mode
+**** lsp-mode
 # :PROPERTIES:
 # :header-args:emacs-lisp: :noweb-ref dummy :tangle no
 # :END:
@@ -2860,7 +2859,7 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
 (setup (:elpaca flycheck))
 #+end_src
 
-***** Eglot
+**** Eglot
 [[https://github.com/joaotavora/eglot][joaotavora/eglot: A client for Language Server Protocol servers]].
 #+begin_src emacs-lisp
 (setup (:elpaca eldoc-box))
@@ -2881,11 +2880,11 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
         (:hook (lambda() (setq-local show-trailing-whitespace nil)))))))
 #+end_src
 
-****** Performance
+***** Performance
 See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP Mode - LSP support for Emacs]]
 # [2022-05-27 Fri 11:00:30 -03]
 
-***** TODO lsp-bridge
+**** TODO lsp-bridge
 - To sandbox the pip dependencies do:
   + On Linux
     : ❯ python -m venv ./.python-venv
@@ -2941,15 +2940,15 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 Before testing disable Corfu or any other completion.
 Run with =lsp-bridge-mode=.
 
-**** Prescient
+*** Prescient
 [[https://github.com/raxod502/prescient.el][raxod502/prescient.el: ☄️ Simple but effective sorting and filtering for Emacs.]]
 # [2022-04-27 Wed 22:45:04]
 Remembers used completion items and put them up.
 
-***** Prescient with Corfu
+**** Prescient with Corfu
 See [[*Corfu][Corfu]].
 
-** 11xx-ui.el: User Interface settings
+* 11xx-ui.el: User Interface settings
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-ui.el
 :END:
@@ -2961,12 +2960,12 @@ See [[*Corfu][Corfu]].
 #+end_src
 
 
-*** User Interface
+** User Interface
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-ui :tangle no
 :END:
 
-**** Change UI modes
+*** Change UI modes
 #+begin_src emacs-lisp
 ;;; UI
 (menu-bar-mode -1)    ; Disable menu bar
@@ -2984,7 +2983,7 @@ See [[*Corfu][Corfu]].
 ;; (toggle-truncate-lines -1)
 #+end_src
 
-**** Font
+*** Font
 #+begin_src emacs-lisp
 ;; Font configuration
 ;; Check if on Windows and change font (Windows-NT)
@@ -3032,7 +3031,7 @@ number."
 ;; end set font
 #+end_src
 
-**** Options
+*** Options
 #+begin_src emacs-lisp
 (setopt cursor-type 'box
         ;; display-line-numbers-type 'relative
@@ -3042,7 +3041,7 @@ number."
         use-dialog-box nil)
 #+end_src
 
-**** Display line numbers
+*** Display line numbers
 #+begin_src emacs-lisp
 (setup display-line-numbers
   (:disabled)
@@ -3060,7 +3059,7 @@ number."
     (:hook (lambda() (display-line-numbers-mode -1)))))
 #+end_src
 
-**** Parens appearance
+*** Parens appearance
 #+begin_src emacs-lisp
 (setopt show-paren-mode t
         show-paren-delay 0.01
@@ -3070,12 +3069,12 @@ number."
   (:hook-into emacs-lisp-mode))
 #+end_src
 
-**** Theme
+*** Theme
 - [[https://emacs.stackexchange.com/questions/2797/emacs-wont-load-theme-on-startup/19271#19271][init file - Emacs won't load theme on startup - Emacs Stack Exchange]]
 - [[https://stackoverflow.com/questions/22977387/setting-the-emacs-theme-on-startup-without-the-interactive-mode][elisp - setting the emacs theme on startup without the interactive mode - Stack Overflow]]
 - [[https://stackoverflow.com/questions/18904529/after-emacs-deamon-i-can-not-see-new-theme-in-emacsclient-frame-it-works-fr/23668935#23668935][After 'emacs --deamon' I can not see new theme in emacsclient frame. It works from 'emacs M-x server-start' - Stack Overflow]]
 
-***** Load theme path
+**** Load theme path
 *NOTE:* Make sure to save a custom theme with the =-theme= suffix,
 otherwise Emacs will ignore the file.
 # My dumbass ignored this for two days of "troubleshooting" :s [2022-04-13 Wed 22:08:31]
@@ -3083,7 +3082,7 @@ otherwise Emacs will ignore the file.
 (add-to-list 'custom-theme-load-path (concat user-emacs-directory "themes/"))
 #+end_src
 
-***** Remove background color when opening from terminal
+**** Remove background color when opening from terminal
 wizard [[https://stackoverflow.com/questions/19054228/emacs-disable-theme-background-color-in-terminal/20233611#20233611][Emacs: disable theme background color in terminal - Stack Overflow]]
 Remove background face when on terminal
 #+begin_src emacs-lisp
@@ -3103,7 +3102,7 @@ Remove background face when on terminal
 #+end_src
 # [2022-12-03 Sat 00:26:02 -03]
 
-***** Day/Night theme switch
+**** Day/Night theme switch
 Load theme based on Dark or Light system theme:
 - Dependencies:
   + =xdg-desktop-portal=, there are multiple providers targeted for
@@ -3131,7 +3130,7 @@ Load theme based on Dark or Light system theme:
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
 
-***** Prevent white flashbang on startup
+**** Prevent white flashbang on startup
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle no :noweb-ref dummy
 :END:
@@ -3147,7 +3146,7 @@ from the =early-init.el= file, just so it loads before the frame is created:
 #+end_example
 # [2022-12-02 Fri 21:23:24 -03]
 
-****** Set initial background color based on system's color scheme
+***** Set initial background color based on system's color scheme
 # pcase example from [[https://www.reddit.com/r/emacs/comments/108kwyl/comment/j3w5j88/?context=3][New package: Darkman integration with Emacs. : emacs]]
 Before loading the theme
 #+begin_src emacs-lisp
@@ -3183,7 +3182,7 @@ Before loading the theme
             (set-face-attribute 'default nil :background 'unspecified)
             (set-frame-parameter nil 'alpha-background nil)))
 #+end_src
-**** ibuffer mode
+*** ibuffer mode
 [[https://www.reddit.com/r/emacs/comments/19xwk3/comment/c8sg4rq/?utm_source=share&utm_medium=web2x&context=3][wizard src]] | [[http://martinowen.net/blog/2010/02/03/tips-for-emacs-ibuffer.html][Tips for using Emacs Ibuffer]]
 #+begin_src emacs-lisp
 (setup ibuffer
@@ -3199,7 +3198,7 @@ Before loading the theme
   (:global "C-x C-b" ibuffer))
 #+end_src
 
-**** Ruler
+*** Ruler
 #+begin_src emacs-lisp
 (setup display-fill-column-indicator-mode
   (:hook-into prog-mode text-mode)
@@ -3207,9 +3206,9 @@ Before loading the theme
     (display-fill-column-indicator-mode 1))
 #+end_src
 
-**** Modeline
+*** Modeline
 
-***** Doom Modeline
+**** Doom Modeline
 [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#better-modeline][daviwil/emacs-from-scratch/Emacs.org#Better Modeline]]
 # [2022-05-07 Sat 02:54:50]
 [[https://github.com/seagle0128/doom-modeline#customize=][seagle0128/doom-modeline]]
@@ -3229,7 +3228,7 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
            ))
 #+end_src
 
-***** Window margin/padding
+**** Window margin/padding
 #+begin_src emacs-lisp
 (set-window-margins nil 1)
 #+end_src
@@ -3238,7 +3237,7 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
   [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Display-Margins.html][Display Margins (GNU Emacs Lisp Reference Manual)]]
   # [2023-06-06 07:35:53]
 
-**** Fira Code ligatures minor mode
+*** Fira Code ligatures minor mode
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref dummy :tangle no
 :END:
@@ -3267,7 +3266,7 @@ Fira Code Symbol externally.
 #+end_src
 - Note: It doesn't work properly on terminal
 
-**** ligature.el
+*** ligature.el
 :PROPERTIES:
 :header-args:emacs-lisp: :noweb-ref dummy :tangle no
 :END:
@@ -3293,7 +3292,7 @@ Fira Code Symbol externally.
   (global-ligature-mode t))
 #+end_src
 
-** 11xx-half-scroll.el
+* 11xx-half-scroll.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-half-scroll.el :noweb-ref 11xx-half-scroll
 :END:
@@ -3337,7 +3336,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 # ;; [remap scroll-down-command] scroll-down-half
 # ;; [remap scroll-up-command] pixel-scroll-up
 # ;; [remap scroll-down-command] pixel-scroll-down
-** 11xx-pixel-scroll.el: Smooth scrolling
+* 11xx-pixel-scroll.el: Smooth scrolling
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-pixel-scroll.el :noweb-ref 11xx-pixel-scroll
 :END:
@@ -3359,7 +3358,7 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 (provide '11xx-pixel-scroll)
 #+end_src
 
-** 11xx-navigation.el: Controlling Emacs
+* 11xx-navigation.el: Controlling Emacs
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-navigation.el
 :END:
@@ -3370,20 +3369,20 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 (provide '11xx-navigation)
 #+end_src
 
-*** def
+** def
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref 11xx-navigation :tangle no
 :END:
 
-**** Navigation
+*** Navigation
 
-***** Window movement with ace-window
+**** Window movement with ace-window
 [[https://www.admiralbumblebee.com/programming/2020/01/04/Six-months-VS-Code.html#window-management][Window Management with ace-window src]]
 
 Packages for enhanced Emacs minibuffers and better completions/matches
 https://youtu.be/43Dg5zYPHTU
 
-***** Rotate frames
+**** Rotate frames
 wizard [[https://emacs.stackexchange.com/questions/5371/how-to-change-emacs-windows-from-vertical-split-to-horizontal-split/5372#5372][How to change Emacs windows from vertical split to horizontal split? - Emacs Stack Exchange]]
 # [2022-12-02 Fri 23:34:18 -03]
 
@@ -3411,7 +3410,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
            ))
 #+end_src
 
-**** Multiple Cursors
+*** Multiple Cursors
 ~multiple-cursors~
 #+begin_src emacs-lisp
 (setup (:elpaca multiple-cursors)
@@ -3422,7 +3421,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 #+end_src
 
 
-** llm-ai-assistants.el: Large Language Models (LLM) AI Assistants
+* llm-ai-assistants.el: Large Language Models (LLM) AI Assistants
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref llm-ai-assistants-setup
 :END:
@@ -3433,7 +3432,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 (provide 'llm-ai-assistants)
 #+end_src
 
-*** gptel
+** gptel
 - See
   + [[https://www.reddit.com/r/emacs/comments/14glmqc/use_emacs_as_a_chatgpt_app/][Use emacs as a ChatGPT app : emacs]]
     that links [[https://www.armindarvish.com/en/post/use_emacs_as_a_chatgpt_client/][Use Emacs as a ChatGPT App from Anywhere on Your System | /\r|\/|i|\|]]
@@ -3483,7 +3482,7 @@ character for the username, as it allows any username to match and
 retrieve the password.
 
 
-*** Aider
+** Aider
 - [[https://github.com/tninja/aider.el][tninja/aider.el: aider emacs plugin for https://github.com/paul-gauthier/aider]]
 - [[https://github.com/Aider-AI/aider][Aider-AI/aider: aider is AI pair programming in your terminal]]
 #+begin_src emacs-lisp
@@ -3497,7 +3496,7 @@ retrieve the password.
   )
 #+end_src
 
-** 11xx-pdf-viewer.el
+* 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]
 - [[https://github.com/vedang/pdf-tools][vedang/pdf-tools: Emacs support library for PDF files.]]
 #+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/11xx-pdf-viewer.el
@@ -3514,7 +3513,7 @@ retrieve the password.
 (provide '11xx-pdf-viewer)
 #+end_src
 
-*** Troubleshooting
+** Troubleshooting
 Getting =[...]: pdf-info-epdfinfo-program is not executable= means
 epdfinfo was not built. Having installed from MELPA or NonGNU ELPA it
 should be available but running =pdf-tools-install= may be necessary:
@@ -3523,7 +3522,7 @@ or eval =(pdf-tools-install)=, it returns nil if it successfully detects
 a working executable.
 - See [[https://github.com/politza/pdf-tools/issues/288][pdf-info-check-epdfinfo: pdf-info-epdfinfo-program is not executable · Issue #288 · politza/pdf-tools]]
 
-** 11xx-latex.el: LaTeX config
+* 11xx-latex.el: LaTeX config
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-latex.el
 :END:
@@ -3545,7 +3544,7 @@ Install auctex for a better, faster backend:
 (:elpaca auctex)
 #+end_src
 
-**** Customize LaTeX preview image size
+*** Customize LaTeX preview image size
 #wizard [[https://emacs.stackexchange.com/questions/19880/font-size-control-of-latex-previews-in-org-files/33992#33992][org mode - Font size control of LateX previews in Org files - Emacs Stack Exchange]]
 #+begin_src emacs-lisp :tangle no
 (:option org-format-latex-options (plist-put org-format-latex-options :scale 1.5))
