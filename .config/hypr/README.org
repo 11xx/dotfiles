@@ -50,33 +50,30 @@ workspace = f[1], gapsin:0, gapsout:0, border:1
 #+end_src
 
 ** Startup
-# exec-once = waybar & hyprpaper & firefox
+- http://wiki.hyprland.org/Useful-Utilities/Must-have/#authentication-agent
 #+begin_src conf
-# http://wiki.hyprland.org/Useful-Utilities/Must-have/#authentication-agent
 exec-once = /usr/lib/polkit-kde-authentication-agent-1
+#+end_src
 
+#+begin_src conf
 exec-once = lightordark-wallpaper # script
 exec-once = kdeconnectd # KDE connect daemon
 exec-once = eww open mainbar & eww open mainbar2
 exec-once = xsettingsd # GTK2-3 theme live changes
-# exec-once = xremap-default # script, keyboard remappings
 # exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
 
 # exec-once = gammastep -P
 exec-once = hypridle
+#+end_src
 
-exec-once = hypr-dynamic-float-bitwarden-unlock-firefox # script, hack
+Fix file association in dolphin.
+- [[https://bbs.archlinux.org/viewtopic.php?pid=2167673#p2167673][[SOLVED] Weird XDG MIME Behavior with KDE Dolphin on Hyprland / Applications & Desktop Environments / Arch Linux Forums]]
+- [[https://wiki.archlinux.org/title/Xdg-menu][xdg-menu - ArchWiki]]
+#+begin_src conf
+exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6
+#+end_src
 
-# exec-once = hyprpm reload -n # Load plugins
-
-# exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6
-
-# [[https://bbs.archlinux.org/viewtopic.php?pid=2167673#p2167673][[SOLVED] Weird XDG MIME Behavior with KDE Dolphin on Hyprland / Applications & Desktop Environments / Arch Linux Forums]]
-# [[https://wiki.archlinux.org/title/Xdg-menu][xdg-menu - ArchWiki]]
-# Fix file association in dolphin.
-# env = XDG_MENU_PREFIX,plasma-
-env = XDG_MENU_PREFIX,arch-
-
+#+begin_src conf
 exec-once = hypr-eww-restart-on-monitor-change # script
 #+end_src
 
