@@ -252,6 +252,9 @@ windowrulev2 = float,class:org.freedesktop.impl.portal.desktop.kde # xdg-desktop
 # Browser
 windowrulev2 = float,class:firefox,title:^$ # firefox notification pop-ups are empty
 windowrulev2 = float,class:firefox,title:Library
+# mainly for xwayland chromium browsers' context menu where ignorezero
+# can't be used because of the lack of class or title.
+windowrulev2 = noblur,class:^()$,title:^()$
 
 # Inkscape
 windowrulev2 = float, class:^(org.inkscape.Inkscape)$, title:^(SVG Input)$
