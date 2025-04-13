@@ -3,17 +3,12 @@
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 (setup (:elpaca haskell-mode))
 
-(setup (:elpaca lsp-haskell)
-  (:require eglot haskell-ts-mode)
-  (:load-after eglot haskell-ts-mode)
-  (haskell-ts-setup-eglot))
-
 (setup (:elpaca haskell-ts-mode)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   (:file-match "*.hs" "*.lhs")
   (defun org-babel-execute:haskell-ts (body params)
-    "Execute a block of c-ts code with Org Babel."
+    "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
     (org-babel-execute:haskell body params))
 
   ;; use haskell-ts-mode for "haskell" code-blocks
@@ -131,13 +126,12 @@ Null prefix argument turns off the mode."
   (:option typescript-indent-level 2)
   (:hook-into js-mode-hook))
 (setup cc-mode
-  (:disabled)
   ;; (electric-pair-local-mode -1) ;; #manual-smartparens
   ;; (smartparens-mode) ;; #manual-smartparens
+  (add-hook 'c-mode-hook #'c-ts-mode)
   )
-
 (defun org-babel-execute:c-ts (body params)
-  "Execute a block of c-ts code with Org Babel."
+  "Execute a block of `c-ts-mode' as `c-mode' with Org Babel."
   (org-babel-execute:C body params))
 (defun f/gcc-compile-current-file ()
   "Compile current file with gcc.

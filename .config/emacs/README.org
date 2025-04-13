@@ -63,7 +63,7 @@ Install setup with Elpaca and define macros
 :END:
 
 #+begin_src emacs-lisp
-(defvar elpaca-installer-version 0.8)
+(defvar elpaca-installer-version 0.10)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
 (defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
@@ -950,17 +950,12 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 #+begin_src emacs-lisp
 (setup (:elpaca haskell-mode))
 
-(setup (:elpaca lsp-haskell)
-  (:require eglot haskell-ts-mode)
-  (:load-after eglot haskell-ts-mode)
-  (haskell-ts-setup-eglot))
-
 (setup (:elpaca haskell-ts-mode)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   (:file-match "*.hs" "*.lhs")
   (defun org-babel-execute:haskell-ts (body params)
-    "Execute a block of c-ts code with Org Babel."
+    "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
     (org-babel-execute:haskell body params))
 
   ;; use haskell-ts-mode for "haskell" code-blocks
@@ -1238,19 +1233,18 @@ Javascript related packages
 # :END:
 
 *** TODO Languages
-**** DONE C
+**** TODO C
 #+begin_src emacs-lisp
 (setup cc-mode
-  (:disabled)
   ;; (electric-pair-local-mode -1) ;; #manual-smartparens
   ;; (smartparens-mode) ;; #manual-smartparens
+  (add-hook 'c-mode-hook #'c-ts-mode)
   )
-
 #+end_src
 
 #+begin_src emacs-lisp
 (defun org-babel-execute:c-ts (body params)
-  "Execute a block of c-ts code with Org Babel."
+  "Execute a block of `c-ts-mode' as `c-mode' with Org Babel."
   (org-babel-execute:C body params))
 #+end_src
 
@@ -1846,6 +1840,13 @@ appear when hovered.
   (setopt org-modern-block-fringe nil)
   (:hook-into org-mode))
 #+end_src
+
+** Troubleshooting
+
+*** I can't find the format file `pdflatex.fmt!'
+Install all relevant =texlive-*= packages. On Arch, install the =texlive=
+group package.
+# [2025-02-11 Tue 17:18:49 -03] @ak
 
 * 11xx-org-functions.el
 :PROPERTIES:
