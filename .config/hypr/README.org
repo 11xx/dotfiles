@@ -534,7 +534,6 @@ bind = , print, exec, mkdir -p "$(xdg-user-dir PICTURES)/screenshots/" && grim -
 # FIX wizard https://github.com/hyprwm/Hyprland/issues/3558#issuecomment-1848768654
 bind = $mainMod CTRL ALT, pause, exec, hyprctl dispatch exit 0; sleep 2; pgrep -x Hyprland >/dev/null && killall -9 Hyprland
 
-# bind = $mainMod, O, focusmonitor, +1
 bind = $mainMod, O, focusmonitor, +1
 # bind = $mainMod, O, exec, hyprctl --batch 'dispatch focusmonitor +1; dispatch movecursortocorner 1'
 bind = $mainMod SHIFT, O, movewindow, mon:+1
@@ -636,7 +635,7 @@ Split files, sourcing them at [[(hyprland-conf-theming-sourcing)][hyprland.conf 
 general {
     gaps_in = 4
     gaps_out = 8
-    border_size = 2
+    border_size = 1
 }
 
 decoration {
@@ -728,7 +727,7 @@ general {
 
     gaps_in = 4
     gaps_out = 8
-    border_size = 4
+    border_size = 3
 }
 #+end_src
 
@@ -893,7 +892,7 @@ source = enable-tearing.conf
 - Monitor DPMS and brightness for hypridle ::
 #+begin_src conf :noweb tangle
 listener {
-    timeout = 600 # 10m
+    timeout = 300 # 10m
     on-timeout = hyprctl dispatch dpms off
     on-resume = hyprctl dispatch dpms on
 }
