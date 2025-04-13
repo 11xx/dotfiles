@@ -89,10 +89,9 @@
               "date +'%Y/%m/%d (%H:%M)'")
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
-(deflisten current-workspace :initial '{"focused":"1","unfocused":"2"}' "hypr-get-active-workspace")
+(deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1"},"unfocused":{"active_workspace":"2"}}' "hypr-get-current-monitor-workspace")
 (defwidget workspaces []
   (eventbox
-   ;; :onscroll " {} ${current-workspace}"
    :class "workspaces-widget-eventbox"
 
    (box
@@ -101,10 +100,9 @@
            :visible false)
     (for workspace in workspaces-listen
          (eventbox
-          :onclick "hypr-workspace ${workspace.id}"
-          (box :class "workspace-entry ${workspace.id == current-workspace.focused ? "current" : ""} \
+          (box :class "workspace-entry ${workspace.id == current-workspace.focused_monitor.active_workspace ? "current" : ""} \
                        ${workspace.windows > 0 ? "occupied" : "empty"} \
-                       ${workspace.id == current-workspace.unfocused ? "active-unfocused" : ""}"
+                       ${workspace.id == current-workspace.unfocused_monitor.active_workspace ? "active-unfocused" : ""}"
                (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "hypr-get-window-title")
