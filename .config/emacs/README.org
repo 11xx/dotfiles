@@ -1845,6 +1845,20 @@ appear when hovered.
   (:hook-into org-mode))
 #+end_src
 
+*** org-transclusion
+aka literate (?hopefully)
+- [[https://github.com/nobiot/org-transclusion/][nobiot/org-transclusion: Emacs package to enable transclusion with Org Mode]]
+- [[https://www.youtube.com/watch?v=6U9wG-pf-aQ][Assembling Org Mode Files with Transclusion - System Crafters Live! - YouTube]]
+
+#+begin_src emacs-lisp
+(setup (:elpaca org-transclusion)
+  (:with-map org-mode-map
+    (:bind "C-c o t a" org-transclusion-add
+           "C-c o t A" org-transclusion-add-all
+           "C-c o t r" org-transclusion-remove)))
+#+end_src
+
+
 ** Troubleshooting
 
 *** I can't find the format file `pdflatex.fmt!'
