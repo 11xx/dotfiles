@@ -1683,6 +1683,23 @@ is_command prepend_path &&
 # # env = QT_QPA_PLATFORMTHEME,gnome
 
 
+** C Programming
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/c-setup.sh
+:END:
+
+Helper functions for running C files as scripts
+#+begin_src shell
+gcc-run-a.out () {
+    gcc -std=c23 -Wall -Werror -fsanitize=address "$1" && ./a.out
+}
+
+gcc-no-sanitize-run-a.out () {
+    gcc -std=c23 -Wall -Werror "$1" && ./a.out
+}
+#+end_src
+
+
 * Local file variables                                             :noexport:
 # Local Variables:
 # org-confirm-babel-evaluate: nil
