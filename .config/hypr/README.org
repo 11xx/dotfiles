@@ -549,11 +549,13 @@ bind = $mainMod CTRL ALT, N, exec, dunstctl history-pop
 bind = $mainMod CTRL ALT, D, exec, wlr-randr --output DP-2 --off && sleep 1 && wlr-randr --output DP-2 --on --pos 2048,122
 
 # Switch keyboard layouts, find names with `hyprctl devices'
-bind = , control_r, exec, hyprctl switchxkblayout "$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')" next
+# bind = , control_r, exec, hyprctl switchxkblayout "$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')" next
 # If using KMonad it will create a virtual keyboard device with the
 # same name as defined in (uinput-sink ...) but with all lowercase an
 # spaces replaces with hyphens, e.g.:
 # `output (uinput-sink "KMonad uinput Sink"...)' will become kmonad-uinput-sink
+# PS same works for kmonad:
+bind = , control_r, exec, hyprctl switchxkblayout "$(pgrep -x xremap >/dev/null && printf 'xremap' || printf 'sino-wealth-usb-keyboard')" next
 
 # pgrep kmonad > /dev/null && printf '%s\n' 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard\n'
 # if pgrep kmonad > /dev/null; then printf '%s\n' 'kmonad-uinput-sink'; else printf 'sino-wealth-usb-keyboard\n'; fi
