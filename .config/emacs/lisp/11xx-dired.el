@@ -125,6 +125,8 @@ The app is chosen from your OS's preference."
 (setup (:elpaca dired-subtree))
 
 (setup (:elpaca dired-efap)
+  (:with-hook dired-mode
+    (:require dired-efap))
   (:with-map dired-mode-map
     (:bind "r" dired-efap))
   (setopt dired-efap-initial-filename-selection nil))
