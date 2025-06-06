@@ -3464,9 +3464,12 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 #+begin_src emacs-lisp
 (setup (:elpaca gptel)
   ;; (:require auth-source) ; seems necessary, for some reason setup.el
-  (:option gptel-api-key (auth-source-pick-first-password :host "api.openai.com")
+  (:option gptel-api-key (auth-source-pick-first-password :host "api.perplexity.ai")
+           gptel-model 'sonar-pro
+           gptel-backend (gptel-make-perplexity "Perplexity"
+                           :key (auth-source-pick-first-password :host "api.perplexity.ai")
+                           :stream t)
            gptel-default-mode 'org-mode)
-
 
   (gptel-make-ollama "Ollama"             ;Any name of your choosing
     :host "localhost:11434"               ;Where it's running
