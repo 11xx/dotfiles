@@ -243,6 +243,11 @@ windowrulev2 = float,title:^Create or select new Steam library folder$
 windowrulev2 = float,class:steam,title:Friends List
 windowrulev2 = float,class:steam,title:Steam Settings
 windowrulev2 = float,class:steam # just float everything steam
+## unstable fps on background "minimize" fix
+windowrulev2 = renderunfocused,class:steam_app_2622380,title:ELDEN RING NIGHTREIGN
+misc {
+  render_unfocused_fps = 30
+}
 
 # File managers
 windowrulev2 = float,class:org.kde.ark,title:^(File Already Exists).*Ark$
@@ -896,7 +901,7 @@ source = enable-tearing.conf
 - Monitor DPMS and brightness for hypridle ::
 #+begin_src conf :noweb tangle
 listener {
-    timeout = 300 # 10m
+    timeout = 1200 # 20m
     on-timeout = hyprctl dispatch dpms off
     on-resume = hyprctl dispatch dpms on
 }
