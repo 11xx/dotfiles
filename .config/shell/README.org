@@ -1201,7 +1201,7 @@ export COLORTERM='truecolor'
 
 *** Interactive shell setup
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/nnn-setup.bash
+:header-args:shell: :tangle setup-modules/nnn.bash
 :END:
 # n³
 - Using =.bash= as extension for sourceable files and adding a echo shebang.
@@ -1449,7 +1449,7 @@ fi
 
 ** Haskell
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/haskell-setup.sh
+:header-args:shell: :tangle setup-modules/haskell.sh
 :END:
 
 *** GHCup
@@ -1605,7 +1605,7 @@ alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 
 ** Vault
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/vault-setup.sh
+:header-args:shell: :tangle setup-modules/vault.sh
 :END:
 Private repo to accompany the public one. This should be hosted
 privately (in a local pc for example) and holds all other files meant
@@ -1616,16 +1616,13 @@ alias vot='git --git-dir="$HOME/.local/vault.git" --work-tree="$HOME"'
 
 ** MPD
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/mpd-setup.sh
+:header-args:shell: :tangle setup-modules/mpd.sh
 :CUSTOM_ID: orgid-upnrlu
 :END:
 #+begin_src shell
 alias m='ncmpcpp --config="$XDG_CONFIG_HOME/mpd/ncmpcpp-config" --bindings="$XDG_CONFIG_HOME/mpd/ncmpcpp-bindings"'
 alias mm='rmpc'
 #+end_src
-# MPD
-# alias mpcl='mpc -p 7777'
-# alias ml="ncmpcpp -p 7777"
 
 ** Wine
 
@@ -1690,9 +1687,9 @@ is_command prepend_path &&
 # # env = QT_QPA_PLATFORMTHEME,gnome
 
 
-** C Programming
+** C Programming Language
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/c-setup.sh
+:header-args:shell: :tangle setup-modules/c-prog.sh
 :END:
 
 Helper functions for running C files as scripts
