@@ -1509,11 +1509,18 @@ To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
 alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'  (ref:ghcup-alias-bin-anchor)
 #+end_src
 
+Also give precedence to =$GHCUP_BIN_DIR= in =$PATH= for Haskell build tools
+#+begin_src shell
+alias cabal='PATH="$GHCUP_BIN_DIR":"$PATH" cabal'
+#+end_src
+
+
 Define some functions for working with Arch Linux's PKGBUILDs using
 system PATH
 #+begin_src shell
 ghcup_remove_bin_dir_from_path() {
     export PATH=$(printf '%s\n' "$PATH" | sed "s,${GHCUP_BIN_DIR}:,,")
+    unalias cabal
 }
 #+end_src
 # - Install Arch Linux packages for using arch-hs:

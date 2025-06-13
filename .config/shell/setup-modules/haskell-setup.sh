@@ -26,8 +26,11 @@ export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
 
 alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'
 
+alias cabal='PATH="$GHCUP_BIN_DIR":"$PATH" cabal'
+
 ghcup_remove_bin_dir_from_path() {
     export PATH=$(printf '%s\n' "$PATH" | sed "s,${GHCUP_BIN_DIR}:,,")
+    unalias cabal
 }
 
 cabal_install_copy() {
