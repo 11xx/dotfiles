@@ -139,7 +139,6 @@
   ;; Toggle for links display set in (setup org)
   (setopt org-appear-autolinks 'just-brackets) ; nil is default
   (:hook-into org-mode))
-(setopt org-fold-core-style 'text-properties)
 (setup (:elpaca htmlize)
   (setopt org-html-htmlize-output-type 'css ; 'inline-css
            htmlize-html-charset "UTF-8")

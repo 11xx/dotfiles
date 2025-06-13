@@ -1803,15 +1803,6 @@ appear when hovered.
   (setopt org-appear-autolinks 'just-brackets) ; nil is default
   (:hook-into org-mode))
 #+end_src
-- NOTE: setting =org-fold-core-style= to ='text-properties= in
-  =early-init.el= to make sure it is defined before Org Mode is loaded
-  (a requirement of the variable) since when it's set to ='overlays= it
-  conflicts with =org-appear='s ability to toggle visibility of links.
-  # #BUG # [2024-02-18 Sun 23:56:32 -03] @ak
-  + See [[https://github.com/awth13/org-appear/issues/53][Issue #53 · awth13/org-appear]].
-  #+begin_src emacs-lisp :tangle early-init.el
-  (setopt org-fold-core-style 'text-properties)
-  #+end_src
 
 *** Exporting
 **** htmlize

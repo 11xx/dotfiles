@@ -6,5 +6,3 @@
     (message "*** Emacs loaded in %s seconds with %d garbage collections."
              (emacs-init-time "%.2f")
              gcs-done)))
-
-(setopt org-fold-core-style 'text-properties)
