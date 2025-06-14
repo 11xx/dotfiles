@@ -1,31 +1,11 @@
+#!/usr/bin/echo 'This is a source only file.'
 export XDG_CACHE_HOME="$HOME/.local/cache"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_BIN_HOME="$HOME/.local/bin"
 
-append_path () {
-    case ":$PATH:" in
-        *:"$1":*)
-        ;;
-        *)
-            PATH="${PATH:+$PATH:}$1"
-            PATH="${PATH#:}"
-            PATH="${PATH%:}"
-    esac
-}
-
-prepend_path () {
-    # Prioritize over system PATH directories
-    case ":$PATH:" in
-        *:"$1":*)
-        ;;
-        *)
-            PATH="$1:${PATH:+$PATH:}"
-            PATH="${PATH#:}"
-            PATH="${PATH%:}"
-    esac
-}
+source "$XDG_CONFIG_HOME/shell/functions"
 
 append_path "$XDG_DATA_HOME/cargo/bin"
 append_path "$XDG_DATA_HOME/cabal/bin"
