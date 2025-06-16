@@ -34,8 +34,8 @@ workspace = 8, persistent:true
 workspace = 9, persistent:true, gapsin:0, gapsout:0, border:true, rounding:false
 workspace = 10, persistent:true
 
-windowrulev2 = bordercolor rgb(970065) rgb(000000), onworkspace:9
-windowrulev2 = bordercolor rgb(008800), fullscreenstate:* 2 # set bordercolor to green if window's client fullscreen state is 1(maximize) (internal state can be anything)
+windowrule = bordercolor rgb(970065) rgb(000000), onworkspace:9
+windowrule = bordercolor rgb(008800), fullscreenstate:* 2 # set bordercolor to green if window's client fullscreen state is 1(maximize) (internal state can be anything)
 #+end_src
 
 *** No gaps with only a single window in the workspace
@@ -218,59 +218,59 @@ binds {
 :END:
 #+begin_src conf
 # See https://wiki.hyprland.org/Configuring/Window-Rules/
-windowrulev2 = float,class:^(org.kde.polkit-kde-authentication-agent-1)$
-windowrulev2 = float,title:^(Picture-in-Picture)$
-windowrulev2 = pin, title:^(Picture-in-Picture)$
-windowrulev2 = float,title:^(Edit with Emacs FRAME)$
-windowrulev2 = float,class:^.*(floatWMRULE|FLOAT_WMRULE)$
-windowrulev2 = float,title:^.*(floatWMRULE|FLOAT_WMRULE)$
-# windowrulev2 = opacity 0.94 0.94,class:^(Dunst)$
-windowrulev2 = float,title:^Open File(|s)
-windowrulev2 = float,title:^Vivaldi Settings:
-windowrulev2 = suppressevent maximize, class:^mpv$
-windowrulev2 = float,class:.*\.exe$
+windowrule = float,class:^(org.kde.polkit-kde-authentication-agent-1)$
+windowrule = float,title:^(Picture-in-Picture)$
+windowrule = pin, title:^(Picture-in-Picture)$
+windowrule = float,title:^(Edit with Emacs FRAME)$
+windowrule = float,class:^.*(floatWMRULE|FLOAT_WMRULE)$
+windowrule = float,title:^.*(floatWMRULE|FLOAT_WMRULE)$
+# windowrule = opacity 0.94 0.94,class:^(Dunst)$
+windowrule = float,title:^Open File(|s)
+windowrule = float,title:^Vivaldi Settings:
+windowrule = suppressevent maximize, class:^mpv$
+windowrule = float,class:.*\.exe$
 
 # Emacs
-windowrulev2 = float,class:(emacs),title:(Ediff)
-windowrulev2 = size 720 330,class:(emacs),title:(Ediff)
-windowrulev2 = move cursor -50% -50%,class:(emacs),title:(Ediff)
+windowrule = float,class:(emacs),title:(Ediff)
+windowrule = size 720 330,class:(emacs),title:(Ediff)
+windowrule = move cursor -50% -50%,class:(emacs),title:(Ediff)
 
 # Blender
-windowrulev2 = float,title:^Blender (Render|Preferences)$
+windowrule = float,title:^Blender (Render|Preferences)$
 
 # Steam & Games
-windowrulev2 = float,title:^Create or select new Steam library folder$
-windowrulev2 = float,class:steam,title:Friends List
-windowrulev2 = float,class:steam,title:Steam Settings
-# windowrulev2 = float,class:steam # just float everything steam
+windowrule = float,title:^Create or select new Steam library folder$
+windowrule = float,class:steam,title:Friends List
+windowrule = float,class:steam,title:Steam Settings
+# windowrule = float,class:steam # just float everything steam
 windowrule = monitor 0 silent,class:^(steam_app_[0-9]+)$
 windowrule = workspace 6 silent,class:^(steam_app_[0-9]+)$
 ## unstable fps on background "minimize" fix
-windowrulev2 = renderunfocused,class:steam_app_2622380,title:ELDEN RING NIGHTREIGN
+windowrule = renderunfocused,class:steam_app_2622380,title:ELDEN RING NIGHTREIGN
 misc {
   render_unfocused_fps = 30
 }
 
 # File managers
-windowrulev2 = float,class:org.kde.ark,title:^(File Already Exists).*Ark$
-windowrulev2 = float,class:org.kde.dolphin,title:^(Choose Application).*Dolphin$
-windowrulev2 = float,class:org.freedesktop.impl.portal.desktop.kde # xdg-desktop-portal dolphin
+windowrule = float,class:org.kde.ark,title:^(File Already Exists).*Ark$
+windowrule = float,class:org.kde.dolphin,title:^(Choose Application).*Dolphin$
+windowrule = float,class:org.freedesktop.impl.portal.desktop.kde # xdg-desktop-portal dolphin
 
 # Browser
-windowrulev2 = float,class:firefox,title:^$ # firefox notification pop-ups are empty
-windowrulev2 = float,class:firefox,title:Library
+windowrule = float,class:firefox,title:^$ # firefox notification pop-ups are empty
+windowrule = float,class:firefox,title:Library
 # mainly for xwayland chromium browsers' context menu where ignorezero
 # can't be used because of the lack of class or title.
-windowrulev2 = noblur,class:^()$,title:^()$
+windowrule = noblur,class:^()$,title:^()$
 
 # Inkscape
-windowrulev2 = float, class:^(org.inkscape.Inkscape)$, title:^(SVG Input)$
+windowrule = float, class:^(org.inkscape.Inkscape)$, title:^(SVG Input)$
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
 source = window-rules.conf
 
-windowrulev2 = suppressevent maximize, class:.*
+windowrule = suppressevent maximize, class:.*
 #+end_src
 
 
@@ -863,7 +863,7 @@ Disable title bars for tiles (non-floating) windows
   + [[https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars#window-rules][hyprland-plugins/hyprbars#Window rules at main · hyprwm/hyprland-plugins]]
   + [[https://www.reddit.com/r/hyprland/comments/1cyaz4u/comment/l5brgnw/][I like hyprbars. That's all. : r/hyprland]]
 #+begin_src conf
-windowrulev2 = plugin:hyprbars:nobar, ^floating:0
+windowrule = plugin:hyprbars:nobar, ^floating:0
 #+end_src
 
 Source in main config
@@ -883,11 +883,11 @@ general {
 
 env = WLR_DRM_NO_ATOMIC,1
 
-windowrulev2 = immediate,class:^eldenring.exe$
-windowrulev2 = immediate,class:^gamescope$
-windowrulev2 = immediate,class:^steam_app_[0-9]+$
-windowrulev2 = immediate,class:^mpv$
-windowrulev2 = immediate,class:love,title:Freesync test
+windowrule = immediate,class:^eldenring.exe$
+windowrule = immediate,class:^gamescope$
+windowrule = immediate,class:^steam_app_[0-9]+$
+windowrule = immediate,class:^mpv$
+windowrule = immediate,class:love,title:Freesync test
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
@@ -915,8 +915,8 @@ listener {
 :END:
 
 #+begin_src conf
-windowrulev2 = idleinhibit fullscreen,class:^(gamescope|steam_app_[0-9]+)$
-windowrulev2 = idleinhibit fullscreen,class:^(eldenring.exe)$
+windowrule = idleinhibit fullscreen,class:^(gamescope|steam_app_[0-9]+)$
+windowrule = idleinhibit fullscreen,class:^(eldenring.exe)$
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
