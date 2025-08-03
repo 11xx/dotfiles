@@ -1805,6 +1805,11 @@ appear when hovered.
 #+end_src
 
 *** Exporting
+- [[https://stackoverflow.com/questions/8395036/make-org-ignore-underscores-when-exporting-to-html][emacs - make Org ignore underscores when exporting to HTML - Stack Overflow]]
+#+begin_src emacs-lisp
+(setopt org-export-with-sub-superscripts nil)
+#+end_src
+
 **** htmlize
 - See
   + [[https://github.com/hniksic/emacs-htmlize][GitHub - hniksic/emacs-htmlize: Convert buffer text and decorations to HTML.]]
@@ -1828,6 +1833,131 @@ appear when hovered.
     the end of code blocks as a yellow square. To fix it unset the
     face e.g.:
     : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
+
+**** GitHub Markdown
+
+#+begin_src emacs-lisp
+(setup (:elpaca ox-gfm))
+(elpaca (ox-html-stable-ids :host github
+                            :repo "jeffkreeftmeijer/ox-html-stable-ids.el")
+  (require 'ox-html-stable-ids)
+  (setopt org-html-stable-ids t
+          org-export-html-stable-ids t)
+  (org-html-stable-ids-add))
+
+(elpaca (ox-md-title :host github
+                     :repo "jeffkreeftmeijer/ox-md-title.el")
+  (require 'ox-md-title))
+
+(defun readme-to-markdown (filename &optional confirm-overwrite)
+  "Export the current Org buffer to a Markdown file named FILENAME.
+Alternative version using display-buffer-overriding-action for cleaner approach."
+  (interactive
+   (list (read-file-name "Export markdown to file: "
+                         nil nil nil
+                         (concat (file-name-sans-extension
+                                  (or (buffer-file-name)
+                                      (buffer-name)))
+                                 ".md"))
+         current-prefix-arg))
+
+  (unless (derived-mode-p 'org-mode)
+    (user-error "This function only works in Org mode buffers"))
+
+  ;; Check for file existence and confirm if requested
+  (when (and confirm-overwrite (file-exists-p filename))
+    (unless (yes-or-no-p (format "File %s exists. Overwrite? " filename))
+      (user-error "Export cancelled")))
+
+  ;; Save current state
+  (let ((original-buffer (current-buffer))
+        (make-backup-files nil)
+        (original-display-action display-buffer-overriding-action)
+        export-buffer)
+
+    ;; Temporarily set display-buffer to not show any buffers
+    (setq display-buffer-overriding-action
+          '((lambda (buffer alist)
+              ;; Return the buffer without displaying it
+              buffer)
+            . nil))
+
+    (unwind-protect
+        (save-window-excursion
+          ;; Add the markdown title
+          (org-md-title-add)
+
+          ;; Export to buffer (silently)
+          (let ((org-md-title t))
+            (setq export-buffer (org-gfm-export-as-markdown)))
+
+          ;; Write to file
+          (with-current-buffer export-buffer
+            (write-region (point-min) (point-max) filename nil 'no-message))
+
+          (message "Exported to %s" filename))
+
+      ;; Restore original display action and cleanup
+      (setq display-buffer-overriding-action original-display-action)
+      (when (and export-buffer (buffer-live-p export-buffer))
+        (kill-buffer export-buffer)))))
+
+(defun readme-org-to-readme-md ()
+  (interactive)
+  (readme-to-markdown "README.md"))
+
+;;; stable IDs for list-item <<targets>>
+
+;; (defun f/slugify (s)
+;;   "GitHub-style slug: lower-case ASCII, spaces & punctuation → “-”."
+;;   (when (and (stringp s) (string-match-p "\\S-" s))
+;;     (setq s (downcase s))
+;;     (setq s (replace-regexp-in-string "[^[:alnum:]#]+" "-" s)) ; keep “#” for now
+;;     (replace-regexp-in-string "[#]" "-" (replace-regexp-in-string "^-\\|-$" "" s))))
+
+(defun f/slugify (s)
+  "GitHub-style slug: preserve more characters, but convert problematic ones."
+  (when (and (stringp s) (string-match-p "\\S-" s))
+    (setq s (downcase s))
+    ;; Convert only truly problematic characters to hyphens
+    (setq s (replace-regexp-in-string "[[:space:]#<>\"'&]+" "-" s))
+    (replace-regexp-in-string "^-\\|-$" "" s)))
+
+(defun f/extract-first-target (item info)
+  "Return the first <<target>> object inside ITEM or nil."
+  (org-element-map (org-element-contents item) '(target radio-target)
+    #'identity info 'first-match))
+
+;; advice
+(defun f/stable-id–around (orig datum info)
+  "Supply deterministic IDs for list items and targets, else fallback to ORIG."
+  (pcase (org-element-type datum)
+
+    ;; 1. A stand-alone <<target>> object --------------------------
+    ((or 'target 'radio-target)
+     (let* ((raw   (org-element-property :value datum))       ; «foo»
+            (clean (and raw (replace-regexp-in-string "[<>]" "" raw))) ; foo
+            (slug  (f/slugify clean)))
+       (or slug (funcall orig datum info))))
+
+    ;; 2. A list ITEM that *contains* a <<target>> ---------------
+    ('item
+     (if-let* ((tgt (f/extract-first-target datum info))
+               (raw (org-element-property :value tgt))
+               (clean (replace-regexp-in-string "[<>]" "" raw))
+               (slug (f/slugify clean)))
+         slug
+       (funcall orig datum info)))
+
+    ;; 3. Anything else → keep package’s behaviour ---------------
+    (_ (funcall orig datum info))))
+
+;; add :depth so we run *before* ox-html-stable-ids’ own advice
+(advice-add 'org-export-get-reference
+            :around #'f/stable-id–around
+            '((depth . -95)))
+#+end_src
+
 
 *** Prettify Org Mode
 #+begin_src emacs-lisp
