@@ -1,6 +1,7 @@
 user_pref("ui.key.menuAccessKeyFocuses", false);
 
 user_pref("media.ffmpeg.vaapi.enabled", true);
+user_pref("media.hardware-video-decoding.force-enabled", true);
 user_pref("media.rdd-ffmpeg.enabled", true);
 user_pref("media.av1.enabled", true); // You may skip this if your GPU does not support AV1
 user_pref("gfx.x11-egl.force-enabled", true);
