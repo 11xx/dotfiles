@@ -6,7 +6,7 @@
 # #+STARTUP: hidestars
 
 # Export as HTML
-#+SETUPFILE: https://fniessen.github.io/org-html-themes/org/theme-readtheorg.setup
+# #+SETUPFILE: ~/org/.setup/theme-readtheorg.setup
 
 #+OPTIONS: toc:2
 
