@@ -1903,6 +1903,10 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 ;;     (setq s (replace-regexp-in-string "[^[:alnum:]#]+" "-" s)) ; keep “#” for now
 ;;     (replace-regexp-in-string "[#]" "-" (replace-regexp-in-string "^-\\|-$" "" s))))
 
+;; Add a hash table to track used IDs during export
+(defvar v/used-ids-table nil
+  "Hash table to track used IDs during export to prevent conflicts.")
+
 (defun f/slugify (s)
   "GitHub-style slug: preserve more characters, but convert problematic ones."
   (when (and (stringp s) (string-match-p "\\S-" s))
@@ -1916,31 +1920,94 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (org-element-map (org-element-contents item) '(target radio-target)
     #'identity info 'first-match))
 
-;; advice
+(defun f/get-heading-path (datum)
+  "Get the path to a heading as a list of ancestor headings."
+  (let ((path '())
+        (current datum))
+    (while (setq current (org-element-property :parent current))
+      (when (eq (org-element-type current) 'headline)
+        (push (org-element-property :raw-value current) path)))
+    path))
+
+(defun f/ensure-unique-id (base-id datum)
+  "Ensure BASE-ID is unique, adding disambiguation if needed."
+  (unless v/used-ids-table
+    (setq v/used-ids-table (make-hash-table :test 'equal)))
+
+  (let ((final-id base-id)
+        (counter 1)
+        (path (f/get-heading-path datum)))
+
+    ;; Check if base-id is already used
+    (while (gethash final-id v/used-ids-table)
+      ;; Try with parent context first (if available and not too long)
+      (when (and path (= counter 1))
+        (let ((parent-slug (f/slugify (car (last path)))))
+          (when (and parent-slug (< (+ (length parent-slug) (length base-id)) 50))
+            (setq final-id (concat parent-slug "-" base-id))
+            (setq counter 2)
+            (if (not (gethash final-id v/used-ids-table))
+                (setq counter 999))))) ; Exit loop if parent-context works
+
+      ;; If parent context didn't work or we're past first attempt, use numbers
+      (when (< counter 999)
+        (setq final-id (format "%s-%d" base-id counter))
+        (setq counter (1+ counter))))
+
+    ;; Register the final ID
+    (puthash final-id t v/used-ids-table)
+    final-id))
+
 (defun f/stable-id–around (orig datum info)
-  "Supply deterministic IDs for list items and targets, else fallback to ORIG."
+  "Supply deterministic IDs for list items, targets, tables, headings with conflict resolution."
   (pcase (org-element-type datum)
 
     ;; 1. A stand-alone <<target>> object --------------------------
     ((or 'target 'radio-target)
      (let* ((raw   (org-element-property :value datum))       ; «foo»
             (clean (and raw (replace-regexp-in-string "[<>]" "" raw))) ; foo
-            (slug  (f/slugify clean)))
-       (or slug (funcall orig datum info))))
+            (base-slug (f/slugify clean)))
+       (if base-slug
+           (f/ensure-unique-id base-slug datum)
+         (funcall orig datum info))))
 
     ;; 2. A list ITEM that *contains* a <<target>> ---------------
     ('item
      (if-let* ((tgt (f/extract-first-target datum info))
                (raw (org-element-property :value tgt))
                (clean (replace-regexp-in-string "[<>]" "" raw))
-               (slug (f/slugify clean)))
-         slug
+               (base-slug (f/slugify clean)))
+         (f/ensure-unique-id base-slug datum)
        (funcall orig datum info)))
 
-    ;; 3. Anything else → keep package’s behaviour ---------------
+    ;; 3. A table with #+NAME: ------------------------------------
+    ('table
+     (let* ((name (org-element-property :name datum))
+            (base-slug (and name (f/slugify name))))
+       (if base-slug
+           (f/ensure-unique-id base-slug datum)
+         (funcall orig datum info))))
+
+    ;; 4. Headlines -----------------------------------------------
+    ('headline
+     (let* ((title (org-element-property :raw-value datum))
+            (base-slug (f/slugify title)))
+       (if base-slug
+           (f/ensure-unique-id base-slug datum)
+         (funcall orig datum info))))
+
+    ;; 5. Anything else → keep package's behaviour ---------------
     (_ (funcall orig datum info))))
 
-;; add :depth so we run *before* ox-html-stable-ids’ own advice
+;; Clear the hash table before each export
+(defun f/clear-ids-table (&rest _)
+  "Clear the used IDs table before export."
+  (setq v/used-ids-table (make-hash-table :test 'equal)))
+
+;; Hook to clear the table before export starts
+(add-hook 'org-export-before-processing-functions #'f/clear-ids-table)
+
+;; Your existing advice with increased depth for priority
 (advice-add 'org-export-get-reference
             :around #'f/stable-id–around
             '((depth . -95)))
