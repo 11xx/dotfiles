@@ -446,6 +446,9 @@ read it before opening a new issue about your will.")
 
                ;; Package-manager interactive UI
                (elpaca-finished :foreground ,c/green :weight bold)
+
+               ;; Eldoc
+               (eldoc-box-border :background ,c/purple)
                )))
 
   (apply #'custom-theme-set-faces 'neron-dark
