@@ -927,6 +927,10 @@ or
 #+begin_src emacs-lisp
 <<11xx-modes>>
 
+(add-hook 'prog-mode-hook
+          (lambda ()
+            (setq-local fill-column 120)))
+
 (provide '11xx-modes)
 #+end_src
 
@@ -965,10 +969,6 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
   ;; use haskell-ts-mode for "haskell" code-blocks
   (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
 
-  ;; use haskell-mode indentation instead
-  (setopt haskell-ts-use-indent nil)
-  (add-hook 'haskell-ts-mode-hook #'haskell-indentation-mode)
-
   (defun haskell-setup-hs-initialize ()
     "Insert default content into a new Setup.hs file."
     (when (and (string= (buffer-name) "Setup.hs")
@@ -986,7 +986,7 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 **** YAML
 #+begin_src emacs-lisp
-(setup (:elpaca yaml-mode))
+(setup (:elpaca yaml-pro))
 #+end_src
 
 **** PKGBUILD
@@ -1823,7 +1823,7 @@ appear when hovered.
     : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
 
 **** GitHub Markdown
-
+- [[https://jeffkreeftmeijer.com/ox-html-stable-ids/][ox-html-stable-ids: Stable IDs for ox-html.el]]
 #+begin_src emacs-lisp
 (setup (:elpaca ox-gfm))
 (elpaca (ox-html-stable-ids :host github
@@ -2699,7 +2699,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                                          t
                                          cursor-intangible
                                          t face minibuffer-prompt))
-  (:with-hook 'elpaca-after-init-hook
+  (:with-hook elpaca-after-init-hook
     (:hook vertico-mode)))
 #+end_src
 
@@ -2844,7 +2844,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
            corfu-preview-current nil)
 
-  (:with-hook 'elpaca-after-init-hook
+  (:with-hook elpaca-after-init-hook
     (:hook global-corfu-mode))
   (global-corfu-mode 1)
 
@@ -3035,7 +3035,7 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 (setup-elpaca (lsp-bridge :host github :repo "manateelazycat/lsp-bridge"
                           :files (:defaults "*.el" "*.py" "acm/*" "core/*" "langserver/*" "multiserver/*" "resources/*")
                           :build (:not compile))
-  ;;(global-lsp-bridge-mode)
+  (global-lsp-bridge-mode)
   )
 #+end_src
 
@@ -3332,8 +3332,10 @@ Before loading the theme
 #+begin_src emacs-lisp
 (setup display-fill-column-indicator-mode
   (:hook-into prog-mode text-mode)
-    (:option display-fill-column-indicator-column 79)
-    (display-fill-column-indicator-mode 1))
+  (:option display-fill-column-indicator-column 79)
+  (:with-hook prog-mode
+    (:hook (lambda() (setq-local display-fill-column-indicator-column 120))))
+  (display-fill-column-indicator-mode 1))
 #+end_src
 
 *** Modeline

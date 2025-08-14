@@ -14,10 +14,6 @@
   ;; use haskell-ts-mode for "haskell" code-blocks
   (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
 
-  ;; use haskell-mode indentation instead
-  (setopt haskell-ts-use-indent nil)
-  (add-hook 'haskell-ts-mode-hook #'haskell-indentation-mode)
-
   (defun haskell-setup-hs-initialize ()
     "Insert default content into a new Setup.hs file."
     (when (and (string= (buffer-name) "Setup.hs")
@@ -31,7 +27,7 @@
 
   ;; hoogle
   (setopt haskell-hoogle-port-number "4141"))
-(setup (:elpaca yaml-mode))
+(setup (:elpaca yaml-pro))
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
 (setup (:elpaca powershell))
@@ -185,5 +181,9 @@ using the function `compile' build a command like:
   (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
 (setup (:elpaca lua-mode))
 (setup picard-mode)
+
+(add-hook 'prog-mode-hook
+          (lambda ()
+            (setq-local fill-column 120)))
 
 (provide '11xx-modes)

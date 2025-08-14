@@ -57,7 +57,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                                          t
                                          cursor-intangible
                                          t face minibuffer-prompt))
-  (:with-hook 'elpaca-after-init-hook
+  (:with-hook elpaca-after-init-hook
     (:hook vertico-mode)))
 ;; Persist history over Emacs restarts. Vertico sorts by history position.
 (setup savehist
@@ -156,7 +156,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
            ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
            corfu-preview-current nil)
 
-  (:with-hook 'elpaca-after-init-hook
+  (:with-hook elpaca-after-init-hook
     (:hook global-corfu-mode))
   (global-corfu-mode 1)
 

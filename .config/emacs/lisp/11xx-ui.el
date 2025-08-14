@@ -114,8 +114,10 @@ number."
   (:global "C-x C-b" ibuffer))
 (setup display-fill-column-indicator-mode
   (:hook-into prog-mode text-mode)
-    (:option display-fill-column-indicator-column 79)
-    (display-fill-column-indicator-mode 1))
+  (:option display-fill-column-indicator-column 79)
+  (:with-hook prog-mode
+    (:hook (lambda() (setq-local display-fill-column-indicator-column 120))))
+  (display-fill-column-indicator-mode 1))
 (setup (:elpaca doom-modeline)
   (:hook-into elpaca-after-init-hook)
   (:option doom-modeline-height 15
