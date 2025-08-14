@@ -1907,6 +1907,10 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 (defvar v/used-ids-table nil
   "Hash table to track used IDs during export to prevent conflicts.")
 
+;; Add a cache for heading-to-ID mapping to ensure consistency
+(defvar v/heading-id-cache nil
+  "Hash table to cache heading title to ID mappings for consistency.")
+
 (defun f/slugify (s)
   "GitHub-style slug: preserve more characters, but convert problematic ones."
   (when (and (stringp s) (string-match-p "\\S-" s))
@@ -1929,34 +1933,65 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
         (push (org-element-property :raw-value current) path)))
     path))
 
+(defun f/get-heading-cache-key (datum)
+  "Generate a cache key for a heading based on its title and position."
+  (let* ((title (org-element-property :raw-value datum))
+         (path (f/get-heading-path datum)))
+    ;; Create a unique key combining title and parent path
+    (concat (mapconcat 'identity (reverse path) "/")
+            (if path "/" "")
+            title)))
+
 (defun f/ensure-unique-id (base-id datum)
   "Ensure BASE-ID is unique, adding disambiguation if needed."
   (unless v/used-ids-table
     (setq v/used-ids-table (make-hash-table :test 'equal)))
+  (unless v/heading-id-cache
+    (setq v/heading-id-cache (make-hash-table :test 'equal)))
 
-  (let ((final-id base-id)
-        (counter 1)
-        (path (f/get-heading-path datum)))
+  ;; For headlines, check cache first for consistency
+  (when (eq (org-element-type datum) 'headline)
+    (let ((cache-key (f/get-heading-cache-key datum)))
+      (when-let ((cached-id (gethash cache-key v/heading-id-cache)))
+        ;; If we already determined an ID for this heading, use it
+        (puthash cached-id t v/used-ids-table)
+        ;; Return the cached ID directly instead of using cl-return-from
+        (setq base-id cached-id)
+        (setq datum nil)))) ; Signal that we should return immediately
 
-    ;; Check if base-id is already used
-    (while (gethash final-id v/used-ids-table)
-      ;; Try with parent context first (if available and not too long)
-      (when (and path (= counter 1))
-        (let ((parent-slug (f/slugify (car (last path)))))
-          (when (and parent-slug (< (+ (length parent-slug) (length base-id)) 50))
-            (setq final-id (concat parent-slug "-" base-id))
-            (setq counter 2)
-            (if (not (gethash final-id v/used-ids-table))
-                (setq counter 999))))) ; Exit loop if parent-context works
+  ;; Only proceed if we didn't find a cached result
+  (when datum
+    (let ((final-id base-id)
+          (counter 1)
+          (path (f/get-heading-path datum)))
 
-      ;; If parent context didn't work or we're past first attempt, use numbers
-      (when (< counter 999)
-        (setq final-id (format "%s-%d" base-id counter))
-        (setq counter (1+ counter))))
+      ;; Check if base-id is already used
+      (while (gethash final-id v/used-ids-table)
+        ;; Try with parent context first (if available and not too long)
+        (when (and path (= counter 1))
+          (let ((parent-slug (f/slugify (car (last path)))))
+            (when (and parent-slug (< (+ (length parent-slug) (length base-id)) 50))
+              (setq final-id (concat parent-slug "-" base-id))
+              (setq counter 2)
+              (if (not (gethash final-id v/used-ids-table))
+                  (setq counter 999))))) ; Exit loop if parent-context works
 
-    ;; Register the final ID
-    (puthash final-id t v/used-ids-table)
-    final-id))
+        ;; If parent context didn't work or we're past first attempt, use numbers
+        (when (< counter 999)
+          (setq final-id (format "%s-%d" base-id counter))
+          (setq counter (1+ counter))))
+
+      ;; Register the final ID
+      (puthash final-id t v/used-ids-table)
+
+      ;; Cache the result for headlines to ensure TOC consistency
+      (when (eq (org-element-type datum) 'headline)
+        (let ((cache-key (f/get-heading-cache-key datum)))
+          (puthash cache-key final-id v/heading-id-cache)))
+
+      (setq base-id final-id)))
+
+  base-id)
 
 (defun f/stable-id–around (orig datum info)
   "Supply deterministic IDs for list items, targets, tables, headings with conflict resolution."
@@ -1999,13 +2034,25 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
     ;; 5. Anything else → keep package's behaviour ---------------
     (_ (funcall orig datum info))))
 
-;; Clear the hash table before each export
+;; Clear the hash tables before each export
 (defun f/clear-ids-table (&rest _)
-  "Clear the used IDs table before export."
-  (setq v/used-ids-table (make-hash-table :test 'equal)))
+  "Clear the used IDs table and heading cache before export."
+  (setq v/used-ids-table (make-hash-table :test 'equal))
+  (setq v/heading-id-cache (make-hash-table :test 'equal)))
 
-;; Hook to clear the table before export starts
+;; Hook to clear the tables before export starts
 (add-hook 'org-export-before-processing-functions #'f/clear-ids-table)
+
+;; Suppress noisy org-babel messages during export
+(defun f/suppress-babel-messages (orig-fun &rest args)
+  "Suppress org-babel messages during export."
+  (let ((inhibit-message t)
+        (message-log-max nil))
+    (apply orig-fun args)))
+
+;; Apply message suppression to common babel functions
+(advice-add 'org-babel-exp-src-block :around #'f/suppress-babel-messages)
+(advice-add 'org-fontify-like-in-org-mode :around #'f/suppress-babel-messages)
 
 ;; Your existing advice with increased depth for priority
 (advice-add 'org-export-get-reference
