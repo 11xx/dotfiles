@@ -79,25 +79,6 @@
    ;;; UI
    org-ellipsis " ▾"
    org-hide-emphasis-markers t
-   ;;; Publish
-   org-publish-project-alist
-   '(("front-end-completo-2-markdown"
-      :base-directory "~/org/learning/web/front-end/2.0/org/"
-      :base-extension "org"
-      :publishing-directory "~/org/learning/web/front-end/2.0/publish/"
-      :recursive t
-      :publishing-function org-html-publish-to-html
-      :headline-levels 4             ; Just the default for this project.
-      :auto-preamble t)
-     ("front-end-completo-2-static"
-      :base-directory "~/org/learning/web/front-end/2.0/org/"
-      :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|ogg\\|swf"
-      :publishing-directory "~/org/learning/web/front-end/2.0/publish/"
-      :recursive t
-      :publishing-function org-publish-attachment)
-     ("org"
-      :components ("front-end-completo-2-markdown" "front-end-completo-2-static")))
-   org-publish-timestamp-directory (expand-file-name "org-timestamps" no-littering-var-directory)
    ;;; Exporting
    ;; export async default:
    ;; Use 'M-x org-export-stack' to display current processes:
@@ -110,6 +91,13 @@
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
    org-src-window-setup 'current-window)
+
+  ;; Publish
+  (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
+    (unless (file-exists-p dir) (make-directory dir t))
+    (setopt org-publish-timestamp-directory dir))
+  (with-eval-after-load 'ox-publish
+    (require '11xx-org-publish))
 
   (:with-mode eldoc
     (:hook-into org-mode)))
