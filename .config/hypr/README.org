@@ -903,7 +903,7 @@ source = enable-tearing.conf
 - Monitor DPMS and brightness for hypridle ::
 #+begin_src conf :noweb tangle
 listener {
-    timeout = 1200 # 20m
+    timeout = 300 # 5min
     on-timeout = hyprctl dispatch dpms off
     on-resume = hyprctl dispatch dpms on
 }
@@ -1066,6 +1066,21 @@ socat -U - UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE
                 dispatch centerwindow
     done
 #+end_src
+
+** =hypr-gamemode-monitors=
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "hypr-gamemode-monitors") :shebang #!/usr/bin/env sh :mkdirp yes
+:END:
+Having different fractional scaling messes somethings up with some games.
+
+So I have a source keyword for a file that overrides the default.
+#+begin_src shell
+sed -Ei 's/^[[:blank:]]*source = \.\/monitors-gamemode\.conf$/#&/
+t
+s/^#([[:blank:]]*source = \.\/monitors-gamemode\.conf)$/\1/' \
+    ~/.config/hypr/monitors.conf
+#+end_src
+
 
 * Hyprland Notes
 ** Turn screen off (screen energy saver)
