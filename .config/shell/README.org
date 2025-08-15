@@ -320,10 +320,10 @@ export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
 Commands
 #+begin_src shell
 #export READER="zatura"
-export GIT_EDITOR='emacs-minimal -t git-floatWMRULE'
-export ALTERNATE_EDITOR='emacs-minimal -nw'
-export EDITOR="emacs-launcher -nw -m"
-export VISUAL="emacs-launcher -m"
+export GIT_EDITOR=emacsclient
+export ALTERNATE_EDITOR=emacs
+export EDITOR=emacsclient
+export VISUAL=emacsclient
 export TERMINAL=alacritty
 export BROWSER=firefox
 export VIDEO=mpv
