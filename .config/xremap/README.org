@@ -27,6 +27,7 @@ keymap:
         - thorium-browser
         - Thorium-browser # X11
         - org.musicbrainz.Picard
+        - zen
     exact_match: true # required for not conflicting with
                       # SUPER+MOD+[...]  that would otherwise be
                       # interpreted by the window manager
