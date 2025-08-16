@@ -1805,9 +1805,10 @@ appear when hovered.
   + [[https://melpa.org/#/htmlize][htmlize - MELPA]]
 #+begin_src emacs-lisp
 (setup (:elpaca htmlize)
-  (setopt org-html-htmlize-output-type 'css ; 'inline-css
-           htmlize-html-charset "UTF-8")
-  (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
+  (setopt org-html-head-include-default-style nil
+          org-html-htmlize-output-type 'css ; classes
+          htmlize-html-charset "UTF-8"
+          htmlize-face-overrides '(whitespace-missing-newline-at-eof
                                    (:foreground nil :background nil))))
 #+end_src
 - For supported html charsets see

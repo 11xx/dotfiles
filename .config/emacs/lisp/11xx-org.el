@@ -129,9 +129,10 @@
   (:hook-into org-mode))
 (setopt org-export-with-sub-superscripts nil)
 (setup (:elpaca htmlize)
-  (setopt org-html-htmlize-output-type 'css ; 'inline-css
-           htmlize-html-charset "UTF-8")
-  (setopt htmlize-face-overrides '(whitespace-missing-newline-at-eof
+  (setopt org-html-head-include-default-style nil
+          org-html-htmlize-output-type 'css ; classes
+          htmlize-html-charset "UTF-8"
+          htmlize-face-overrides '(whitespace-missing-newline-at-eof
                                    (:foreground nil :background nil))))
 (setup (:elpaca ox-gfm))
 (elpaca (ox-html-stable-ids :host github
