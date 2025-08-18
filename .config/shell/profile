@@ -38,7 +38,6 @@ export XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
 export GEM_PATH="$XDG_DATA_HOME/ruby/gems"
 export GEM_SPEC_CACHE="$XDG_DATA_HOME/ruby/specs"
 
-export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
 export NVM_DIR="$XDG_DATA_HOME"/nvm
 export GOPATH="$XDG_DATA_HOME"/go
 export _JAVA_OPTIONS=-Djava.util.prefs.userRoot="${XDG_CONFIG_HOME}"/java
@@ -68,7 +67,6 @@ export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
 export MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
 export MAIL="$XDG_DATA_HOME"/mail # Mailutils
 export NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages # dotNet
-export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
 # ~/.slime: https://github.com/slime/slime/issues/610
 export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
 export UNISON="$XDG_DATA_HOME"/unison

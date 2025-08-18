@@ -1,8 +1,6 @@
 #+title: Shell configurations
 #+description: General configuration defaults for all used shells.
 
-#+html_head: <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
-
 - Basic shell references:
   + [[https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html][3.5.3 Shell Parameter Expansion]]
   + [[https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html][3.4.2 Special Parameters]]
@@ -141,7 +139,7 @@ alias monitors-setup-alias='nvidia-settings --assign CurrentMetaMode="DPY-1: 256
 #+end_src
 
 *** Monitor controls
-"=brightness=" is an AUR script. See [[file:~/org/arch-linux.org::*Change brightness from the command-line][Change brightness from the command-line]].
+"=brightness=" is an AUR script. See [[file:~/org/arch-linux.org::#orgid-jpxivm][Change brightness from the command-line]].
 #+begin_src shell
 alias b10='brightness 10'
 alias b30='brightness 30'
@@ -265,7 +263,6 @@ NOTE: setting =GEM_HOME= now causes issues, in special the error:
 : export GEM_HOME="$XDG_DATA_HOME/ruby/gems"
 
 #+begin_src shell -r
-export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
 export NVM_DIR="$XDG_DATA_HOME"/nvm
 export GOPATH="$XDG_DATA_HOME"/go
 export _JAVA_OPTIONS=-Djava.util.prefs.userRoot="${XDG_CONFIG_HOME}"/java
@@ -295,7 +292,6 @@ export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
 export MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
 export MAIL="$XDG_DATA_HOME"/mail # Mailutils
 export NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages # dotNet
-export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
 # ~/.slime: https://github.com/slime/slime/issues/610
 export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
 export UNISON="$XDG_DATA_HOME"/unison
@@ -1737,6 +1733,17 @@ The following is recommended in =man gpg-agent=:
 #+begin_src shell
 GPG_TTY=$(tty)
 export GPG_TTY
+#+end_src
+
+** NPM
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/npm.sh
+:END:
+
+#+begin_src shell
+append_path "$XDG_DATA_HOME/npm/bin"
+export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
+export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
 #+end_src
 
 
