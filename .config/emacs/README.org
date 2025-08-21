@@ -8,7 +8,7 @@
 # Export as HTML
 # #+SETUPFILE: ~/org/.setup/theme-readtheorg.setup
 
-#+OPTIONS: toc:2
+# #+OPTIONS: toc:2
 
 Send errors to *Backtrace*, only set to true while debugging
 : (setq debug-on-error t)
@@ -130,6 +130,7 @@ block easier)/
 :PROPERTIES:
 :header-args:emacs-lisp+: :noweb-ref setup-el :tangle no
 :END:
+#+ATTR_HTML: :class seealso
 - See:
   + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
   + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
@@ -394,12 +395,14 @@ the feature prefix."
 :END:
 
 Backup & auto-save
+#+begin_seealso
 - See
   + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
   + [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][backup files config example]]
   + [[https://emacs.stackexchange.com/questions/60970/how-to-replace-focus-out-hook-with-after-focus-change-function-in-emacs-27/60971#60971][replacing focus-out-hook]]
   + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files#437563]]
   + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
+#+end_seealso
 
 #+begin_src emacs-lisp
 (require '11xx-functions)
@@ -1610,6 +1613,78 @@ Usage
   (message "Free as in Freedom!"))
 #+end_example
 
+*** Replace alist item
+like =add-to-list= but replaces item
+#+begin_src emacs-lisp
+(cl-defun add-or-replace-to-alist (list-var element &key append prepend)
+  "Add or replace ELEMENT or a list of ELEMENTS in the alist stored in LIST-VAR.
+
+LIST-VAR should be a symbol whose value is a proper alist.
+ELEMENT may be a single alist entry (a list or cons whose CAR is the lookup key)
+or a list of such entries.  If multiple entries are given, each is merged
+individually rather than nesting.
+
+By default, new entries are prepended.  Use :append to add at the end,
+or :prepend to force prepending (it overrides :append).
+
+Returns the updated alist value (like 'add-to-list').  Also echoes a
+message indicating how many entries were added or replaced.
+
+Arguments:
+  LIST-VAR   Symbol naming the target alist variable.
+  ELEMENT    A single entry (list or cons) or a list of entries.
+  ':append'   If non-nil, append new entries.
+  `:prepend'  If non-nil, prepend new entries.
+
+Examples:
+    ;; Single entry - replaces if key exists, adds if not
+    (setq servers '((\"prod\" . \"192.168.1.10\") (\"dev\" . \"192.168.1.20\")))
+    (add-or-replace-to-alist 'servers '(\"prod\" . \"10.0.0.100\"))
+    ;; => ((\"prod\" . \"10.0.0.100\") (\"dev\" . \"192.168.1.20\"))
+
+    ;; Multiple entries with :append
+    (add-or-replace-to-alist
+    'auto-mode-alist
+    '((\"\\.tsx\\'\" . typescript-mode)
+    (\"\\.vue\\'\" . vue-mode))
+    :append t)"
+  (let ((count 0)
+        updated)
+    ;; Handle a list of entries recursively
+    (cl-labels ((process-entry (entry)
+                  (let* ((key   (car entry))
+                         (alist (symbol-value list-var))
+                         (found (assoc key alist)))
+                    ;; remove any old entry
+                    (setq alist (cl-remove-if (lambda (old)
+                                                (equal (car old) key))
+                                              alist))
+                    ;; insert
+                    (setq alist
+                          (cond
+                           (prepend  (cons entry alist))
+                           (append   (append alist (list entry)))
+                           (t        (cons entry alist))))
+                    ;; update var, bump counter
+                    (set list-var alist)
+                    (cl-incf count)
+                    alist)))
+      (if (and (listp element)
+               element
+               (cl-every (lambda (e) (and (listp e)
+                                          (not (keywordp (car e)))))
+                         element))
+          (dolist (e element)
+            (setq updated (process-entry e)))
+        (setq updated (process-entry element))))
+    (message "add-or-replace-to-alist: %d entr%s %s"
+             count
+             (if (> count 1) "ies were" "y was")
+             (if append "appended/replaced." "prepended/replaced."))
+    updated))
+#+end_src
+
+
 * 11xx-org.el: Org Mode
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-org.el
@@ -1709,17 +1784,9 @@ Usage
  ;;; Org mode version 9.5:
    ;; ~org-adapt-indentation~ now defaults to ~nil~
    org-adapt-indentation nil ;; testing nil [2022-03-31 Thu 07:34:31]
-
-   ;;; Use HTML5 on export
-   org-html-html5-fancy t
    ;;; UI
    org-ellipsis " ▾"
    org-hide-emphasis-markers t
-   ;;; Exporting
-   ;; export async default:
-   ;; Use 'M-x org-export-stack' to display current processes:
-   org-export-in-background nil
-   org-html-validation-link "" ; remove validade xml
    ;;; Properties
    ;; org-use-property-inheritance t ; Apparently slows down searches when on.
    ;;; Default header-args for evaluation
@@ -1727,16 +1794,6 @@ Usage
    org-image-actual-width nil
    ;; Edit src blocks in the current window instead of split
    org-src-window-setup 'current-window)
-
-  ;; Publish
-  (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
-    (unless (file-exists-p dir) (make-directory dir t))
-    (setopt org-publish-timestamp-directory dir))
-  (with-eval-after-load 'ox-publish
-    (require '11xx-org-publish))
-
-  (:with-mode eldoc
-    (:hook-into org-mode)))
 
 ;; Visual Fill Column
 ;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
@@ -1792,10 +1849,36 @@ appear when hovered.
   (:hook-into org-mode))
 #+end_src
 
-*** Exporting
+*** Prettify Org Mode
+#+begin_src emacs-lisp
+(setup (:elpaca org-modern)
+  (setopt org-modern-block-fringe nil)
+  (:hook-into org-mode))
+#+end_src
+
+*** org-transclusion
+aka literate (?hopefully)
+- [[https://github.com/nobiot/org-transclusion/][nobiot/org-transclusion: Emacs package to enable transclusion with Org Mode]]
+- [[https://www.youtube.com/watch?v=6U9wG-pf-aQ][Assembling Org Mode Files with Transclusion - System Crafters Live! - YouTube]]
+
+#+begin_src emacs-lisp
+(setup (:elpaca org-transclusion)
+  (:with-map org-mode-map
+    (:bind "C-c o t a" org-transclusion-add
+           "C-c o t A" org-transclusion-add-all
+           "C-c o t r" org-transclusion-remove)))
+#+end_src
+
+*** Export & Publish
+
+**** Export
 - [[https://stackoverflow.com/questions/8395036/make-org-ignore-underscores-when-exporting-to-html][emacs - make Org ignore underscores when exporting to HTML - Stack Overflow]]
 #+begin_src emacs-lisp
-(setopt org-export-with-sub-superscripts nil)
+(setopt org-export-with-sub-superscripts nil ; interpret "_" and "^" for export.
+        org-html-html5-fancy t
+        org-export-in-background nil ; export async default: Use 'M-x org-export-stack' to display current processes:
+        org-html-validation-link "" ; remove validade xml
+        )
 #+end_src
 
 **** htmlize
@@ -2062,24 +2145,338 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 #+end_src
 
 
-*** Prettify Org Mode
+***** =org-html5-plus-template.el=: Custom output export HTML with template support
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/org-html5-plus-template.el
+:END:
+
+# Custom TOC position
 #+begin_src emacs-lisp
-(setup (:elpaca org-modern)
-  (setopt org-modern-block-fringe nil)
-  (:hook-into org-mode))
+;;; org-html5-plus-template.el --- Org -> HTML5 via external template  -*- lexical-binding: t; -*-
+
+;; Emacs 30+ focused exporter backend using a user-editable template file.
+;; Features:
+;;  - Uses an external template with placeholders: {{HEAD}}, {{TITLE}},
+;;    {{PREAMBLE}}, {{TOC}}, {{CONTENT}}, {{POSTAMBLE}}
+;;  - Generates a single, predictable TOC with both `table-of-contents` and
+;;    `text-table-of-contents` ids, avoids mutating the original INFO plist,
+;;    and reuses the parse tree for performance.
+;;  - Conditional preamble/postamble wrappers (omitted when empty).
+;;  - Adds C-c C-e h 5 menu entry for interactive export.
+;;  - Includes a publish wrapper that suppresses the usual fontification/htmlize messages.
+
+;;; Commentary:
+;; Drop this file into your `load-path` and (require 'org-html5-plus-template).
+;; Configure `org-html5-plus-template-file' to point to your HTML template file
+;; (or leave nil to use the built-in default).
+;;
+;; Template placeholders (order matters; change `org-html5-plus-template-placeholders`
+;; if you use a different layout):
+;;   {{HEAD}} {{TITLE}} {{PREAMBLE}} {{TOC}} {{CONTENT}} {{POSTAMBLE}}
+;;
+;; Example template snippet:
+;; <!doctype html>
+;; <html lang="en">
+;; <head>
+;; {{HEAD}}
+;; <title>{{TITLE}}</title>
+;; </head>
+;; <body>
+;; {{PREAMBLE}}
+;; {{TOC}}
+;; <main class="content">{{CONTENT}}</main>
+;; {{POSTAMBLE}}
+;; </body>
+;; </html>
+
+;;; Code:
+
+(require 'cl-lib)
+(require 'subr-x)
+(require 'ox-html)
+
+(defgroup org-html5-plus nil
+  "Export Org to HTML5 using an external HTML template with placeholders."
+  :group 'org-export)
+
+(defcustom org-html5-plus-template-file nil
+  "Path to an HTML template file used by the html5-template backend.
+If nil, a small built-in default template will be used.
+Template placeholders: {{HEAD}}, {{TITLE}}, {{PREAMBLE}}, {{TOC}},
+{{CONTENT}}, {{POSTAMBLE}}."
+  :type '(file)
+  :group 'org-html5-plus)
+
+(defcustom org-html5-plus-template-placeholders
+  '("{{HEAD}}" "{{TITLE}}" "{{PREAMBLE}}" "{{TOC}}" "{{CONTENT}}" "{{POSTAMBLE}}")
+  "List of placeholders (strings) the template uses, in this order.
+Order is HEAD, TITLE, PREAMBLE, TOC, CONTENT, POSTAMBLE."
+  :type '(repeat string)
+  :group 'org-html5-plus)
+
+(defcustom org-html5-template-treat-custom-toc-as-first t
+  "When non-nil, treat the custom-generated TOC as the first TOC.
+This makes the TOC use `id=\"table-of-contents\"` / `id=\"text-table-of-contents\"`
+(with no numeric suffix).  After generating the TOC we update the
+`:org-html--toc-counter` so later TOC generation remains unique."
+  :type 'boolean
+  :group 'org-html5-plus)
+
+
+;;; Backend definition REMOVED
+
+;;; Template reading
+(defun org-html5-template--read-template ()
+  "Return template text. Prefer `org-html5-plus-template-file' if set."
+  (if (and org-html5-plus-template-file (file-exists-p org-html5-plus-template-file))
+      (with-temp-buffer
+        (insert-file-contents org-html5-plus-template-file)
+        (buffer-string))
+    (org-html5-template--default-template)))
+
+(defun org-html5-template--default-template ()
+  "A tiny default HTML5 template used if no external file is configured."
+  (string-join
+   '("<!doctype html>"
+     "<html lang=\"en\">"
+     "<head>"
+     "{{HEAD}}"
+     "  <title>{{TITLE}}</title>"
+     "</head>"
+     "<body>"
+     "{{PREAMBLE}}"
+     "<nav id=\"table-of-contents\" role=\"doc-toc\">"
+     "{{TOC}}"
+     "</nav>"
+     "  <main class=\"content\">"
+     "    {{CONTENT}}"
+     "  </main>"
+     "{{POSTAMBLE}}"
+     "</body>"
+     "</html>")
+   "\n"))
+
+;;; Body-only rendering (reuses parse tree when available)
+(defun org-html5-template--body-only (info &optional parse-tree)
+  "Return HTML for the document body only (no title, no TOC).
+INFO is the export info plist. If PARSE-TREE is non-nil, use it instead of parsing."
+  (let ((info (copy-sequence info))
+        (pt (or parse-tree (org-element-parse-buffer))))
+    (plist-put info :with-title nil)
+    (plist-put info :with-toc nil)
+    (org-export-data pt info)))
+
+;;; TOC generation that guarantees text-table-of-contents id and matching suffix
+(defun org-html5-template--generate-toc (info &optional parse-tree)
+  "Generate a `<nav id=\"table-of-contents...\" role=\"doc-toc\">...</nav>` string or nil.
+If `org-html5-template-treat-custom-toc-as-first' is non-nil, temporarily
+clear `:org-html--toc-counter` so the generated TOC has no suffix, and then
+update the counter so subsequent TOC calls are unique."
+  (let ((depth (plist-get info :with-toc)))
+    (when depth
+      (let* ((scope (plist-get info :parse-tree))
+             (pt (or parse-tree scope (org-element-parse-buffer)))
+             ;; the field we will play with
+             (old-counter (plist-get info :org-html--toc-counter)))
+        (condition-case err
+            (progn
+              ;; If user requested to treat custom toc as first, temporarily set counter nil
+              (when org-html5-template-treat-custom-toc-as-first
+                (plist-put info :org-html--toc-counter nil))
+              ;; call canonical org-html-toc (depth INFO &optional SCOPE)
+              (let ((toc (org-html-toc depth info scope)))
+                ;; After generating, set the counter to reflect we've emitted one more TOC
+                ;; so subsequent calls will produce unique suffixes.
+                (plist-put info :org-html--toc-counter (1+ (or old-counter 0)))
+                ;; Return the toc HTML string (may be nil)
+                toc))
+          (error
+           ;; restore on error, then re-signal
+           (plist-put info :org-html--toc-counter old-counter)
+           (signal (car err) (cdr err))))))))
+
+;;; Template transcode
+(defun org-html5-template--template (contents info)
+  "Template transcode for the html5-template backend.
+CONTENTS is the already-transcoded contents (unused here). INFO is the export plist."
+  ;; ensure ox-html helpers are available (defensive; cheap)
+  (unless (fboundp 'org-html-preamble)
+    (require 'ox-html))
+  (let* ((tpl (org-html5-template--read-template))
+         ;; compute parse-tree once and reuse
+         (parse-tree (or (plist-get info :parse-tree) (org-element-parse-buffer)))
+         ;; simple fields
+         (head (or (plist-get info :html-head) ""))
+         (title (or (format "%s" (plist-get info :title)) ""))
+         ;; preamble/postamble via canonical helpers (Emacs 30+)
+         (preamble (cond
+                    ((fboundp 'org-html-preamble) (or (org-html-preamble info) ""))
+                    ((stringp (plist-get info :html-preamble)) (plist-get info :html-preamble))
+                    (t "")))
+         (postamble (cond
+                     ((fboundp 'org-html-postamble) (or (org-html-postamble info) ""))
+                     ((stringp (plist-get info :html-postamble)) (plist-get info :html-postamble))
+                     (t "")))
+         ;; generate toc and content using same parse-tree
+         (toc (or (org-html5-template--generate-toc info parse-tree) ""))
+         (content (org-html5-template--body-only info parse-tree))
+         ;; build wrappers only when content is non-empty
+         (preamble-wrapper (if (and (stringp preamble) (not (string-empty-p preamble)))
+                               (format "<header class=\"site-preamble\">%s</header>" preamble)
+                             ""))
+         (postamble-wrapper (if (and (stringp postamble) (not (string-empty-p postamble)))
+                                (format "<footer class=\"site-postamble\">%s</footer>" postamble)
+                              ""))
+         (replacements (list head title preamble-wrapper toc content postamble-wrapper)))
+    ;; Perform placeholder replacement. Use targeted substitution to avoid scanning huge text.
+    (cl-loop for ph in org-html5-plus-template-placeholders
+             for rep in replacements
+             do (let ((rep-str (if (stringp rep) rep (format "%s" rep))))
+                  (setq tpl (replace-regexp-in-string (regexp-quote ph) rep-str tpl t t))))
+    tpl))
+
+;;;###autoload
+(defun org-html5-template-export-to-html (&optional async subtreep visible-only)
+  "Export current buffer to HTML using the `html5-template' backend.
+Optional ASYNC SUBTREEP VISIBLE-ONLY are forwarded to `org-export-to-file'."
+  (interactive)
+  (let* ((outfile (concat (file-name-sans-extension (or (buffer-file-name) "untitled")) ".html")))
+    (org-export-to-file 'html5-template outfile async subtreep visible-only nil nil)
+    (message "Wrote %s" outfile)))
+
+;;; Publishing wrapper (silences fontification/htmlize/indent messages)
+(defun org-html5-plus-publish-to-html (plist filename pub-dir)
+  "Publish a single Org file FILENAME using `html5-template' backend.
+PLIST is the org-publish project plist. PUB-DIR is the publishing directory."
+  (require 'org-html5-plus-template)
+  (let ((org-export-in-background nil)
+        (outfile (expand-file-name (concat (file-name-sans-extension (file-name-nondirectory filename)) ".html")
+                                   pub-dir)))
+    (make-directory (file-name-directory outfile) :parents)
+    ;; suppress messages and reduce font-lock verbosity during export
+    (let ((inhibit-message t)
+          (font-lock-verbose nil)
+          (org-src-fontify-natively (if (boundp 'org-src-fontify-natively)
+                                        org-src-fontify-natively
+                                      nil)))
+      (with-current-buffer (find-file-noselect filename)
+        (org-export-to-file 'html5-template outfile nil nil nil nil plist)))
+    ;; return outfile for debugging convenience
+    outfile))
+
+;;; Ensure backend is registered: if the file was loaded but the backend wasn't,
+;;; define it now. This guards against situations where top-level execution
+;;; failed earlier and left feature provided but backend unregistered.
+(unless (org-export-get-backend 'html5-template)
+  (org-export-define-derived-backend 'html5-template 'html
+    :translate-alist '((template . org-html5-template--template))))
+
+
+;;; Provide
+(provide 'org-html5-plus-template)
+;;; org-html5-plus-template.el ends here
 #+end_src
 
-*** org-transclusion
-aka literate (?hopefully)
-- [[https://github.com/nobiot/org-transclusion/][nobiot/org-transclusion: Emacs package to enable transclusion with Org Mode]]
-- [[https://www.youtube.com/watch?v=6U9wG-pf-aQ][Assembling Org Mode Files with Transclusion - System Crafters Live! - YouTube]]
 
+**** Publishing
 #+begin_src emacs-lisp
-(setup (:elpaca org-transclusion)
-  (:with-map org-mode-map
-    (:bind "C-c o t a" org-transclusion-add
-           "C-c o t A" org-transclusion-add-all
-           "C-c o t r" org-transclusion-remove)))
+;; Publish
+(let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
+  (unless (file-exists-p dir) (make-directory dir t))
+  (setopt org-publish-timestamp-directory dir))
+(with-eval-after-load 'ox-publish
+  (require '11xx-org-publish))
+
+(:with-mode eldoc
+  (:hook-into org-mode)))
+#+end_src
+
+***** Custom publishing projects
+
+****** 11xx.org website
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-org-publish.el
+:END:
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+(require '11xx-org-functions-tangle-export-helpers)
+
+;; 0. Define global variables for your paths
+(defvar 11xx.org/config/base-dir    (expand-file-name "~/.config/"))
+(defvar 11xx.org/config/publish-dir (expand-file-name "~/www/11xx.org/config/"))
+
+(defvar 11xx.org/config/index-files
+  '(
+    "darkman/README.org"
+    "emacs/README.org"
+    "hypr/README.org"
+    "mpd/README.org"
+    "shell/README.org"
+    )
+  "Files whose basename will be renamed to \"index\" by `org-publish-rename-completion'")
+
+(defvar 11xx.org/config/other-files
+  '(
+    "emacs/emacs-notes.org"
+    "shell/notes.org"
+    )
+  "Publish with basename as-is (default export behaviour)")
+
+;; (defvar my-config-asset-files
+;;   '("emacs/style.css" "shell/script.js" "mpd/icon.png"))
+
+(defvar 11xx.org/config/all-files
+  (append 11xx.org/config/index-files 11xx.org/config/other-files))
+
+(defun org-publish-rename-completion (plist)
+  "After publishing, rename README.html files to index.html.
+
+Based on `11xx.org/config/index-files'."
+  ;; For each file in 11xx.org/config/index-files, check if the corresponding
+  ;; README.html exists and rename it to index.html
+  (dolist (org-file 11xx.org/config/index-files)
+    (let* ((html-file (concat (file-name-sans-extension org-file) ".html"))
+           (full-html-path (expand-file-name html-file 11xx.org/config/publish-dir))
+           (index-path (expand-file-name
+                        "index.html"
+                        (file-name-directory full-html-path))))
+      (when (file-exists-p full-html-path)
+        (rename-file full-html-path index-path t)))))
+
+;; (setq org-publish-use-timestamps-flag nil)
+;; (setq org-export-async-debug t)
+
+(add-or-replace-to-alist
+ 'org-publish-project-alist
+ `(;; A: Index files → index.html
+   ("11xx.org_config_files"
+    :base-directory ,11xx.org/config/base-dir
+    :publishing-directory ,11xx.org/config/publish-dir
+    :base-extension "org"
+    :recursive nil
+    :include ,11xx.org/config/all-files
+    :publishing-function org-html5-plus-publish-to-html
+    ;; options
+    :html-head "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+<link rel=\"stylesheet\" href=\"../../static/tw-out.css\">"
+    :auto-preamble t
+    :section-numbers nil
+    :with-author nil
+    :with-date nil
+    :with-email nil
+    :with-latex nil
+    :with-timestamps nil
+    :with-toc 3
+    :force t
+    :auto-sitemap t
+    :completion-function org-publish-rename-completion)
+
+   ;; Aggregate
+   ("11xx.org_config"
+    :components ("11xx.org_config_files"))
+   ))
+
+(provide '11xx-org-publish)
 #+end_src
 
 
@@ -2371,6 +2768,62 @@ in the source Org buffer so it can get the list.
                       (filter-list '(".dir-locals.el")))
                   (filter-list-any source-list filter-list)))
     (add-lexical-binding-prop file)))
+#+end_src
+
+* 11xx-org-functions-tangle-export-helpers.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/11xx-org-functions-tangle-export-helpers.el
+:END:
+
+#+begin_src emacs-lisp
+<<org-functions-tangle-export-helpers>>
+
+(provide '11xx-org-functions-tangle-export-helpers)
+#+end_src
+
+#+begin_src emacs-lisp :noweb-ref org-functions-tangle-export-helpers :tangle no
+(defun org-babel-get-src-block-header-arg (header-arg)
+  "Get the value of the header argument HEADER-ARG from the provided SRC-BLOCK-INFO.
+
+First argument `org-babel-get-src-block-info' is set to `t'
+because it will try to evaluate function in e.g. `:tangle' and if
+for some reason that function refers to
+`org-babel-get-src-block-info' it infinite loops."
+  ;; This could be set as an optional arg? but then what's the point meh haha
+  (let* ((src-block-info (org-babel-get-src-block-info t)) ; t for NO-EVAL, otherwise it will infinite loop
+         (params (nth 2 src-block-info)))
+    (assoc-default header-arg params)))
+#+end_src
+
+for [[file:~/.config/darkman/README.org]]
+#+begin_src emacs-lisp :noweb-ref org-functions-tangle-export-helpers :tangle no
+(defun darkmandir (shfile)
+  "Evaluate to a filename in a directory from `XDG_DATA_HOME' that's either `light-mode.d' or `dark-mode.d'.
+
+The string argument SHFILE is the target filename of the darkman script to be tangled.
+
+Usage:
+  Either set
+  A header-arg \":theme light\" or \":theme dark\";
+  A `org-set-property' called 'theme' with value \"dark\" or \"light\".
+
+  Then using the function returns:
+  (darkmandir \"script.sh\")
+    => \"/home/user/.local/share/light-mode.d/script.sh\"
+    or
+    => \"/home/user/.local/share/dark-mode.d/script.sh\""
+  (let* ((file (if shfile (string-trim shfile "/")))
+         (dir-light (expand-file-name "light-mode.d/" (xdg-data-home)))
+         (dir-dark (expand-file-name "dark-mode.d/" (xdg-data-home)))
+         (out-path-light (expand-file-name file dir-light))
+         (out-path-dark (expand-file-name file dir-dark)))
+    (cond
+     ((or (string= (org-babel-get-src-block-header-arg :theme) "light")
+          (string= (org-entry-get nil "theme" t) "light"))
+      out-path-light)
+     ((or (string= (org-babel-get-src-block-header-arg :theme) "dark")
+          (string= (org-entry-get nil "theme" t) "dark"))
+      out-path-dark))))
 #+end_src
 
 * 11xx-dired.el

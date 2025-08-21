@@ -144,5 +144,71 @@ Example:
   (declare (indent defun))
   `(when (eq system-type ',type)
      ,@body))
+(cl-defun add-or-replace-to-alist (list-var element &key append prepend)
+  "Add or replace ELEMENT or a list of ELEMENTS in the alist stored in LIST-VAR.
+
+LIST-VAR should be a symbol whose value is a proper alist.
+ELEMENT may be a single alist entry (a list or cons whose CAR is the lookup key)
+or a list of such entries.  If multiple entries are given, each is merged
+individually rather than nesting.
+
+By default, new entries are prepended.  Use :append to add at the end,
+or :prepend to force prepending (it overrides :append).
+
+Returns the updated alist value (like 'add-to-list').  Also echoes a
+message indicating how many entries were added or replaced.
+
+Arguments:
+  LIST-VAR   Symbol naming the target alist variable.
+  ELEMENT    A single entry (list or cons) or a list of entries.
+  ':append'   If non-nil, append new entries.
+  `:prepend'  If non-nil, prepend new entries.
+
+Examples:
+    ;; Single entry - replaces if key exists, adds if not
+    (setq servers '((\"prod\" . \"192.168.1.10\") (\"dev\" . \"192.168.1.20\")))
+    (add-or-replace-to-alist 'servers '(\"prod\" . \"10.0.0.100\"))
+    ;; => ((\"prod\" . \"10.0.0.100\") (\"dev\" . \"192.168.1.20\"))
+
+    ;; Multiple entries with :append
+    (add-or-replace-to-alist
+    'auto-mode-alist
+    '((\"\\.tsx\\'\" . typescript-mode)
+    (\"\\.vue\\'\" . vue-mode))
+    :append t)"
+  (let ((count 0)
+        updated)
+    ;; Handle a list of entries recursively
+    (cl-labels ((process-entry (entry)
+                  (let* ((key   (car entry))
+                         (alist (symbol-value list-var))
+                         (found (assoc key alist)))
+                    ;; remove any old entry
+                    (setq alist (cl-remove-if (lambda (old)
+                                                (equal (car old) key))
+                                              alist))
+                    ;; insert
+                    (setq alist
+                          (cond
+                           (prepend  (cons entry alist))
+                           (append   (append alist (list entry)))
+                           (t        (cons entry alist))))
+                    ;; update var, bump counter
+                    (set list-var alist)
+                    (cl-incf count)
+                    alist)))
+      (if (and (listp element)
+               element
+               (cl-every (lambda (e) (and (listp e)
+                                          (not (keywordp (car e)))))
+                         element))
+          (dolist (e element)
+            (setq updated (process-entry e)))
+        (setq updated (process-entry element))))
+    (message "add-or-replace-to-alist: %d entr%s %s"
+             count
+             (if (> count 1) "ies were" "y was")
+             (if append "appended/replaced." "prepended/replaced."))
+    updated))
 
 (provide '11xx-functions)
