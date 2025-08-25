@@ -2398,8 +2398,8 @@ PLIST is the org-publish project plist. PUB-DIR is the publishing directory."
 :header-args:emacs-lisp: :tangle lisp/11xx-org-publish.el :noweb-ref dummy
 :END:
 #+begin_src emacs-lisp
-;; -*- lexical-binding: t; -*-
 (require '11xx-org-functions-tangle-export-helpers)
+(require 'org-html5-plus-template)
 
 ;; 0. Define global variables for your paths
 (defvar 11xx.org/config/base-dir    (expand-file-name "~/.config/"))
@@ -2443,7 +2443,56 @@ Based on `11xx.org/config/index-files'."
       (when (file-exists-p full-html-path)
         (rename-file full-html-path index-path t)))))
 
-;; (setq org-publish-use-timestamps-flag nil)
+(defun org-selective-index-publisher-html5-plus-template (index-files-var)
+  "Return a publishing function that renames files based on INDEX-FILES-VAR.
+
+INDEX-FILES-VAR should be a symbol that holds the list of files to be
+renamed to 'index.html'."
+  (lambda (plist filename pub-dir)
+    "Publish FILENAME, renaming to 'index.html' if in the list."
+    (let* ((base-dir (plist-get plist :base-directory))
+           (relative-source (file-relative-name filename base-dir))
+           ;; Use the variable passed to the factory
+           (is-index-file (member relative-source (symbol-value index-files-var)))
+           (output-file
+            (if is-index-file
+                (expand-file-name "index.html"
+                                  (expand-file-name (file-name-directory relative-source) pub-dir))
+              (expand-file-name (concat (file-name-sans-extension (file-name-nondirectory filename)) ".html")
+                                (expand-file-name (file-name-directory relative-source) pub-dir)))))
+      (org-export-to-file 'html5-plus filename
+        :output-file output-file
+        :publishing-directory pub-dir
+        :extra plist)
+      output-file)))
+
+(defun org-selective-index-publisher-html (index-files-var)
+  "Return a publishing function that uses org-export-to-file with
+the default HTML backend, but with custom output filenames based on
+the list stored in the symbol INDEX-FILES-VAR."
+  (lambda (plist filename pub-dir)
+    "Publish FILENAME to PUB-DIR using the 'html backend.
+Files listed in the `index-files-var` symbol are published as
+`index.html` in their respective subdirectories."
+    (let* ((base-dir (plist-get plist :base-directory))
+           (relative-source (file-relative-name filename base-dir))
+           (is-index-file (member relative-source (symbol-value index-files-var)))
+           (output-file
+            (if is-index-file
+                (expand-file-name "index.html" pub-dir)
+              (expand-file-name (concat (file-name-sans-extension (file-name-nondirectory filename)) ".html")
+                                pub-dir))))
+
+      ;; First visit the input file, then export it
+      (with-current-buffer (find-file-noselect filename)
+        (org-export-to-file 'html output-file nil nil nil nil plist))
+
+      ;; Return the path of the generated file
+      output-file)))
+
+
+
+(setq org-publish-use-timestamps-flag nil)
 ;; (setq org-export-async-debug t)
 
 (add-or-replace-to-alist
@@ -2455,21 +2504,38 @@ Based on `11xx.org/config/index-files'."
     :base-extension "org"
     :recursive nil
     :include ,11xx.org/config/all-files
-    :publishing-function org-html5-plus-publish-to-html
+    :publishing-function ,(org-selective-index-publisher-html '11xx.org/config/index-files)
     ;; options
-    :html-head "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-<link rel=\"stylesheet\" href=\"../../static/tw-out.css\">"
+    :html-head "<link rel=\"stylesheet\" href=\"../../static/tw-out.css\">"
+    :html-head-extra ,(string-join
+                       '("<script defer src=\"../../static/js/toc-sidebar.js\"></script>"
+                         "<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // desktop starts open
+  if (matchMedia('(min-width:1025px)').matches) document.body.classList.add('toc-open');
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.toc-toggle')) {
+    document.body.classList.toggle('toc-open');              // open/close
+  } else if (e.target.closest('.toc-mobile-overlay')) {
+    document.body.classList.remove('toc-open');              // click backdrop to close
+  } else if (e.target.closest('#table-of-contents a[href^=\"#\"]')) {
+    document.body.classList.remove('toc-open');              // close after selecting a heading
+  }
+});
+</script>")
+                       "\n")
     :auto-preamble t
     :section-numbers nil
     :with-author nil
-    :with-date nil
     :with-email nil
-    :with-latex nil
-    :with-timestamps nil
     :with-toc 3
+
+    :html-doctype "html5"
+    :html-html5-fancy t
+
     :force t
-    :auto-sitemap t
-    :completion-function org-publish-rename-completion)
+    :auto-sitemap nil)
 
    ;; Aggregate
    ("11xx.org_config"
