@@ -2147,7 +2147,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 
 ***** =org-html5-plus-template.el=: Custom output export HTML with template support
 :PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/org-html5-plus-template.el
+:header-args:emacs-lisp+: :tangle lisp/org-html5-plus-template.el :noweb-ref dummy
 :END:
 
 # Custom TOC position
@@ -2395,7 +2395,7 @@ PLIST is the org-publish project plist. PUB-DIR is the publishing directory."
 
 ****** 11xx.org website
 :PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/11xx-org-publish.el
+:header-args:emacs-lisp: :tangle lisp/11xx-org-publish.el :noweb-ref dummy
 :END:
 #+begin_src emacs-lisp
 ;; -*- lexical-binding: t; -*-
@@ -4284,7 +4284,6 @@ LaTeX preview in org-mode:
 #+BEGIN_src emacs-lisp :tangle .dir-locals.el
 
 #+end_src
-
 
 # Local Variables:
 # eval: (add-hook 'org-babel-tangle-finished-hook #'org-babel-tangle-add-lexical-prop-to-el-tangled-files nil nil)
