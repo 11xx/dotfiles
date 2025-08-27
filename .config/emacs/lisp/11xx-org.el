@@ -365,10 +365,12 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
   (unless (file-exists-p dir) (make-directory dir t))
   (setopt org-publish-timestamp-directory dir))
-(with-eval-after-load 'ox-publish
-  (require '11xx-org-publish))
 
 (:with-mode eldoc
   (:hook-into org-mode)))
+(when (file-exists-p "~/www/11xx.org/lisp/11xx-org-publish.el")
+  (add-to-list 'load-path "~/www/11xx.org/lisp/")
+  (with-eval-after-load 'ox-publish
+    (require '11xx-org-publish)))
 
 (provide '11xx-org)
