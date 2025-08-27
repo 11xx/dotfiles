@@ -2508,22 +2508,8 @@ Files listed in the `index-files-var` symbol are published as
     ;; options
     :html-head "<link rel=\"stylesheet\" href=\"../../static/tw-out.css\">"
     :html-head-extra ,(string-join
-                       '("<script defer src=\"../../static/js/toc-sidebar.js\"></script>"
-                         "<script>
-document.addEventListener('DOMContentLoaded', () => {
-  // desktop starts open
-  if (matchMedia('(min-width:1025px)').matches) document.body.classList.add('toc-open');
-});
-document.addEventListener('click', (e) => {
-  if (e.target.closest('.toc-toggle')) {
-    document.body.classList.toggle('toc-open');              // open/close
-  } else if (e.target.closest('.toc-mobile-overlay')) {
-    document.body.classList.remove('toc-open');              // click backdrop to close
-  } else if (e.target.closest('#table-of-contents a[href^=\"#\"]')) {
-    document.body.classList.remove('toc-open');              // close after selecting a heading
-  }
-});
-</script>")
+                       '("<script defer type=\"module\" src=\"../../static/js/toc-sidebar.js\"></script>"
+                         "<script defer type=\"module\" src=\"../../static/js/toc-highlight.js\"></script>")
                        "\n")
     :auto-preamble t
     :section-numbers nil
