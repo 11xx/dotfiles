@@ -367,7 +367,9 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (setopt org-publish-timestamp-directory dir))
 
 (:with-mode eldoc
-  (:hook-into org-mode)))
+  (:hook-into org-mode))
+
+) ;; (setup org ends here
 (when (file-exists-p "~/www/11xx.org/lisp/11xx-org-publish.el")
   (add-to-list 'load-path "~/www/11xx.org/lisp/")
   (with-eval-after-load 'ox-publish

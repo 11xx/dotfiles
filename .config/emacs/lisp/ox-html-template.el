@@ -196,25 +196,46 @@ Optional ASYNC SUBTREEP VISIBLE-ONLY are forwarded to `org-export-to-file'."
     (org-export-to-file 'html-template outfile async subtreep visible-only nil nil)
     (message "Wrote %s" outfile)))
 
-;;; Publishing wrapper (silences fontification/htmlize/indent messages)
+;;;###autoload
 (defun org-html-template-publish-to-html (plist filename pub-dir)
-  "Publish a single Org file FILENAME using `html-template' backend.
-PLIST is the org-publish project plist. PUB-DIR is the publishing directory."
-  (require 'org-html-template)
-  (let ((org-export-in-background nil)
-        (outfile (expand-file-name (concat (file-name-sans-extension (file-name-nondirectory filename)) ".html")
-                                   pub-dir)))
-    (make-directory (file-name-directory outfile) :parents)
-    ;; suppress messages and reduce font-lock verbosity during export
-    (let ((inhibit-message t)
-          (font-lock-verbose nil)
-          (org-src-fontify-natively (if (boundp 'org-src-fontify-natively)
-                                        org-src-fontify-natively
-                                      nil)))
-      (with-current-buffer (find-file-noselect filename)
-        (org-export-to-file 'html-template outfile nil nil nil nil plist)))
-    ;; return outfile for debugging convenience
-    outfile))
+  "Publish FILENAME to HTML, using settings from the project PLIST.
+
+This function supports selective renaming of files to \"index.html\" and
+can use different backends.
+
+PLIST is the project property list, which can specify:
+  `:backend'            The export backend to use, e.g., 'html or
+                        'html-template. Defaults to 'html.
+  `:index-files'        A list of file paths (relative to :base-directory)
+                        that should be published as \"index.html\" in their
+                        respective subdirectories.
+  `:html-template-file' A path to an HTML template file, used by the
+                        `html-template' backend.
+
+Return the path to the generated output file."
+
+  (let* ((base-dir   (plist-get plist :base-directory))
+         (backend    (or (plist-get plist :backend) 'html))
+         (index-list (plist-get plist :index-files))
+         (tpl-file   (plist-get plist :html-template-file))
+         (rel        (file-relative-name filename base-dir))
+         (dir        (file-name-directory rel))
+         (is-index   (member rel index-list))
+         (out-dir    (expand-file-name (or dir "") pub-dir))
+         (out-name   (if is-index "index.html"
+                       (concat (file-name-sans-extension
+                                (file-name-nondirectory filename))
+                               ".html")))
+         (out        (expand-file-name out-name out-dir))
+         (org-inhibit-startup t)
+         (visiting (find-buffer-visiting filename))
+         (work-buf (or visiting (find-file-noselect filename))))
+    (make-directory out-dir t)
+    (unwind-protect
+        (with-current-buffer work-buf
+          (org-export-to-file backend out nil nil nil nil plist))
+      (unless visiting (kill-buffer work-buf)))
+    out))
 
 ;;; Ensure backend is registered: if the file was loaded but the backend wasn't,
 ;;; define it now. This guards against situations where top-level execution
