@@ -111,7 +111,7 @@
   (:hook-into org-mode))
 (setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
-  (:hook-into org-mode))
+  (global-org-modern-mode))
 (setup (:elpaca org-transclusion)
   (:with-map org-mode-map
     (:bind "C-c o t a" org-transclusion-add

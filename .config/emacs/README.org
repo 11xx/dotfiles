@@ -1853,7 +1853,7 @@ appear when hovered.
 #+begin_src emacs-lisp
 (setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
-  (:hook-into org-mode))
+  (global-org-modern-mode))
 #+end_src
 
 *** org-transclusion
