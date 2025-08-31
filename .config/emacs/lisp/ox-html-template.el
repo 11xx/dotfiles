@@ -221,16 +221,15 @@ Return the path to the generated output file."
          (rel        (file-relative-name filename base-dir))
          (dir        (file-name-directory rel))
          (is-index   (member rel index-list))
-         (out-dir    (expand-file-name (or dir "") pub-dir))
          (out-name   (if is-index "index.html"
                        (concat (file-name-sans-extension
                                 (file-name-nondirectory filename))
                                ".html")))
-         (out        (expand-file-name out-name out-dir))
+         (out        (expand-file-name out-name pub-dir))
          (org-inhibit-startup t)
          (visiting (find-buffer-visiting filename))
          (work-buf (or visiting (find-file-noselect filename))))
-    (make-directory out-dir t)
+    (make-directory (file-name-directory out) t)
     (unwind-protect
         (with-current-buffer work-buf
           (org-export-to-file backend out nil nil nil nil plist))
