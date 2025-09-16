@@ -100,7 +100,7 @@ env = GDK_BACKEND,wayland,x11,*
 env = QT_QPA_PLATFORM,wayland;xcb
 env = QT_AUTO_SCREEN_SCALE_FACTOR,1
 env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
-env = SDL_VIDEODRIVER,wayland
+env = SDL_VIDEODRIVER,wayland,x11
 env = CLUTTER_BACKEND,wayland
 #+end_src
 
@@ -369,7 +369,8 @@ bind = , C, submap, reset
 bind = $mainMod, C, killactive, # for kill with M-x M-c
 bind = $mainMod, C, submap, reset
 bind = , E, exec, zsh -i -c 'exec emacs'
-bind = , B, exec, $browser
+bind = , F, exec, firefox
+bind = , Z, exec, zen-browser
 bind = , V, exec, vivaldi
 # bind = , N, exec, [workspace special:emacs-quick-note;noanim] emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
 # bind = , N, exec, emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
