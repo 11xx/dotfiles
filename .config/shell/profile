@@ -7,9 +7,6 @@ export XDG_BIN_HOME="$HOME/.local/bin"
 
 source "$XDG_CONFIG_HOME/shell/functions"
 
-append_path "$XDG_DATA_HOME/cargo/bin"
-append_path "$XDG_DATA_HOME/cabal/bin"
-
 append_path "$XDG_BIN_HOME"
 
 find_subdirs_xdg_bin_home_colon_sep() {
@@ -38,25 +35,13 @@ export XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
 export GEM_PATH="$XDG_DATA_HOME/ruby/gems"
 export GEM_SPEC_CACHE="$XDG_DATA_HOME/ruby/specs"
 
-export NVM_DIR="$XDG_DATA_HOME"/nvm
-export GOPATH="$XDG_DATA_HOME"/go
 export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
-export CARGO_HOME="$XDG_DATA_HOME"/cargo
 export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
 #export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
 #export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
 #export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
 export TERMINFO="$XDG_DATA_HOME"/terminfo
 export TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
-
-# Haskell:
-export STACK_ROOT="$XDG_DATA_HOME"/stack
-export STACK_XDG=1
-export CABAL_DIR="$XDG_DATA_HOME"/cabal
-export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
-export XMONAD_CACHE_DIR="$XDG_CACHE_HOME"/xmonad
-export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
-export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
 
 export LESSHISTFILE="$XDG_STATE_HOME"/less/history
 export GRIPHOME="$XDG_CONFIG_HOME/grip"

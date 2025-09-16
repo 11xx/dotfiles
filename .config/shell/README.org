@@ -177,15 +177,7 @@ Source helper functions, specifically =append_path=.
 source "$XDG_CONFIG_HOME/shell/functions"
 #+end_src
 
-Add local, user-space, package manager directories to PATH
-#+begin_src shell
-append_path "$XDG_DATA_HOME/cargo/bin"
-append_path "$XDG_DATA_HOME/cabal/bin"
-#+end_src
-# removed checks because it shouldn't matter? # [2023-11-18 Sat 18:06:24 -03]
-# [ -d "$XDG_DATA_HOME/cargo/bin" ] && # [ -d "$XDG_DATA_HOME/cabal/bin" ] &&
-
-More path directories
+More PATH directories
 #+begin_src shell
 append_path "$XDG_BIN_HOME"
 #+end_src
@@ -263,25 +255,13 @@ NOTE: setting =GEM_HOME= now causes issues, in special the error:
 : export GEM_HOME="$XDG_DATA_HOME/ruby/gems"
 
 #+begin_src shell -r
-export NVM_DIR="$XDG_DATA_HOME"/nvm
-export GOPATH="$XDG_DATA_HOME"/go
 export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
-export CARGO_HOME="$XDG_DATA_HOME"/cargo
 export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
 #export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
 #export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
 #export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
 export TERMINFO="$XDG_DATA_HOME"/terminfo
 export TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
-
-# Haskell:
-export STACK_ROOT="$XDG_DATA_HOME"/stack
-export STACK_XDG=1
-export CABAL_DIR="$XDG_DATA_HOME"/cabal
-export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
-export XMONAD_CACHE_DIR="$XDG_CACHE_HOME"/xmonad
-export XMONAD_CONFIG_DIR="$XDG_CONFIG_HOME"/xmonad
-export XMONAD_DATA_DIR="$XDG_DATA_HOME"/xmonad
 
 export LESSHISTFILE="$XDG_STATE_HOME"/less/history
 export GRIPHOME="$XDG_CONFIG_HOME/grip"
@@ -1620,6 +1600,20 @@ alias cidist=cabal_install_copy_dir
 alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 #+end_src
 
+*** Cabal
+=cabal install= bin directory.
+#+begin_src shell
+export CABAL_DIR="$XDG_DATA_HOME"/cabal
+export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
+append_path "$CABAL_DIR"/bin
+#+end_src
+
+*** Stack
+#+begin_src shell
+export STACK_ROOT="$XDG_DATA_HOME"/stack
+export STACK_XDG=1
+#+end_src
+
 ** Vault
 :PROPERTIES:
 :header-args:shell: :tangle setup-modules/vault.sh
@@ -1743,6 +1737,33 @@ export GPG_TTY
 append_path "$XDG_DATA_HOME/npm/bin"
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
 export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
+export NVM_DIR="$XDG_DATA_HOME"/nvm
+#+end_src
+
+
+** Rust
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/rust.sh
+:END:
+
+*** Cargo
+=cargo install= bin directory
+#+begin_src shell
+export CARGO_HOME="$XDG_DATA_HOME"/cargo
+append_path "$CARGO_HOME"/bin
+#+end_src
+
+
+
+** Go
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/go.sh
+:END:
+
+=go install= bin directory
+#+begin_src shell
+export GOPATH="$XDG_DATA_HOME"/go
+append_path "$GOPATH"/bin
 #+end_src
 
 
