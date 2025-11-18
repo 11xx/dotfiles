@@ -383,26 +383,12 @@ bind = $mainMod ALT, C, killactive, # for kill with s-M-c
 bind = $mainMod, return, exec, alacritty
 bind = $mainMod, backspace, exec, foot
 
-# custom
-# move focus with mouse to the corner
-# bind = $mainMod, J, cyclenext,
-# bind = $mainMod, K, cyclenext, prev
-
 bind = $mainMod, H, movefocus, l
 bind = $mainMod, J, movefocus, d
 bind = $mainMod, K, movefocus, u
 bind = $mainMod, L, movefocus, r
-bind = $mainMod, H, movecursortocorner, 1
-bind = $mainMod, J, movecursortocorner, 1
-bind = $mainMod, K, movecursortocorner, 1
-bind = $mainMod, L, movecursortocorner, 1
 bind = $mainMod, P, cyclenext, prev
 bind = $mainMod, N, cyclenext, next
-
-# bind = $mainMod, H, exec, hyprctl --batch 'dispatch movefocus l; dispatch movecursortocorner 1'
-# bind = $mainMod, L, exec, hyprctl --batch 'dispatch movefocus r; dispatch movecursortocorner 1'
-# bind = $mainMod, K, exec, hyprctl --batch 'dispatch movefocus u; dispatch movecursortocorner 1'
-# bind = $mainMod, J, exec, hyprctl --batch 'dispatch movefocus d; dispatch movecursortocorner 1'
 
 bind = $mainMod, S, swapsplit,
 
@@ -543,12 +529,8 @@ bind = , print, exec, mkdir -p "$(xdg-user-dir PICTURES)/screenshots/" && grim -
 bind = $mainMod CTRL ALT, pause, exec, hyprctl dispatch exit 0; sleep 2; pgrep -x Hyprland >/dev/null && killall -9 Hyprland
 
 bind = $mainMod, O, focusmonitor, +1
-# bind = $mainMod, O, exec, hyprctl --batch 'dispatch focusmonitor +1; dispatch movecursortocorner 1'
 bind = $mainMod SHIFT, O, movewindow, mon:+1
 # exec, hyprctl dispatch movewindow mon:"$(hyprctl monitors -j | jq -r '.[] | select(.focused == false).id')"
-
-bind = $mainMod, O, movecursortocorner, 1
-bind = $mainMod SHIFT, O, movecursortocorner, 1
 
 # Notification contols
 bind = $mainMod CTRL ALT, N, exec, dunstctl history-pop
