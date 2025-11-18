@@ -373,20 +373,6 @@ running_check_killall() {
 }
 #+end_src
 
-** Notify change
-
-- Light
-- From [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/dark-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/dark-mode.d/executable_desktop-notification.sh]]
-#+begin_src shell :tangle (darkmandir "notification.sh") :theme light
-notify-send --app-name="darkman" --urgency=low --icon=weather-clear "Switching to light mode"
-#+end_src
-
-- Dark
-- [[https://github.com/lkmgr/dotfiles/blob/main/dot_local/share/light-mode.d/executable_desktop-notification.sh][lkmgr/dotfiles/dot_local/share/light-mode.d/executable_desktop-notification.sh]]
-#+begin_src shell :tangle (darkmandir "notification.sh") :theme dark
-notify-send --app-name="darkman" --urgency=low --icon=weather-clear-night "Switching to dark mode"
-#+end_src
-
 ** GTK and Qt
 
 - Light
