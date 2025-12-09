@@ -20,12 +20,10 @@ running_check_killall() {
 check_cmd swaybg
 
 running_check_killall swaybg
-# swaybg --color '#eeeeee' &
 swaybg_fork() {
-    # Setting the wayland display because systemd would not recognize it otherwise. #TODO-Workarounds?
-    WAYLAND_DISPLAY=wayland-1 swaybg --color "$@" &
-    # IMPORTANT: fork this process because otherwise darkman will not
-    # execute the other scripts, waiting for this one to finish.
+    nohup swaybg --color "$@" >/dev/null 2>&1 &
+    # IMPORTANT: fork this process because darkman will not kill any
+    # attached process after executing.
 }
 
 swaybg_fork '#382738'

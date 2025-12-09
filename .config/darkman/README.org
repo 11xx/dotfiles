@@ -528,10 +528,6 @@ mako_source_theme dark
 #+end_src
 
 ** Wallpaper
-# - =lightordark-wallpaper= is a script. Instead changed to using
-# - Wayland-specific swaybg explicitly because the script wasn't
-# - working # inside systemd.
-
 #+NAME: wallpaper-setup
 #+begin_src shell
 «darkman-helper-functions»
@@ -539,12 +535,10 @@ mako_source_theme dark
 check_cmd swaybg
 
 running_check_killall swaybg
-# swaybg --color '#eeeeee' &
 swaybg_fork() {
-    # Setting the wayland display because systemd would not recognize it otherwise. #TODO-Workarounds?
-    WAYLAND_DISPLAY=wayland-1 swaybg --color "$@" &
-    # IMPORTANT: fork this process because otherwise darkman will not
-    # execute the other scripts, waiting for this one to finish.
+    nohup swaybg --color "$@" >/dev/null 2>&1 &
+    # IMPORTANT: fork this process because darkman will not kill any
+    # attached process after executing.
 }
 #+end_src
 
@@ -768,3 +762,14 @@ themeName=Adwaita-dark
 
 sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
 #+end_src
+
+* systemd override file
+:PROPERTIES:
+:header-args:systemd: :mkdirp yes
+:END:
+
+#+begin_src systemd :tangle (expand-file-name "systemd/user/darkman.service.d/env.conf" (xdg-config-home))
+[Service]
+Environment=WAYLAND_DISPLAY=wayland-1
+#+end_src
+
