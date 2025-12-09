@@ -1767,6 +1767,19 @@ append_path "$GOPATH"/bin
 #+end_src
 
 
+** Sqlite
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/sqlite.sh
+:END:
+
+#+begin_src shell
+sqlite_all_tables() {
+    sqlite3 "$1" "SELECT name FROM sqlite_master WHERE type='table'" |
+        xargs -I{} sqlite3 -table "$1" "SELECT * FROM {}"
+}
+#+end_src
+
+
 * Local file variables                                             :noexport:
 # Local Variables:
 # org-confirm-babel-evaluate: nil
