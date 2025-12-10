@@ -112,21 +112,26 @@ keymap:
 #+begin_src systemd :tangle (expand-file-name "systemd/user/xremap.service" (xdg-config-home))
 [Unit]
 Description=Keyboard remapper (custom configuration)
+After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 Type=exec
-ExecStart=sh -c '%h/.local/bin/xremap-default --service'
+ExecStart=%h/.local/bin/xremap-default --service
 Restart=always
-RestartSec=5
+RestartSec=3
 SyslogIdentifier=xremap-emacs-browser
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 #+end_src
 
 
 * Launcher script
-#+begin_src shell :tangle (concat (xdg-bin-home) "/xremap-default") :tangle-mode o755
+#+begin_src shell :tangle (concat (xdg-bin-home) "/xremap-default") :tangle-mode o755 :shebang #!/bin/sh
+command -v xremap >/dev/null ||
+    notify-send -a "xremap-default script" "ERROR: xremap command not available" "add it to path of the running shell"
+
 cmd () {
     xremap ~/.config/xremap/browser-emacs.yaml --device 'SINO WEALTH USB KEYBOARD'
 }
@@ -136,6 +141,7 @@ notify() {
 }
 
 if [ "$1" = --service ]; then
+    echo "Starting $0 as a service"
     cmd > /dev/null 2>&1
 else
     cmd
