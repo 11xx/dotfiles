@@ -1,0 +1,166 @@
+#+TITLE: Wayland overlay bar for volume, brightness, etc.
+# * =wob=: Wayland overlay bar for volume, brightness, etc.
+# moved # [2024-08-11 Sun 21:47:35 -03] @ak
+
+* =wob.ini=: Config file
+:PROPERTIES:
+:header-args:conf: :tangle wob.ini
+:END:
+
+#+begin_src conf
+width = 400
+height = 60
+border_offset = 0
+border_size = 2
+anchor = center center
+margin = 100
+
+background_color = 00000000
+bar_color = 61bd09ee
+# neronfg a6a8a9
+border_color = ff77cf80
+# col.active_border = rgba(61bd09ee) rgba(ff77cfee) 45deg
+#+end_src
+
+* Custom pipewire sinks
+** wob-gamesink.ini
+:PROPERTIES:
+:header-args:conf: :tangle wob-game-sink.ini
+:END:
+
+#+begin_src conf
+anchor = top center
+margin = 20
+
+width = 600
+height = 5
+border_size = 0
+border_offset = 0
+bar_padding = 0
+
+border_color = ffffff00
+bar_color = ff0000ff
+background_color = 11111100
+#+end_src
+
+** wob-firefox-sink.ini
+:PROPERTIES:
+:header-args:conf: :tangle wob-firefox-sink.ini
+:END:
+
+#+begin_src conf
+anchor = top left
+margin = 20
+
+width = 600
+height = 5
+border_size = 0
+border_offset = 0
+bar_padding = 0
+
+background_color = 11111100
+
+border_color = ff7700ff
+bar_color = ff7700ff
+#+end_src
+
+* Scripts
+:PROPERTIES:
+:tangle-dir: (expand-file-name (xdg-bin-home))
+:END:
+
+** =wob-volume=: Script to setup wob for volume
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "wob-volume") :shebang #!/usr/bin/env sh
+:CUSTOM_ID: orgid-snwuth
+:END:
+
+This script monitors the config file from the heredoc and uses entr to
+restart tail + wob.
+
+- DEPENDENCIES:
+  + wob
+  + entr
+
+#+begin_src shell
+set -e
+while :
+do case $1 in
+       -v)
+           set -x
+           ;;
+       ,*) break
+   esac; shift; done
+
+wobPipeVolume=/tmp/wobpipe-volume
+[ -p "${wobPipeVolume}" ] || mkfifo "${wobPipeVolume}"
+# tail -f $wobPipeVolume | wob
+killall wob || echo 'No wob instance found, skipping...'
+entr -r -- sh -c "tail -f \"${wobPipeVolume}\" | wob" <<EOF
+${XDG_CONFIG_HOME}/wob/wob.ini
+EOF
+#+end_src
+
+** =wob-instance=: Instance monitor starter for custom pipes and config
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "wob-instance") :shebang #!/usr/bin/env sh
+:END:
+
+#+begin_src shell
+#!/usr/bin/env sh
+# Usage: start-wob-instance <PIPE_PATH> <CONFIG_FILE>
+
+PIPE="$1"
+CONFIG="$2"
+
+if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
+    echo "Usage: $0 PIPE_PATH CONFIG_FILE"
+    exit 1
+fi
+
+# Ensure the named pipe exists
+[ -p "$PIPE" ] || mkfifo "$PIPE"
+
+# Clean up pipe on exit
+trap "rm -f $PIPE" EXIT
+
+# Start wob reading from the pipe
+# tail -f keeps the pipe open even after a write finishes
+tail -f "$PIPE" | wob -c "$CONFIG"
+#+end_src
+
+** =pw-volume-wob-monitor=
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "pw-volume-wob-monitor") :shebang #!/usr/bin/env zsh
+:END:
+test
+#+begin_src shell
+set -xe
+
+wobPipeVolume=/tmp/pw-volume.wob
+
+[ -p "${wobPipeVolume}" ] || mkfifo "${wobPipeVolume}"
+
+#  read -r -d '' wobConfig <<'EOF'
+cat <<'EOF' > /tmp/pw-volume.wob.ini
+width = 600
+height = 20
+border_offset = 0
+border_size = 0
+anchor = center center
+margin = 300 0 0 0
+
+background_color = 00000000
+bar_color = 61bd09ee
+# neronfg a6a8a9
+border_color = ff77cf80
+# col.active_border = rgba(61bd09ee) rgba(ff77cfee) 45deg
+EOF
+
+
+# tail -f $wobPipeVolume | wob
+killall wob || echo 'No wob instance found, skipping...'
+entr -r -- zsh -c "tail -f \"${wobPipeVolume}\" | wob -c <("$wobConfig")" <<EOF
+/tmp/pw-volume.wob.ini
+EOF
+#+end_src
