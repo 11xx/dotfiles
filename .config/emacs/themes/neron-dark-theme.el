@@ -167,9 +167,10 @@ read it before opening a new issue about your will.")
                (highlight :foreground ,c/bg :background ,c/comment :weight bold :inverse t)
                (match :foreground "white" :slant italic)
                (region :foreground "white" :background ,c/current)
-               (window-divider :foreground ,c/bg) ; had bg2
-               (window-divider-first-pixel :foreground ,c/bg) ; had bg2
-               (vertical-border :foreground ,c/bg) ; had bg2 ; window/buffer divider line
+               (vertical-border :foreground ,c/current) ; window/buffer divider line
+               (window-divider :foreground "gray20") ; window-divider-mode
+               (window-divider-first-pixel :inherit window-divider)
+               (window-divider-last-pixel :inherit window-divider)
 
                ;; ace-window
                (aw-leading-char-face :foreground ,c/red :height 300)

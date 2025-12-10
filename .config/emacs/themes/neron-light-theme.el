@@ -209,9 +209,10 @@ read it before opening a new issue about your will.")
                (highlight :background ,c/current)
                (match :inherit highlight)
                (region :background ,c/bg-light-blue)
-               (window-divider :foreground ,c/bg) ; had bg2
-               (window-divider-first-pixel :foreground ,c/bg) ; had bg2
-               (vertical-border :foreground ,c/bg) ; had bg2 ; window/buffer divider line
+               (vertical-border :foreground ,c/current) ; window/buffer divider line
+               (window-divider :foreground "gray20") ; window-divider-mode
+               (window-divider-first-pixel :inherit window-divider)
+               (window-divider-last-pixel :inherit window-divider)
                (widget-field :background ,c/bg-616)
 
                ;; isearch, also inherited by consult
