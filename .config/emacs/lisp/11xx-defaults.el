@@ -169,5 +169,6 @@
 (setup tramp
   (:require tramp)
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+(add-hook 'after-init-hook (lambda() (desktop-save-mode)))
 
 (provide '11xx-defaults)

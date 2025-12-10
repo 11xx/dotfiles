@@ -4,6 +4,7 @@
 (setup (:elpaca haskell-mode))
 
 (setup (:elpaca haskell-ts-mode)
+  (:disabled)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   (:file-match "*.hs" "*.lhs")
@@ -26,7 +27,11 @@
     (:file-match "stack.yaml" "package.yaml"))
 
   ;; hoogle
-  (setopt haskell-hoogle-port-number "4141"))
+  (setopt haskell-hoogle-port-number "4141")
+
+  (setopt haskell-ts-use-indent nil)
+  (:hook haskell-indentation-mode)
+  )
 (setup (:elpaca yaml-pro))
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))

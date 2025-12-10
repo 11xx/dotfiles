@@ -871,6 +871,13 @@ needs.
 #+end_quote
 # (Retrieved at [2024-11-12 Tue 01:14])
 
+*** desktop-save
+Save state for session restoring
+#+begin_src emacs-lisp
+(add-hook 'after-init-hook (lambda() (desktop-save-mode)))
+#+end_src
+
+
 * utf-8-default.el: Use UTF-8 for all character encoding
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/utf-8-default.el :noweb-ref utf-8-default
@@ -962,6 +969,7 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 (setup (:elpaca haskell-mode))
 
 (setup (:elpaca haskell-ts-mode)
+  (:disabled)
   (:load-after haskell-mode)
   ;; (:elpaca haskell-snippets) ; yasnippets
   (:file-match "*.hs" "*.lhs")
@@ -984,7 +992,11 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
     (:file-match "stack.yaml" "package.yaml"))
 
   ;; hoogle
-  (setopt haskell-hoogle-port-number "4141"))
+  (setopt haskell-hoogle-port-number "4141")
+
+  (setopt haskell-ts-use-indent nil)
+  (:hook haskell-indentation-mode)
+  )
 #+end_src
 
 **** YAML
@@ -1786,7 +1798,6 @@ Examples:
    org-adapt-indentation nil ;; testing nil [2022-03-31 Thu 07:34:31]
    ;;; UI
    org-ellipsis " ▾"
-   org-hide-emphasis-markers t
    ;;; Properties
    ;; org-use-property-inheritance t ; Apparently slows down searches when on.
    ;;; Default header-args for evaluation
@@ -1846,6 +1857,7 @@ appear when hovered.
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (setopt org-appear-autolinks 'just-brackets) ; nil is default
+  (setopt org-hide-emphasis-markers t) ; needs to be t
   (:hook-into org-mode))
 #+end_src
 

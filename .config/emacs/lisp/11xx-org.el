@@ -75,7 +75,6 @@
    org-adapt-indentation nil ;; testing nil [2022-03-31 Thu 07:34:31]
    ;;; UI
    org-ellipsis " ▾"
-   org-hide-emphasis-markers t
    ;;; Properties
    ;; org-use-property-inheritance t ; Apparently slows down searches when on.
    ;;; Default header-args for evaluation
@@ -108,6 +107,7 @@
   (:load-after org)
   ;; Toggle for links display set in (setup org)
   (setopt org-appear-autolinks 'just-brackets) ; nil is default
+  (setopt org-hide-emphasis-markers t) ; needs to be t
   (:hook-into org-mode))
 (setup (:elpaca org-modern)
   (setopt org-modern-block-fringe nil)
