@@ -2,36 +2,6 @@
 (add-to-list 'load-path (concat user-emacs-directory "modes"))
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 (setup (:elpaca haskell-mode))
-
-(setup (:elpaca haskell-ts-mode)
-  (:disabled)
-  (:load-after haskell-mode)
-  ;; (:elpaca haskell-snippets) ; yasnippets
-  (:file-match "*.hs" "*.lhs")
-  (defun org-babel-execute:haskell-ts (body params)
-    "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
-    (org-babel-execute:haskell body params))
-
-  ;; use haskell-ts-mode for "haskell" code-blocks
-  (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
-
-  (defun haskell-setup-hs-initialize ()
-    "Insert default content into a new Setup.hs file."
-    (when (and (string= (buffer-name) "Setup.hs")
-               (= (buffer-size) 0)) ;; Only if the buffer is empty
-      (insert "import Distribution.Simple\nmain = defaultMain\n")
-      (save-buffer)))
-  (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
-
-  (:with-mode haskell-cabal-mode
-    (:file-match "stack.yaml" "package.yaml"))
-
-  ;; hoogle
-  (setopt haskell-hoogle-port-number "4141")
-
-  (setopt haskell-ts-use-indent nil)
-  (:hook haskell-indentation-mode)
-  )
 (setup (:elpaca yaml-pro))
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))

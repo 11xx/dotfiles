@@ -178,23 +178,19 @@ This macro is a replacement for =(setup)= that uses elpaca to install packages.
 #+begin_src emacs-lisp
 (defmacro setup-elpaca (order &rest body)
   "Execute BODY in `setup' declaration after ORDER is finished.
-If the :disabled keyword is present in body, the package is completely ignored.
-This happens regardless of the value associated with :disabled.
-The expansion is a string indicating the package has been disabled."
+The elpaca package manager installs ORDER."
   (declare (indent 1))
-  (if (memq :disabled body)
-      (format "%S :disabled by -setup" order)
-    (let ((o order))
-      (when-let ((ensure (cl-position :ensure body)))
-        (setq o (if (null (nth (1+ ensure) body)) nil order)
-              body (append (cl-subseq body 0 ensure)
-                           (cl-subseq body (+ ensure 2)))))
-      `(elpaca ,o (setup
-                      ,(if-let (((memq (car-safe order) '(quote \`)))
-                                (feature (flatten-tree order)))
-                           (cadr feature)
-                         (elpaca--first order))
-                    ,@body)))))
+  (let ((o order))
+    (when-let ((ensure (cl-position :ensure body)))
+      (setq o (if (null (nth (1+ ensure) body)) nil order)
+            body (append (cl-subseq body 0 ensure)
+                         (cl-subseq body (+ ensure 2)))))
+    `(elpaca ,o (setup
+                    ,(if-let (((memq (car-safe order) '(quote \`)))
+                              (feature (flatten-tree order)))
+                         (cadr feature)
+                       (elpaca--first order))
+                  ,@body))))
 #+end_src
 
 This method uses =setup='s internal keyword and defines =:elpaca= for
@@ -250,7 +246,7 @@ https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
 #+begin_src emacs-lisp
 (setup-define :disabled
   (lambda ()
-    `,(setup-quit))
+    (setup-quit))
   :documentation "Always stop evaluating the body.")
 #+end_src
 
@@ -967,37 +963,36 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 **** Haskell
 #+begin_src emacs-lisp
 (setup (:elpaca haskell-mode))
-
-(setup (:elpaca haskell-ts-mode)
-  (:disabled)
-  (:load-after haskell-mode)
-  ;; (:elpaca haskell-snippets) ; yasnippets
-  (:file-match "*.hs" "*.lhs")
-  (defun org-babel-execute:haskell-ts (body params)
-    "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
-    (org-babel-execute:haskell body params))
-
-  ;; use haskell-ts-mode for "haskell" code-blocks
-  (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
-
-  (defun haskell-setup-hs-initialize ()
-    "Insert default content into a new Setup.hs file."
-    (when (and (string= (buffer-name) "Setup.hs")
-               (= (buffer-size) 0)) ;; Only if the buffer is empty
-      (insert "import Distribution.Simple\nmain = defaultMain\n")
-      (save-buffer)))
-  (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
-
-  (:with-mode haskell-cabal-mode
-    (:file-match "stack.yaml" "package.yaml"))
-
-  ;; hoogle
-  (setopt haskell-hoogle-port-number "4141")
-
-  (setopt haskell-ts-use-indent nil)
-  (:hook haskell-indentation-mode)
-  )
 #+end_src
+# (setup (:elpaca haskell-ts-mode)
+#   (:disabled)
+#   (:load-after haskell-mode)
+#   ;; (:elpaca haskell-snippets) ; yasnippets
+#   (:file-match "*.hs" "*.lhs")
+#   (defun org-babel-execute:haskell-ts (body params)
+#     "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
+#     (org-babel-execute:haskell body params))
+
+#   ;; use haskell-ts-mode for "haskell" code-blocks
+#   (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
+
+#   (defun haskell-setup-hs-initialize ()
+#     "Insert default content into a new Setup.hs file."
+#     (when (and (string= (buffer-name) "Setup.hs")
+#                (= (buffer-size) 0)) ;; Only if the buffer is empty
+#       (insert "import Distribution.Simple\nmain = defaultMain\n")
+#       (save-buffer)))
+#   (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
+
+#   (:with-mode haskell-cabal-mode
+#     (:file-match "stack.yaml" "package.yaml"))
+
+#   ;; hoogle
+#   (setopt haskell-hoogle-port-number "4141")
+
+#   (setopt haskell-ts-use-indent nil)
+#   (:hook haskell-indentation-mode)
+#   )
 
 **** YAML
 #+begin_src emacs-lisp
