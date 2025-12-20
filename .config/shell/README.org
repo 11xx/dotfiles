@@ -1600,6 +1600,11 @@ alias cidist=cabal_install_copy_dir
 alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 #+end_src
 
+fix =arch-hs= not using =$CABAL_DIR=
+#+begin_src shell
+alias arch-hs='arch-hs -h "$CABAL_DIR/packages/hackage.haskell.org/01-index.tar"'
+#+end_src
+
 *** Cabal
 =cabal install= bin directory.
 #+begin_src shell

@@ -52,6 +52,8 @@ alias cinstall=cabal_install_copy
 alias cidist=cabal_install_copy_dir
 alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 
+alias arch-hs='arch-hs -h "$CABAL_DIR/packages/hackage.haskell.org/01-index.tar"'
+
 export CABAL_DIR="$XDG_DATA_HOME"/cabal
 export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
 append_path "$CABAL_DIR"/bin
