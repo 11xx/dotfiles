@@ -33,9 +33,6 @@ workspace = 7, persistent:true
 workspace = 8, persistent:true
 workspace = 9, persistent:true, gapsin:0, gapsout:0, border:true, rounding:false
 workspace = 10, persistent:true
-
-windowrule = bordercolor rgb(970065) rgb(000000), onworkspace:9
-windowrule = bordercolor rgb(008800), fullscreenstate:* 2 # set bordercolor to green if window's client fullscreen state is 1(maximize) (internal state can be anything)
 #+end_src
 
 *** No gaps with only a single window in the workspace
@@ -60,7 +57,7 @@ exec-once = lightordark-wallpaper # script
 exec-once = kdeconnectd # KDE connect daemon
 exec-once = sh -c 'eww open mainbar && eww open mainbar2'
 exec-once = xsettingsd # GTK2-3 theme live changes
-# exec-once = emacs --daemon && sleep 1 && emacs-launcher # script, the real OS
+exec-once = sh -c 'emacs --daemon && sleep 1 && emacs-launcher'
 
 # exec-once = gammastep -P
 exec-once = hypridle
@@ -188,10 +185,6 @@ misc {
 
      mouse_move_enables_dpms = true #prevents accidental wake up
      key_press_enables_dpms = true
-
-     new_window_takes_over_fullscreen = 2
-
-     # focus_on_activate = true
 }
 #+end_src
 
@@ -209,61 +202,79 @@ binds {
 :PROPERTIES:
 :header-args:conf: :tangle window-rules.conf
 :END:
+
+See https://wiki.hyprland.org/Configuring/Window-Rules/
 #+begin_src conf
-# See https://wiki.hyprland.org/Configuring/Window-Rules/
-windowrule = float,class:^(org.kde.polkit-kde-authentication-agent-1)$
-windowrule = float,title:^(Picture-in-Picture)$
-windowrule = pin, title:^(Picture-in-Picture)$
-windowrule = float,title:^(Edit with Emacs FRAME)$
-windowrule = float,class:^.*(floatWMRULE|FLOAT_WMRULE)$
-windowrule = float,title:^.*(floatWMRULE|FLOAT_WMRULE)$
-# windowrule = opacity 0.94 0.94,class:^(Dunst)$
-windowrule = float,title:^Open File(|s)
-windowrule = float,title:^Vivaldi Settings:
-windowrule = suppressevent maximize, class:^mpv$
-windowrule = float,class:.*\.exe$
+# Polkit dialogs
+windowrule = match:class ^(org.kde.polkit-kde-authentication-agent-1)$, float on
+
+# Picture-in-Picture (dynamic title, requires full regex match)
+windowrule = match:title ^(Picture-in-Picture)$, float on
+windowrule = match:title ^(Picture-in-Picture)$, pin on
+
+# Emacs floating frames
+windowrule = match:title ^(Edit with Emacs FRAME)$, float on
+
+# Wine/Proton windows
+windowrule = match:class ^.*(floatWMRULE|FLOAT_WMRULE)$, float on
+windowrule = match:title ^.*(floatWMRULE|FLOAT_WMRULE)$, float on
+
+# File open dialogs (anchor pattern at start, not middle)
+windowrule = match:title ^Open File, float on
+windowrule = match:title ^Vivaldi Settings:, float on
+
+# MPV suppress maximize (prevents maximization requests)
+windowrule = match:class ^mpv$, suppress_event maximize
+
+# Floating .exe windows (Windows app shortcuts)
+windowrule = match:class .*\.exe$, float on
 
 # Emacs
-windowrule = float,class:(emacs),title:(Ediff)
-windowrule = size 720 330,class:(emacs),title:(Ediff)
-windowrule = move cursor -50% -50%,class:(emacs),title:(Ediff)
+windowrule = match:class emacs match:title Ediff, float on
+windowrule = match:class emacs match:title Ediff, size 720 330
+windowrule = match:class emacs match:title Ediff, move (cursor_x-(window_w*0.5)) (cursor_y-(window_h*0.5))
 
 # Blender
-windowrule = float,title:^Blender (Render|Preferences)$
+windowrule = match:title ^Blender (Render|Preferences)$, float on
 
 # Steam & Games
-windowrule = float,title:^Create or select new Steam library folder$
-windowrule = float,class:steam,title:Friends List
-windowrule = float,class:steam,title:Steam Settings
-# windowrule = float,class:steam # just float everything steam
-windowrule = monitor 0 silent,class:^(steam_app_[0-9]+)$
-windowrule = workspace 6 silent,class:^(steam_app_[0-9]+)$
-## unstable fps on background "minimize" fix
-windowrule = renderunfocused,class:steam_app_2622380,title:ELDEN RING NIGHTREIGN
-misc {
-  render_unfocused_fps = 30
-}
+windowrule = match:title ^Create or select new Steam library folder$, float on
+windowrule = match:class steam match:title Friends List, float on
+windowrule = match:class steam match:title Steam Settings, float on
+# windowrule = match:class steam, float on  # Uncomment to float all Steam windows
+# Steam apps: send to workspace 6, render in background for FPS stability
+windowrule = match:class ^(steam_app_[0-9]+)$, monitor 0 silent
+windowrule = match:class ^(steam_app_[0-9]+)$, workspace 6 silent
 
-# File managers
-windowrule = float,class:org.kde.ark,title:^(File Already Exists).*Ark$
-windowrule = float,class:org.kde.dolphin,title:^(Choose Application).*Dolphin$
-windowrule = float,class:org.freedesktop.impl.portal.desktop.kde # xdg-desktop-portal dolphin
+# Elden Ring: prevent FPS drops when unfocused
+windowrule = match:class steam_app_2622380 match:title ELDEN RING NIGHTREIGN, render_unfocused on
 
-# Browser
-windowrule = float,class:firefox,title:^$ # firefox notification pop-ups are empty
-windowrule = float,class:firefox,title:Library
-# mainly for xwayland chromium browsers' context menu where ignorezero
-# can't be used because of the lack of class or title.
-windowrule = noblur,class:^()$,title:^()$
+# Render unfocused at lower FPS (add to config misc section)
+# misc {
+#   render_unfocused_fps = 30
+# }
+
+# File Managers
+windowrule = match:class org.kde.ark match:title ^(File Already Exists).*Ark$, float on
+windowrule = match:class org.kde.dolphin match:title ^(Choose Application).*Dolphin$, float on
+windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on
+
+# Firefox
+# Empty title notifications (popups with no text)
+windowrule = match:class firefox match:title ^$, float on
+windowrule = match:class firefox match:title Library, float on
+
+# Global rule: disable blur for windows with empty class/title (xwayland context menus)
+windowrule = match:class ^()$ match:title ^()$, no_blur on
 
 # Inkscape
-windowrule = float, class:^(org.inkscape.Inkscape)$, title:^(SVG Input)$
+windowrule = match:class org.inkscape.Inkscape match:title ^(SVG Input)$, float on
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
 source = window-rules.conf
 
-windowrule = suppressevent maximize, class:.*
+windowrule = suppress_event maximize, match:class .*
 #+end_src
 
 
@@ -279,20 +290,20 @@ windowrule = suppressevent maximize, class:.*
   + [[https://www.reddit.com/r/hyprland/comments/10q5t3e/comment/j6ok1qm/?context=3][No blur on hyprland? : hyprland]]
   Blur notifications and bars
 #+begin_src conf
-layerrule = blur, notifications
-layerrule = blur, wob
-layerrule = blur, launcher
+layerrule = blur on, match:namespace notifications
+layerrule = blur on, match:namespace wob
+layerrule = blur on, match:namespace launcher
 #+end_src
 
 - Layer Rules
   + =ignorezero=: Layer rule for Hyprland to ignore fully transparent
     pixels and e.g. not blur them.
 #+begin_src conf
-layerrule = ignorezero, notifications
-layerrule = blur, swaync-control-center
-layerrule = blur, swaync-notification-window
-layerrule = ignorezero, swaync-control-center
-layerrule = ignorezero, swaync-notification-window
+layerrule = ignore_alpha 0, match:namespace notifications
+layerrule = blur on, match:namespace swaync-control-center
+layerrule = blur on, match:namespace swaync-notification-window
+layerrule = ignore_alpha 0, match:namespace swaync-control-center
+layerrule = ignore_alpha 0, match:namespace swaync-notification-window
 #+end_src
 
 Source in the main config file
@@ -890,11 +901,11 @@ general {
 
 env = WLR_DRM_NO_ATOMIC,1
 
-windowrule = immediate,class:^eldenring.exe$
-windowrule = immediate,class:^gamescope$
-windowrule = immediate,class:^steam_app_[0-9]+$
-windowrule = immediate,class:^mpv$
-windowrule = immediate,class:love,title:Freesync test
+windowrule = immediate on, match:class ^eldenring.exe$
+windowrule = immediate on, match:class ^gamescope$
+windowrule = immediate on, match:class ^steam_app_[0-9]+$
+windowrule = immediate on, match:class ^mpv$
+windowrule = immediate on, match:class love, match:title Freesync test
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
@@ -922,8 +933,8 @@ listener {
 :END:
 
 #+begin_src conf
-windowrule = idleinhibit fullscreen,class:^(gamescope|steam_app_[0-9]+)$
-windowrule = idleinhibit fullscreen,class:^(eldenring.exe)$
+windowrule = idle_inhibit fullscreen, match:class ^(gamescope|steam_app_[0-9]+)$
+windowrule = idle_inhibit fullscreen, match:class ^(eldenring.exe)$
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
