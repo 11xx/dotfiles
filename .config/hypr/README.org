@@ -55,7 +55,9 @@ exec-once = /usr/lib/polkit-kde-authentication-agent-1
 #+begin_src conf
 exec-once = lightordark-wallpaper # script
 exec-once = kdeconnectd # KDE connect daemon
-exec-once = sh -c 'eww open mainbar && eww open mainbar2'
+exec-once = sh -c 'sleep 2 && eww open mainbar && eww open mainbar2'
+exec-once = hypr-eww-restart-on-monitor-change
+
 exec-once = xsettingsd # GTK2-3 theme live changes
 exec-once = sh -c 'emacs --daemon && sleep 1 && emacs-launcher'
 
@@ -68,10 +70,6 @@ Fix file association in dolphin.
 - [[https://wiki.archlinux.org/title/Xdg-menu][xdg-menu - ArchWiki]]
 #+begin_src conf
 exec-once = XDG_MENU_PREFIX=arch- kbuildsycoca6
-#+end_src
-
-#+begin_src conf
-exec-once = hypr-eww-restart-on-monitor-change
 #+end_src
 
 ** Environment variables
@@ -230,24 +228,24 @@ windowrule = match:class ^mpv$, suppress_event maximize
 windowrule = match:class .*\.exe$, float on
 
 # Emacs
-windowrule = match:class emacs match:title Ediff, float on
-windowrule = match:class emacs match:title Ediff, size 720 330
-windowrule = match:class emacs match:title Ediff, move (cursor_x-(window_w*0.5)) (cursor_y-(window_h*0.5))
+windowrule = match:class emacs, match:title Ediff, float on
+windowrule = match:class emacs, match:title Ediff, size 720 330
+windowrule = match:class emacs, match:title Ediff, move (cursor_x-(window_w*0.5)) (cursor_y-(window_h*0.5))
 
 # Blender
 windowrule = match:title ^Blender (Render|Preferences)$, float on
 
 # Steam & Games
 windowrule = match:title ^Create or select new Steam library folder$, float on
-windowrule = match:class steam match:title Friends List, float on
-windowrule = match:class steam match:title Steam Settings, float on
+windowrule = match:class steam, match:title Friends List, float on
+windowrule = match:class steam, match:title Steam Settings, float on
 # windowrule = match:class steam, float on  # Uncomment to float all Steam windows
 # Steam apps: send to workspace 6, render in background for FPS stability
 windowrule = match:class ^(steam_app_[0-9]+)$, monitor 0 silent
 windowrule = match:class ^(steam_app_[0-9]+)$, workspace 6 silent
 
 # Elden Ring: prevent FPS drops when unfocused
-windowrule = match:class steam_app_2622380 match:title ELDEN RING NIGHTREIGN, render_unfocused on
+windowrule = match:class steam_app_2622380, match:title ELDEN RING NIGHTREIGN, render_unfocused on
 
 # Render unfocused at lower FPS (add to config misc section)
 # misc {
@@ -255,20 +253,20 @@ windowrule = match:class steam_app_2622380 match:title ELDEN RING NIGHTREIGN, re
 # }
 
 # File Managers
-windowrule = match:class org.kde.ark match:title ^(File Already Exists).*Ark$, float on
-windowrule = match:class org.kde.dolphin match:title ^(Choose Application).*Dolphin$, float on
+windowrule = match:class org.kde.ark, match:title ^(File Already Exists).*Ark$, float on
+windowrule = match:class org.kde.dolphin, match:title ^(Choose Application).*Dolphin$, float on
 windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on
 
 # Firefox
 # Empty title notifications (popups with no text)
-windowrule = match:class firefox match:title ^$, float on
-windowrule = match:class firefox match:title Library, float on
+windowrule = match:class firefox, match:title ^$, float on
+windowrule = match:class firefox, match:title Library, float on
 
 # Global rule: disable blur for windows with empty class/title (xwayland context menus)
-windowrule = match:class ^()$ match:title ^()$, no_blur on
+windowrule = match:class ^()$, match:title ^()$, no_blur on
 
 # Inkscape
-windowrule = match:class org.inkscape.Inkscape match:title ^(SVG Input)$, float on
+windowrule = match:class org.inkscape.Inkscape, match:title ^(SVG Input)$, float on
 #+end_src
 
 #+begin_src conf :tangle hyprland.conf
@@ -573,15 +571,15 @@ bind = , F3, exec, gpu-screen-recorder-replay-save-60
 # Media keys
 # the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode
 # is to use lower case for keysyms, it it stops working capitalized y'know
-bind = $mainMod, XF86AudioNext, exec, playerctl next
-bind = $mainMod, XF86AudioPrev, exec, playerctl previous
-bind = $mainMod, XF86AudioPlay, exec, playerctl play-pause
-bind = $mainMod, XF86AudioStop, exec, wptoggle
+bind = , XF86AudioNext, exec, playerctl next
+bind = , XF86AudioPrev, exec, playerctl previous
+bind = , XF86AudioPlay, exec, playerctl play-pause
+bind = , XF86AudioStop, exec, wptoggle
 # MPD
-bind = , XF86AudioNext, exec, playerctl --player=mpd next
-bind = , XF86AudioPrev, exec, playerctl --player=mpd previous
-bind = , XF86AudioPlay, exec, playerctl --player=mpd play-pause
-bind = , XF86AudioStop, exec, playerctl --player=mpd stop
+bind = $mainMod, XF86AudioNext, exec, playerctl --player=mpd next
+bind = $mainMod, XF86AudioPrev, exec, playerctl --player=mpd previous
+bind = $mainMod, XF86AudioPlay, exec, playerctl --player=mpd play-pause
+bind = $mainMod, XF86AudioStop, exec, playerctl --player=mpd stop
 
 exec-once = pw-volume-wob-monitor
 exec-once = wob-instance /tmp/wob-firefox-sink.pipe ~/.config/wob/wob-firefox-sink.ini
@@ -1609,6 +1607,17 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 :header-args:shell+: :tangle (tdir "hypr-eww-restart-on-monitor-change")
 :END:
 #+begin_src shell :noweb yes
+while :
+do case $1 in
+       -v|--verbose)
+           set -x
+           ;;
+       --) # End of all options.
+           shift; break
+           ;;
+       *) break
+   esac; shift; done
+
 eww_restart() {
     # [ -f /tmp/eww-restarting ] && return
     # touch /tmp/eww-restarting
