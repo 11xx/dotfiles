@@ -1097,7 +1097,6 @@ s/^#([[:blank:]]*source = \.\/monitors-gamemode\.conf)$/\1/' \
     ~/.config/hypr/monitors.conf
 #+end_src
 
-
 * Hyprland Notes
 ** Turn screen off (screen energy saver)
 [[https://www.reddit.com/r/hyprland/comments/14u9p3v/turning_off_screens_after_locking_them/][Turning off screens after locking them : r/hyprland]]
@@ -1131,6 +1130,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
   + [[https://dharmx.is-a.dev/eww-powermenu/][EWW Powermenu - dead airspace]]
 
 #+begin_src yuck :noweb yes
+(deflisten current-monitor :initial '{"focused":false}' "hypr-active-monitor DP-1")
+(deflisten current-monitor2 :initial '{"focused":false}' "hypr-active-monitor DP-2")
+;; initial needs to be the opposite of the check that will add the class name.
+
 (defwindow mainbar
            :monitor "DELL S2721DGF"
            :geometry (geometry :x "0px"
@@ -1140,12 +1143,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
            :reserve (struts :distance "30px" :side "top")
-           ;; :windowtype "dock" ; x11
-           ;; :wm-ignore false ; x11
            :exclusive true ; wayland
            :namespace "bar" ; wayland
-           :class "mainbar"
-           (bar-all-modules))
+           (box :class "mainbar ${current-monitor.focused == true ? 'focused-monitor' : '' }"
+                (bar-all-modules)))
 
 (defwindow mainbar2
            :monitor "DELL P2418D"
@@ -1159,20 +1160,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
-           ;; for some reason when two defwindows use the same class it either
-           ;; appends a number to it or requires manual disambiguation.
-           :class "mainbar2"
-           (box :space-evenly true
-                (box :orientation "h"
-                     :space-evenly false
-                     (label :text "${time}" :class "time-label"))
-                (box :orientation "h"
-                     :space-evenly false
-                     :halign "end"
-                     (window-title-second-monitor)
-                     (sep)
-                     (workspaces)
-                     (sep))))
+           (box :class "mainbar ${current-monitor2.focused == true ? 'focused-monitor' : '' }"
+                (bar-mainbar2-all-modules)))
 
 (defwidget bar-all-modules []
            (box :space-evenly true
@@ -1181,6 +1170,24 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (left-modules)
                 ;; (center-modules)
                 (right-modules)))
+
+(defwidget bar-mainbar2-all-modules []
+           (box :space-evenly true
+                ;; left
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "start"
+                     (label :text "${time}" :class "time-label")
+                     (sep)
+                     (mpd-current :nth 0))
+                ;; right
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "end"
+                     (window-title-second-monitor)
+                     (sep)
+                     (workspaces)
+                     (sep))))
 
 (defwidget sep []
            (label :class "separator" :text "|"))
@@ -1206,9 +1213,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "end"
                 :class "right-modules"
-                (mpd-current :nth 0)
-                (sep)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
+                (sep)
+                (swaync_icon)
                 (sep)
                 (label :text "${time}" :class "time-label")))
 
@@ -1223,6 +1230,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
 (deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1"},"unfocused":{"active_workspace":"2"}}' "hypr-get-current-monitor-workspace")
+
 (defwidget workspaces []
   (eventbox
    :class "workspaces-widget-eventbox"
@@ -1257,7 +1265,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           )))
 
 (include "mpd.yuck")
-
+(include "swaync.yuck")
 #+end_src
 
 #+begin_src yuck :tangle (tdir "mpd.yuck")
@@ -1350,6 +1358,66 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (mpd-current-1st-wrap)))
 #+end_src
 
+** =swaync.yuck=: swaync notification client
+:PROPERTIES:
+:header-args:yuck: :tangle (tdir "/swaync.yuck") :mkdirp yes
+:END:
+
+#+begin_src yuck :noweb yes
+(deflisten swaync_data :initial '{"text": "0", "alt": "none", "tooltip": "", "class": "none"}'
+  "swaync-client -swb")
+
+(defwidget swaync_btn []
+  (eventbox
+    :onclick "swaync-client -t -sw"
+    :onrightclick "swaync-client -d -sw"
+    :onmiddleclick "swaync-client -C -sw"
+    :tooltip "${swaync_data.tooltip}"
+    :class "notification-button ${swaync_data.alt} ${swaync_data.class}"
+    (box
+      :class "notification-content"
+      :space-evenly false
+      :spacing 6
+      ;; Icon based on alt status
+      (label
+        :text "${swaync_data.alt == 'dnd-notification' || swaync_data.alt == 'dnd-inhibited-notification' || swaync_data.alt == 'dnd-none' ? '󰂛' : '󰂚'}"
+        :class "notification-icon")
+      ;; Notification count
+      (label
+        :text "${swaync_data.text}"
+        :class "notification-count"
+        :visible {swaync_data.text != "0"}))))
+
+;; More detailed notification widget
+(defwidget swaync_icon []
+  (eventbox
+    :onclick "swaync-client -t -sw"
+    :onrightclick "swaync-client -d -sw"
+    :onmiddleclick "swaync-client -C -sw"
+    :tooltip "Notifications: ${swaync_data.text} ${swaync_data.alt == 'none' ? '' : '(' + swaync_data.alt + ')'}"
+    :class "notification-widget ${swaync_data.alt} ${swaync_data.class}"
+    (box
+      :orientation "h"
+      :space-evenly false
+      :spacing 6
+      ;; Dynamic icon based on status
+      (label
+        :text "${swaync_data.alt == 'dnd-notification' ? '󰂛' :
+                swaync_data.alt == 'dnd-none' ? '󰂛' :
+                swaync_data.alt == 'dnd-inhibited-notification' ? '󰂛' :
+                swaync_data.alt == 'dnd-inhibited-none' ? '󰂛' :
+                swaync_data.alt == 'inhibited-notification' ? '󰂚' :
+                swaync_data.alt == 'inhibited-none' ? '󰂚' :
+                swaync_data.alt == 'notification' ? '󰂚' : '󰂚'}"
+        :class "notification-icon")
+      ;; Count badge (only show when > 0)
+      (label
+        :text "${swaync_data.text}"
+        :class "notification-count ${swaync_data.text != '0' ? 'has-count' : ''}"
+        :visible {swaync_data.text != "0"}))))
+#+end_src
+
+
 ** =eww.scss=: Customization for =eww.yuck= widgets
 :PROPERTIES:
 :header-args:scss: :tangle (tdir "/eww.scss") :mkdirp yes
@@ -1358,6 +1426,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 Variables files, first dark:
 #+begin_src scss :tangle (tdir "/dark-colors.scss") :mkdirp yes
 $bar-bg: #222;
+$bar-bg-unfocused: #000;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
 $middle-gray: #808080;
@@ -1369,6 +1438,7 @@ $current-icon: #666666;
 then light:
 #+begin_src scss :tangle (tdir "/light-colors.scss") :mkdirp yes
 $bar-bg: #fff;
+$bar-bg-unfocused: #000;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
 $middle-gray: #808080;
@@ -1385,22 +1455,17 @@ Now import /one/ of them on the normal file =eww= expects to read:
 
 Based on the variables, customize the widgets:
 #+begin_src scss :noweb yes
+@import "swaync.scss";
+
 $current-bb-t: .15em;
 
-// * { all: unset; }
-
 .mainbar {
-  // font-size: 14;
   color: $neron-fg;
-  background-color: $bar-bg;
-}
-
-// for some reason when two defwindows use the same class it either
-// appends a number to it or requires manual disambiguation.
-.mainbar2 {
-  // font-size: 14;
-  color: $neron-fg;
-  background-color: $bar-bg;
+  background-color: $bar-bg-unfocused;
+  &.focused-monitor {
+    transition: all 0.1s ease;
+    background-color: $bar-bg;
+  }
 }
 
 .workspace-entry {
@@ -1416,7 +1481,6 @@ $current-bb-t: .15em;
   font-weight: bold;
   background-color: $neron-current;
   border-bottom: $current-bb-t solid $neron-green;
-  // padding-bottom: 0;
 }
 
 .workspace-entry.occupied {
@@ -1431,8 +1495,6 @@ $current-bb-t: .15em;
   font-weight: bold;
   background-color: $neron-current;
   border-bottom: $current-bb-t solid $neron-pink;
-  // padding-bottom: 0;
-
 }
 
 .separator {
@@ -1454,13 +1516,10 @@ $current-bb-t: .15em;
 .mpd-circular-progress {
   color: $middle-gray;
   background-color: $neron-current;
-  // margin: 0 0;
-  // width: 100;
 }
 
 .mpd-current-box {
   font-size: inherit;
-  // font-weight: bold;
 }
 
 .mpd-current-meta-field {
@@ -1486,6 +1545,96 @@ $current-bb-t: .15em;
 
 .mpd-current-artist-separator {
   margin: 0 8;
+}
+#+end_src
+
+** =swaync.scss=: Styles for =swaync.yuck=
+:PROPERTIES:
+:header-args:scss: :tangle (tdir "/swaync.scss") :mkdirp yes
+:END:
+
+#+begin_src scss
+/* ===== SwayNC Notification Styles ===== */
+/* Base notification button/widget */
+.notification-button,
+.notification-widget {
+  background-color: $bar-bg;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0px 4px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background-color: lighten($bar-bg, 10%);
+  }
+
+  /* State-based styling using your existing color palette */
+  &.none {
+    /* Normal state - uses default bar-bg */
+  }
+
+  &.notification {
+    background-color: rgba(97, 189, 9, 0.2); // neron-green with alpha
+    border: 1px solid $neron-green;
+  }
+
+  &.dnd-notification,
+  &.dnd-none {
+    background-color: rgba(255, 119, 207, 0.2); // neron-pink with alpha
+    border: 1px solid $neron-pink;
+  }
+
+  &.inhibited-notification,
+  &.inhibited-none {
+    background-color: rgba(128, 128, 128, 0.2); // middle-gray with alpha
+    border: 1px solid $middle-gray;
+  }
+
+  &.dnd-inhibited-notification,
+  &.dnd-inhibited-none {
+    background-color: rgba(47, 47, 47, 0.8); // neron-current
+    border: 1px solid $neron-current;
+  }
+}
+
+/* Icon styling */
+.notification-icon {
+  color: $neron-fg;
+  font-size: 16px;
+  min-width: 20px;
+}
+
+/* DnD state icons use pink accent */
+.notification-button.dnd-notification .notification-icon,
+.notification-button.dnd-none .notification-icon,
+.notification-button.dnd-inhibited-notification .notification-icon,
+.notification-button.dnd-inhibited-none .notification-icon,
+.notification-widget.dnd-notification .notification-icon,
+.notification-widget.dnd-none .notification-icon,
+.notification-widget.dnd-inhibited-notification .notification-icon,
+.notification-widget.dnd-inhibited-none .notification-icon {
+  color: $neron-pink;
+}
+
+/* Notification count badge */
+.notification-count {
+  color: $neron-fg;
+  font-size: 12px;
+  font-weight: bold;
+  min-width: 16px;
+}
+
+/* Count with background when has notifications */
+.notification-count.has-count {
+  background-color: $neron-green;
+  color: $bar-bg; // Dark text on bright background
+  border-radius: 10px;
+  padding: 2px 6px;
+}
+
+/* Alternative: Simple notification content styling */
+.notification-content {
+  /* Container for icon and count */
 }
 #+end_src
 
@@ -1639,6 +1788,19 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
     while read -r event; do
         eww_restart
     done
+#+end_src
+
+*** =hypr-active-monitor=: Get current monitor information
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "/hypr-active-monitor") :shebang #!/usr/bin/env sh :mkdirp yes
+:END:
+
+# [2026-01-07 Wed 20:29:11 -03] @ak
+#+begin_src shell :noweb yes
+# - jaq doesn't have --unbuffered
+# - needs to be single line or eww's (deflisten) won't work
+hypr-get-current-monitor-workspace |
+    jq -c -M --unbuffered --arg mon "$*" '{focused: (.focused_monitor.name == $mon)}'
 #+end_src
 
 

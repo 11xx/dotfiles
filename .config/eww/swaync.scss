@@ -1,0 +1,82 @@
+/* ===== SwayNC Notification Styles ===== */
+/* Base notification button/widget */
+.notification-button,
+.notification-widget {
+  background-color: $bar-bg;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0px 4px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background-color: lighten($bar-bg, 10%);
+  }
+
+  /* State-based styling using your existing color palette */
+  &.none {
+    /* Normal state - uses default bar-bg */
+  }
+
+  &.notification {
+    background-color: rgba(97, 189, 9, 0.2); // neron-green with alpha
+    border: 1px solid $neron-green;
+  }
+
+  &.dnd-notification,
+  &.dnd-none {
+    background-color: rgba(255, 119, 207, 0.2); // neron-pink with alpha
+    border: 1px solid $neron-pink;
+  }
+
+  &.inhibited-notification,
+  &.inhibited-none {
+    background-color: rgba(128, 128, 128, 0.2); // middle-gray with alpha
+    border: 1px solid $middle-gray;
+  }
+
+  &.dnd-inhibited-notification,
+  &.dnd-inhibited-none {
+    background-color: rgba(47, 47, 47, 0.8); // neron-current
+    border: 1px solid $neron-current;
+  }
+}
+
+/* Icon styling */
+.notification-icon {
+  color: $neron-fg;
+  font-size: 16px;
+  min-width: 20px;
+}
+
+/* DnD state icons use pink accent */
+.notification-button.dnd-notification .notification-icon,
+.notification-button.dnd-none .notification-icon,
+.notification-button.dnd-inhibited-notification .notification-icon,
+.notification-button.dnd-inhibited-none .notification-icon,
+.notification-widget.dnd-notification .notification-icon,
+.notification-widget.dnd-none .notification-icon,
+.notification-widget.dnd-inhibited-notification .notification-icon,
+.notification-widget.dnd-inhibited-none .notification-icon {
+  color: $neron-pink;
+}
+
+/* Notification count badge */
+.notification-count {
+  color: $neron-fg;
+  font-size: 12px;
+  font-weight: bold;
+  min-width: 16px;
+}
+
+/* Count with background when has notifications */
+.notification-count.has-count {
+  background-color: $neron-green;
+  color: $bar-bg; // Dark text on bright background
+  border-radius: 10px;
+  padding: 2px 6px;
+}
+
+/* Alternative: Simple notification content styling */
+.notification-content {
+  /* Container for icon and count */
+}

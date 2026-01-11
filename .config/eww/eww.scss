@@ -1,21 +1,16 @@
 @import "dark-colors.scss";
 
+@import "swaync.scss";
+
 $current-bb-t: .15em;
 
-// * { all: unset; }
-
 .mainbar {
-  // font-size: 14;
   color: $neron-fg;
-  background-color: $bar-bg;
-}
-
-// for some reason when two defwindows use the same class it either
-// appends a number to it or requires manual disambiguation.
-.mainbar2 {
-  // font-size: 14;
-  color: $neron-fg;
-  background-color: $bar-bg;
+  background-color: $bar-bg-unfocused;
+  &.focused-monitor {
+    transition: all 0.1s ease;
+    background-color: $bar-bg;
+  }
 }
 
 .workspace-entry {
@@ -31,7 +26,6 @@ $current-bb-t: .15em;
   font-weight: bold;
   background-color: $neron-current;
   border-bottom: $current-bb-t solid $neron-green;
-  // padding-bottom: 0;
 }
 
 .workspace-entry.occupied {
@@ -46,8 +40,6 @@ $current-bb-t: .15em;
   font-weight: bold;
   background-color: $neron-current;
   border-bottom: $current-bb-t solid $neron-pink;
-  // padding-bottom: 0;
-
 }
 
 .separator {
@@ -69,13 +61,10 @@ $current-bb-t: .15em;
 .mpd-circular-progress {
   color: $middle-gray;
   background-color: $neron-current;
-  // margin: 0 0;
-  // width: 100;
 }
 
 .mpd-current-box {
   font-size: inherit;
-  // font-weight: bold;
 }
 
 .mpd-current-meta-field {

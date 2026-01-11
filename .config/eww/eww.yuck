@@ -1,3 +1,7 @@
+(deflisten current-monitor :initial '{"focused":false}' "hypr-active-monitor DP-1")
+(deflisten current-monitor2 :initial '{"focused":false}' "hypr-active-monitor DP-2")
+;; initial needs to be the opposite of the check that will add the class name.
+
 (defwindow mainbar
            :monitor "DELL S2721DGF"
            :geometry (geometry :x "0px"
@@ -7,12 +11,10 @@
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
            :reserve (struts :distance "30px" :side "top")
-           ;; :windowtype "dock" ; x11
-           ;; :wm-ignore false ; x11
            :exclusive true ; wayland
            :namespace "bar" ; wayland
-           :class "mainbar"
-           (bar-all-modules))
+           (box :class "mainbar ${current-monitor.focused == true ? 'focused-monitor' : '' }"
+                (bar-all-modules)))
 
 (defwindow mainbar2
            :monitor "DELL P2418D"
@@ -26,20 +28,8 @@
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
-           ;; for some reason when two defwindows use the same class it either
-           ;; appends a number to it or requires manual disambiguation.
-           :class "mainbar2"
-           (box :space-evenly true
-                (box :orientation "h"
-                     :space-evenly false
-                     (label :text "${time}" :class "time-label"))
-                (box :orientation "h"
-                     :space-evenly false
-                     :halign "end"
-                     (window-title-second-monitor)
-                     (sep)
-                     (workspaces)
-                     (sep))))
+           (box :class "mainbar ${current-monitor2.focused == true ? 'focused-monitor' : '' }"
+                (bar-mainbar2-all-modules)))
 
 (defwidget bar-all-modules []
            (box :space-evenly true
@@ -48,6 +38,24 @@
                 (left-modules)
                 ;; (center-modules)
                 (right-modules)))
+
+(defwidget bar-mainbar2-all-modules []
+           (box :space-evenly true
+                ;; left
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "start"
+                     (label :text "${time}" :class "time-label")
+                     (sep)
+                     (mpd-current :nth 0))
+                ;; right
+                (box :orientation "h"
+                     :space-evenly false
+                     :halign "end"
+                     (window-title-second-monitor)
+                     (sep)
+                     (workspaces)
+                     (sep))))
 
 (defwidget sep []
            (label :class "separator" :text "|"))
@@ -73,9 +81,9 @@
                 :space-evenly false
                 :halign "end"
                 :class "right-modules"
-                (mpd-current :nth 0)
-                (sep)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
+                (sep)
+                (swaync_icon)
                 (sep)
                 (label :text "${time}" :class "time-label")))
 
@@ -90,6 +98,7 @@
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
 (deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1"},"unfocused":{"active_workspace":"2"}}' "hypr-get-current-monitor-workspace")
+
 (defwidget workspaces []
   (eventbox
    :class "workspaces-widget-eventbox"
@@ -124,3 +133,4 @@
           )))
 
 (include "mpd.yuck")
+(include "swaync.yuck")
