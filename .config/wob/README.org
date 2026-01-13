@@ -2,10 +2,11 @@
 # * =wob=: Wayland overlay bar for volume, brightness, etc.
 # moved # [2024-08-11 Sun 21:47:35 -03] @ak
 
-* =wob.ini=: Config file
+* =wob.ini=: main config
 :PROPERTIES:
 :header-args:conf: :tangle wob.ini
 :END:
+
 
 #+begin_src conf
 width = 400
@@ -33,12 +34,12 @@ anchor = top center
 margin = 20
 
 width = 600
-height = 5
-border_size = 0
+height = 10
+border_size = 3
 border_offset = 0
 bar_padding = 0
 
-border_color = ffffff00
+border_color = ff0000ff
 bar_color = ff0000ff
 background_color = 11111100
 #+end_src
@@ -53,15 +54,14 @@ anchor = top left
 margin = 20
 
 width = 600
-height = 5
-border_size = 0
+height = 10
+border_size = 3
 border_offset = 0
 bar_padding = 0
 
-background_color = 11111100
-
 border_color = ff7700ff
 bar_color = ff7700ff
+background_color = 11111100
 #+end_src
 
 * Scripts
@@ -107,7 +107,6 @@ EOF
 :END:
 
 #+begin_src shell
-#!/usr/bin/env sh
 # Usage: start-wob-instance <PIPE_PATH> <CONFIG_FILE>
 
 PIPE="$1"
@@ -129,38 +128,23 @@ trap "rm -f $PIPE" EXIT
 tail -f "$PIPE" | wob -c "$CONFIG"
 #+end_src
 
-** =pw-volume-wob-monitor=
+** =wob-volume-pw=
 :PROPERTIES:
-:header-args:shell: :tangle (tdir "pw-volume-wob-monitor") :shebang #!/usr/bin/env zsh
+:header-args:shell: :tangle (tdir "wob-volume-pw") :shebang #!/usr/bin/env zsh
 :END:
-test
+- =!&= is equivalent to =nohup= + =disown=
 #+begin_src shell
-set -xe
-
 wobPipeVolume=/tmp/pw-volume.wob
-
-[ -p "${wobPipeVolume}" ] || mkfifo "${wobPipeVolume}"
-
-#  read -r -d '' wobConfig <<'EOF'
-cat <<'EOF' > /tmp/pw-volume.wob.ini
-width = 600
-height = 20
-border_offset = 0
-border_size = 0
-anchor = center center
-margin = 300 0 0 0
-
-background_color = 00000000
-bar_color = 61bd09ee
-# neronfg a6a8a9
-border_color = ff77cf80
-# col.active_border = rgba(61bd09ee) rgba(ff77cfee) 45deg
-EOF
-
-
-# tail -f $wobPipeVolume | wob
-killall wob || echo 'No wob instance found, skipping...'
-entr -r -- zsh -c "tail -f \"${wobPipeVolume}\" | wob -c <("$wobConfig")" <<EOF
-/tmp/pw-volume.wob.ini
-EOF
+wob-instance "${wobPipeVolume}" ~/.config/wob/wob.ini &!
 #+end_src
+
+** =wob-volume-pw-extras=
+:PROPERTIES:
+:header-args:shell: :tangle (tdir "wob-volume-pw-extras") :shebang #!/usr/bin/env zsh
+:END:
+
+#+begin_src shell
+wob-instance /tmp/wob-firefox-sink.pipe ~/.config/wob/wob-firefox-sink.ini &!
+wob-instance /tmp/wob-game-sink.pipe ~/.config/wob/wob-game-sink.ini &!
+#+end_src
+
