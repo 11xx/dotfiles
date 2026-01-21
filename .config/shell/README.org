@@ -305,7 +305,7 @@ export VIDEO=mpv
 export IMAGE=qimgv
 export OPENER=launch
 export PAGER=bat
-export WM=Hyprland
+export WM=start-hyprland
 #+end_src
 
 ** Import environment variables from systemd
@@ -1304,9 +1304,9 @@ n() {
     # ^ disabled because using 'proper' ansi color theme.
 
     if command -v cpg >/dev/null && command -v mvg >/dev/null; then
-        nnn -EHr "$@"
+        nnn -EHd -r "$@"
     else
-        nnn -EH "$@"
+        nnn -EHd "$@"
     fi
 
     if [ -f "$NNN_TMPFILE" ]; then

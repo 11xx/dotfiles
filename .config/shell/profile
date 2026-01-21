@@ -81,7 +81,7 @@ export VIDEO=mpv
 export IMAGE=qimgv
 export OPENER=launch
 export PAGER=bat
-export WM=Hyprland
+export WM=start-hyprland
 
 ps -p 1 -o comm= | grep -q systemd &&
     [ "$(/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator | wc -l)" != 0 ] &&

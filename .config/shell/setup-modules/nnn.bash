@@ -97,9 +97,9 @@ n() {
     # ^ disabled because using 'proper' ansi color theme.
 
     if command -v cpg >/dev/null && command -v mvg >/dev/null; then
-        nnn -EHr "$@"
+        nnn -EHd -r "$@"
     else
-        nnn -EH "$@"
+        nnn -EHd "$@"
     fi
 
     if [ -f "$NNN_TMPFILE" ]; then
