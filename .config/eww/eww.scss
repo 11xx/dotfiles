@@ -6,11 +6,12 @@ $current-bb-t: .15em;
 
 .mainbar {
   color: $neron-fg;
-  background-color: $bar-bg-unfocused;
-  &.focused-monitor {
-    transition: all 0.1s ease;
-    background-color: $bar-bg;
-  }
+  background-color: $bar-bg;
+}
+
+.unfocused-monitor {
+  padding: 0 10px;
+  background-color: darkred;
 }
 
 .workspace-entry {

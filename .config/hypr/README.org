@@ -1127,8 +1127,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
   + [[https://dharmx.is-a.dev/eww-powermenu/][EWW Powermenu - dead airspace]]
 
 #+begin_src yuck :noweb yes
-(deflisten current-monitor :initial '{"focused":false}' "hypr-active-monitor DP-1")
-(deflisten current-monitor2 :initial '{"focused":false}' "hypr-active-monitor DP-2")
+(deflisten current-monitor :initial '{"focused":true}' "hypr-active-monitor DP-1")
+(deflisten current-monitor2 :initial '{"focused":true}' "hypr-active-monitor DP-2")
 ;; initial needs to be the opposite of the check that will add the class name.
 
 (defwindow mainbar
@@ -1142,8 +1142,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            :reserve (struts :distance "30px" :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
-           (box :class "mainbar ${current-monitor.focused == true ? 'focused-monitor' : '' }"
-                (bar-all-modules)))
+           (bar-mainbar-all-modules))
 
 (defwindow mainbar2
            :monitor "DELL P2418D"
@@ -1157,10 +1156,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
-           (box :class "mainbar ${current-monitor2.focused == true ? 'focused-monitor' : '' }"
-                (bar-mainbar2-all-modules)))
+           (bar-mainbar2-all-modules))
 
-(defwidget bar-all-modules []
+(defwidget bar-mainbar-all-modules []
            (box :space-evenly true
                 :class "bar-all-modules"
                 :orientation "h"
@@ -1184,7 +1182,14 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                      (window-title-second-monitor)
                      (sep)
                      (workspaces)
-                     (sep))))
+                     (sep)
+                     (active-monitor2-indicator)
+                     )))
+
+(defwidget active-monitor-indicator []
+           (box :class "${current-monitor.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
+(defwidget active-monitor2-indicator []
+           (box :class "${current-monitor2.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
 
 (defwidget sep []
            (label :class "separator" :text "|"))
@@ -1194,6 +1199,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "start"
                 :class "left-modules"
+                (active-monitor-indicator)
                 (workspaces)
                 (sep)
                 (window-title)))
@@ -1423,7 +1429,6 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 Variables files, first dark:
 #+begin_src scss :tangle (tdir "/dark-colors.scss") :mkdirp yes
 $bar-bg: #222;
-$bar-bg-unfocused: #000;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
 $middle-gray: #808080;
@@ -1435,7 +1440,6 @@ $current-icon: #666666;
 then light:
 #+begin_src scss :tangle (tdir "/light-colors.scss") :mkdirp yes
 $bar-bg: #fff;
-$bar-bg-unfocused: #000;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
 $middle-gray: #808080;
@@ -1458,11 +1462,12 @@ $current-bb-t: .15em;
 
 .mainbar {
   color: $neron-fg;
-  background-color: $bar-bg-unfocused;
-  &.focused-monitor {
-    transition: all 0.1s ease;
-    background-color: $bar-bg;
-  }
+  background-color: $bar-bg;
+}
+
+.unfocused-monitor {
+  padding: 0 10px;
+  background-color: darkred;
 }
 
 .workspace-entry {
