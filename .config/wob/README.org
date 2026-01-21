@@ -75,30 +75,16 @@ background_color = 11111100
 :CUSTOM_ID: orgid-snwuth
 :END:
 
-This script monitors the config file from the heredoc and uses entr to
-restart tail + wob.
+Monitor =wob='s config file and restart on change with =entr=
 
 - DEPENDENCIES:
   + wob
   + entr
 
 #+begin_src shell
-set -e
-while :
-do case $1 in
-       -v)
-           set -x
-           ;;
-       ,*) break
-   esac; shift; done
-
-wobPipeVolume=/tmp/wobpipe-volume
-[ -p "${wobPipeVolume}" ] || mkfifo "${wobPipeVolume}"
-# tail -f $wobPipeVolume | wob
-killall wob || echo 'No wob instance found, skipping...'
-entr -r -- sh -c "tail -f \"${wobPipeVolume}\" | wob" <<EOF
-${XDG_CONFIG_HOME}/wob/wob.ini
-EOF
+wobPipe="${XDG_RUNTIME_DIR:-/tmp}/wobpipe-volume"
+wobConfig="${XDG_CONFIG_HOME:-$HOME/.config}/wob/wob.ini"
+wobPidFile="/tmp/wob-volume.pid$$"
 #+end_src
 
 ** =wob-instance=: Instance monitor starter for custom pipes and config
@@ -107,25 +93,45 @@ EOF
 :END:
 
 #+begin_src shell
-# Usage: start-wob-instance <PIPE_PATH> <CONFIG_FILE>
+wobPipe="$1"
+wobConfig="$2"
+wobPidFile="/tmp/wob-volume.pid$$"
 
-PIPE="$1"
-CONFIG="$2"
-
-if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
+if [ -z "${wobPipe}" ] || [ -z "${wobConfig}" ]; then
     echo "Usage: $0 PIPE_PATH CONFIG_FILE"
     exit 1
 fi
 
-# Ensure the named pipe exists
-[ -p "$PIPE" ] || mkfifo "$PIPE"
+# Cleanup on exit
+cleanup() {
+    [ -f "$wobPidFile" ] && kill "$(cat "$wobPidFile")" 2>/dev/null || true
+    rm -f "$wobPidFile" "$wobPipe"
+}
+trap cleanup EXIT
 
-# Clean up pipe on exit
-trap "rm -f $PIPE" EXIT
+# Create FIFO if doesn't exist
+[ -p "$wobPipe" ] || mkfifo "$wobPipe"
 
-# Start wob reading from the pipe
-# tail -f keeps the pipe open even after a write finishes
-tail -f "$PIPE" | wob -c "$CONFIG"
+start_wob() {
+    tail -f "$wobPipe" | wob -c "$wobConfig" &
+    echo $! > "$wobPidFile"
+}
+
+# Kill previous instance (by PID, not killall)
+[ -f "$wobPidFile" ] && kill "$(cat "$wobPidFile")" 2>/dev/null
+
+# Start fresh
+start_wob
+
+# Watch config file with entr (stdin from heredoc)
+entr -r -- sh -c "
+    [ -f '$wobPidFile' ] && kill \$(cat '$wobPidFile') 2>/dev/null || true
+    tail -f '$wobPipe' | wob -c '$wobConfig' &
+    echo \$! > '$wobPidFile'
+    wait \$(cat '$wobPidFile')
+" <<EOF
+$wobConfig
+EOF
 #+end_src
 
 ** =wob-volume-pw=
