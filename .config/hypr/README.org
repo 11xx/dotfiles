@@ -518,10 +518,7 @@ bind = $mainMod SHIFT, O, movewindow, mon:+1
 # exec, hyprctl dispatch movewindow mon:"$(hyprctl monitors -j | jq -r '.[] | select(.focused == false).id')"
 
 # Notification contols
-bind = $mainMod CTRL ALT, N, exec, dunstctl history-pop
-
-# Reload second monitor to set the primary monitor:
-bind = $mainMod CTRL ALT, D, exec, wlr-randr --output DP-2 --off && sleep 1 && wlr-randr --output DP-2 --on --pos 2048,122
+bind = $mainMod CTRL ALT, N, exec, swaync-client --open-panel
 
 # Switch keyboard layouts, find names with `hyprctl devices'
 # bind = , control_r, exec, hyprctl switchxkblayout "$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')" next
@@ -530,7 +527,7 @@ bind = $mainMod CTRL ALT, D, exec, wlr-randr --output DP-2 --off && sleep 1 && w
 # spaces replaces with hyphens, e.g.:
 # `output (uinput-sink "KMonad uinput Sink"...)' will become kmonad-uinput-sink
 # PS same works for kmonad:
-bind = $mainMod ALT, control_r, exec, hyprctl switchxkblayout "$(pgrep -x xremap >/dev/null && printf 'xremap' || printf 'sino-wealth-usb-keyboard')" next
+bind = $mainMod ALT, menu, exec, hyprctl switchxkblayout "$(pgrep -x xremap >/dev/null && printf 'xremap' || printf 'sino-wealth-usb-keyboard')" next
 
 # pgrep kmonad > /dev/null && printf '%s\n' 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard\n'
 # if pgrep kmonad > /dev/null; then printf '%s\n' 'kmonad-uinput-sink'; else printf 'sino-wealth-usb-keyboard\n'; fi
@@ -556,15 +553,15 @@ Using =gpu-screen-recorder=
 bind = $mainMod ALT, SPACE, exec, gpu-screen-recorder-replay-save
 
 # Pause/resume replay buffer
-bind = $mainMod, pause, exec, gpu-screen-recorder-replay-toggle
+bind = $mainMod ALT, pause, exec, gpu-screen-recorder-replay-toggle
 
 # Stop replay buffer entirely
-bind = $mainMod, end, exec, gpu-screen-recorder-replay-stop
+bind = $mainMod ALT, end, exec, gpu-screen-recorder-replay-stop
 
-bind = , F1, exec, gpu-screen-recorder-replay-save-10
-bind = , F2, exec, gpu-screen-recorder-replay-save-30
-bind = , Capslock, exec, gpu-screen-recorder-replay-save-30
-bind = , F3, exec, gpu-screen-recorder-replay-save-60
+bind = $mainMod ALT, F1, exec, gpu-screen-recorder-replay-save-10
+bind = $mainMod ALT, F2, exec, gpu-screen-recorder-replay-save-30
+bind = $mainMod, Capslock, exec, gpu-screen-recorder-replay-save-30
+bind = $mainMod ALT, F3, exec, gpu-screen-recorder-replay-save-60
 #+end_src
 **** media/volume
 #+begin_src conf
@@ -574,18 +571,19 @@ bind = , F3, exec, gpu-screen-recorder-replay-save-60
 bind = , XF86AudioNext, exec, playerctl next
 bind = , XF86AudioPrev, exec, playerctl previous
 bind = , XF86AudioPlay, exec, playerctl play-pause
-bind = , XF86AudioStop, exec, wptoggle
+
 # MPD
 bind = $mainMod, XF86AudioNext, exec, playerctl --player=mpd next
 bind = $mainMod, XF86AudioPrev, exec, playerctl --player=mpd previous
 bind = $mainMod, XF86AudioPlay, exec, playerctl --player=mpd play-pause
 bind = $mainMod, XF86AudioStop, exec, playerctl --player=mpd stop
+bind = $mainMod, XF86AudioStop, exec, wptoggle
 
 exec-once = wob-volume-pw
 exec-once = wob-volume-pw-extras
 
-binde = , XF86AudioLowerVolume, exec, pw-volume @DEFAULT_AUDIO_SINK@ 1-
-binde = , XF86AudioRaiseVolume, exec, pw-volume @DEFAULT_AUDIO_SINK@ 1+
+binde = , XF86AudioLowerVolume, exec, pw-volume @DEFAULT_AUDIO_SINK@ 3-
+binde = , XF86AudioRaiseVolume, exec, pw-volume @DEFAULT_AUDIO_SINK@ 3+
 
 binde = $mainMod ALT, XF86AudioLowerVolume, exec, env WOB_PIPE=/tmp/wob-game-sink.pipe pw-volume gamesink 5-
 binde = $mainMod ALT, XF86AudioRaiseVolume, exec, env WOB_PIPE=/tmp/wob-game-sink.pipe pw-volume gamesink 5+
