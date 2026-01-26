@@ -21,3 +21,7 @@ prepend_path () {
             PATH="${PATH%:}"
     esac
 }
+
+is_systemd_system() {
+    ps -p 1 -o comm= | grep -q systemd
+}

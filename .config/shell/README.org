@@ -151,6 +151,11 @@ alias b100='brightness 100'
 :header-args:shell: :tangle ~/.config/shell/profile :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
 :END:
 
+Source helper functions.
+#+begin_src shell
+source "$XDG_CONFIG_HOME/shell/functions"
+#+end_src
+
 ** Default Apps
 Commands
 #+begin_src shell
@@ -176,20 +181,20 @@ export WM=start-hyprland
   [[https://wiki.archlinux.org/title/Environment_variables#:~:text=use systemd-environment-d-generator(8) to generate environment%2C][Environment variables - ArchWiki]]
   # [2023-04-07 Fri 05:58:58 -03]
 
-Install =run-parts= to run all scripts within a directory.
-
-The check is to make sure the =30-systemd-environment-d-generator=
-program doesn't return an empty result, from having an empty or
-inexistent =environment.d= directory.
+Source all files from =environment.d= and export all variables with
+=set -a=. Turn off auto-export feature with =set +a=.
 #+begin_src shell
-ps -p 1 -o comm= | grep -q systemd &&
-    [ "$(/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator | wc -l)" != 0 ] &&
-    export $(run-parts /usr/lib/systemd/user-environment-generators/ | xargs)
+if is_systemd_system; then
+    set -a
+    for env_file in "${XDG_CONFIG_HOME}"/environment.d/*.conf; do
+        [ -f "${env_file}" ] && source "${env_file}"
+    done
+    set +a
+fi
 #+end_src
-Here, =xargs= separates the output of the scripts into a space-separated
-list of arguments.
 
-#+begin_src shell
+# disabled deduplicate for testing
+#+begin_src shell :tangle no
 # check for duplicates in the PATH again
 PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
 #+end_src
@@ -227,6 +232,13 @@ prepend_path () {
             PATH="${PATH#:}"
             PATH="${PATH%:}"
     esac
+}
+#+end_src
+
+Check if current system uses Systemd as init
+#+begin_src shell
+is_systemd_system() {
+    ps -p 1 -o comm= | grep -q systemd
 }
 #+end_src
 

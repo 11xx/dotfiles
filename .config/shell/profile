@@ -1,4 +1,6 @@
 #!/usr/bin/echo 'This is a source only file.'
+source "$XDG_CONFIG_HOME/shell/functions"
+
 #export READER="zatura"
 export GIT_EDITOR=emacsclient
 export ALTERNATE_EDITOR=emacs
@@ -12,9 +14,10 @@ export OPENER=launch
 export PAGER=bat
 export WM=start-hyprland
 
-ps -p 1 -o comm= | grep -q systemd &&
-    [ "$(/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator | wc -l)" != 0 ] &&
-    export $(run-parts /usr/lib/systemd/user-environment-generators/ | xargs)
-
-# check for duplicates in the PATH again
-PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
+if is_systemd_system; then
+    set -a
+    for env_file in "${XDG_CONFIG_HOME}"/environment.d/*.conf; do
+        [ -f "${env_file}" ] && source "${env_file}"
+    done
+    set +a
+fi
