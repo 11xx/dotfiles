@@ -4,11 +4,6 @@
     return 1
 }
 
-GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
-
-is_command prepend_path &&
-    prepend_path "${GHCUP_BIN_DIR}"
-
 __newPath=$(
     printf '%s\n' "$PATH" |
         awk -v ghcupdir=${GHCUP_BIN_DIR} \
@@ -21,8 +16,6 @@ is_command makepkg &&
     alias makepkg="PATH=\"${__newPath}\" makepkg"
 
 unset __newPath
-
-export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
 
 alias ghcup='XDG_BIN_HOME="$GHCUP_BIN_DIR" ghcup'
 
@@ -53,10 +46,3 @@ alias cidist=cabal_install_copy_dir
 alias ci.='cabalInstallDir=. cabal_install_copy_dir'
 
 alias arch-hs='arch-hs -h "$CABAL_DIR/packages/hackage.haskell.org/01-index.tar"'
-
-export CABAL_DIR="$XDG_DATA_HOME"/cabal
-export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
-append_path "$CABAL_DIR"/bin
-
-export STACK_ROOT="$XDG_DATA_HOME"/stack
-export STACK_XDG=1

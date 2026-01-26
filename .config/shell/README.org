@@ -950,7 +950,7 @@ export ZDOTDIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell"
 
 * Setup Modules
 :PROPERTIES:
-:header-args: :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
+:header-args:shell: :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
 :END:
 Files meant for sourcing, modulating the shell config and centralizing
 program-specific setting into their own files.
@@ -971,7 +971,7 @@ unset __setupModulesDir
 
 ** Source functions
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/functions.sh
+:header-args:shell+: :tangle setup-modules/functions.sh
 :END:
 
 #+begin_src shell
@@ -980,7 +980,7 @@ source "$XDG_CONFIG_HOME/shell/functions"
 
 ** Shell colors
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/colors.sh
+:header-args:shell+: :tangle setup-modules/colors.sh
 :END:
 
 Source =LS_COLORS=. Some programs support it but default to something
@@ -1025,7 +1025,7 @@ export COLORTERM='truecolor'
 
 *** Interactive shell setup
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/nnn.bash
+:header-args:shell+: :tangle setup-modules/nnn.bash
 :END:
 # n³
 - Using =.bash= as extension for sourceable files and adding a echo shebang.
@@ -1174,7 +1174,7 @@ unset block char dir exe regular hardlink symlink miss orph fifo socket unkn
 
 *** nnn Plugins
 :PROPERTIES:
-:header-args:shell: :shebang #!/usr/bin/env sh :tangle-mode o755
+:header-args:shell+: :shebang #!/usr/bin/env sh :tangle-mode o755
 :tangle-dir: (expand-file-name "nnn/plugins" (xdg-config-home))
 :END:
 
@@ -1273,7 +1273,8 @@ fi
 
 ** Haskell
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/haskell.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/haskell.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/haskell.sh
 :END:
 
 *** GHCup
@@ -1286,16 +1287,15 @@ Fail short if =ghcup= is not found
 #+end_src
 
 Custom install directory for GHCup downloads.
-#+begin_src shell
-GHCUP_BIN_DIR=${XDG_BIN_HOME%/*}/ghcup-bin
+#+begin_src conf
+GHCUP_BIN_DIR=${HOME}/.local/ghcup-bin
 #+end_src
 
 This path is overriden by [[(ghcup-alias-bin-anchor)][an alias]], GHCup installs binaries and links
 to =XDG_BIN_HOME= so with alias it is possible to override where it
 installs and manages its files.
-#+begin_src shell
-is_command prepend_path &&
-    prepend_path "${GHCUP_BIN_DIR}"
+#+begin_src conf
+PATH=${GHCUP_BIN_DIR}:${PATH}
 #+end_src
 - Arch Linux Note: When building a PKGBUILD, its build process uses
   the running shell's PATH, so it may try to use GHCup's binaries and
@@ -1324,8 +1324,9 @@ is_command prepend_path &&
     contain unexpanded variables since when run those variables expand
     at runtime.
 
-#+begin_src shell
-export GHCUP_USE_XDG_DIRS=t # https://www.haskell.org/ghcup/guide/#xdg-support
+https://www.haskell.org/ghcup/guide/#xdg-support
+#+begin_src conf
+GHCUP_USE_XDG_DIRS=t
 #+end_src
 
 To prevent GHCup "littering" =XDG_BIN_HOME= it can be overriden by:
@@ -1355,7 +1356,7 @@ ghcup_remove_bin_dir_from_path() {
 
 **** Stack integration with GHCup
 :PROPERTIES:
-:header-args:shell: :tangle (expand-file-name "stack/hooks/ghc-install.sh" (xdg-data-home)) :tangle-mode o755 :shebang #!/bin/sh :mkdirp yes
+:header-args:shell+: :tangle (expand-file-name "stack/hooks/ghc-install.sh" (xdg-data-home)) :tangle-mode o755 :shebang #!/bin/sh :mkdirp yes
 :END:
 - Stack integration with GHCup
   https://www.haskell.org/ghcup/guide/#strategy-1-stack-hooks-new-recommended
@@ -1434,21 +1435,21 @@ alias arch-hs='arch-hs -h "$CABAL_DIR/packages/hackage.haskell.org/01-index.tar"
 
 *** Cabal
 =cabal install= bin directory.
-#+begin_src shell
-export CABAL_DIR="$XDG_DATA_HOME"/cabal
-export CABAL_CONFIG="$XDG_CONFIG_HOME"/cabal/config
-append_path "$CABAL_DIR"/bin
+#+begin_src conf
+CABAL_DIR=${XDG_DATA_HOME}/cabal
+CABAL_CONFIG=${XDG_CONFIG_HOME}/cabal/config
+PATH=${PATH}:${CABAL_DIR}/bin
 #+end_src
 
 *** Stack
-#+begin_src shell
-export STACK_ROOT="$XDG_DATA_HOME"/stack
-export STACK_XDG=1
+#+begin_src conf
+STACK_ROOT=${XDG_DATA_HOME}/stack
+STACK_XDG=1
 #+end_src
 
 ** Vault
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/vault.sh
+:header-args:shell+: :tangle setup-modules/vault.sh
 :END:
 Private repo to accompany the public one. This should be hosted
 privately (in a local pc for example) and holds all other files meant
@@ -1459,7 +1460,7 @@ alias vot='git --git-dir="$HOME/.local/vault.git" --work-tree="$HOME"'
 
 ** MPD
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/mpd.sh
+:header-args:shell+: :tangle setup-modules/mpd.sh
 :CUSTOM_ID: orgid-upnrlu
 :END:
 #+begin_src shell
@@ -1471,7 +1472,7 @@ alias mm='rmpc'
 
 *** Default prefix
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/wine.sh
+:header-args:shell+: :tangle setup-modules/wine.sh
 :END:
 #+begin_src shell
 wineDefaultPrefixDir=${XDG_DATA_HOME}/wine/prefixes/default
@@ -1482,7 +1483,8 @@ unset wineDefaultPrefixDir
 
 ** GTK & Qt: Uniform look & live theme change
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/gtk-qt.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/gtk-qt.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/gtk-qt.sh
 :CUSTOM_ID: orgid-twrkwj
 :END:
 
@@ -1490,8 +1492,8 @@ unset wineDefaultPrefixDir
   + [[file:~/.config/darkman/README.org::#orgid-tjunht][darkman: GTK & QT: Uniform look and live theme change]]
 
 Make Qt apps listen to =plasma-apply-colorscheme=
-#+begin_src shell
-export QT_QPA_PLATFORMTHEME=kde
+#+begin_src conf
+QT_QPA_PLATFORMTHEME=kde
 #+end_src
 
 Make GTK apps use a different file picker and read settings form the
@@ -1506,15 +1508,15 @@ portal depending on the XDG Desktop Portal (e.g. KDE's).
       - [[file:~/.config/xdg-desktop-portal/README.org::#orgid-uxoxxl][GTK apps lost font rendering, cursor theme or other settings]]
   + An alternative to this is to enable it on specific programs that
     should use it instead of enabling globally.
-#+begin_src shell
-# export GTK_USE_PORTAL=1
+
+#+begin_src conf :tangle no
+# GTK_USE_PORTAL=1
 #+end_src
 
 Make wrapper scripts that use ~QT_QPA_PLATFORMTHEME=gnome~ take
 precedente, for pairing with =qgnomeplatform=.
-#+begin_src shell
-is_command prepend_path &&
-    prepend_path "${XDG_DATA_HOME}/qt-platform-theme-wrappers"
+#+begin_src conf
+PATH=${XDG_DATA_HOME}/qt-platform-theme-wrappers:${PATH}
 #+end_src
 
 # # ** Desktop Toolkit Theme
@@ -1531,7 +1533,7 @@ is_command prepend_path &&
 
 ** C Programming Language
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/c-prog.sh
+:header-args:shell+: :tangle setup-modules/c-prog.sh
 :END:
 
 Helper functions for running C files as scripts
@@ -1547,11 +1549,16 @@ gcc-no-sanitize-run-a.out () {
 
 ** GPG
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/gpg.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/gpg.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/gpg.sh
 :END:
+#+begin_src conf
+GNUPGHOME=${XDG_DATA_HOME}/gnupg
+#+end_src
+
 #+begin_src shell
-export GNUPGHOME="$XDG_DATA_HOME"/gnupg
-mkdir -p -m 700 "$GNUPGHOME"
+[ ! -d "${GNUPGHOME}" ] &&
+    mkdir -p -m 700 "${GNUPGHOME}"
 #+end_src
 
 The following is recommended in =man gpg-agent=:
@@ -1562,46 +1569,49 @@ export GPG_TTY
 
 ** NPM
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/npm.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/npm.conf" (xdg-config-home))
 :END:
 
-#+begin_src shell
-append_path "$XDG_DATA_HOME/npm/bin"
-export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME"/npm/npmrc
-export npm_config_devdir="$XDG_CACHE_HOME"/gyp # https://github.com/nodejs/node-gyp
-export NVM_DIR="$XDG_DATA_HOME"/nvm
+#+begin_src conf
+PATH=${PATH}:${XDG_DATA_HOME}/npm/bin
+NPM_CONFIG_USERCONFIG=${XDG_CONFIG_HOME}/npm/npmrc
+# https://github.com/nodejs/node-gyp
+npm_config_devdir=${XDG_CACHE_HOME}/gyp
+NVM_DIR=${XDG_DATA_HOME}/nvm
 #+end_src
 
 
 ** Rust
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/rust.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/rust.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/rust.sh
 :END:
 
 *** Cargo
 =cargo install= bin directory
-#+begin_src shell
-export CARGO_HOME="$XDG_DATA_HOME"/cargo
-append_path "$CARGO_HOME"/bin
+#+begin_src conf
+CARGO_HOME=${XDG_DATA_HOME}/cargo
+PATH=${PATH}:${CARGO_HOME}/bin
 #+end_src
 
 
 
 ** Go
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/go.sh
+:header-args:conf: :tangle (expand-file-name "environment.d/go.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/go.sh
 :END:
 
 =go install= bin directory
-#+begin_src shell
-export GOPATH="$XDG_DATA_HOME"/go
-append_path "$GOPATH"/bin
+#+begin_src conf
+GOPATH=${XDG_DATA_HOME}/go
+PATH=${PATH}:${GOPATH}/bin
 #+end_src
 
 
 ** Sqlite
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/sqlite.sh
+:header-args:shell+: :tangle setup-modules/sqlite.sh
 :END:
 
 #+begin_src shell
@@ -1613,7 +1623,7 @@ sqlite_all_tables() {
 
 ** Defending Home: Aliases
 :PROPERTIES:
-:header-args:shell: :tangle setup-modules/defending-home-aliases.sh
+:header-args:shell+: :tangle setup-modules/defending-home-aliases.sh
 :END:
 
 - Complementary setup for [[file:~/.config/environment.d/README.org::#orgid-gktrml][defending-home.conf]]

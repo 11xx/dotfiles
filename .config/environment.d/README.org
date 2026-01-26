@@ -35,7 +35,7 @@ XDG_CACHE_HOME=$HOME/.local/cache
 XDG_CONFIG_HOME=$HOME/.config
 XDG_STATE_HOME=$HOME/.local/state
 XDG_BIN_HOME=$HOME/.local/bin
-PATH=$PATH:$XDG_BIN_HOME
+PATH=${PATH}:${XDG_BIN_HOME}
 #+end_src
 
 * nvidia.conf: Hardware acceleration
