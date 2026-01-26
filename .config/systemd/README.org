@@ -1,35 +1,19 @@
+#+TITLE: Systemd user services
 #+PROPERTY: header-args :mkdirp yes
 
 # moved # [2024-02-18 Sun 21:33:18 -03] @ak
+
 * Systemd environment variables
+Systemd-managed environment variables at:
+[[../environment.d/README.org]]
 
-Systemd don't share environment variables with the login shell, for them to
-be available to services declarations need to be done in
-the ~$XDG_CONFIG_HOME/environment.d/*.conf~ files.
+* User Services
+** xremap
+#+INCLUDE: "../xremap/README.org::#orgid-iztysr" :only-contents t
 
-*Files should end with the ~.conf~ extension.*
+** test services
 
-- See
-  [[https://www.baeldung.com/linux/systemd-services-environment-variables][Setting Environment Variables for systemd Services | Baeldung on Linux]]
-  [[https://curiouscoding.nl/linux/environment-variables/][Environment variables done once · CuriousCoding]]
-  # [2023-02-24 Fri 14:39:55 -03]
-
-# *NOTE:* The function ~f/xdg-home-envvar~ is defined in =init.el=
-** xdg.conf
-:PROPERTIES:
-:header-args:conf: :tangle (expand-file-name "environment.d/20-xdg.conf" (xdg-config-home))
-:END:
-
-#+BEGIN_SRC conf
-XDG_DATA_HOME=$HOME/.local/share
-XDG_CACHE_HOME=$HOME/.local/cache
-XDG_CONFIG_HOME=$HOME/.config
-XDG_STATE_HOME=$HOME/.local/state
-XDG_BIN_HOME=$HOME/.local/bin
-PATH=$PATH:$XDG_BIN_HOME
-#+END_SRC
-
-** =test-env-var.service=
+*** =test-env-var.service=
 :PROPERTIES:
 :header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/test-env-vars.service")
 :END:
@@ -52,7 +36,7 @@ Restart=no
 WantedBy=default.target
 #+end_src
 
-** =test-script-run.service=
+*** =test-script-run.service=
 :PROPERTIES:
 :header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/test-script-run.service")
 :END:
@@ -70,9 +54,6 @@ SyslogIdentifier=test-systemd-script-run
 # WantedBy=default.target
 #+end_src
 
-* User Services
-** xremap
-#+INCLUDE: "../xremap/README.org::#orgid-iztysr" :only-contents t
 
 * Systemd: Notes
 - Systemd unit files can be easily generated using this utility: \\

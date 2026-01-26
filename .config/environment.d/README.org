@@ -1,0 +1,136 @@
+#+TITLE: Systemd environment variables
+#+PROPERTY: header-args :mkdirp yes
+
+Systemd don't share environment variables with the login shell, for them to
+be available to services declarations need to be done in
+the ~$XDG_CONFIG_HOME/environment.d/*.conf~ files.
+
+*Files should end with the ~.conf~ extension.*
+
+- See
+  + [[https://www.baeldung.com/linux/systemd-services-environment-variables][Setting Environment Variables for systemd Services | Baeldung on Linux]]
+  + [[https://curiouscoding.nl/linux/environment-variables/][Environment variables done once · CuriousCoding]]
+    # [2023-02-24 Fri 14:39:55 -03]
+
+The following set variables and script generators shall be used with
+: /usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator
+to print the variables to a shell, for example.
+
+* xdg.conf: XDG Base Directory
+:PROPERTIES:
+:header-args:conf: :tangle "20-xdg.conf"
+:END:
+
+For the XDG standard, =XDG_STATE_HOME= is less conventional, and
+=XDG_BIN_HOME= is /not/ a part of the specification but commonly used.
+
+#+begin_seealso
+- [[https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html][XDG Base Directory Specification]]
+- [[https://stackoverflow.com/questions/25897836/where-should-i-write-a-user-specific-log-file-to-and-be-xdg-base-directory-comp/27965014#27965014][Where should I write a user specific log file to (and be XDG base directory compatible) - Stack Overflow]]
+#+end_seealso
+
+#+begin_src conf
+XDG_DATA_HOME=$HOME/.local/share
+XDG_CACHE_HOME=$HOME/.local/cache
+XDG_CONFIG_HOME=$HOME/.config
+XDG_STATE_HOME=$HOME/.local/state
+XDG_BIN_HOME=$HOME/.local/bin
+PATH=$PATH:$XDG_BIN_HOME
+#+end_src
+
+* nvidia.conf: Hardware acceleration
+:PROPERTIES:
+:header-args:conf: :tangle nvidia.conf
+:END:
+#+begin_src conf
+MOZ_DISABLE_RDD_SANDBOX=1
+NVD_BACKEND=direct
+#+end_src
+
+* code.conf: Coding settings
+:PROPERTIES:
+:header-args:conf: :tangle code.conf
+:END:
+
+** LSP
+[[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP Mode - LSP support for Emacs]]
+#+begin_src shell
+LSP_USE_PLISTS=true
+#+end_src
+
+* defending-home.conf: Set apps to use XDG Base Directory
+:PROPERTIES:
+:header-args:conf: :tangle defending-home.conf
+:CUSTOM_ID: orgid-gktrml
+:END:
+
+- Based on
+  + [[https://lobste.rs/s/3wntbx/practical_self_defense_against_scourge][Practical Self-Defense against the Scourge of Dot-Files | Lobsters]]
+  + https://github.com/BrodieRobertson/dotfiles/blob/master/.zshenv
+  + [[https://wiki.archlinux.org/title/XDG_Base_Directory][XDG Base Directory - ArchWiki]]
+  + [[https://github.com/b3nj5m1n/xdg-ninja][b3nj5m1n/xdg-ninja: A shell script which checks your $HOME for unwanted files and directories.]]
+#+begin_src conf
+XAUTHORITY="$XDG_DATA_HOME"/xorg/Xauthority
+XINITRC="$XDG_CONFIG_HOME"/X11/xinitrc
+XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
+GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
+RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
+TERMINFO="$XDG_DATA_HOME"/terminfo
+TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
+LESSHISTFILE="$XDG_STATE_HOME"/less/history
+GRIPHOME="$XDG_CONFIG_HOME/grip"
+# https://github.com/vercel/pkg/issues/537
+PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg"
+# alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
+DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
+MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
+# Mailutils
+MAIL="$XDG_DATA_HOME"/mail
+# dotNet
+NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages
+UNISON="$XDG_DATA_HOME"/unison
+PARALLEL_HOME="$XDG_CONFIG_HOME"/parallel
+IPYTHONDIR="${XDG_CONFIG_HOME}"/ipython
+ANDROID_HOME=${XDG_DATA_HOME}/android
+CUDA_CACHE_PATH=${XDG_CACHE_HOME}/nv
+GRADLE_USER_HOME="$XDG_DATA_HOME"/gradle
+ANSIBLE_HOME=${XDG_DATA_HOME}/ansible
+RUSTUP_HOME=${XDG_DATA_HOME}/rustup
+CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
+RANDFILE=${XDG_CACHE_HOME}/rnd
+SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
+WGETRC=${XDG_CONFIG_HOME}/wgetrc
+#+end_src
+
+#+begin_src conf
+GEM_PATH=${XDG_DATA_HOME}/ruby/gems
+GEM_SPEC_CACHE=${XDG_DATA_HOME}/ruby/specs
+#+end_src
+NOTE: setting =GEM_HOME= now causes issues, in special the error:
+#+begin_example
+/usr/lib/ruby/3.0.0/rubygems.rb:265:in `find_spec_for_exe': can't find gem gemname (>= 0.a) with executable asciidoctor (Gem::GemNotFoundException)
+      from /usr/lib/ruby/3.0.0/rubygems.rb:284:in `activate_bin_path'
+      from /usr/bin/asciidoctor:25:in `<main>'
+#+end_example
+
+# #export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
+# #export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
+# #export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
+# # ~/.slime: https://github.com/slime/slime/issues/610
+# export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
+
+* path-subdirs.conf: PATH subdir hierarchy
+:PROPERTIES:
+:header-args:conf: :tangle 50-path-subdirs.conf
+:END:
+#+begin_src conf
+PATH=${PATH}:${XDG_BIN_HOME}/mpd
+PATH=${PATH}:${XDG_BIN_HOME}/hyprland
+PATH=${PATH}:${XDG_BIN_HOME}/wrappers
+PATH=${PATH}:${XDG_BIN_HOME}/yt
+PATH=${PATH}:${XDG_BIN_HOME}/fd-helpers
+PATH=${PATH}:${XDG_BIN_HOME}/fzf-scripts
+PATH=${PATH}:${XDG_BIN_HOME}/stash
+PATH=${PATH}:${XDG_BIN_HOME}/emacs
+PATH=${PATH}:${XDG_BIN_HOME}/git
+#+end_src

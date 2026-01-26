@@ -151,146 +151,6 @@ alias b100='brightness 100'
 :header-args:shell: :tangle ~/.config/shell/profile :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
 :END:
 
-# User defined variables are in lowerCamelCase.
-
-** XDG Standard enviroment variables
-
-For the XDG standard, the only less conventional one is
-=XDG_STATE_HOME=, and =XDG_BIN_HOME= is /not/ a part of the specification
-but commonly used.
-# as of # [2022-11-30 Wed 16:41:29 -03].
-- See
-  + [[https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html][XDG Base Directory Specification]]
-  + [[https://stackoverflow.com/questions/25897836/where-should-i-write-a-user-specific-log-file-to-and-be-xdg-base-directory-comp/27965014#27965014][Where should I write a user specific log file to (and be XDG base directory compatible) - Stack Overflow]].
-
-#+begin_src shell
-export XDG_CACHE_HOME="$HOME/.local/cache"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-export XDG_BIN_HOME="$HOME/.local/bin"
-#+end_src
-
-** Additional PATH directories
-Source helper functions, specifically =append_path=.
-#+begin_src shell
-source "$XDG_CONFIG_HOME/shell/functions"
-#+end_src
-
-More PATH directories
-#+begin_src shell
-append_path "$XDG_BIN_HOME"
-#+end_src
-
-See [[https://github.com/LukeSmithxyz/voidrice/blob/284b1078cb6231863244a1355dd08cd81be279a6/.config/shell/profile#L9][voidrice/profile at master · LukeSmithxyz/voidrice#L9]].
-Putting the directories in =XDG_BIN_HOME= /after/ PATH to make already present
-executables, e.g. from =/usr/bin=, take precedence.
-#+begin_src shell
-find_subdirs_xdg_bin_home_colon_sep() {
-    [ -d "$XDG_BIN_HOME" ] &&
-        find "$XDG_BIN_HOME" \
-             -mindepth 1 \
-             -maxdepth 1 \
-             -type d \
-             -not -name '.*' \
-             -printf %p:
-}
-#+end_src
-- where
-  + =-not -name '.*'= is to exclude directories (=-type d=) beggining with =.= (dot).
-  + =-mindepth 1= prevents the target directory =$XDG_BIN_HOME= itself from being included.
-    * See https://stackoverflow.com/a/13525005
-  + =-maxdepth 1= includes only first-level subdirectories of =$XDG_BIN_HOME=.
-
-- Now:
-  + Get the output of =find_subdirs_xdg_bin_home_colon_sep=;
-  + save it in a local variable (POSIX-style);
-  + remove any =:= at the end of it while appending to path with
-    =append_path=.
-  + =unset= the local variable for good measure.
-#+begin_src shell
-[ -d "$XDG_BIN_HOME" ] && {
-    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_colon_sep)
-    append_path "${_xdg_bin_home_dirs%:}"
-    unset _xdg_bin_home_dirs
-}
-#+end_src
-
-# This came here because in earlier versions of this config when
-# adding subdirectories of XDG_BIN_HOME to PATH `-mindepth 1' wasn't
-# being used in find, leading to duplicates being added to PATH. But
-# leave it here just because it's redundant.
-# [2024-02-24 Sat 22:19:41 -03] @ak
-Remove duplicated from PATH without changing the order:
-See [[https://superuser.com/questions/449636/path-is-filled-with-duplicates/1321712#1321712][bash - $PATH is filled with duplicates - Super User]]
-#+begin_src shell
-PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
-#+end_src
-
-Finally, export PATH:
-#+begin_src shell
-export PATH
-#+end_src
-
-** Defending Home
-based on:
-- [[https://lobste.rs/s/3wntbx/practical_self_defense_against_scourge][Practical Self-Defense against the Scourge of Dot-Files | Lobsters]]
-- https://github.com/BrodieRobertson/dotfiles/blob/master/.zshenv
-- [[https://wiki.archlinux.org/title/XDG_Base_Directory][XDG Base Directory - ArchWiki]]
-- [[https://github.com/b3nj5m1n/xdg-ninja][b3nj5m1n/xdg-ninja: A shell script which checks your $HOME for unwanted files and directories.]]
-#+begin_src shell
-export XAUTHORITY="$XDG_DATA_HOME"/xorg/Xauthority
-export XINITRC="$XDG_CONFIG_HOME"/X11/xinitrc
-export XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
-export GEM_PATH="$XDG_DATA_HOME/ruby/gems"
-export GEM_SPEC_CACHE="$XDG_DATA_HOME/ruby/specs"
-#+end_src
-
-NOTE: setting =GEM_HOME= now causes issues, in special the error:
-#+begin_example
-/usr/lib/ruby/3.0.0/rubygems.rb:265:in `find_spec_for_exe': can't find gem gemname (>= 0.a) with executable asciidoctor (Gem::GemNotFoundException)
-      from /usr/lib/ruby/3.0.0/rubygems.rb:284:in `activate_bin_path'
-      from /usr/bin/asciidoctor:25:in `<main>'
-#+end_example
-: export GEM_HOME="$XDG_DATA_HOME/ruby/gems"
-
-#+begin_src shell -r
-export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
-export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
-#export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
-#export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
-#export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
-export TERMINFO="$XDG_DATA_HOME"/terminfo
-export TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
-
-export LESSHISTFILE="$XDG_STATE_HOME"/less/history
-export GRIPHOME="$XDG_CONFIG_HOME/grip"
-export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
-alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
-export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
-export MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
-export MAIL="$XDG_DATA_HOME"/mail # Mailutils
-export NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages # dotNet
-# ~/.slime: https://github.com/slime/slime/issues/610
-export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
-export UNISON="$XDG_DATA_HOME"/unison
-export PARALLEL_HOME="$XDG_CONFIG_HOME"/parallel
-export IPYTHONDIR="${XDG_CONFIG_HOME}"/ipython
-export ANDROID_HOME=${XDG_DATA_HOME}/android
-alias adb='HOME="$XDG_DATA_HOME"/android adb'
-export CUDA_CACHE_PATH=${XDG_CACHE_HOME}/nv
-alias dosbox=dosbox -conf "$XDG_CONFIG_HOME"/dosbox/dosbox.conf
-export GRADLE_USER_HOME="$XDG_DATA_HOME"/gradle
-alias nvidia-settings='mkdir -p "${XDG_CONFIG_HOME}"/nvidia && nvidia-settings --config="$XDG_CONFIG_HOME"/nvidia/settings'
-# https://github.com/ansible/ansible/commit/d7fbde4ea9db6cc44e81c39d699595330f4fa3c6
-export ANSIBLE_HOME=${XDG_DATA_HOME}/ansible
-export RUSTUP_HOME=${XDG_DATA_HOME}/rustup
-alias wget="wget --hsts-file=${XDG_DATA_HOME}/wget-hsts"
-export CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
-export RANDFILE=${XDG_CACHE_HOME}/rnd
-export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
-#+end_src
-
 ** Default Apps
 Commands
 #+begin_src shell
@@ -332,39 +192,6 @@ list of arguments.
 #+begin_src shell
 # check for duplicates in the PATH again
 PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
-#+end_src
-
-** NVIDIA hardware acceleration
-#+begin_src shell
-export MOZ_DISABLE_RDD_SANDBOX=1
-export NVD_BACKEND=direct
-#+end_src
-# export LIBVA_DRIVER_NAME=nvidia
-# this can be disabled to not use video decoding per
-# command. e.g. 'LIBVA_DRIVER_NAME= firefox'
-
-# idk anything else but this just worked # [2023-03-23 Thu 18:20:00 -03]
-# ####
-# ## X11 only
-# export MOZ_X11_EGL=1 # this doesn't seem to work but `gfx.x11-egl.force-enabled = true' does
-
-# export MOZ_DRM_DEVICE=/dev/dri/renderD128 # testing not necessary with `libva-nvidia-driver' [AUR]
-# apparently this is all firefox need, testing # [2023-03-23 Thu 18:35:16 -03]
-# ps: for X11, testing wayland # [2023-03-31 Fri 08:19:39 -03]
-
-# ## Wayland only
-# moved these to built-in window manager's enviroment variables,
-# e.g. `env' keyword in Hyprland.
-# export EGL_PLATFORM=wayland # unset this when on X11
-# export MOZ_ENABLE_WAYLAND=1 # necessary otherwise Firefox will only try X11
-
-
-** Program specific settings
-*** LSP
-[[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP Mode - LSP support for Emacs]]
-
-#+begin_src shell
-export LSP_USE_PLISTS=true
 #+end_src
 
 * =functions=: Sourceable helper function definitions
@@ -1784,6 +1611,17 @@ sqlite_all_tables() {
 }
 #+end_src
 
+** Defending Home: Aliases
+:PROPERTIES:
+:header-args:shell: :tangle setup-modules/defending-home-aliases.sh
+:END:
+
+- Complementary setup for [[file:~/.config/environment.d/README.org::#orgid-gktrml][defending-home.conf]]
+
+#+begin_src shell
+alias dosbox='dosbox -conf "$XDG_CONFIG_HOME"/dosbox/dosbox.conf'
+alias wget='wget --hsts-file=${XDG_DATA_HOME}/wget-hsts'
+#+end_src
 
 * Local file variables                                             :noexport:
 # Local Variables:

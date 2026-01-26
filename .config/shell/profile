@@ -1,75 +1,4 @@
 #!/usr/bin/echo 'This is a source only file.'
-export XDG_CACHE_HOME="$HOME/.local/cache"
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_STATE_HOME="$HOME/.local/state"
-export XDG_BIN_HOME="$HOME/.local/bin"
-
-source "$XDG_CONFIG_HOME/shell/functions"
-
-append_path "$XDG_BIN_HOME"
-
-find_subdirs_xdg_bin_home_colon_sep() {
-    [ -d "$XDG_BIN_HOME" ] &&
-        find "$XDG_BIN_HOME" \
-             -mindepth 1 \
-             -maxdepth 1 \
-             -type d \
-             -not -name '.*' \
-             -printf %p:
-}
-
-[ -d "$XDG_BIN_HOME" ] && {
-    _xdg_bin_home_dirs=$(find_subdirs_xdg_bin_home_colon_sep)
-    append_path "${_xdg_bin_home_dirs%:}"
-    unset _xdg_bin_home_dirs
-}
-
-PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
-
-export PATH
-
-export XAUTHORITY="$XDG_DATA_HOME"/xorg/Xauthority
-export XINITRC="$XDG_CONFIG_HOME"/X11/xinitrc
-export XSERVERRC="$XDG_CONFIG_HOME"/X11/xserverrc
-export GEM_PATH="$XDG_DATA_HOME/ruby/gems"
-export GEM_SPEC_CACHE="$XDG_DATA_HOME/ruby/specs"
-
-export GTK2_RC_FILES="$XDG_CONFIG_HOME"/gtk-2.0/gtkrc
-export RIPGREP_CONFIG_PATH="$XDG_CONFIG_HOME/ripgrep/ripgreprc"
-#export MYVIMRC="$XDG_CONFIG_HOME/vim/vimrc"
-#export VIMINIT=":set runtimepath+=$XDG_CACHE_HOME/vim|:source $MYVIMRC"
-#export __GL_SHADER_DISK_CACHE_PATH="$XDG_CACHE_HOME/nv-gl-shader-cache"
-export TERMINFO="$XDG_DATA_HOME"/terminfo
-export TERMINFO_DIRS="$XDG_DATA_HOME"/terminfo:/usr/share/terminfo
-
-export LESSHISTFILE="$XDG_STATE_HOME"/less/history
-export GRIPHOME="$XDG_CONFIG_HOME/grip"
-export PKG_CACHE_PATH="$XDG_CACHE_HOME/pkg" # https://github.com/vercel/pkg/issues/537
-alias yarn='yarn --use-yarnrc "$XDG_CONFIG_HOME/yarn/config"'
-export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
-export MACHINE_STORAGE_PATH="$XDG_DATA_HOME"/docker-machine
-export MAIL="$XDG_DATA_HOME"/mail # Mailutils
-export NUGET_PACKAGES="$XDG_CACHE_HOME"/NuGetPackages # dotNet
-# ~/.slime: https://github.com/slime/slime/issues/610
-export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
-export UNISON="$XDG_DATA_HOME"/unison
-export PARALLEL_HOME="$XDG_CONFIG_HOME"/parallel
-export IPYTHONDIR="${XDG_CONFIG_HOME}"/ipython
-export ANDROID_HOME=${XDG_DATA_HOME}/android
-alias adb='HOME="$XDG_DATA_HOME"/android adb'
-export CUDA_CACHE_PATH=${XDG_CACHE_HOME}/nv
-alias dosbox=dosbox -conf "$XDG_CONFIG_HOME"/dosbox/dosbox.conf
-export GRADLE_USER_HOME="$XDG_DATA_HOME"/gradle
-alias nvidia-settings='mkdir -p "${XDG_CONFIG_HOME}"/nvidia && nvidia-settings --config="$XDG_CONFIG_HOME"/nvidia/settings'
-# https://github.com/ansible/ansible/commit/d7fbde4ea9db6cc44e81c39d699595330f4fa3c6
-export ANSIBLE_HOME=${XDG_DATA_HOME}/ansible
-export RUSTUP_HOME=${XDG_DATA_HOME}/rustup
-alias wget="wget --hsts-file=${XDG_DATA_HOME}/wget-hsts"
-export CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
-export RANDFILE=${XDG_CACHE_HOME}/rnd
-export SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
-
 #export READER="zatura"
 export GIT_EDITOR=emacsclient
 export ALTERNATE_EDITOR=emacs
@@ -89,8 +18,3 @@ ps -p 1 -o comm= | grep -q systemd &&
 
 # check for duplicates in the PATH again
 PATH="$(perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, $ENV{PATH}))')"
-
-export MOZ_DISABLE_RDD_SANDBOX=1
-export NVD_BACKEND=direct
-
-export LSP_USE_PLISTS=true
