@@ -6,8 +6,6 @@ if [[ $TERM == "dumb" ]] || [[ -n $INSIDE_EMACS ]]; then
     return
 fi
 
-[[ $- != *i* ]] && return
-
 XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 [[ -r "$XDG_CONFIG_HOME"/shell/profile ]] &&
     source "$XDG_CONFIG_HOME"/shell/profile

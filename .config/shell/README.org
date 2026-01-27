@@ -159,21 +159,25 @@ source "$XDG_CONFIG_HOME/shell/functions"
 ** Default Apps
 Commands
 #+begin_src shell
-#export READER="zatura"
-export GIT_EDITOR=emacsclient
+export GIT_EDITOR=emacsclient-def
 export ALTERNATE_EDITOR=emacs
-export EDITOR=emacsclient
-export VISUAL=emacsclient
+export EDITOR=emacsclient-def
+export VISUAL=emacsclient-def
 export TERMINAL=alacritty
-export BROWSER=firefox
+export BROWSER=zen-browser
 export VIDEO=mpv
 export IMAGE=qimgv
 export OPENER=launch
 export PAGER=bat
 export WM=start-hyprland
+export READER=zatura
 #+end_src
 
 ** Import environment variables from systemd
+
+All variables defined here in =*.conf= files shall be sourced:
+[[file:~/.config/environment.d/README.org]]
+
 - See
   [[https://github.com/systemd/systemd/issues/17180#issuecomment-723856129][systemd ignores $HOME/.config/environment.d/envvars.conf file · Issue #17180 · systemd/systemd]]
   [[https://curiouscoding.nl/linux/environment-variables/][Environment variables done once · CuriousCoding]]
@@ -932,11 +936,6 @@ For some reason, specially on bigger configs split between [[*TRAMP/dumb termina
 «tramp-dumb-terminal-check»
 #+end_src
 
-*** Check if shell is "interative"
-#+begin_src bash
-[[ $- != *i* ]] && return
-#+end_src
-
 *** Load [[*=profile=: Shell environment variables & user-login configuration][profile: Shell environment variables & user-login configuration]]
 #+begin_src bash
 XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
@@ -959,6 +958,18 @@ setting =$ZDOTDIR= in a =/etc/profile.d= script is insufficient.
 #+begin_src bash
 export ZDOTDIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell"
 #+end_src
+
+*** $ZDOTDIR/.zshenv
+:PROPERTIES:
+:header-args:zsh: :tangle (tdir ".zshenv")
+:END:
+This is a quirk of this setup, =~/.zshenv= sets =$ZDOTDIR=, later child
+Zsh processes after that's set will search for =.zshenv= in =$ZDOTDIR=
+instead. So source the main file from there too.
+#+begin_src zsh
+source ~/.zshenv
+#+end_src
+
 
 * Setup Modules
 :PROPERTIES:

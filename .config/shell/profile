@@ -1,18 +1,18 @@
 #!/usr/bin/echo 'This is a source only file.'
 source "$XDG_CONFIG_HOME/shell/functions"
 
-#export READER="zatura"
-export GIT_EDITOR=emacsclient
+export GIT_EDITOR=emacsclient-def
 export ALTERNATE_EDITOR=emacs
-export EDITOR=emacsclient
-export VISUAL=emacsclient
+export EDITOR=emacsclient-def
+export VISUAL=emacsclient-def
 export TERMINAL=alacritty
-export BROWSER=firefox
+export BROWSER=zen-browser
 export VIDEO=mpv
 export IMAGE=qimgv
 export OPENER=launch
 export PAGER=bat
 export WM=start-hyprland
+export READER=zatura
 
 if is_systemd_system; then
     set -a
