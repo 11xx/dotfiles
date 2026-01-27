@@ -345,8 +345,11 @@ source = keybinds.conf
 $mainMod = SUPER
 $browser = firefox
 
+bindu = $mainMod, G, submap, reset
+bindu = , escape, submap, reset
+
 bind = $mainMod, T, togglefloating,
-bind = $mainMod, R, togglesplit, # dwindle
+bind = $mainMod, R, togglesplit,
 
 # [[https://github.com/hyprwm/Hyprland/issues/102][Submap of key bindings · Issue #102 · hyprwm/Hyprland]]
 # [[https://wiki.hyprland.org/Configuring/Uncommon-tips--tricks/#disabling-keybinds-with-one-master-keybind][Uncommon Tips & Tricks | Hyprland Wiki]]
@@ -360,27 +363,34 @@ bind = $mainMod, R, togglesplit, # dwindle
 bindl = $mainMod ALT, pause, exec, hyprctl dispatch dpms off
 
 bind = $mainMod, X, submap, exemap
-submap = exemap
-# bind = , space, exec, dmenu-def run $reset # dmenu script with custom command line options
-# escape # with ##
-# bind = , space, exec, bemenu-run --fn 'Liberation Mono' --nf '##f0f0f0' --sb '##76ee00' --sf '##111111' -i
-bind = , space, exec, $(tofi-run)
-bind = , space, submap, reset
-bind = , C, killactive, # for kill with M-x c
-bind = , C, submap, reset
-bind = $mainMod, C, killactive, # for kill with M-x M-c
-bind = $mainMod, C, submap, reset
-bind = , E, exec, emacs-launcher
-bind = , F, exec, firefox
-bind = , Z, exec, zen-browser
-bind = , V, exec, vivaldi
-# bind = , N, exec, [workspace special:emacs-quick-note;noanim] emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
-# bind = , N, exec, emacs-launcher -- -c -e '(bookmark-jump "chronological-random-notes")'
+  submap = exemap
 
-source = ./catchall-reset-submap.conf
+  bind = , space, exec, $(tofi-run)
+  bind = , space, submap, reset
+
+  bind = , C, killactive, # for kill with M-x c
+  bind = , C, submap, reset
+
+  bind = $mainMod, C, killactive, # for kill with M-x M-c
+  bind = $mainMod, C, submap, reset
+
+  bind = , F, exec, firefox
+  bind = , F, submap, reset
+
+  bind = , Z, exec, zen-browser
+  bind = , Z, submap, reset
+
+  bind = , V, exec, vivaldi
+  bind = , V, submap, reset
+
+
+  bind = , E, submap, exemap-emacs
+    submap = exemap-emacs, reset
+
+    bind = , E, exec, emacsclient-def
+    bind = , C, exec, emacsclient-code
+
 submap = reset
-
-bind = $mainMod ALT, C, killactive, # for kill with s-M-c
 
 bind = $mainMod, return, exec, alacritty
 bind = $mainMod, backspace, exec, foot
