@@ -1,6 +1,4 @@
 (deflisten current-monitor :initial '{"focused":true}' "hypr-active-monitor DP-1")
-(deflisten current-monitor2 :initial '{"focused":true}' "hypr-active-monitor DP-2")
-;; initial needs to be the opposite of the check that will add the class name.
 
 (defwindow mainbar
            :monitor "DELL S2721DGF"
@@ -52,7 +50,7 @@
                      :halign "end"
                      (window-title-second-monitor)
                      (sep)
-                     (workspaces)
+                     (workspaces-bar :monitor-name "DP-2")
                      (sep)
                      (active-monitor2-indicator)
                      )))
@@ -60,7 +58,7 @@
 (defwidget active-monitor-indicator []
            (box :class "${current-monitor.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
 (defwidget active-monitor2-indicator []
-           (box :class "${current-monitor2.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
+           (box :class "${current-monitor.focused == false ? 'focused-monitor' : 'unfocused-monitor' }"))
 
 (defwidget sep []
            (label :class "separator" :text "|"))
@@ -71,7 +69,7 @@
                 :halign "start"
                 :class "left-modules"
                 (active-monitor-indicator)
-                (workspaces)
+                (workspaces-bar :monitor-name "DP-1")
                 (sep)
                 (window-title)))
 
@@ -103,22 +101,36 @@
               "date +'%Y/%m/%d (%H:%M)'")
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
-(deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1"},"unfocused":{"active_workspace":"2"}}' "hypr-get-current-monitor-workspace")
+(deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1","active_workspace_id":1,"name":"DP-1"},"unfocused_monitor":{"active_workspace":"10","active_workspace_id":10,"name":"DP-2"}}'
+           "hypr-get-current-monitor-workspace")
 
-(defwidget workspaces []
+(defwidget workspaces-bar [monitor-name]
   (eventbox
-   :class "workspaces-widget-eventbox"
-
-   (box
-    :space-evenly true
-    (label :text "${workspaces-listen}${current-workspace}"
-           :visible false)
-    (for workspace in workspaces-listen
-         (eventbox
-          (box :class "workspace-entry ${workspace.id == current-workspace.focused_monitor.active_workspace ? "current" : ""} \
-                       ${workspace.windows > 0 ? "occupied" : "empty"} \
-                       ${workspace.id == current-workspace.unfocused_monitor.active_workspace ? "active-unfocused" : ""}"
-               (label :text "${workspace.id}")))))))
+    :class "workspaces-widget-eventbox"
+    (box
+      :space-evenly true
+      ;; trigger deflisten to update the whole widget
+      (label :text "${current-workspace}"
+             :visible false)
+      (for workspace in workspaces-listen
+        (eventbox
+          (box
+            :class "workspace-entry ${
+              workspace.id == (
+                current-workspace.focused_monitor.name == monitor-name
+                  ? current-workspace.focused_monitor.active_workspace
+                  : current-workspace.unfocused_monitor.active_workspace
+              ) ? "current" : ""
+            } ${
+              workspace.windows > 0 ? "occupied" : "empty"
+            } ${
+              workspace.id == (
+                current-workspace.focused_monitor.name == monitor-name
+                  ? current-workspace.unfocused_monitor.active_workspace
+                  : current-workspace.focused_monitor.active_workspace
+              ) ? "active-unfocused" : ""
+            }"
+            (label :text "${workspace.id}")))))))
 
 (deflisten window-listen :initial "..." "hypr-get-window-title")
 (deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
