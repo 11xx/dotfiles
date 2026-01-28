@@ -1,7 +1,7 @@
 #!/usr/bin/echo 'This is a source only file.'
 source "$XDG_CONFIG_HOME/shell/functions"
 
-export GIT_EDITOR=emacsclient-def
+export GIT_EDITOR=emacsclient-code
 export ALTERNATE_EDITOR=emacs
 export EDITOR=emacsclient-def
 export VISUAL=emacsclient-def

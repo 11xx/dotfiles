@@ -169,6 +169,17 @@
 (setup tramp
   (:require tramp)
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
-(add-hook 'after-init-hook (lambda() (desktop-save-mode)))
+(setup desktop
+  (:require)
+
+  (defvar v/daemon-name (daemonp)
+    "Name of current daemon: 'def', 'code', etc. or nil if interactive.")
+
+  (when v/daemon-name
+    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)))
+
+  (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
+          desktop-auto-save-timeout 60
+          desktop-save 'ask-if-new))
 
 (provide '11xx-defaults)

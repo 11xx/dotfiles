@@ -59,7 +59,7 @@ exec-once = sh -c 'sleep 2 && eww open mainbar && eww open mainbar2'
 exec-once = hypr-eww-restart-on-monitor-change
 
 exec-once = xsettingsd # GTK2-3 theme live changes
-exec-once = sh -c 'emacs --daemon && sleep 1 && emacs-launcher'
+exec-once = emacsclient-def
 
 # exec-once = gammastep -P
 exec-once = hypridle
