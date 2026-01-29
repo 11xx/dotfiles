@@ -1,27 +1,27 @@
 (deflisten current-monitor :initial '{"focused":true}' "hypr-active-monitor DP-1")
 
-(defwindow mainbar
-           :monitor "DELL S2721DGF"
+(defwindow mainbar [monitor ?height-px]
+           :monitor monitor
            :geometry (geometry :x "0px"
                                :y "0px"
                                :width "100%"
-                               :height "26px"
+                               :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance "30px" :side "top")
+           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
            (bar-mainbar-all-modules))
 
-(defwindow mainbar2
-           :monitor "DELL P2418D"
+(defwindow mainbar2 [monitor ?height-px]
+           :monitor monitor
            :geometry (geometry :x "0px"
                                :y "0px"
                                :width "100%"
-                               :height "26px"
+                               :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance "30px" :side "top")
+           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
