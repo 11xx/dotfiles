@@ -9,9 +9,14 @@ $current-bb-t: .15em;
   background-color: $bar-bg;
 }
 
+.focused-monitor {
+  padding: 0 0 0 10px;
+  background-color: darkgreen;
+}
+
 .unfocused-monitor {
-  padding: 0 10px;
-  background-color: darkred;
+  padding: 0 0 0 10px;
+  background-color: rgba(0,0,0,0);
 }
 
 .workspace-entry {
