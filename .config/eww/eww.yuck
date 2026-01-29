@@ -11,7 +11,7 @@
            :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
-           (bar-mainbar-all-modules))
+           (bar-all-modules))
 
 (defwindow mainbar2 [monitor ?height-px]
            :monitor monitor
@@ -25,35 +25,59 @@
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
-           (bar-mainbar2-all-modules))
+           (bar2-all-modules))
 
-(defwidget bar-mainbar-all-modules []
+(defwidget bar-all-modules []
            (box :space-evenly true
                 :class "bar-all-modules"
                 :orientation "h"
-                (left-modules)
-                ;; (center-modules)
-                (right-modules)))
+                (bar-left-modules)
+                (bar-right-modules)))
 
-(defwidget bar-mainbar2-all-modules []
+(defwidget bar2-all-modules []
            (box :space-evenly true
-                ;; left
-                (box :orientation "h"
-                     :space-evenly false
-                     :halign "start"
-                     (label :text "${time}" :class "time-label")
-                     (sep)
-                     (mpd-current :nth 0))
-                ;; right
-                (box :orientation "h"
-                     :space-evenly false
-                     :halign "end"
-                     (window-title-second-monitor)
-                     (sep)
-                     (workspaces-bar :monitor-name "DP-2")
-                     (sep)
-                     (active-monitor2-indicator)
-                     )))
+                (bar2-left-modules)
+                (bar2-right-modules)))
+
+(defwidget bar-left-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "start"
+                :class "bar-left-modules"
+                (active-monitor-indicator)
+                (workspaces-bar :monitor-name "DP-1")
+                (sep)
+                (window-title)))
+
+(defwidget bar-right-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "end"
+                :class "bar-right-modules"
+                (systray :orientation "h" :spacing 10 :icon-size 24)
+                (sep)
+                (swaync_icon)
+                (sep)
+                (label :text "${time}" :class "time-label")))
+
+(defwidget bar2-left-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "start"
+                (label :text "${time}" :class "time-label")
+                (sep)
+                (mpd-current :nth 0)))
+
+(defwidget bar2-right-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "end"
+                (window-title-second-monitor)
+                (sep)
+                (workspaces-bar :monitor-name "DP-2")
+                (sep)
+                (active-monitor2-indicator)
+                ))
 
 (defwidget active-monitor-indicator []
            (box :class "${current-monitor.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
@@ -62,34 +86,6 @@
 
 (defwidget sep []
            (label :class "separator" :text "|"))
-
-(defwidget left-modules []
-           (box :orientation "h"
-                :space-evenly false
-                :halign "start"
-                :class "left-modules"
-                (active-monitor-indicator)
-                (workspaces-bar :monitor-name "DP-1")
-                (sep)
-                (window-title)))
-
-(defwidget center-modules []
-           (box :orientation "h"
-                :space-evenly false
-                ;; :halign "center"
-                :halign "center"
-                :class "center-modules"))
-
-(defwidget right-modules []
-           (box :orientation "h"
-                :space-evenly false
-                :halign "end"
-                :class "right-modules"
-                (systray :orientation "h" :spacing 10 :icon-size 24)
-                (sep)
-                (swaync_icon)
-                (sep)
-                (label :text "${time}" :class "time-label")))
 
 (defvar time-visible false)   ; for :run-while property of below variable
                               ; when this turns true, the polling starts and
