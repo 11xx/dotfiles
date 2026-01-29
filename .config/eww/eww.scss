@@ -4,7 +4,7 @@
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
-$transparent: rgba(0,0,0,0);
+
 .mainbar {
   color: $neron-fg;
   background-color: $bar-bg;
@@ -17,12 +17,12 @@ $transparent: rgba(0,0,0,0);
 
 .unfocused-monitor {
   padding: $focused-monitor-pad;
-  background-color: $transparent;
+  background-color: transparent;
 }
 
 .workspace-entry {
   padding: 0 .2em;
-  border-bottom: $current-bb-t solid $transparent; /* to make text not shift position when
+  border-bottom: $current-bb-t solid transparent; /* to make text not shift position when
                                                     * .current uses border-bottom too */
   &:hover {
     background-color: $middle-gray;
@@ -60,14 +60,14 @@ $transparent: rgba(0,0,0,0);
 }
 
 .time-label {
-  margin: 0 10 0 0;
+  margin: 0 10px 0 0;
 }
 
 
 
 .mpd-circular-progress {
-  color: $middle-gray;
-  background-color: $neron-current;
+  color: #6c6c6c;
+  background-color: transparent;
 }
 
 .mpd-current-box {
@@ -78,23 +78,29 @@ $transparent: rgba(0,0,0,0);
   margin: 0;
 }
 
+.mpd-current-meta-field-title {
+  color: $neron-yellow;
+}
+
+.mpd-current-meta-field-albumartist {
+  color: $neron-green;
+}
+
 .mpd-current-meta-field-album {
-  margin: 0;
+  color: $neron-blue;
 }
 
 .mpd-current-meta-field-elapsed {
-  margin: 0 0 0 15;
+  color: $neron-comment;
+  margin: 0 0 0 15px;
 }
-
-// .mpd-current-elapsed {
-//   padding: 0 10 0 10;
-// }
 
 .mpd-current-icon {
   color: $current-icon;
-  margin-right: 15;
+  margin-right: 15px;
 }
 
 .mpd-current-artist-separator {
-  margin: 0 8;
+  color: $neron-pink;
+  margin: 0 8px;
 }

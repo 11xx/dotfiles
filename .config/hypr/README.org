@@ -1448,24 +1448,63 @@ Variables files, first dark:
 #+begin_src scss :tangle (tdir "/dark-colors.scss") :mkdirp yes
 $bar-bg: #222;
 $neon-green: #76ee00;
-$neron-green: #61bd09;
-$neron-orange: #fd892c;
-$middle-gray: #808080;
-$neron-pink: #ff77cf;
 $neron-fg: #a6a8a9;
 $neron-current: #2f2f2f;
+
+$neron-bg: #222222;
+$neron-fg: #a6a8a9;
+$neron-current: #2f2f2f;
+$neron-comment: #bda38e;
+$neron-cyan: #00bbb7;
+$neron-green: #61bd09;
+$neron-orange: #fd892c;
+$neron-pink: #ff77cf;
+$neron-purple: #a89bff;
+$neron-red: #f88785;
+$neron-yellow: #b8aa07;
+$neron-blue: #69aaff;
+$neron-cursor: #4455bb;
+$neron-warning: #d2a022;
+
+// alacritty
+$neron-black: #414a44;
+// $neron-blue = "#63abff"
+// $neron-cyan = "#16b0cf"
+// $neron-green = "#61bd00"
+// $neron-magenta = "#ff77ce"
+// $neron-red = "#f88785"
+// $neron-white = "#929595"
+// $neron-yellow = "#b8aa07"
+
+$middle-gray: #808080;
 $current-icon: #666666;
 #+end_src
 then light:
 #+begin_src scss :tangle (tdir "/light-colors.scss") :mkdirp yes
-$bar-bg: #fff;
+$bar-bg: #ffffff;
 $neon-green: #76ee00;
-$neron-green: #61bd09;
-$neron-orange: #fd892c;
+
+$neron-fg: #545e62;
+$neron-current: #fdf6df;
+$neron-comment: #a0a1a7;
+$neron-cyan: #006861;
+$neron-green: #316900;
+$neron-orange: #964505;
+$neron-pink: #b30071;
+$neron-purple: #4d2eff;
+$neron-red: #ba0d0d;
+$neron-yellow: #615f0b;
+$neron-blue: #0353c6;
+$neron-cursor: #3d51c2;
+$neron-warning: #7a5524;
+
+// alacritty
+$neron-black: #5a5d5c;
+// $neron-blue = "#1e5ca8"
+// $neron-white = "#5e5c5a"
+// $neron-yellow = "#755800"
+
 $middle-gray: #808080;
-$neron-pink: #ff77cf;
-$neron-fg: #333333;
-$neron-current: #eee;
 $current-icon: #666666;
 #+end_src
 
@@ -1480,7 +1519,6 @@ Based on the variables, customize the widgets:
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
-$transparent: rgba(0,0,0,0);
 
 .mainbar {
   color: $neron-fg;
@@ -1494,12 +1532,12 @@ $transparent: rgba(0,0,0,0);
 
 .unfocused-monitor {
   padding: $focused-monitor-pad;
-  background-color: $transparent;
+  background-color: transparent;
 }
 
 .workspace-entry {
   padding: 0 .2em;
-  border-bottom: $current-bb-t solid $transparent; /* to make text not shift position when
+  border-bottom: $current-bb-t solid transparent; /* to make text not shift position when
                                                     ,* .current uses border-bottom too */
   &:hover {
     background-color: $middle-gray;
@@ -1537,14 +1575,14 @@ $transparent: rgba(0,0,0,0);
 }
 
 .time-label {
-  margin: 0 10 0 0;
+  margin: 0 10px 0 0;
 }
 
 
 
 .mpd-circular-progress {
-  color: $middle-gray;
-  background-color: $neron-current;
+  color: #6c6c6c;
+  background-color: transparent;
 }
 
 .mpd-current-box {
@@ -1555,25 +1593,31 @@ $transparent: rgba(0,0,0,0);
   margin: 0;
 }
 
+.mpd-current-meta-field-title {
+  color: $neron-yellow;
+}
+
+.mpd-current-meta-field-albumartist {
+  color: $neron-green;
+}
+
 .mpd-current-meta-field-album {
-  margin: 0;
+  color: $neron-blue;
 }
 
 .mpd-current-meta-field-elapsed {
-  margin: 0 0 0 15;
+  color: $neron-comment;
+  margin: 0 0 0 15px;
 }
-
-// .mpd-current-elapsed {
-//   padding: 0 10 0 10;
-// }
 
 .mpd-current-icon {
   color: $current-icon;
-  margin-right: 15;
+  margin-right: 15px;
 }
 
 .mpd-current-artist-separator {
-  margin: 0 8;
+  color: $neron-pink;
+  margin: 0 8px;
 }
 #+end_src
 
@@ -1603,14 +1647,13 @@ $transparent: rgba(0,0,0,0);
   }
 
   &.notification {
-    background-color: rgba(97, 189, 9, 0.2); // neron-green with alpha
-    border: 1px solid $neron-green;
+    border-right: 1px solid rgba($neron-warning, 0.5);
+    background-image: linear-gradient(90deg, rgba($neron-warning, 0.5), transparent);
   }
 
   &.dnd-notification,
   &.dnd-none {
-    background-color: rgba(255, 119, 207, 0.2); // neron-pink with alpha
-    border: 1px solid $neron-pink;
+    background-color: rgba($neron-pink, 0.1); // neron-pink with alpha
   }
 
   &.inhibited-notification,
@@ -1621,7 +1664,7 @@ $transparent: rgba(0,0,0,0);
 
   &.dnd-inhibited-notification,
   &.dnd-inhibited-none {
-    background-color: rgba(47, 47, 47, 0.8); // neron-current
+    background-color: rgba($neron-current, 0.8);
     border: 1px solid $neron-current;
   }
 }
@@ -1629,8 +1672,8 @@ $transparent: rgba(0,0,0,0);
 /* Icon styling */
 .notification-icon {
   color: $neron-fg;
-  font-size: 16px;
-  min-width: 20px;
+  font-size: 20px;
+  padding: 0 10px;
 }
 
 /* DnD state icons use pink accent */
@@ -1655,8 +1698,7 @@ $transparent: rgba(0,0,0,0);
 
 /* Count with background when has notifications */
 .notification-count.has-count {
-  background-color: $neron-green;
-  color: $bar-bg; // Dark text on bright background
+  color: $neron-fg;
   border-radius: 10px;
   padding: 2px 6px;
 }
@@ -1860,4 +1902,3 @@ eww open-many mainbar mainbar2 \
 #+begin_src shell
 lightordark
 #+end_src
-
