@@ -1449,6 +1449,7 @@ Variables files, first dark:
 $bar-bg: #222;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
+$neron-orange: #fd892c;
 $middle-gray: #808080;
 $neron-pink: #ff77cf;
 $neron-fg: #a6a8a9;
@@ -1460,6 +1461,7 @@ then light:
 $bar-bg: #fff;
 $neon-green: #76ee00;
 $neron-green: #61bd09;
+$neron-orange: #fd892c;
 $middle-gray: #808080;
 $neron-pink: #ff77cf;
 $neron-fg: #333333;
@@ -1477,6 +1479,8 @@ Based on the variables, customize the widgets:
 @import "swaync.scss";
 
 $current-bb-t: .15em;
+$focused-monitor-pad: 0 0 0 3px;
+$transparent: rgba(0,0,0,0);
 
 .mainbar {
   color: $neron-fg;
@@ -1484,19 +1488,19 @@ $current-bb-t: .15em;
 }
 
 .focused-monitor {
-  padding: 0 0 0 10px;
-  background-color: darkgreen;
+  padding: $focused-monitor-pad;
+  background-color: $neron-green;
 }
 
 .unfocused-monitor {
-  padding: 0 0 0 10px;
-  background-color: rgba(0,0,0,0);
+  padding: $focused-monitor-pad;
+  background-color: $transparent;
 }
 
 .workspace-entry {
   padding: 0 .2em;
-  border-bottom: $current-bb-t solid $bar-bg; /* to make text not shift position when
-                                               ,* .current uses border-bottom too */
+  border-bottom: $current-bb-t solid $transparent; /* to make text not shift position when
+                                                    ,* .current uses border-bottom too */
   &:hover {
     background-color: $middle-gray;
   }

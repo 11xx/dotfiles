@@ -3,26 +3,27 @@
 @import "swaync.scss";
 
 $current-bb-t: .15em;
-
+$focused-monitor-pad: 0 0 0 3px;
+$transparent: rgba(0,0,0,0);
 .mainbar {
   color: $neron-fg;
   background-color: $bar-bg;
 }
 
 .focused-monitor {
-  padding: 0 0 0 10px;
-  background-color: darkgreen;
+  padding: $focused-monitor-pad;
+  background-color: $neron-green;
 }
 
 .unfocused-monitor {
-  padding: 0 0 0 10px;
-  background-color: rgba(0,0,0,0);
+  padding: $focused-monitor-pad;
+  background-color: $transparent;
 }
 
 .workspace-entry {
   padding: 0 .2em;
-  border-bottom: $current-bb-t solid $bar-bg; /* to make text not shift position when
-                                               * .current uses border-bottom too */
+  border-bottom: $current-bb-t solid $transparent; /* to make text not shift position when
+                                                    * .current uses border-bottom too */
   &:hover {
     background-color: $middle-gray;
   }
