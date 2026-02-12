@@ -3893,6 +3893,7 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
            doom-modeline-percent-position nil
            doom-modeline-icon nil
            doom-modeline-enable-word-count nil ; Performance
+           doom-modeline-buffer-file-name-style 'relative-from-project
            ))
 #+end_src
 

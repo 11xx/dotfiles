@@ -126,6 +126,7 @@ number."
            doom-modeline-percent-position nil
            doom-modeline-icon nil
            doom-modeline-enable-word-count nil ; Performance
+           doom-modeline-buffer-file-name-style 'relative-from-project
            ))
 (set-window-margins nil 1)
 
