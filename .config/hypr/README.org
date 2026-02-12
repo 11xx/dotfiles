@@ -544,6 +544,8 @@ bind = $mainMod ALT, menu, exec, hyprctl switchxkblayout "$(pgrep -x xremap >/de
 bind = $mainMod CTRL ALT, period, exec, tofimoji
 
 bind = $mainMod CTRL ALT, M, exec, [float; stayfocused] terminal -w 120 -h 20 --float pulsemixer
+
+bind = ALT, F4, exec, notify-send lmao
 #+end_src
 
 # ## Issues
