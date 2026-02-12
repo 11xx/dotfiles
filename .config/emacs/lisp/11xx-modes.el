@@ -10,7 +10,10 @@
 (setup (:elpaca ansible-vault))
 (setup (:elpaca ansible-doc))
 (setup (:elpaca yuck-mode))
-(setup (:elpaca ron-mode))
+(setup ron-mode
+  (:elpaca ron-mode)
+  (autoload 'ron-mode "ron-mode" nil t)
+  (add-to-list 'auto-mode-alist '("\\.ron\\'" . ron-mode)))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
 

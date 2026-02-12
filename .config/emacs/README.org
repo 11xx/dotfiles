@@ -1040,7 +1040,10 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
     /"A configurable, terminal based Media Player Client with album art
     support via various terminal image protocols."/
 #+begin_src emacs-lisp
-(setup (:elpaca ron-mode))
+(setup ron-mode
+  (:elpaca ron-mode)
+  (autoload 'ron-mode "ron-mode" nil t)
+  (add-to-list 'auto-mode-alist '("\\.ron\\'" . ron-mode)))
 #+end_src
 
 *** Minor modes
