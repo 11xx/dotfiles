@@ -179,7 +179,7 @@
     (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)))
 
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
-          desktop-auto-save-timeout 60
+          desktop-auto-save-timeout 1
           desktop-save 'ask-if-new))
 
 (provide '11xx-defaults)
