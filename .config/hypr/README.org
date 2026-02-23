@@ -571,9 +571,11 @@ bind = $mainMod ALT, end, exec, gpu-screen-recorder-replay-stop
 
 bind = $mainMod ALT, F1, exec, gpu-screen-recorder-replay-save-10
 bind = $mainMod ALT, F2, exec, gpu-screen-recorder-replay-save-30
-bind = $mainMod, Capslock, exec, gpu-screen-recorder-replay-save-30
 bind = $mainMod ALT, F3, exec, gpu-screen-recorder-replay-save-60
+
+bind = $mainMod ALT, tab, exec, gpu-screen-recorder-replay-toggle-recording
 #+end_src
+
 **** media/volume
 #+begin_src conf
 # Media keys
@@ -979,7 +981,7 @@ Install =hyprland-nvidia-git= or apply nvidia patch manually
 
 * Hyprland Scripts
 :PROPERTIES:
-:tangle-dir: (concat (xdg-bin-home) "/hyprland")
+:tangle-dir: (expand-file-name "hyprland" (xdg-bin-home))
 :END:
 
 ** noweb setup helpers
@@ -1117,7 +1119,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 * Eww - Widgets
 :PROPERTIES:
-:tangle-dir: (concat (xdg-config-home) "/eww")
+:tangle-dir: (expand-file-name "eww" (xdg-bin-home))
 :END:
 
 - Arch Linux Note:
