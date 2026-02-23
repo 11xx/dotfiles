@@ -247,10 +247,6 @@ is_systemd_system() {
 #+end_src
 
 * Zsh
-:PROPERTIES:
-:tangle-dir: (concat (xdg-config-home) "/shell")
-:END:
-
 - [[https://ospfranco.com/post/2023/08/15/zsh-configuration-files-load-order/][ZSH configuration files load order | Oscar Franco]]
 - [[https://apple.stackexchange.com/questions/388622/zsh-zprofile-zshrc-zlogin-what-goes-where][ZSH: .zprofile, .zshrc, .zlogin - What goes where?]]
 # [2022-04-14 Thu 23:25:18]
@@ -267,7 +263,7 @@ is_systemd_system() {
 
 ** =.zprofile=: Login profile setup and $ZDOTDIR
 :PROPERTIES:
-:header-args:bash: :tangle (tdir "/.zprofile") :mkdirp yes
+:header-args:bash: :tangle .zprofile :mkdirp yes
 :END:
 
 *** Autostart
@@ -292,7 +288,7 @@ fi
 
 ** =.zshrc=
 :PROPERTIES:
-:header-args:bash: :tangle (tdir "/.zshrc") :mkdirp yes
+:header-args:bash: :tangle .zshrc :mkdirp yes
 :END:
 
 *** TRAMP/dumb terminal check
@@ -769,20 +765,6 @@ autoload -U +X bashcompinit && bashcompinit
 #+end_src
 
 **** Program-specific completions
-***** Git
-# This section is using zero width spaces (ZERO WIDTH SPACE [00200B]) in some places.
-# this comment may be placed anywhere else that is using it.
-
-# [2022-03-30 Wed 18:27:02]
-Install =bash-completion=
-
-Download [[https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.zsh][git-completion.zsh]] to a file named =_git= and place it in a
-directory present in the =$fpath= array.
-#+begin_src bash
-is_command git &&
-    download_to_user_fpath _git 'https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.zsh'
-#+end_src
-
 
 ***** Stack bash/zsh auto-completion                               :noexport:
 # *NOTE*: This is valid for the arch repo install
@@ -961,7 +943,7 @@ export ZDOTDIR="${XDG_CONFIG_HOME:-$HOME/.config}/shell"
 
 *** $ZDOTDIR/.zshenv
 :PROPERTIES:
-:header-args:zsh: :tangle (tdir ".zshenv")
+:header-args:zsh: :tangle .zshenv
 :END:
 This is a quirk of this setup, =~/.zshenv= sets =$ZDOTDIR=, later child
 Zsh processes after that's set will search for =.zshenv= in =$ZDOTDIR=

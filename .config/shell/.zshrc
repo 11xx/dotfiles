@@ -194,9 +194,6 @@ delsel-mode
 
 autoload -U +X bashcompinit && bashcompinit
 
-is_command git &&
-    download_to_user_fpath _git 'https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.zsh'
-
 is_command stack && {
     is_user_fpath_file "$1" ||
         stack --bash-completion-script `which stack` > "$localFPATH"/_stack
