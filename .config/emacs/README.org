@@ -435,8 +435,14 @@ Backup & auto-save
         kept-old-versions 6    ; oldest versions to keep when a new numbered backup is made (default: 2)
         kept-new-versions 9    ; newest versions to keep when a new numbered backup is made (default: 2)
         auto-save-default t    ; auto-save every buffer that visits a file
-        auto-save-timeout 1   ; number of seconds idle time before auto-save (default: 30)
-        auto-save-interval 200) ; number of keystrokes between auto-saves (default: 300)
+        auto-save-timeout 10   ; number of seconds idle time before auto-save (default: 30)
+        auto-save-interval 150) ; number of keystrokes between auto-saves (default: 300)
+
+;; silence "Auto-saving..." messages on minibuffer
+(advice-add 'do-auto-save :around
+  (lambda (orig-fn &rest args)
+    (let ((inhibit-message t))
+      (apply orig-fn args))))
 
 (provide 'init-backup-auto-save)
 #+end_src
@@ -884,6 +890,20 @@ Save state for session restoring
           desktop-save 'ask-if-new))
 #+end_src
 
+*** eros: Overlay eval result (better C-x C-e)
+#+begin_src emacs-lisp
+(setup (:elpaca eros)
+  (:hook-into emacs-lisp-mode
+              org-mode)
+  (setopt ;; eros-eval-result-prefix    "∷ "
+           eros-eval-result-duration  'command
+           eros-overlays-use-font-lock t)
+  (set-face-attribute 'eros-result-overlay-face nil
+                      :box        '(:line-width -1 :color "dim gray")
+                      :background 'unspecified
+                      :inherit    'shadow))
+#+end_src
+
 
 * utf-8-default.el: Use UTF-8 for all character encoding
 :PROPERTIES:
@@ -1007,7 +1027,51 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 **** YAML
 #+begin_src emacs-lisp
-(setup (:elpaca yaml-pro))
+(elpaca yaml-mode)
+(elpaca-wait)
+
+;; considering `yaml-ts-mode' is already provided by Emacs
+;; use `yaml-indent-line' with it.
+(with-eval-after-load 'yaml-ts-mode
+  (require 'yaml-mode)
+  (add-hook 'yaml-ts-mode-hook
+            (lambda ()
+              (setq-local indent-line-function #'yaml-indent-line)
+              (setq-local yaml-indent-offset 2)))
+
+  (define-advice org-src-font-lock-fontify-block
+    (:around (orig lang start end) my/yaml-strip-org-coderefs)
+  "Prevent org code refs from breaking tree-sitter YAML fontification."
+  (if (not (string-match-p (rx word-start "yaml") lang))
+      (funcall orig lang start end)
+    (let* ((coderef-re (rx (1+ blank)
+                           "(ref:" (1+ (not (any " \t\n)"))) ")"
+                           (* blank) eol))
+           replacements)
+      ;; Phase 1: swap (ref:...) for same-length spaces so TS sees valid YAML
+      (with-silent-modifications
+        (save-excursion
+          (goto-char start)
+          (while (re-search-forward coderef-re end t)
+            (push (list (match-beginning 0)
+                        (match-end 0)
+                        (match-string 0))
+                  replacements)
+            (replace-match
+             (make-string (- (match-end 0) (match-beginning 0)) ?\s)
+             t t))))
+      ;; Phase 2: fontify (TS sees clean YAML), then unconditionally restore
+      (unwind-protect
+          (funcall orig lang start end)
+        (with-silent-modifications
+          (save-excursion
+            (pcase-dolist (`(,beg ,_end ,str) replacements)
+              (goto-char beg)
+              (delete-region beg (+ beg (length str)))
+              (insert str)
+              ;; faces on these positions are now from our spaces; override with comment
+              (put-text-property beg (+ beg (length str))
+                                 'face 'font-lock-comment-face)))))))))
 #+end_src
 
 **** PKGBUILD
@@ -2510,10 +2574,18 @@ group package.
 # [2023-05-19 Fri 23:48:32 -03]
 #+begin_src emacs-lisp
 (defvar v/tdir-allowed-functions
-  '(tdir-base expand-file-name concat
-    xdg-config-home xdg-data-home xdg-cache-home
-    xdg-config-dirs xdg-data-dirs
-    getenv)
+  '(tdir-base
+    expand-file-name
+    concat
+    xdg-config-home
+    xdg-data-home
+    xdg-cache-home
+    xdg-bin-home
+    xdg-config-dirs
+    xdg-data-dirs
+    getenv
+    xdg-runtime-dir
+    )
   "Side-effect-free functions permitted inside :tangle-dir: sexp values.
 All must return strings or path components.")
 

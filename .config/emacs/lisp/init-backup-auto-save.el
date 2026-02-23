@@ -33,8 +33,14 @@
         kept-old-versions 6    ; oldest versions to keep when a new numbered backup is made (default: 2)
         kept-new-versions 9    ; newest versions to keep when a new numbered backup is made (default: 2)
         auto-save-default t    ; auto-save every buffer that visits a file
-        auto-save-timeout 1   ; number of seconds idle time before auto-save (default: 30)
-        auto-save-interval 200) ; number of keystrokes between auto-saves (default: 300)
+        auto-save-timeout 10   ; number of seconds idle time before auto-save (default: 30)
+        auto-save-interval 150) ; number of keystrokes between auto-saves (default: 300)
+
+;; silence "Auto-saving..." messages on minibuffer
+(advice-add 'do-auto-save :around
+  (lambda (orig-fn &rest args)
+    (let ((inhibit-message t))
+      (apply orig-fn args))))
 
 (provide 'init-backup-auto-save)
 

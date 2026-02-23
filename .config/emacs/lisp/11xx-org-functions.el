@@ -23,10 +23,18 @@
     (forward-line -2))
   (recenter-top-bottom))
 (defvar v/tdir-allowed-functions
-  '(tdir-base expand-file-name concat
-    xdg-config-home xdg-data-home xdg-cache-home
-    xdg-config-dirs xdg-data-dirs
-    getenv)
+  '(tdir-base
+    expand-file-name
+    concat
+    xdg-config-home
+    xdg-data-home
+    xdg-cache-home
+    xdg-bin-home
+    xdg-config-dirs
+    xdg-data-dirs
+    getenv
+    xdg-runtime-dir
+    )
   "Side-effect-free functions permitted inside :tangle-dir: sexp values.
 All must return strings or path components.")
 

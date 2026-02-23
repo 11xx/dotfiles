@@ -181,5 +181,15 @@
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
           desktop-auto-save-timeout 1
           desktop-save 'ask-if-new))
+(setup (:elpaca eros)
+  (:hook-into emacs-lisp-mode
+              org-mode)
+  (setopt ;; eros-eval-result-prefix    "∷ "
+           eros-eval-result-duration  'command
+           eros-overlays-use-font-lock t)
+  (set-face-attribute 'eros-result-overlay-face nil
+                      :box        '(:line-width -1 :color "dim gray")
+                      :background 'unspecified
+                      :inherit    'shadow))
 
 (provide '11xx-defaults)
