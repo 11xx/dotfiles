@@ -1,12 +1,3 @@
-# [2026-03-02 Mon 10:01:18 -03] @ak
-
-* Neron Theme Generator
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle themes/neron-themes-generator.el
-:END:
-
-# v3
-#+begin_src emacs-lisp
 ;;; neron-gen.el --- Neron Theme Generator -*- lexical-binding: t; -*-
 
 ;;; Code:
@@ -791,4 +782,3 @@ OVERRIDES is an alist of shorthand faces. Returns the file path written."
 
 (provide 'neron-gen)
 ;;; neron-gen.el ends here
-#+end_src
