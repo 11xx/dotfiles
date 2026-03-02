@@ -12,35 +12,35 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 ;;;###autoload
 (when (boundp 'custom-theme-load-path)
   (add-to-list 'custom-theme-load-path
                (file-name-directory (or load-file-name buffer-file-name))))
 
-
 (defun neron--create-theme (variant colors &optional face-overrides)
-  "Create a Neron theme for VARIANT (symbol: dark or light).
+  "Create a Neron theme for VARIANT using COLORS and optional FACE-OVERRIDES.
 
+VARIANT is a symbol, typically 'dark or 'light.
 COLORS is an alist of (NAME HEX-24BIT HEX-256 TTY-COLOR).
-FACE-OVERRIDES is an optional alist of (FACE-NAME PROP VAL ...) entries
-that replace specific faces from the base definition for this variant."
-  (let* ((theme-name (intern (format "neron-%s" variant)))
+FACE-OVERRIDES is a list like: ((face :prop val ...) (face2 :prop val ...))."
+  (let* ((variant (if (symbolp variant) variant (intern (format "%s" variant))))
+         (theme-name (intern (format "neron-%s" variant)))
          (group-name (intern (format "neron-%s" variant)))
          (prefix-str (format "neron-%s-" variant)))
 
-    ;; custom-declare-theme is the function underlying the deftheme macro
-    (custom-declare-theme theme-name nil
-      (format "Neron %s theme with neon-pastel accents and lower contrast."
-              (capitalize (symbol-name variant))))
+    (custom-declare-theme
+     theme-name nil
+     (format "Neron %s theme with neon-pastel accents and lower contrast."
+             (capitalize (symbol-name variant))))
 
-    ;; custom-declare-group is the function underlying defgroup
-    (custom-declare-group group-name nil
-      (format "Neron %s theme options." (capitalize (symbol-name variant)))
-      :group 'faces
-      :prefix prefix-str)
+    (custom-declare-group
+     group-name nil
+     (format "Neron %s theme options." (capitalize (symbol-name variant)))
+     :group 'faces
+     :prefix prefix-str)
 
-    ;; custom-declare-variable is the function underlying defcustom;
-    ;; unlike the macro, it takes the default as an evaluated value directly
     (custom-declare-variable
      (intern (concat prefix-str "enlarge-headings")) t
      "Use scaled font sizes for headings."
@@ -59,18 +59,47 @@ that replace specific faces from the base definition for this variant."
      :type 'boolean
      :group group-name)
 
-    (let ((all-faces (neron--merge-faces (neron--get-base-faces) face-overrides)))
-      (apply #'custom-theme-set-faces theme-name
-             (neron--build-face-specs all-faces colors)))
+    (let* ((base-faces (neron--get-base-faces))
+           (all-faces (neron--merge-faces base-faces face-overrides))
+           (face-specs (neron--build-face-specs all-faces colors)))
+      (apply #'custom-theme-set-faces theme-name face-specs))
 
-    ;; provide-theme is a plain function, no eval needed
     (provide-theme theme-name)))
 
+(defun neron--merge-faces (base-faces overrides)
+  "Merge OVERRIDES into BASE-FACES, with overrides taking precedence."
+  (if (not overrides)
+      base-faces
+    (let ((result (copy-alist base-faces)))
+      (dolist (ov overrides)
+        (setf (alist-get (car ov) result) (cdr ov)))
+      result)))
 
-(defun neron--substitute-colors (face-attrs color-alist color-index)
-  "Substitute color symbols in FACE-ATTRS plist using COLOR-ALIST at COLOR-INDEX.
-COLOR-INDEX: 1 = primary (24-bit), 2 = 256-color, 3 = tty.
-Recursively handles nested plists such as :box or :underline values."
+(defun neron--build-face-specs (faces colors)
+  "Convert FACES (alist-ish) to `custom-theme-set-faces` specs using COLORS."
+  (mapcar
+   (lambda (face-spec)
+     (let ((face-name (car face-spec))
+           (attrs (cdr face-spec)))
+       `(,face-name
+         ((((min-colors 16777216))
+           ,(neron--substitute-colors attrs colors 1))
+          (((min-colors 256))
+           ,(neron--substitute-colors attrs colors 2))
+          (t
+           ,(neron--substitute-colors attrs colors 3))))))
+   faces))
+
+(defun neron--plistp (x)
+  "Return non-nil if X looks like a plist (KEY VAL KEY VAL...)."
+  (and (listp x)
+       (cl-evenp (length x))
+       (cl-loop for (k v) on x by #'cddr
+                always (keywordp k))))
+
+(defun neron--substitute-colors (face-attrs colors color-index)
+  "Substitute palette symbols in FACE-ATTRS using COLORS at COLOR-INDEX.
+COLOR-INDEX: 1 = 24-bit, 2 = 256-color, 3 = tty."
   (let ((result nil)
         (attrs face-attrs))
     (while attrs
@@ -78,47 +107,23 @@ Recursively handles nested plists such as :box or :underline values."
             (val (pop attrs)))
         (push key result)
         (cond
-         ;; Palette symbol → substitute resolved color
-         ((and (symbolp val) (assoc val color-alist))
-          (push (nth color-index (assoc val color-alist)) result))
-         ;; Nested plist, e.g. (:line-width 1 :color border) → recurse
-         ((listp val)
-          (push (neron--substitute-colors val color-alist color-index) result))
-         ;; Literal string, number, keyword, t, nil, unspecified → keep
+         ;; Never touch inheritance: it can be a face symbol or a list of faces.
+         ((eq key :inherit)
+          (push val result))
+
+         ;; Replace palette symbol with actual color string.
+         ((and (symbolp val) (assoc val colors))
+          (push (nth color-index (assoc val colors)) result))
+
+         ;; Only recurse into known nested plist-valued attributes.
+         ((and (memq key '(:box :underline :overline :strike-through))
+               (neron--plistp val))
+          (push (neron--substitute-colors val colors color-index) result))
+
+         ;; Otherwise keep value as-is.
          (t
           (push val result)))))
     (nreverse result)))
-
-
-(defun neron--merge-faces (base-faces overrides)
-  "Return BASE-FACES alist with OVERRIDES entries replacing matching faces.
-Faces in OVERRIDES that are absent from BASE-FACES are appended."
-  (if (not overrides)
-      base-faces
-    (let ((result (copy-alist base-faces)))
-      (dolist (override overrides)
-        ;; setf on alist-get: modifies cdr in-place when key exists,
-        ;; prepends a new entry when it doesn't
-        (setf (alist-get (car override) result)
-              (cdr override)))
-      result)))
-
-
-(defun neron--build-face-specs (faces color-alist)
-  "Build the argument list for `custom-theme-set-faces' from FACES and COLOR-ALIST.
-Each entry covers three display conditions: 24-bit, 256-color, and tty."
-  (mapcar
-   (lambda (face-spec)
-     (let ((face-name  (car face-spec))
-           (face-attrs (cdr face-spec)))
-       `(,face-name
-         ((((min-colors 16777216))        ; graphical / 24-bit color
-           ,(neron--substitute-colors face-attrs color-alist 1))
-          (((min-colors 256))             ; 256-color terminal
-           ,(neron--substitute-colors face-attrs color-alist 2))
-          (t                              ; tty fallback
-           ,(neron--substitute-colors face-attrs color-alist 3))))))
-   faces))
 
 
 (defun neron--get-base-faces ()
@@ -296,7 +301,7 @@ Theme files override only the faces that differ between dark and light."
     (diredfl-other-priv :foreground accent-warning)                              ;; *Face used for l,s,S,t,T privilege indicators in Dired buffers.
     (diredfl-write-priv :foreground accent-red)                                  ;; *Face used for write privilege indicator (w) in Dired buffers.
     (diredfl-dir-heading :inherit font-lock-comment-face :background bg-primary) ;; *Face used for directory headings in Dired buffers.
-    (diredfl-file-suffix undefined)                                              ;; *Face used for file suffixes in Dired buffers. This means the ‘.’ plus the file extension.  Example: ‘.elc’.
+    (diredfl-file-suffix :foreground accent-orange)                                              ;; *Face used for file suffixes in Dired buffers. This means the ‘.’ plus the file extension.  Example: ‘.elc’.
     (diredfl-autofile-name :foreground accent-yellow)                            ;; *Face used in Dired for names of files that are autofile bookmarks.
     (diredfl-tagged-autofile-name :inherit accent-red)                           ;; *Face used in Dired for names of files that are autofile bookmarks.
     (diredfl-flag-mark-line :background cursor)                                  ;; *Face used for flagged and marked lines in Dired buffers.
@@ -407,7 +412,6 @@ Theme files override only the faces that differ between dark and light."
     (highlight-indent-guides-stack-odd-face :foreground border :background border)
     (eros-result-overlay-face :foreground fg-muted :box (:line-width -1 :color border))
     ))
-
 
 (provide 'neron-theme-base)
 ;;; neron-theme-base.el ends here
