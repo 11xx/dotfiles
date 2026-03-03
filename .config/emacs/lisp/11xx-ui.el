@@ -82,7 +82,9 @@ number."
 
 (setup (:elpaca rainbow-delimiters)
   (:hook-into emacs-lisp-mode))
-(add-to-list 'custom-theme-load-path (concat user-emacs-directory "themes/"))
+(defvar themedir (expand-file-name "themes/" user-emacs-directory))
+(add-to-list 'custom-theme-load-path themedir)
+(add-to-list 'load-path themedir)
 (defun on-after-init ()
   (unless (display-graphic-p (selected-frame))
     (set-face-background 'default "unspecified-bg" (selected-frame))))
@@ -96,7 +98,12 @@ number."
   (unless (display-graphic-p frame)
     (set-face-background 'default "unspecified-bg" frame)))
 (add-hook 'after-make-frame-functions #'on-frame-open)
+(elpaca (neron-themes :host codeberg
+                      :repo "11xx/neron-themes"
+                      :files ("neron-*-theme.el" "neron-themes.el")))
+
 (setup (:elpaca auto-dark)
+  (:load-after neron-themes)
   (setopt auto-dark-dark-theme 'neron-dark
           auto-dark-light-theme 'neron-light)
   (auto-dark-mode t)

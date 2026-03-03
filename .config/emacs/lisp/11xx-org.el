@@ -88,8 +88,7 @@
 (setup (:elpaca visual-fill-column)
   (:load-after org)
   (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
-          visual-fill-column-center-text t)
-  (:hook-into org-mode))
+          visual-fill-column-center-text t))
 
 (setup (:elpaca org-bulletproof)
   (:load-after org)

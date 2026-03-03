@@ -50,8 +50,8 @@ The app is chosen from your OS's preference."
            )
 
   (:hook ;; dired-hide-details-mode
-         ;; dired-hide-dotfiles-mode
-         auto-revert-mode)
+   ;; dired-hide-dotfiles-mode
+   auto-revert-mode)
 
   ;; Enable disabled commands
   (:put-enable dired-find-alternate-file)
@@ -89,6 +89,7 @@ The app is chosen from your OS's preference."
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
 
 (setup (:elpaca dired-rainbow)
+  (:load-after dired)
   (require 'dired-rainbow)
   ;; * `dired-rainbow-define` - add face by file extension
   ;; * `dired-rainbow-define-chmod` - add face by file permissions
@@ -132,9 +133,35 @@ The app is chosen from your OS's preference."
   (setopt dired-efap-initial-filename-selection nil))
 
 (setup (:elpaca all-the-icons-dired)
+  (:load-after dired)
+  ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
   (:hook-into dired-mode))
 
 (setup (:elpaca diredfl)
-  (add-hook 'dired-mode-hook #'diredfl-mode))
+  (:hook-into dired-mode))
+
+(setup dired
+  (:load-after dired)
+  (:require hl-line)
+
+  (defun f/dired-restore-cursor ()
+    "Restore cursor on current buffer."
+    (setq-local cursor-type t))
+
+  (defun f/dired-hl-line-cursor ()
+    "Hide cursor and enable hl-line for read-only dired browsing."
+    (hl-line-mode 1)
+    (setq-local cursor-type nil))
+
+  ;; Entry into read-only dired
+  (add-hook 'dired-mode-hook #'f/dired-hl-line-cursor)
+
+  ;; wdired: restore on entry, hide on exit
+  (add-hook 'wdired-mode-hook #'f/dired-restore-cursor)
+  (advice-add 'wdired-change-to-dired-mode :after #'f/dired-hl-line-cursor)
+
+  ;; efap: restore on entry, hide on exit
+  (advice-add 'dired-efap :after #'f/dired-restore-cursor)
+  (advice-add 'dired-efap--change-to-dired-mode :after #'f/dired-hl-line-cursor))
 
 (provide '11xx-dired)

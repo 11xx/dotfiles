@@ -172,24 +172,29 @@
 (setup desktop
   (:require)
 
-  (defvar v/daemon-name (daemonp)
-    "Name of current daemon: 'def', 'code', etc. or nil if interactive.")
+  (defvar v/daemon-name
+    (let ((d (daemonp)))
+      (cond
+       ((stringp d) d)
+       ((eq d t)   "default")
+       (t           nil)))
+    "Server name this Emacs instance is running as, or nil if not a daemon.
+Mirrors `daemonp': a string for named daemons (--daemon=NAME), \"default\"
+for unnamed (--daemon), nil for interactive sessions.")
 
   (when v/daemon-name
-    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)))
+    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)
+            desktop-base-lock-name (format ".emacs-%s.desktop.lock" v/daemon-name)))
 
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
           desktop-auto-save-timeout 1
-          desktop-save 'ask-if-new))
+          desktop-save 'ask-if-new)
+  (desktop-save-mode))
 (setup (:elpaca eros)
-  (:hook-into emacs-lisp-mode
-              org-mode)
+  (:load-after org-mode)
+  (:hook-into org-mode)
   (setopt ;; eros-eval-result-prefix    "∷ "
            eros-eval-result-duration  'command
-           eros-overlays-use-font-lock t)
-  (set-face-attribute 'eros-result-overlay-face nil
-                      :box        '(:line-width -1 :color "dim gray")
-                      :background 'unspecified
-                      :inherit    'shadow))
+           eros-overlays-use-font-lock t))
 
 (provide '11xx-defaults)

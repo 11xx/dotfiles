@@ -879,29 +879,34 @@ Save state for session restoring
 (setup desktop
   (:require)
 
-  (defvar v/daemon-name (daemonp)
-    "Name of current daemon: 'def', 'code', etc. or nil if interactive.")
+  (defvar v/daemon-name
+    (let ((d (daemonp)))
+      (cond
+       ((stringp d) d)
+       ((eq d t)   "default")
+       (t           nil)))
+    "Server name this Emacs instance is running as, or nil if not a daemon.
+Mirrors `daemonp': a string for named daemons (--daemon=NAME), \"default\"
+for unnamed (--daemon), nil for interactive sessions.")
 
   (when v/daemon-name
-    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)))
+    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)
+            desktop-base-lock-name (format ".emacs-%s.desktop.lock" v/daemon-name)))
 
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
           desktop-auto-save-timeout 1
-          desktop-save 'ask-if-new))
+          desktop-save 'ask-if-new)
+  (desktop-save-mode))
 #+end_src
 
 *** eros: Overlay eval result (better C-x C-e)
 #+begin_src emacs-lisp
 (setup (:elpaca eros)
-  (:hook-into emacs-lisp-mode
-              org-mode)
+  (:load-after org-mode)
+  (:hook-into org-mode)
   (setopt ;; eros-eval-result-prefix    "∷ "
            eros-eval-result-duration  'command
-           eros-overlays-use-font-lock t)
-  (set-face-attribute 'eros-result-overlay-face nil
-                      :box        '(:line-width -1 :color "dim gray")
-                      :background 'unspecified
-                      :inherit    'shadow))
+           eros-overlays-use-font-lock t))
 #+end_src
 
 
@@ -1884,8 +1889,7 @@ Examples:
 (setup (:elpaca visual-fill-column)
   (:load-after org)
   (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
-          visual-fill-column-center-text t)
-  (:hook-into org-mode))
+          visual-fill-column-center-text t))
 
 (setup (:elpaca org-bulletproof)
   (:load-after org)
@@ -3071,8 +3075,8 @@ NOTE: =dired-async= is provided by the =async= package.
            )
 
   (:hook ;; dired-hide-details-mode
-         ;; dired-hide-dotfiles-mode
-         auto-revert-mode)
+   ;; dired-hide-dotfiles-mode
+   auto-revert-mode)
 
   ;; Enable disabled commands
   (:put-enable dired-find-alternate-file)
@@ -3110,6 +3114,7 @@ NOTE: =dired-async= is provided by the =async= package.
 ;; customize faces with =dired-subtree-depth-[1-6]-face=
 
 (setup (:elpaca dired-rainbow)
+  (:load-after dired)
   (require 'dired-rainbow)
   ;; * `dired-rainbow-define` - add face by file extension
   ;; * `dired-rainbow-define-chmod` - add face by file permissions
@@ -3153,10 +3158,36 @@ NOTE: =dired-async= is provided by the =async= package.
   (setopt dired-efap-initial-filename-selection nil))
 
 (setup (:elpaca all-the-icons-dired)
+  (:load-after dired)
+  ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
   (:hook-into dired-mode))
 
 (setup (:elpaca diredfl)
-  (add-hook 'dired-mode-hook #'diredfl-mode))
+  (:hook-into dired-mode))
+
+(setup dired
+  (:load-after dired)
+  (:require hl-line)
+
+  (defun f/dired-restore-cursor ()
+    "Restore cursor on current buffer."
+    (setq-local cursor-type t))
+
+  (defun f/dired-hl-line-cursor ()
+    "Hide cursor and enable hl-line for read-only dired browsing."
+    (hl-line-mode 1)
+    (setq-local cursor-type nil))
+
+  ;; Entry into read-only dired
+  (add-hook 'dired-mode-hook #'f/dired-hl-line-cursor)
+
+  ;; wdired: restore on entry, hide on exit
+  (add-hook 'wdired-mode-hook #'f/dired-restore-cursor)
+  (advice-add 'wdired-change-to-dired-mode :after #'f/dired-hl-line-cursor)
+
+  ;; efap: restore on entry, hide on exit
+  (advice-add 'dired-efap :after #'f/dired-restore-cursor)
+  (advice-add 'dired-efap--change-to-dired-mode :after #'f/dired-hl-line-cursor))
 #+end_src
 
 * 11xx-magit.el
@@ -3920,7 +3951,9 @@ number."
 otherwise Emacs will ignore the file.
 # My dumbass ignored this for two days of "troubleshooting" :s [2022-04-13 Wed 22:08:31]
 #+begin_src emacs-lisp
-(add-to-list 'custom-theme-load-path (concat user-emacs-directory "themes/"))
+(defvar themedir (expand-file-name "themes/" user-emacs-directory))
+(add-to-list 'custom-theme-load-path themedir)
+(add-to-list 'load-path themedir)
 #+end_src
 
 **** Remove background color when opening from terminal
@@ -3963,7 +3996,12 @@ Load theme based on Dark or Light system theme:
     #+end_example
 
 #+begin_src emacs-lisp
+(elpaca (neron-themes :host codeberg
+                      :repo "11xx/neron-themes"
+                      :files ("neron-*-theme.el" "neron-themes.el")))
+
 (setup (:elpaca auto-dark)
+  (:load-after neron-themes)
   (setopt auto-dark-dark-theme 'neron-dark
           auto-dark-light-theme 'neron-light)
   (auto-dark-mode t)
