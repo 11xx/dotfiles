@@ -103,10 +103,9 @@ number."
                       :files ("neron-*-theme.el" "neron-themes.el")))
 
 (setup (:elpaca auto-dark)
-  (:load-after neron-themes)
-  (setopt auto-dark-dark-theme 'neron-dark
-          auto-dark-light-theme 'neron-light)
-  (auto-dark-mode t)
+  (setopt auto-dark-themes '((neron-dark)
+                             (neron-light)))
+  (:hook-into elpaca-after-init-hook)
   (:hide-mode))
 (setup ibuffer
   (:option ibuffer-show-empty-filter-groups nil

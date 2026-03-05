@@ -75,6 +75,7 @@
  undo-outer-limit 1010000000
  ring-bell-function 'ignore
  auto-window-vscroll nil
+ delete-by-moving-to-trash t
  )
 
 ;; #manual-smartparens

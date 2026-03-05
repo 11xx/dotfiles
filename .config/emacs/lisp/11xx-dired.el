@@ -34,7 +34,6 @@ The app is chosen from your OS's preference."
   (:require dired-x dired-aux)
   (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
            ls-lisp-dirs-first t ;; show directories on top of the list
-           ;; delete-by-moving-to-trash t ;; move to trash instead of hard deleting
            ;; dired-omit-files-p t
            dired-recursive-copies #'always
            dired-recursive-deletes #'always

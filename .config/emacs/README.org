@@ -807,6 +807,11 @@ ring-bell-function 'ignore
 auto-window-vscroll nil
 #+end_src
 
+Little safety-net for internal deletion functions
+#+begin_src emacs-lisp
+delete-by-moving-to-trash t
+#+end_src
+
 *** =custom.el= file
 file to store ~customize~ options. This can be disabled but
 ~init.el~ will receive all generated code. It's also useful
@@ -3059,7 +3064,6 @@ NOTE: =dired-async= is provided by the =async= package.
   (:require dired-x dired-aux)
   (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
            ls-lisp-dirs-first t ;; show directories on top of the list
-           ;; delete-by-moving-to-trash t ;; move to trash instead of hard deleting
            ;; dired-omit-files-p t
            dired-recursive-copies #'always
            dired-recursive-deletes #'always
@@ -4001,10 +4005,9 @@ Load theme based on Dark or Light system theme:
                       :files ("neron-*-theme.el" "neron-themes.el")))
 
 (setup (:elpaca auto-dark)
-  (:load-after neron-themes)
-  (setopt auto-dark-dark-theme 'neron-dark
-          auto-dark-light-theme 'neron-light)
-  (auto-dark-mode t)
+  (setopt auto-dark-themes '((neron-dark)
+                             (neron-light)))
+  (:hook-into elpaca-after-init-hook)
   (:hide-mode))
 #+end_src
 # [2023-12-10  01:20:49 -03] @winr58
@@ -4387,7 +4390,7 @@ retrieve the password.
 #+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/11xx-pdf-viewer.el
 (setup (:elpaca org-pdftools))
 (setup (:elpaca pdf-tools)
-  (pdf-tools-install)
+  ;; (pdf-tools-install)
   (:with-map pdf-view-mode-map
     (:bind "j" pdf-view-next-line-or-next-page
            "k" pdf-view-previous-line-or-previous-page
