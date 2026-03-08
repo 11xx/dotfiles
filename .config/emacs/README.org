@@ -2524,6 +2524,17 @@ Return the path to the generated output file."
     (require '11xx-org-publish)))
 #+end_src
 
+*** Library of Babel
+https://orgmode.org/manual/Library-of-Babel.html
+#+begin_src emacs-lisp
+(setup ob-lob
+  (:with-mode org-mode
+    (:match-file "*.org.setup" "*.setup"))
+  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup"))
+
+#+end_src
+
+
 ** Troubleshooting
 
 *** I can't find the format file `pdflatex.fmt!'
@@ -3955,9 +3966,9 @@ number."
 otherwise Emacs will ignore the file.
 # My dumbass ignored this for two days of "troubleshooting" :s [2022-04-13 Wed 22:08:31]
 #+begin_src emacs-lisp
-(defvar themedir (expand-file-name "themes/" user-emacs-directory))
-(add-to-list 'custom-theme-load-path themedir)
-(add-to-list 'load-path themedir)
+(let ((themedir (expand-file-name "themes/" user-emacs-directory)))
+  (add-to-list 'custom-theme-load-path themedir)
+  (add-to-list 'load-path themedir))
 #+end_src
 
 **** Remove background color when opening from terminal
@@ -4000,9 +4011,15 @@ Load theme based on Dark or Light system theme:
     #+end_example
 
 #+begin_src emacs-lisp
-(elpaca (neron-themes :host codeberg
-                      :repo "11xx/neron-themes"
-                      :files ("neron-*-theme.el" "neron-themes.el")))
+;; (elpaca (neron-themes :host codeberg
+;;                       :repo "11xx/neron-themes"
+;;                       :files ("neron-*.el")))
+
+;; dev
+(let ((neron-themes-dir (expand-file-name "~/code/emacs/neron-themes/")))
+  (add-to-list 'custom-theme-load-path neron-themes-dir)
+  (add-to-list 'load-path neron-themes-dir)
+  (require 'neron-themes))
 
 (setup (:elpaca auto-dark)
   (setopt auto-dark-themes '((neron-dark)

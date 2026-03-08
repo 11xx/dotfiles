@@ -373,5 +373,10 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (add-to-list 'load-path "~/www/11xx.org/lisp/")
   (with-eval-after-load 'ox-publish
     (require '11xx-org-publish)))
+(setup ob-lob
+  (:with-mode org-mode
+    (:match-file "*.org.setup" "*.setup"))
+  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup"))
+
 
 (provide '11xx-org)
