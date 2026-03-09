@@ -118,18 +118,20 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   (setopt marginalia-align 'left
           marginalia-field-width 120))
 (setup (:elpaca consult)
-  (:global "C-s" consult-line ;; Was search-forward
-           "C-x b" consult-buffer ;; Was switch-to-buffer
-           "C-r" consult-history ;; #TODO-ithink was isearch-backward
-           "C-c o s" consult-org-heading
-           ))
+  (:global-set
+   "C-s" consult-line ;; Was search-forward
+   "C-x b" consult-buffer ;; Was switch-to-buffer
+   "C-r" consult-history ;; #TODO-ithink was isearch-backward
+   "C-c o s" consult-org-heading
+   ))
 ;; note: consult-outline & consult-org-heading
 (setup (:elpaca embark)
        (:elpaca embark-consult)
   (:load-after consult)
-  (:global "C-." embark-act
-           ;; "C-;" embark-dwim
-           "C-h B" embark-bindings)
+  (:global-set
+   "C-." embark-act
+   ;; "C-;" embark-dwim
+   "C-h B" embark-bindings)
   ;; Optionally replace the key help with a completing-read interface
   (setq prefix-help-command #'embark-prefix-help-command)
 
@@ -141,7 +143,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; (:hook embark-collect-mode consult-preview-at-point-mode)
   )
 (setup (:elpaca corfu)
-  (:global "<tab>" completion-at-point)
+  (:global-set "<tab>" completion-at-point)
 
   (:with-map corfu-map
     (:bind "M-SPC" corfu-insert-separator)
@@ -184,23 +186,24 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 (setup (:elpaca cape)
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
-  (:global "C-c p p" completion-at-point ;; capf
-           "C-c p t" complete-tag        ;; etags
-           "C-c p d" cape-dabbrev        ;; or dabbrev-completion
-           "C-c p h" cape-history
-           "C-c p f" cape-file
-           "C-c p k" cape-keyword
-           "C-c p s" cape-elisp-symbol
-           "C-c p e" cape-elisp-block
-           "C-c p a" cape-abbrev
-           "C-c p l" cape-line
-           "C-c p w" cape-dict
-           "C-c p :" cape-emoji
-           "C-c p \\" cape-tex
-           "C-c p _" cape-tex
-           "C-c p ^" cape-tex
-           "C-c p &" cape-sgml
-           "C-c p r" cape-rfc1345)
+  ;; (:global-set
+  ;;  "C-c p p" completion-at-point ;; capf
+  ;;  "C-c p t" complete-tag        ;; etags
+  ;;  "C-c p d" cape-dabbrev        ;; or dabbrev-completion
+  ;;  "C-c p h" cape-history
+  ;;  "C-c p f" cape-file
+  ;;  "C-c p k" cape-keyword
+  ;;  "C-c p s" cape-elisp-symbol
+  ;;  "C-c p e" cape-elisp-block
+  ;;  "C-c p a" cape-abbrev
+  ;;  "C-c p l" cape-line
+  ;;  "C-c p w" cape-dict
+  ;;  "C-c p :" cape-emoji
+  ;;  "C-c p \\" cape-tex
+  ;;  "C-c p _" cape-tex
+  ;;  "C-c p ^" cape-tex
+  ;;  "C-c p &" cape-sgml
+  ;;  "C-c p r" cape-rfc1345)
   ;; Add to the global default value of `completion-at-point-functions' which is
   ;; used by `completion-at-point'.  The order of the functions matters, the
   ;; first function returning a result wins.  Note that the list of buffer-local
@@ -222,8 +225,9 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
 
   ;; Require trigger prefix before template name when completing.
   ;; (:option tempel-trigger-prefix "<")
-  (:global "M-+" tempel-complete ;; Alternative tempel-expand
-           "M-*" tempel-insert)
+  (:global-set
+   "M-+" tempel-complete ;; Alternative tempel-expand
+   "M-*" tempel-insert)
 
   ;; Setup completion at point
   (defun tempel-setup-capf ()

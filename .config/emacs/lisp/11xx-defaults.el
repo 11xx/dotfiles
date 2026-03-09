@@ -1,10 +1,10 @@
 ;; -*- lexical-binding: t; -*-
 (setup emacs
   ;; Keybindings
-  (:global
+  (:global-set
    "C-c C-/"          comment-region
    "C-c C-M-/"        uncomment-region
-   [remap mark-word]  f/mark-whole-word
+   "<remap> <mark-word>"  f/mark-whole-word
    ;; Local file variables
    "C-c a f v"        add-file-local-variable
    "C-c d f v"        delete-file-local-variable
@@ -21,10 +21,10 @@
    "C-x C-z" org-set-property
    "C-z" org-set-property
    ;; [[https://www.emacswiki.org/emacs/WindowResize][EmacsWiki: Window Resize]] [2022-04-20 Wed 02:50:51]
-   "S-C-<left>"   shrink-window-horizontally
-   "S-C-<right>"  enlarge-window-horizontally
-   "S-C-<down>"   shrink-window
-   "S-C-<up>"     enlarge-window
+   "C-S-<left>"   shrink-window-horizontally
+   "C-S-<right>"  enlarge-window-horizontally
+   "C-S-<down>"   shrink-window
+   "C-S-<up>"     enlarge-window
    ;; Cursor
    ;; "C-M-d" backward-delete-char ; was down-list
    "C-M-d" delete-pair ; was down-list
@@ -121,7 +121,7 @@
   (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
 (setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
-  (:global "M-o" ace-window)
+  (:global-set "M-o" ace-window)
 
   ;; https://github.com/abo-abo/ace-window?tab=readme-ov-file#aw-keys
   (setopt aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)
@@ -130,12 +130,12 @@
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
 (setup (:elpaca helpful)
   ;; Helpful.el
-  (:global
-   [remap describe-function] helpful-callable
-   [remap describe-command] helpful-command
-   [remap describe-variable] helpful-variable
-   [remap describe-key] helpful-key
-   [remap describe-symbol] helpful-symbol))
+  (:global-set
+   "<remap> <describe-function>" helpful-callable
+   "<remap> <describe-command>" helpful-command
+   "<remap> <describe-variable>" helpful-variable
+   "<remap> <describe-key>" helpful-key
+   "<remap> <describe-symbol>" helpful-symbol))
 
 (setup (:elpaca which-key)
   ;; :defer 10
@@ -145,7 +145,7 @@
 (setup (:elpaca jump-char)
   (:load-after kmacro) ; bc I only use this for macro-ing anyway
 
-  (:global
+  (:global-set
    "C-c j f" jump-char-forward
    "C-c j b" jump-char-backward
    "C-c j m f" jump-char-forward-set-mark
@@ -157,14 +157,14 @@
 (load custom-file 'noerror 'nomessage)
 (setup (:elpaca async))
 (setup (:elpaca detached)
-  (:global
+  (:global-set
    ;; Replace `async-shell-command' with `detached-shell-command'
-   [remap async-shell-command] detached-shell-command
+   "<remap> <async-shell-command>" detached-shell-command
    ;; Replace `compile' with `detached-compile'
-   [remap compile] detached-compile
-   [remap recompile] detached-compile-recompile
+   "<remap> <compile>" detached-compile
+   "<remap> <recompile>" detached-compile-recompile
    ;; Replace built in completion of sessions with `consult'
-   [remap detached-open-session] detached-consult-session)
+   "<remap> <detached-open-session>" detached-consult-session)
   (:option detached-show-output-on-attach t)
   (detached-init))
 (setup tramp

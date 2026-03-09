@@ -344,7 +344,17 @@ the feature prefix."
   :repeatable t)
 #+end_src
 
-
+****** :global-set
+Adress =:global= deprecation:
+: The ‘:global’ macro for setup has been deprecated, please use ‘keymap-global-set’.
+#+begin_src emacs-lisp
+(setup-define :global-set
+  (lambda (key command)
+    `(keymap-global-set ,key #',command))
+  :documentation "Globally bind KEY to COMMAND using keymap-global-set."
+  :debug '(form sexp)
+  :repeatable t)
+#+end_src
 
 
 ** Clean Emacs directory
@@ -535,10 +545,10 @@ Personal config modularized into "pseudo-packages"
 #+begin_src emacs-lisp
 (setup emacs
   ;; Keybindings
-  (:global
+  (:global-set
    "C-c C-/"          comment-region
    "C-c C-M-/"        uncomment-region
-   [remap mark-word]  f/mark-whole-word
+   "<remap> <mark-word>"  f/mark-whole-word
    ;; Local file variables
    "C-c a f v"        add-file-local-variable
    "C-c d f v"        delete-file-local-variable
@@ -555,10 +565,10 @@ Personal config modularized into "pseudo-packages"
    "C-x C-z" org-set-property
    "C-z" org-set-property
    ;; [[https://www.emacswiki.org/emacs/WindowResize][EmacsWiki: Window Resize]] [2022-04-20 Wed 02:50:51]
-   "S-C-<left>"   shrink-window-horizontally
-   "S-C-<right>"  enlarge-window-horizontally
-   "S-C-<down>"   shrink-window
-   "S-C-<up>"     enlarge-window
+   "C-S-<left>"   shrink-window-horizontally
+   "C-S-<right>"  enlarge-window-horizontally
+   "C-S-<down>"   shrink-window
+   "C-S-<up>"     enlarge-window
    ;; Cursor
    ;; "C-M-d" backward-delete-char ; was down-list
    "C-M-d" delete-pair ; was down-list
@@ -667,7 +677,7 @@ Personal config modularized into "pseudo-packages"
 #+begin_src emacs-lisp
 (setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
-  (:global "M-o" ace-window)
+  (:global-set "M-o" ace-window)
 
   ;; https://github.com/abo-abo/ace-window?tab=readme-ov-file#aw-keys
   (setopt aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)
@@ -676,12 +686,12 @@ Personal config modularized into "pseudo-packages"
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
 (setup (:elpaca helpful)
   ;; Helpful.el
-  (:global
-   [remap describe-function] helpful-callable
-   [remap describe-command] helpful-command
-   [remap describe-variable] helpful-variable
-   [remap describe-key] helpful-key
-   [remap describe-symbol] helpful-symbol))
+  (:global-set
+   "<remap> <describe-function>" helpful-callable
+   "<remap> <describe-command>" helpful-command
+   "<remap> <describe-variable>" helpful-variable
+   "<remap> <describe-key>" helpful-key
+   "<remap> <describe-symbol>" helpful-symbol))
 
 (setup (:elpaca which-key)
   ;; :defer 10
@@ -691,7 +701,7 @@ Personal config modularized into "pseudo-packages"
 (setup (:elpaca jump-char)
   (:load-after kmacro) ; bc I only use this for macro-ing anyway
 
-  (:global
+  (:global-set
    "C-c j f" jump-char-forward
    "C-c j b" jump-char-backward
    "C-c j m f" jump-char-forward-set-mark
@@ -845,14 +855,14 @@ Note that by default =dired= don't provide the full path to the =dtach= command.
 The full path is required.
 #+begin_src emacs-lisp
 (setup (:elpaca detached)
-  (:global
+  (:global-set
    ;; Replace `async-shell-command' with `detached-shell-command'
-   [remap async-shell-command] detached-shell-command
+   "<remap> <async-shell-command>" detached-shell-command
    ;; Replace `compile' with `detached-compile'
-   [remap compile] detached-compile
-   [remap recompile] detached-compile-recompile
+   "<remap> <compile>" detached-compile
+   "<remap> <recompile>" detached-compile-recompile
    ;; Replace built in completion of sessions with `consult'
-   [remap detached-open-session] detached-consult-session)
+   "<remap> <detached-open-session>" detached-consult-session)
   (:option detached-show-output-on-attach t)
   (detached-init))
 #+end_src
@@ -1841,9 +1851,10 @@ Examples:
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
-  (:global "C-c o l" org-store-link
-           "C-c o a" org-agenda
-           "C-c o c" org-capture)
+  (:global-set
+   "C-c o l" org-store-link
+   "C-c o a" org-agenda
+   "C-c o c" org-capture)
 
   ;; Move this to file local
   (org-babel-do-load-languages
@@ -3254,7 +3265,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 
   (require 'magit-status-bare)
   (keymap-global-unset "C-x g") ; unbind default `magit-status'
-  (:global "C-x g g" magit-status-default)
+  (:global-set "C-x g g" magit-status-default)
   ;; (keymap-global-set "C-x g g" #'magit-status-default)
 
   (magit-status-bare :git-dir "~/.local/dotfiles.git/"
@@ -3542,11 +3553,12 @@ Have =M-x= commands history across sessions
 [[https://github.com/minad/consult#use-package-example][Example configuration for Consult]]
 #+begin_src emacs-lisp
 (setup (:elpaca consult)
-  (:global "C-s" consult-line ;; Was search-forward
-           "C-x b" consult-buffer ;; Was switch-to-buffer
-           "C-r" consult-history ;; #TODO-ithink was isearch-backward
-           "C-c o s" consult-org-heading
-           ))
+  (:global-set
+   "C-s" consult-line ;; Was search-forward
+   "C-x b" consult-buffer ;; Was switch-to-buffer
+   "C-r" consult-history ;; #TODO-ithink was isearch-backward
+   "C-c o s" consult-org-heading
+   ))
 ;; note: consult-outline & consult-org-heading
 #+end_src
 
@@ -3567,9 +3579,10 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 (setup (:elpaca embark)
        (:elpaca embark-consult)
   (:load-after consult)
-  (:global "C-." embark-act
-           ;; "C-;" embark-dwim
-           "C-h B" embark-bindings)
+  (:global-set
+   "C-." embark-act
+   ;; "C-;" embark-dwim
+   "C-h B" embark-bindings)
   ;; Optionally replace the key help with a completing-read interface
   (setq prefix-help-command #'embark-prefix-help-command)
 
@@ -3586,7 +3599,7 @@ https://github.com/minad/consult/issues/563#issuecomment-1186612641
 yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-in-regions-with-corfu][daviwil/dotfiles/Emacs.org#completions-in-regions-with-corfu]]
 #+begin_src emacs-lisp
 (setup (:elpaca corfu)
-  (:global "<tab>" completion-at-point)
+  (:global-set "<tab>" completion-at-point)
 
   (:with-map corfu-map
     (:bind "M-SPC" corfu-insert-separator)
@@ -3639,23 +3652,24 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 (setup (:elpaca cape)
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
-  (:global "C-c p p" completion-at-point ;; capf
-           "C-c p t" complete-tag        ;; etags
-           "C-c p d" cape-dabbrev        ;; or dabbrev-completion
-           "C-c p h" cape-history
-           "C-c p f" cape-file
-           "C-c p k" cape-keyword
-           "C-c p s" cape-elisp-symbol
-           "C-c p e" cape-elisp-block
-           "C-c p a" cape-abbrev
-           "C-c p l" cape-line
-           "C-c p w" cape-dict
-           "C-c p :" cape-emoji
-           "C-c p \\" cape-tex
-           "C-c p _" cape-tex
-           "C-c p ^" cape-tex
-           "C-c p &" cape-sgml
-           "C-c p r" cape-rfc1345)
+  ;; (:global-set
+  ;;  "C-c p p" completion-at-point ;; capf
+  ;;  "C-c p t" complete-tag        ;; etags
+  ;;  "C-c p d" cape-dabbrev        ;; or dabbrev-completion
+  ;;  "C-c p h" cape-history
+  ;;  "C-c p f" cape-file
+  ;;  "C-c p k" cape-keyword
+  ;;  "C-c p s" cape-elisp-symbol
+  ;;  "C-c p e" cape-elisp-block
+  ;;  "C-c p a" cape-abbrev
+  ;;  "C-c p l" cape-line
+  ;;  "C-c p w" cape-dict
+  ;;  "C-c p :" cape-emoji
+  ;;  "C-c p \\" cape-tex
+  ;;  "C-c p _" cape-tex
+  ;;  "C-c p ^" cape-tex
+  ;;  "C-c p &" cape-sgml
+  ;;  "C-c p r" cape-rfc1345)
   ;; Add to the global default value of `completion-at-point-functions' which is
   ;; used by `completion-at-point'.  The order of the functions matters, the
   ;; first function returning a result wins.  Note that the list of buffer-local
@@ -3683,8 +3697,9 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
 
   ;; Require trigger prefix before template name when completing.
   ;; (:option tempel-trigger-prefix "<")
-  (:global "M-+" tempel-complete ;; Alternative tempel-expand
-           "M-*" tempel-insert)
+  (:global-set
+   "M-+" tempel-complete ;; Alternative tempel-expand
+   "M-*" tempel-insert)
 
   ;; Setup completion at point
   (defun tempel-setup-capf ()
@@ -4094,7 +4109,7 @@ Before loading the theme
                                           ("emacs-lisp" (mode . emacs-lisp)))))
            ibuffer-expert t)
   (:hook (lambda() (ibuffer-switch-to-saved-filter-groups "default")))
-  (:global "C-x C-b" ibuffer))
+  (:global-set "C-x C-b" ibuffer))
 #+end_src
 
 *** Ruler
@@ -4234,10 +4249,10 @@ Scroll half-page hack: [[https://www.emacswiki.org/emacs/HalfScrolling][emacswik
 # ;; [next] good-scroll-up-full-screen
 # ;; [prior] good-scroll-down-full-screen
 # ;; Scroll
-# ;; [remap scroll-up-command] scroll-up-half
-# ;; [remap scroll-down-command] scroll-down-half
-# ;; [remap scroll-up-command] pixel-scroll-up
-# ;; [remap scroll-down-command] pixel-scroll-down
+# ;; "<remap> <scroll-up-command>" scroll-up-half
+# ;; "<remap> <scroll-down-command>" scroll-down-half
+# ;; "<remap> <scroll-up-command>" pixel-scroll-up
+# ;; "<remap> <scroll-down-command>" pixel-scroll-down
 * 11xx-pixel-scroll.el: Smooth scrolling
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-pixel-scroll.el :noweb-ref 11xx-pixel-scroll
@@ -4307,19 +4322,21 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
       ;; Default command:
       (call-interactively #'move-to-window-line-top-bottom)))
 
-  (:global "M-r" #'f/rotate-frame-clockwise-or-default ;; was #'move-to-window-line-top-bottom
-           "M-S-r" #'f/rotate-frame-anticlockwise-or-default ;; was #'move-to-window-line-top-bottom
-           ))
+  (:global-set
+   "M-r" #'f/rotate-frame-clockwise-or-default ;; was #'move-to-window-line-top-bottom
+   "M-S-r" #'f/rotate-frame-anticlockwise-or-default ;; was #'move-to-window-line-top-bottom
+   ))
 #+end_src
 
 *** Multiple Cursors
 ~multiple-cursors~
 #+begin_src emacs-lisp
 (setup (:elpaca multiple-cursors)
-  (:global "C-S-c C-S-c" mc/edit-lines
-           "C-<" mc/mark-previous-like-this
-           "C->" mc/mark-next-like-this
-           "C-c C-<" mc/mark-all-like-this))
+  (:global-set
+   "C-S-c C-S-c" mc/edit-lines
+   "C-<" mc/mark-previous-like-this
+   "C->" mc/mark-next-like-this
+   "C-c C-<" mc/mark-all-like-this))
 #+end_src
 
 

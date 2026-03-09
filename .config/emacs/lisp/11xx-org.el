@@ -35,9 +35,10 @@
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
-  (:global "C-c o l" org-store-link
-           "C-c o a" org-agenda
-           "C-c o c" org-capture)
+  (:global-set
+   "C-c o l" org-store-link
+   "C-c o a" org-agenda
+   "C-c o c" org-capture)
 
   ;; Move this to file local
   (org-babel-do-load-languages

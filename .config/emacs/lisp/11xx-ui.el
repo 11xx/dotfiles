@@ -123,7 +123,7 @@ number."
                                           ("emacs-lisp" (mode . emacs-lisp)))))
            ibuffer-expert t)
   (:hook (lambda() (ibuffer-switch-to-saved-filter-groups "default")))
-  (:global "C-x C-b" ibuffer))
+  (:global-set "C-x C-b" ibuffer))
 (setup display-fill-column-indicator-mode
   (:hook-into prog-mode text-mode)
   (:option display-fill-column-indicator-column 79)

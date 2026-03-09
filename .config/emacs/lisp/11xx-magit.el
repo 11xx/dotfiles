@@ -18,7 +18,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 
   (require 'magit-status-bare)
   (keymap-global-unset "C-x g") ; unbind default `magit-status'
-  (:global "C-x g g" magit-status-default)
+  (:global-set "C-x g g" magit-status-default)
   ;; (keymap-global-set "C-x g g" #'magit-status-default)
 
   (magit-status-bare :git-dir "~/.local/dotfiles.git/"

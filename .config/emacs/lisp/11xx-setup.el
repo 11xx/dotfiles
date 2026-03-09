@@ -120,5 +120,11 @@ NAME is not the name of the option itself, but of the option with
 the feature prefix."
   :debug '(sexp form)
   :repeatable t)
+(setup-define :global-set
+  (lambda (key command)
+    `(keymap-global-set ,key #',command))
+  :documentation "Globally bind KEY to COMMAND using keymap-global-set."
+  :debug '(form sexp)
+  :repeatable t)
 
 (provide '11xx-setup)
