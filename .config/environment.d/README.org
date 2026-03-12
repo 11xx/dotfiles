@@ -134,3 +134,13 @@ PATH=${PATH}:${XDG_BIN_HOME}/stash
 PATH=${PATH}:${XDG_BIN_HOME}/emacs
 PATH=${PATH}:${XDG_BIN_HOME}/git
 #+end_src
+
+* scripts-path.conf: Additional scripts directories to PATH
+:PROPERTIES:
+:header-args:conf: :tangle scripts-path.conf
+:END:
+
+#+begin_src conf
+PATH=${PATH}:${HOME}/code/linux-scripts
+#+end_src
+
