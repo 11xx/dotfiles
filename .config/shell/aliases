@@ -70,7 +70,7 @@ alias pc='patool create'
 alias pe='patool extract'
 alias px='patool extract'
 alias pl='patool list'
-alias xs='xtosubdir'
+alias xs='xtodir'
 
 alias rgboff='sudo openrgb --device 0 -m off; sudo openrgb --device 1 -m off;'
 

@@ -117,7 +117,7 @@ alias pc='patool create'
 alias pe='patool extract'
 alias px='patool extract'
 alias pl='patool list'
-alias xs='xtosubdir'
+alias xs='xtodir'
 #+end_src
 
 ** Root commands without password
@@ -1068,7 +1068,7 @@ anpca 'm:!mediainfo-color "$nnn"'
 # anpca 'q:!clear && audio-quality "$nnn"'
 # anpca 'E:!echo-files "$nnn"'
 anpca 'o:launch4nnn'
-anpca 'x:xtosubdir4nnn'
+anpca 'x:xtodir-nnn'
 anpca 's:dusum4nnn'
 # anpca 'a:!archive "$nnn"'
 # anpca 'c:!archive -11 "$nnn"'
@@ -1222,30 +1222,30 @@ else
 fi
 #+end_src
 
-**** xtosubdir4nnn
+**** xtodir-nnn
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "xtosubdir4nnn")
+:header-args:shell+: :tangle (tdir "xtodir-nnn")
 :END:
 
 #+begin_src shell
-command -v xtosubdir >/dev/null || {
+command -v xtodir >/dev/null || {
     notify-send -a 'NNN plugin' \
                 "Unable to exectute plugin \"${0}\"" \
-                '"xtosubdir" command not found.'
+                '"xtodir" command not found.'
     exit 1
 }
 
 selection=${NNN_SEL:-${XDG_CONFIG_HOME:-$HOME/.config}/nnn/.selection}
 
 if [ -s "$selection" ]; then
-    xargs -0 xtosubdir < "$selection"
+    xargs -0 xtodir < "$selection"
 
     # Clear selection
     if [ -p "$NNN_PIPE" ]; then
         printf "-" > "$NNN_PIPE"
     fi
 else
-    xtosubdir "$1"
+    xtodir "$1"
 fi
 #+end_src
 
