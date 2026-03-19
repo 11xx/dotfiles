@@ -252,7 +252,7 @@ windowrule = match:class steam_app_2622380, match:title ELDEN RING NIGHTREIGN, r
 # File Managers
 windowrule = match:class org.kde.ark, match:title ^(File Already Exists).*Ark$, float on
 windowrule = match:class org.kde.dolphin, match:title ^(Choose Application).*Dolphin$, float on
-windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on
+windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on, size 1500 900
 
 # Firefox
 # Empty title notifications (popups with no text)
@@ -538,9 +538,11 @@ bind = SUPER ALT, menu, exec, hyprctl switchxkblayout "$(pgrep -x xremap >/dev/n
 
 bind = SUPER CTRL ALT, period, exec, tofimoji
 
-bind = SUPER CTRL ALT, M, exec, [float; stayfocused] terminal -w 120 -h 20 --float pulsemixer
+bind = SUPER CTRL ALT, M, exec, [float; stayfocused] terminal -w 120 -h 20 --float wiremix
 
 bind = ALT, F4, exec, notify-send lmao
+
+bind = SUPER CTRL ALT, D, exec, aria2-dragdrop
 #+end_src
 
 # ## Issues
@@ -918,6 +920,26 @@ windowrule = immediate on, match:class love, match:title Freesync test
 #+begin_src hyprlang-ts :tangle hyprland.conf
 source = enable-tearing.conf
 #+end_src
+
+** misc-snippets.conf
+:PROPERTIES:
+:header-args:hyprlang-ts: :tangle misc-snippets.conf
+:END:
+
+Different config options for e.g. specific programs that are better better
+coupled together, such as =windowrule= + =bind=.
+
+Source in main =hyprland.conf=
+#+begin_src hyprlang-ts :tangle hyprland.conf
+source = misc-snippets.conf
+#+end_src
+
+Clipboard manager
+#+begin_src hyprlang-ts
+windowrule = match:class com.github.hluk.copyq, float on
+bind = SUPER, grave, exec, copyq toggle
+#+end_src
+
 
 * =hypridle.conf=: Idle management daemon
 :PROPERTIES:
