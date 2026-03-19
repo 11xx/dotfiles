@@ -1,0 +1,99 @@
+{
+  "openFileKb": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_F5"
+  },
+  "key_close": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_DELETE"
+  },
+  "key_savePage": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_INSERT"
+  },
+  "key_restoreLastClosedTabOrWindowOrSession": {
+    "modifiers": "accel,alt,shift",
+    "key": "?"
+  },
+  "key_closeWindow": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_END"
+  },
+  "goBackKb": {
+    "modifiers": "accel,alt,shift",
+    "key": "B"
+  },
+  "goForwardKb": {
+    "modifiers": "accel,alt,shift",
+    "key": "F"
+  },
+  "zen-new-unsynced-window": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_F2"
+  },
+  "key_newNavigator": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_F1"
+  },
+  "key_privatebrowsing": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_F3"
+  },
+  "focusURLBar": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_F4"
+  },
+  "key_fullZoomReset": {
+    "modifiers": "accel,alt,shift",
+    "key": ")"
+  },
+  "key_showAllTabs": {
+    "modifiers": "accel,alt,shift",
+    "key": "("
+  },
+  "zen-workspace-forward": {
+    "modifiers": "accel,alt",
+    "key": "E"
+  },
+  "zen-workspace-backward": {
+    "modifiers": "accel,alt",
+    "key": "Q"
+  },
+  "key_openDownloads": {
+    "modifiers": "accel,alt,shift",
+    "key": "D"
+  },
+  "key_openAddons": {
+    "modifiers": "accel,alt,shift",
+    "key": "E"
+  },
+  "key_browserToolbox": {},
+  "key_viewInfo": {
+    "modifiers": "accel,alt,shift",
+    "key": "I"
+  },
+  "goHome": {
+    "modifiers": "accel,alt,shift",
+    "keycode": "VK_HOME"
+  },
+  "key_toggleToolbox": {},
+  "key_aboutProcesses": {},
+  "key_browserConsole": {},
+  "key_responsiveDesignMode": {},
+  "key_toggleToolboxF12": {},
+  "key_inspector": {},
+  "key_webconsole": {},
+  "key_jsdebugger": {},
+  "key_netmonitor": {},
+  "key_styleeditor": {},
+  "key_performance": {},
+  "key_storage": {},
+  "key_dom": {},
+  "key_accessibility": {},
+  "key_find": {},
+  "key_findAgain": {},
+  "key_undoCloseWindow": {
+    "modifiers": "accel,alt,shift",
+    "key": "\""
+  }
+}

@@ -10,78 +10,82 @@ keymap:
         - Thorium-browser # X11
         - org.musicbrainz.Picard
         - zen
-    exact_match: true # required for not conflicting with
-                      # SUPER+MOD+[...]  that would otherwise be
-                      # interpreted by the window manager
+    exact_match: true # avoid WM conflicts with SUPER+MOD+...
     remap:
-      # Cursor
       C-b: { with_mark: left }
       C-f: { with_mark: right }
       C-p: { with_mark: up }
       C-n: { with_mark: down }
-      # Forward/Backward word
       M-b: { with_mark: C-left }
       M-f: { with_mark: C-right }
-      # Beginning/End of line
       C-a: { with_mark: home }
       C-e: { with_mark: end }
-      # Page up/down
       M-v: { with_mark: pageup }
       C-v: { with_mark: pagedown }
-      # Beginning/End of file
-      M-Shift-comma: { with_mark: C-home }
-      M-Shift-dot: { with_mark: C-end }
-      # Newline
+      M-SHIFT-comma: { with_mark: C-home }
+      M-SHIFT-dot: { with_mark: C-end }
       C-m: enter
-      C-j: enter
-      C-o: [enter, left]
-      # Copy
+      C-j: SHIFT-enter
+      C-o: [SHIFT-enter, left]
       C-w: [C-x, { set_mark: false }]
       M-w: [C-c, { set_mark: false }]
       C-y: [C-v, { set_mark: false }]
-      # Delete
       C-d: [delete, { set_mark: false }]
       M-d: [C-delete, { set_mark: false }]
-      # Kill line
-      C-k: [Shift-end, C-x, { set_mark: false }]
-      # Kill word backward
+      C-k: [SHIFT-end, C-x, { set_mark: false }]
       Alt-backspace: [C-backspace, {set_mark: false}]
-      # set mark next word continuously.
-      C-M-space: [C-Shift-right, {set_mark: true}]
-      # Undo
+      C-M-space: [C-SHIFT-right, {set_mark: true}]
       C-slash: [C-z, { set_mark: false }]
-      C-Shift-ro: C-z
-      # Mark
+      C-SHIFT-ro: C-z
       C-space: { set_mark: true }
-      # Search
-      C-s: C-f
-      C-r: Shift-F3
-      M-Shift-5: C-h
-      # Cancel
+      C-s: f3
+      C-r: SHIFT-f3
       C-g: [esc, { set_mark: false }]
-      # C-x YYY
-      # Tabs
       M-p: C-pageup
       M-n: C-pagedown
-      # C-slash: C-shift-t
-      # C-k: C-w
-      C-M-b: M-left
-      C-M-f: M-right
-      C-slash: C-shift-t # undo close tab
-      C-M-k: C-w # close tab
-      M-shift-b: M-left
-      M-shift-f: M-right
+      C-M-k: C-M-SHIFT-delete # close tab
+      M-SHIFT-b: M-left
+      M-SHIFT-f: M-right
       C-x:
+      - name: C-x chord
         remap:
-          # C-x h (select all)
-          h: [C-home, C-a, { set_mark: true }]
-          # C-x C-f (open)
-          C-f: C-o
-          # C-x C-s (save)
-          C-s: C-s
+          h: [C-home, C-a, { set_mark: true }] # C-x h (select all)
+          C-f: C-t # New Tab
+          C-w: C-M-SHIFT-insert # Save Page As...
           # C-x k (kill tab)
           k: C-f4
           # C-x C-c (exit)
-          C-c: C-q
+          C-c: C-M-SHIFT-q
           # C-x u (undo)
-          u: [C-z, { set_mark: false }]
+          u: C-M-SHIFT-slash
+          "4":
+          - name: Window actions
+            remap:
+              "0": C-M-SHIFT-end # kill window
+          "5":
+          - name: Window actions
+            remap:
+              u: C-M-SHIFT-apostrophe
+          t:
+            remap:
+              u: C-M-SHIFT-slash
+          M-b: C-M-SHIFT-b
+          M-f: C-M-SHIFT-f
+          x:
+            remap:
+              g: f5
+      C-c:
+        remap:
+          d: C-M-SHIFT-d
+          i: C-M-SHIFT-i
+          e:
+          - name: Extensions
+            remap:
+              tab: C-M-SHIFT-e
+          z:
+          - name: Zen Browser features
+            application:
+              only: zen
+            remap:
+              c: C-M-SHIFT-c
+              s: C-M-SHIFT-s

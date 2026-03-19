@@ -205,6 +205,10 @@ This can also be used for renaming a profile directory.
 
 =user.js= is for =user_pref=. =autoconfig.js= is for injection.
 
+** Recommendations
+- [[https://github.com/arkenfox/user.js/wiki/4.1-Extensions][4.1 Extensions · arkenfox/user.js Wiki]]
+  # [2026-03-13 Fri 18:55:55 -03] @ak
+
 * TODO AutoConfig                                         :ignore:noexport:
 :PROPERTIES:
 :header-args:typescript: :tangle no

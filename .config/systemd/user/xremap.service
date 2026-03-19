@@ -5,10 +5,12 @@ PartOf=graphical-session.target
 
 [Service]
 Type=exec
-ExecStart=%h/.local/bin/xremap-default --service
+ExecStart=sh -c 'xremap-default --service'
 Restart=always
 RestartSec=3
 SyslogIdentifier=xremap-emacs-browser
+StandardOutput=append:%t/xremap.log
+StandardError=inherit
 
 [Install]
 WantedBy=graphical-session.target
