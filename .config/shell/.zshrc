@@ -32,6 +32,8 @@ zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
+# [[ -z $DEBUG ]] && source /usr/share/zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh
+[[ -z $DEBUG ]] && source /usr/share/zsh/plugins/zsh-autopair/autopair.zsh
 
 source "$XDG_CONFIG_HOME/shell/aliases"
 
