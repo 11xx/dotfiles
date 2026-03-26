@@ -257,7 +257,7 @@ In =about:config= set =widget.use-xdg-desktop-portal.file-picker= to =1=.
 - [[https://forum.endeavouros.com/t/transparencies-in-kvantum-eos-kde/56168/5][Transparencies in Kvantum EOS KDE - Desktop Environments / Plasma - EndeavourOS]]
 
 Make sure to set /either/ kvantum-dark or qt6ct on =plasma-open-settings=
-> =Colors & Thems= > =Application Style=.
+> =Colors & Themes= > =Application Style=.
 # [2024-09-10 Tue 13:22:26 -03] @ak
 *** pcmanfm-qt doesn't show icons
 - [[https://forum.endeavouros.com/t/pcmanfm-qt-doesnt-show-icons/4854/8][Pcmanfm-qt doesn't show icons - Desktop Environments / Lxqt - EndeavourOS]]
@@ -351,7 +351,13 @@ implementation and exposed by =xdg-desktop-portal=:
   + [[file:~/.local/share/light-mode.d]]
   + [[file:~/.local/share/dark-mode.d]]
 
-Helper functions for checking and setup
+** Shared functions library
+:PROPERTIES:
+:header-args:shell: :mkdirp yes :tangle-mode o644 :tangle ~/.local/share/shlib/darkman_helpers.sh
+:END:
+
+Helper functions used by multiple of the scripts
+
 #+NAME: darkman-helper-functions
 #+begin_src shell
 check_file() {
@@ -371,66 +377,28 @@ running_check() {
 running_check_killall() {
     running_check "$1" && killall "$1" --quiet
 }
+
+set_ini_key() {
+    local file="$1" section="$2" key="$3" value="$4"
+    awk -v sec="[$section]" -v k="$key" -v v="$value" '
+        BEGIN { OFS="="; in_sec=0; done=0 }
+        /^\[/ {
+            if ($0 == sec) { in_sec=1; print; print k, v; done=1; next }
+            in_sec=0
+        }
+        in_sec && $0 ~ "^" k "=" { next }
+        { print }
+        END { if (!done) { print ""; print sec; print k, v } }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+}
 #+end_src
-
-** GTK and Qt
-
-- Light
-#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme light
-gsettings set org.gnome.desktop.interface gtk-theme Adwaita
-gsettings set org.gnome.desktop.interface color-scheme prefer-light
-
-# icon theme too ?
-
-# `--platform offscreen' is necessary since this script will be run by systemd
-plasma-apply-colorscheme --platform offscreen KvGnome
-#+end_src
-
-- Dark
-#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme dark
-gsettings set org.gnome.desktop.interface gtk-theme Adwaita-dark
-gsettings set org.gnome.desktop.interface color-scheme prefer-dark
-
-plasma-apply-colorscheme --platform offscreen KvGnomeDark
-#+end_src
-
-*** QGnomePlatform environment variable wrappers
-:PROPERTIES:
-:tangle-dir: (expand-file-name "qt-platform-theme-wrappers" (xdg-data-home))
-:header-args:bash: :tangle-mode o775 :mkdirp yes
-:header-args:python: :tangle-mode o775 :mkdirp yes
-:CUSTOM_ID: orgid-jwzzky
-:END:
-
-- picard: MusicBrainz Picard's launcher is just a Python script, NOTE:
-  *do not* try to wrap the system provided one using a shell script or
-  it will cause an infinite loop of processes spawning (though they do
-  nothing). Instead set the environment variable in Python and just
-  copy over rest of the launcher script.
-  #+begin_src python :tangle (tdir "picard")
-  #!/usr/bin/python3
-  import os
-  os.environ['QT_QPA_PLATFORMTHEME'] = 'gnome'
-
-  # rest is the same from /usr/bin/picard:
-  try:
-      from picard.tagger import main
-      main('/usr/share/locale', True)
-  except SystemExit:
-      raise  # Just continue with a normal application exit
-  except:  # noqa: E722,F722 # pylint: disable=bare-except
-      from picard import crash_handler
-      crash_handler()
-      raise
-  #+end_src
-
 
 ** Dunst: Notification server
 The themed versions of =dunstrc= are named =dunstrc-dark= and
 =dunstrc-light= and should be present in the same directory.
 #+NAME: dunst-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 check_cmd dunst
 
@@ -470,7 +438,7 @@ override_dunstrc "${dunstrcDark}"
 
 #+NAME: mako-setup
 #+begin_src shell :tangle no
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 check_cmd mako
 check_cmd busctl
@@ -530,7 +498,7 @@ mako_source_theme dark
 ** Wallpaper
 #+NAME: wallpaper-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 check_cmd swaybg
 
@@ -583,7 +551,7 @@ it sources a written file.
 Actual theming done & prepared withing Hyprland's directory.
 #+NAME: hyprland-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 hyprDir=${XDG_CONFIG_HOME}/hypr
 themeConfFile=${hyprDir}/themes/theme.conf
@@ -623,7 +591,7 @@ hyprland_source_theme dark
 Setup that will be used in both scripts:
 #+NAME: darkman-eww-mainbar-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 
 ewwDir=${XDG_CONFIG_HOME}/eww
@@ -701,7 +669,7 @@ theme=neron-dark
 
 #+NAME: darkman-tofi-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 tofiDir=${XDG_CONFIG_HOME}/tofi
 
@@ -736,7 +704,7 @@ tofi_replace_include_theme
 ** xsettingsd: XSETTINGS daemon
 #+NAME: darkman-xsettingsd-setup
 #+begin_src shell
-«darkman-helper-functions»
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 xsettingsdConf=${XDG_CONFIG_HOME:-$HOME/.config}/xsettingsd/xsettingsd.conf
 
@@ -773,3 +741,104 @@ sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
 Environment=WAYLAND_DISPLAY=wayland-1
 #+end_src
 
+
+* GTK & Qt: Uniform look & live theme change
+
+** QT live change outside of KDE
+:PROPERTIES:
+:header-args:conf: :tangle (expand-file-name "environment.d/gtk-qt.conf" (xdg-config-home))
+:header-args:shell+: :tangle setup-modules/gtk-qt.sh
+:CUSTOM_ID: orgid-twrkwj
+:END:
+
+- See the notes about this setup:
+  + [[file:~/.config/darkman/README.org::#orgid-tjunht][darkman: GTK & QT: Uniform look and live theme change]]
+
+Make Qt apps listen to =plasma-apply-colorscheme=
+#+begin_src conf
+QT_QPA_PLATFORMTHEME=qt6ct
+#+end_src
+
+Make GTK apps use a different file picker and read settings form the
+portal depending on the XDG Desktop Portal (e.g. KDE's).
+- *NOTE*:
+  + To use this install =xdg-desktop-portal-gtk=.
+    # [2024-09-07 Sat 12:54:06 -03] @ak
+  + This may break more GTK apps than help and since
+    =xdg-desktop-portal= doesn't really (yet) respect the config file
+    order and it may cause slowdowns at Window Manager's startup.
+    * See note in:
+      - [[file:~/.config/xdg-desktop-portal/README.org::#orgid-uxoxxl][GTK apps lost font rendering, cursor theme or other settings]]
+  + An alternative to this is to enable it on specific programs that
+    should use it instead of enabling globally.
+
+#+begin_src conf
+PATH=${XDG_DATA_HOME}/qt-platform-theme-wrappers:${PATH}
+#+end_src
+
+** Scripts
+:PROPERTIES:
+:header-args:shell: :mkdirp yes :shebang #!/usr/bin/env sh :noweb no-export
+:END:
+
+- setup
+
+#+NAME: qt-gtk-setup
+#+begin_src shell :tangle no
+source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
+
+gsettings_plasma() {
+    if ! printf '%s' "$1" | grep -qEi 'light|dark'; then
+        printf 'Error: gsettings_plasma argument must be "dark" or "light"' >&2
+        return 1
+    fi
+
+    gsettings set org.gnome.desktop.interface color-scheme prefer-"${1}"
+    gsettings set org.gnome.desktop.interface gtk-theme "${gtkTheme}"
+    plasma-apply-colorscheme --platform offscreen "${qtTheme}"
+}
+
+qtct() {
+    qt6conf=~/.config/qt6ct/qt6ct.conf
+    qt5conf=~/.config/qt5ct/qt5ct.conf
+    set_ini_key "${qt6conf}" Appearance icon_theme "${iconTheme}"
+    set_ini_key "${qt6conf}" Appearance style "${gtkTheme}"
+    set_ini_key "${qt5conf}" Appearance icon_theme "${iconTheme}"
+    set_ini_key "${qt5conf}" Appearance style "${gtkTheme}"
+}
+#+end_src
+
+- Light
+#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme light
+«qt-gtk-setup»
+
+gtkTheme=Adwaita
+qtTheme=KvGnome
+iconTheme=Papirus
+
+qtct
+gsettings_plasma light
+#+end_src
+
+- Dark
+#+begin_src shell :tangle (darkmandir "gtk-qt.sh") :theme dark
+«qt-gtk-setup»
+
+gtkTheme=Adwaita-dark
+qtTheme=KvGnomeDark
+iconTheme=Papirus-Dark
+
+qtct
+gsettings_plasma dark
+#+end_src
+
+*** TODO QGnomePlatform environment variable wrappers
+:PROPERTIES:
+:tangle-dir: (expand-file-name "qt-platform-theme-wrappers" (xdg-data-home))
+:header-args:bash: :tangle-mode o775 :mkdirp yes
+:header-args:python: :tangle-mode o775 :mkdirp yes
+:CUSTOM_ID: orgid-jwzzky
+:END:
+
+
+*** qt5ct update
