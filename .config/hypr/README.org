@@ -253,6 +253,7 @@ windowrule = match:class steam_app_2622380, match:title ELDEN RING NIGHTREIGN, r
 windowrule = match:class org.kde.ark, match:title ^(File Already Exists).*Ark$, float on
 windowrule = match:class org.kde.dolphin, match:title ^(Choose Application).*Dolphin$, float on
 windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on, size 1500 900
+windowrule = match:class pcmanfm-qt, match:title Removable medium is inserted, float on
 
 # Firefox
 # Empty title notifications (popups with no text)
@@ -264,6 +265,8 @@ windowrule = match:class ^()$, match:title ^()$, no_blur on
 
 # Inkscape
 windowrule = match:class org.inkscape.Inkscape, match:title ^(SVG Input)$, float on
+
+windowrule = match:initial_class ^(dragon-drop)$, float on, pin on
 #+end_src
 
 #+begin_src hyprlang-ts :tangle hyprland.conf
@@ -364,8 +367,8 @@ bind = SUPER, X, submap, exemap
   bind = , space, exec, $(tofi-run)
   bind = , space, submap, reset
 
-  bind = , C, killactive, # for kill with M-x c
-  bind = , C, submap, reset
+  bind = , D, exec, dolphin
+  bind = , D, submap, reset
 
   bind = SUPER, C, killactive, # for kill with M-x M-c
   bind = SUPER, C, submap, reset
