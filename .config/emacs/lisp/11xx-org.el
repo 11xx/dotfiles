@@ -1,4 +1,6 @@
 ;; -*- lexical-binding: t; -*-
+(setq org-modules '(ol-info ol-docview ol-doi))
+
 (require '11xx-org-functions)
 ;; (setup org
 ;;   ;; Disable angle bracket syntax highlighting/matching
@@ -8,30 +10,22 @@
 
 (setup (:elpaca org-contrib)
   (:load-after org)
-  (require 'org-eldoc))
-;; `org-eldoc' shows the inherited code block properties.
+  (require 'org-eldoc) ; shows inherited code block properties
+  )
 
 (setup org
   (:with-map org-mode-map
     (:bind
      "C-c C-;" org-babel-repeat-previous-src-block
-     ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
      "C-M-p" org-previous-visible-heading ; was `backward-list'
      "C-M-n" org-next-visible-heading ; was `forward-list'
      "C-c o t l" org-toggle-link-display
-     ;; Meta indentation ; `S' for Shift not working for some reason
+     ;; Meta indentation
      "M-F" org-metaright
      "M-B" org-metaleft
      "M-P" org-metaup
      "M-N" org-metadown
-     ;; Cursor
-     ;; "C-M-d" ; was down-list
-     "C-M-d" backward-delete-char ; was down-list
-     "M-D" backward-kill-word
-     ;; "M-h"   backward-delete-char ; was `org-mark-element'
-     ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
      "C-c o p" org-kill-full-outline-path))
-
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
@@ -71,29 +65,21 @@
     (add-to-list 'org-structure-template-alist begin))
 
   (setopt
- ;;; Org mode version 9.5:
-   ;; ~org-adapt-indentation~ now defaults to ~nil~
-   org-adapt-indentation nil ;; testing nil [2022-03-31 Thu 07:34:31]
-   ;;; UI
+   org-edit-src-content-indentation 0
+   org-adapt-indentation nil
    org-ellipsis " ▾"
-   ;;; Properties
-   ;; org-use-property-inheritance t ; Apparently slows down searches when on.
-   ;;; Default header-args for evaluation
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
-   ;; Edit src blocks in the current window instead of split
    org-src-window-setup 'current-window)
-
-;; Visual Fill Column
-;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(setup (:elpaca visual-fill-column)
-  (:load-after org)
-  (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
-          visual-fill-column-center-text t))
 
 (setup (:elpaca org-bulletproof)
   (:load-after org)
   (:hook-into org-mode))
+(setup (:elpaca visual-fill-column)
+  (:load-after org)
+  (:global-set "C-c d c" visual-fill-column-mode)
+  (setopt visual-fill-column-width 130 ; `display-fill-column-indicator-mode's width
+          visual-fill-column-center-text t))
 (defun f/org-export-dispatch-disable-whitespace-mode (&rest args)
   "Disable `whitespace-mode' for the Org Export Dispatch Buffer."
   (let ((buf (get-buffer "*Org Export Dispatcher*")))
@@ -129,12 +115,6 @@
           htmlize-face-overrides '(whitespace-missing-newline-at-eof
                                    (:foreground nil :background nil))))
 (setup (:elpaca ox-gfm))
-(elpaca (ox-html-stable-ids :host github
-                            :repo "jeffkreeftmeijer/ox-html-stable-ids.el")
-  (require 'ox-html-stable-ids)
-  (setopt org-html-stable-ids t
-          org-export-html-stable-ids t)
-  (org-html-stable-ids-add))
 
 (elpaca (ox-md-title :host github
                      :repo "jeffkreeftmeijer/ox-md-title.el")
@@ -197,170 +177,8 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (interactive)
   (readme-to-markdown "README.md"))
 
-;;; stable IDs for list-item 
-
-;; (defun f/slugify (s)
-;;   "GitHub-style slug: lower-case ASCII, spaces & punctuation → “-”."
-;;   (when (and (stringp s) (string-match-p "\\S-" s))
-;;     (setq s (downcase s))
-;;     (setq s (replace-regexp-in-string "[^[:alnum:]#]+" "-" s)) ; keep “#” for now
-;;     (replace-regexp-in-string "[#]" "-" (replace-regexp-in-string "^-\\|-$" "" s))))
-
-;; Add a hash table to track used IDs during export
-(defvar v/used-ids-table nil
-  "Hash table to track used IDs during export to prevent conflicts.")
-
-;; Add a cache for heading-to-ID mapping to ensure consistency
-(defvar v/heading-id-cache nil
-  "Hash table to cache heading title to ID mappings for consistency.")
-
-(defun f/slugify (s)
-  "GitHub-style slug: preserve more characters, but convert problematic ones."
-  (when (and (stringp s) (string-match-p "\\S-" s))
-    (setq s (downcase s))
-    ;; Convert only truly problematic characters to hyphens
-    (setq s (replace-regexp-in-string "[[:space:]#<>\"'&]+" "-" s))
-    (replace-regexp-in-string "^-\\|-$" "" s)))
-
-(defun f/extract-first-target (item info)
-  "Return the first  object inside ITEM or nil."
-  (org-element-map (org-element-contents item) '(target radio-target)
-    #'identity info 'first-match))
-
-(defun f/get-heading-path (datum)
-  "Get the path to a heading as a list of ancestor headings."
-  (let ((path '())
-        (current datum))
-    (while (setq current (org-element-property :parent current))
-      (when (eq (org-element-type current) 'headline)
-        (push (org-element-property :raw-value current) path)))
-    path))
-
-(defun f/get-heading-cache-key (datum)
-  "Generate a cache key for a heading based on its title and position."
-  (let* ((title (org-element-property :raw-value datum))
-         (path (f/get-heading-path datum)))
-    ;; Create a unique key combining title and parent path
-    (concat (mapconcat 'identity (reverse path) "/")
-            (if path "/" "")
-            title)))
-
-(defun f/ensure-unique-id (base-id datum)
-  "Ensure BASE-ID is unique, adding disambiguation if needed."
-  (unless v/used-ids-table
-    (setq v/used-ids-table (make-hash-table :test 'equal)))
-  (unless v/heading-id-cache
-    (setq v/heading-id-cache (make-hash-table :test 'equal)))
-
-  ;; For headlines, check cache first for consistency
-  (when (eq (org-element-type datum) 'headline)
-    (let ((cache-key (f/get-heading-cache-key datum)))
-      (when-let ((cached-id (gethash cache-key v/heading-id-cache)))
-        ;; If we already determined an ID for this heading, use it
-        (puthash cached-id t v/used-ids-table)
-        ;; Return the cached ID directly instead of using cl-return-from
-        (setq base-id cached-id)
-        (setq datum nil)))) ; Signal that we should return immediately
-
-  ;; Only proceed if we didn't find a cached result
-  (when datum
-    (let ((final-id base-id)
-          (counter 1)
-          (path (f/get-heading-path datum)))
-
-      ;; Check if base-id is already used
-      (while (gethash final-id v/used-ids-table)
-        ;; Try with parent context first (if available and not too long)
-        (when (and path (= counter 1))
-          (let ((parent-slug (f/slugify (car (last path)))))
-            (when (and parent-slug (< (+ (length parent-slug) (length base-id)) 50))
-              (setq final-id (concat parent-slug "-" base-id))
-              (setq counter 2)
-              (if (not (gethash final-id v/used-ids-table))
-                  (setq counter 999))))) ; Exit loop if parent-context works
-
-        ;; If parent context didn't work or we're past first attempt, use numbers
-        (when (< counter 999)
-          (setq final-id (format "%s-%d" base-id counter))
-          (setq counter (1+ counter))))
-
-      ;; Register the final ID
-      (puthash final-id t v/used-ids-table)
-
-      ;; Cache the result for headlines to ensure TOC consistency
-      (when (eq (org-element-type datum) 'headline)
-        (let ((cache-key (f/get-heading-cache-key datum)))
-          (puthash cache-key final-id v/heading-id-cache)))
-
-      (setq base-id final-id)))
-
-  base-id)
-
-(defun f/stable-id–around (orig datum info)
-  "Supply deterministic IDs for list items, targets, tables, headings with conflict resolution."
-  (pcase (org-element-type datum)
-
-    ;; 1. A stand-alone  object --------------------------
-    ((or 'target 'radio-target)
-     (let* ((raw   (org-element-property :value datum))       ; 
-            (clean (and raw (replace-regexp-in-string "[<>]" "" raw))) ; foo
-            (base-slug (f/slugify clean)))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 2. A list ITEM that *contains* a  ---------------
-    ('item
-     (if-let* ((tgt (f/extract-first-target datum info))
-               (raw (org-element-property :value tgt))
-               (clean (replace-regexp-in-string "[<>]" "" raw))
-               (base-slug (f/slugify clean)))
-         (f/ensure-unique-id base-slug datum)
-       (funcall orig datum info)))
-
-    ;; 3. A table with #+NAME: ------------------------------------
-    ('table
-     (let* ((name (org-element-property :name datum))
-            (base-slug (and name (f/slugify name))))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 4. Headlines -----------------------------------------------
-    ('headline
-     (let* ((title (org-element-property :raw-value datum))
-            (base-slug (f/slugify title)))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 5. Anything else → keep package's behaviour ---------------
-    (_ (funcall orig datum info))))
-
-;; Clear the hash tables before each export
-(defun f/clear-ids-table (&rest _)
-  "Clear the used IDs table and heading cache before export."
-  (setq v/used-ids-table (make-hash-table :test 'equal))
-  (setq v/heading-id-cache (make-hash-table :test 'equal)))
-
-;; Hook to clear the tables before export starts
-(add-hook 'org-export-before-processing-functions #'f/clear-ids-table)
-
-;; Suppress noisy org-babel messages during export
-(defun f/suppress-babel-messages (orig-fun &rest args)
-  "Suppress org-babel messages during export."
-  (let ((inhibit-message t)
-        (message-log-max nil))
-    (apply orig-fun args)))
-
-;; Apply message suppression to common babel functions
-(advice-add 'org-babel-exp-src-block :around #'f/suppress-babel-messages)
-(advice-add 'org-fontify-like-in-org-mode :around #'f/suppress-babel-messages)
-
-;; Your existing advice with increased depth for priority
-(advice-add 'org-export-get-reference
-            :around #'f/stable-id–around
-            '((depth . -95)))
+(require 'org-stable-ids)
+(org-stable-ids-setup)
 ;; Publish
 (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
   (unless (file-exists-p dir) (make-directory dir t))
@@ -375,9 +193,8 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (with-eval-after-load 'ox-publish
     (require '11xx-org-publish)))
 (setup ob-lob
-  (:with-mode org-mode
-    (:match-file "*.org.setup" "*.setup"))
-  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup"))
-
+  (:load-after org)
+  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup")
+  (require 'org-bitwarden))
 
 (provide '11xx-org)

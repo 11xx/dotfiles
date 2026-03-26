@@ -38,7 +38,11 @@ Here are some complete configuration examples:
 
 Add subdirectory to load path containing custom modules.
 #+begin_src emacs-lisp
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+(defvar config-lisp-directory
+  (expand-file-name "lisp/" user-emacs-directory)
+  "Directory containing local configuration Lisp source files.")
+
+(add-to-list 'load-path config-lisp-directory)
 #+end_src
 
 ** Elpaca package manager bootstrap & setup.el
@@ -357,6 +361,18 @@ Adress =:global= deprecation:
 #+end_src
 
 
+****** :config
+#+begin_src emacs-lisp
+(setup-define :config
+  (lambda (&rest body)
+    `(with-eval-after-load ',(setup-get 'feature)
+       ,@body))
+  :documentation "Defer BODY until the current feature is actually loaded.
+Analogous to use-package's :config — runs on first require, not on elpaca activation."
+  :debug '(&rest form)
+  :repeatable nil)
+#+end_src
+
 ** Clean Emacs directory
 #+begin_src emacs-lisp
 (require 'clean-emacs-user-directory)
@@ -480,7 +496,7 @@ Increase Garbage Collection threshold:
 - [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
 - [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
 #+begin_src emacs-lisp
-(setq gc-cons-threshold (* 1000 8 2 100)) ; (* 1000 8) (8KB) is the default
+(setq gc-cons-threshold (* 500 1024 1024))
 (add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 #+end_src
 
@@ -499,6 +515,38 @@ Increase Garbage Collection threshold:
              gcs-done)))
 #+end_src
 
+** Load autoloads
+#+begin_src emacs-lisp
+(defun loaddefs-setup (&optional lisp-dir)
+  "Ensure autoloads for LISP-DIR are current, then load them.
+
+Scans LISP-DIR (default: `config-lisp-directory') for `;;;###autoload'
+cookies via `loaddefs-generate', skipping regeneration when the output
+file is newer than all source files.  The generated file is stored in
+`no-littering-var-directory' and LISP-DIR is added to `load-path'."
+  (require 'cl-lib)
+  (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
+         (out (expand-file-name "config-loaddefs.el"
+                                no-littering-var-directory))
+         (sources (directory-files dir t "\\.el\\'"))
+         (out-attrs (and (file-exists-p out) (file-attributes out)))
+         (out-mtime  (and out-attrs
+                          (file-attribute-modification-time out-attrs))))
+    (add-to-list 'load-path dir)
+    (when (or (not out-mtime)
+              (cl-some (lambda (f)
+                         (time-less-p
+                          out-mtime
+                          (file-attribute-modification-time
+                           (file-attributes f))))
+                       sources))
+      (loaddefs-generate dir out))
+    (load out nil :nomessage)))
+
+(loaddefs-setup config-lisp-directory)
+#+end_src
+
+
 ** Load config
 Personal config modularized into "pseudo-packages"
 #+begin_src emacs-lisp
@@ -510,12 +558,17 @@ Personal config modularized into "pseudo-packages"
 (require '11xx-navigation)
 (require '11xx-half-scroll)
 (require '11xx-pixel-scroll)
-(require '11xx-dired)
+
+(setup 11xx-dired
+  (:load-after dired))
 (require '11xx-magit)
-(require '11xx-org)
+(setup 11xx-org
+  (:load-after org))
+
 (require '11xx-modes)
-(require 'llm-ai-assistants)
-(require '11xx-pdf-viewer)
+;; (run-with-idle-timer 3 nil #'require '11xx-modes)
+(run-with-idle-timer 5 nil #'require 'llm-ai-assistants)
+(run-with-idle-timer 2 nil #'require '11xx-pdf-viewer)
 #+end_src
 
 * 11xx-defaults.el: New defaults
@@ -560,8 +613,7 @@ Personal config modularized into "pseudo-packages"
    "C-c M-t"    toggle-truncate-lines
    ;; Insert text
    "C-c i t" f/current-timestamp-insert
-   ;; UI Changes
-   "C-c d c" visual-fill-column-mode
+
    "C-x C-z" org-set-property
    "C-z" org-set-property
    ;; [[https://www.emacswiki.org/emacs/WindowResize][EmacsWiki: Window Resize]] [2022-04-20 Wed 02:50:51]
@@ -765,19 +817,10 @@ tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
 tab-always-indent t ; when using the TAB key
 #+end_src
 
-Remove leading padding indentation for content inside code blocks
 #+begin_src emacs-lisp
-org-edit-src-content-indentation 0
+fill-column 79
 #+end_src
 
-Keep indentation when tangling src code blocks, see [[https://emacs.stackexchange.com/questions/62602/how-do-i-keep-the-indentation-on-org-babel-tangle/62613#62613][org mode - How do
-I keep the indentation on org-babel-tangle? - Emacs Stack Exchange]].
-#+begin_src emacs-lisp
-org-src-preserve-indentation nil  ; default is nil
-#+end_src
-Changed back to the default (nil) because it was useful only in
-specific cases and it can be enabled buffer-only, with local
-variables.
 
 start up behavior
 See [[https://tychoish.com/post/towards-faster-emacs-start-times/][Towards Faster Emacs Start Times#Helpful Settings]]
@@ -925,6 +968,18 @@ for unnamed (--daemon), nil for interactive sessions.")
 #+end_src
 
 
+*** mwim: Custom C-e/C-a
+:PROPERTIES:
+:header-args:emacs-lisp: :noweb-ref dummy :tangle no
+:END:
+
+#+begin_src emacs-lisp
+(setup (:elpaca mwim)
+  (:global-set "<remap> <move-beginning-of-line>" mwim-beginning
+               "<remap> <move-end-of-line>" mwim-end))
+#+end_src
+
+
 * utf-8-default.el: Use UTF-8 for all character encoding
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/utf-8-default.el :noweb-ref utf-8-default
@@ -983,10 +1038,6 @@ or
 
 #+begin_src emacs-lisp
 <<11xx-modes>>
-
-(add-hook 'prog-mode-hook
-          (lambda ()
-            (setq-local fill-column 120)))
 
 (provide '11xx-modes)
 #+end_src
@@ -1126,9 +1177,17 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 #+begin_src emacs-lisp
 (setup ron-mode
   (:elpaca ron-mode)
-  (autoload 'ron-mode "ron-mode" nil t)
-  (add-to-list 'auto-mode-alist '("\\.ron\\'" . ron-mode)))
+  (:autoload ron-mode)
+  (:match-file "*.ron"))
 #+end_src
+
+**** hyprlang/hyprland config language
+#+begin_src emacs-lisp
+(setup (:elpaca hyprlang-ts-mode)
+  (:autoload hyprlang-ts-mode)
+  (:match-file "*hyprland.conf"))
+#+end_src
+
 
 *** Minor modes
 
@@ -1348,10 +1407,13 @@ Javascript related packages
 **** TODO C
 #+begin_src emacs-lisp
 (setup cc-mode
-  ;; (electric-pair-local-mode -1) ;; #manual-smartparens
-  ;; (smartparens-mode) ;; #manual-smartparens
-  (add-hook 'c-mode-hook #'c-ts-mode)
-  )
+  (setopt c-default-style '((java-mode . "java")
+                            (awk-mode  . "awk")
+                            (other     . "k&r"))
+          c-basic-offset 2))
+
+;; (setup c-ts-mode
+;;   (setopt c-ts-mode-indent-style 'k&r))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -1815,6 +1877,8 @@ Examples:
     # [2022-05-14 Sat 20:54:33]
 
 #+begin_src emacs-lisp
+(setq org-modules '(ol-info ol-docview ol-doi))
+
 (require '11xx-org-functions)
 ;; (setup org
 ;;   ;; Disable angle bracket syntax highlighting/matching
@@ -1824,30 +1888,22 @@ Examples:
 
 (setup (:elpaca org-contrib)
   (:load-after org)
-  (require 'org-eldoc))
-;; `org-eldoc' shows the inherited code block properties.
+  (require 'org-eldoc) ; shows inherited code block properties
+  )
 
 (setup org
   (:with-map org-mode-map
     (:bind
      "C-c C-;" org-babel-repeat-previous-src-block
-     ;; "C-c C-'" org-babel-repeat-previous-src-block-reverse ;; use `org-babel-demarcate-block' instead #DONE-TO-SEND-CEMETARY
      "C-M-p" org-previous-visible-heading ; was `backward-list'
      "C-M-n" org-next-visible-heading ; was `forward-list'
      "C-c o t l" org-toggle-link-display
-     ;; Meta indentation ; `S' for Shift not working for some reason
+     ;; Meta indentation
      "M-F" org-metaright
      "M-B" org-metaleft
      "M-P" org-metaup
      "M-N" org-metadown
-     ;; Cursor
-     ;; "C-M-d" ; was down-list
-     "C-M-d" backward-delete-char ; was down-list
-     "M-D" backward-kill-word
-     ;; "M-h"   backward-delete-char ; was `org-mark-element'
-     ;; "M-H"   backward-kill-word ; was `org-mark-element' in org map
      "C-c o p" org-kill-full-outline-path))
-
 
   ;; [[https://orgmode.org/manual/Activation.html][src]]
   ;; Enable Org-mode commands to be available anywhere.
@@ -1887,29 +1943,25 @@ Examples:
     (add-to-list 'org-structure-template-alist begin))
 
   (setopt
- ;;; Org mode version 9.5:
-   ;; ~org-adapt-indentation~ now defaults to ~nil~
-   org-adapt-indentation nil ;; testing nil [2022-03-31 Thu 07:34:31]
-   ;;; UI
+   org-edit-src-content-indentation 0
+   org-adapt-indentation nil
    org-ellipsis " ▾"
-   ;;; Properties
-   ;; org-use-property-inheritance t ; Apparently slows down searches when on.
-   ;;; Default header-args for evaluation
    org-babel-default-header-args:emacs-lisp '((:lexical . yes))
    org-image-actual-width nil
-   ;; Edit src blocks in the current window instead of split
    org-src-window-setup 'current-window)
-
-;; Visual Fill Column
-;; [[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
-(setup (:elpaca visual-fill-column)
-  (:load-after org)
-  (setopt visual-fill-column-width 130 ; use with `display-fill-column-indicator-mode'
-          visual-fill-column-center-text t))
 
 (setup (:elpaca org-bulletproof)
   (:load-after org)
   (:hook-into org-mode))
+#+end_src
+
+[[https://github.com/daviwil/emacs-from-scratch/blob/master/Emacs.org#center-org-buffers][Emacs From Scratch/Emacs.org#Center Org Buffers]].
+#+begin_src emacs-lisp
+(setup (:elpaca visual-fill-column)
+  (:load-after org)
+  (:global-set "C-c d c" visual-fill-column-mode)
+  (setopt visual-fill-column-width 130 ; `display-fill-column-indicator-mode's width
+          visual-fill-column-center-text t))
 #+end_src
 
 # auto generate/export markdown version of the current org file, GitHub-flavored
@@ -2015,12 +2067,6 @@ aka literate (?hopefully)
 - [[https://jeffkreeftmeijer.com/ox-html-stable-ids/][ox-html-stable-ids: Stable IDs for ox-html.el]]
 #+begin_src emacs-lisp
 (setup (:elpaca ox-gfm))
-(elpaca (ox-html-stable-ids :host github
-                            :repo "jeffkreeftmeijer/ox-html-stable-ids.el")
-  (require 'ox-html-stable-ids)
-  (setopt org-html-stable-ids t
-          org-export-html-stable-ids t)
-  (org-html-stable-ids-add))
 
 (elpaca (ox-md-title :host github
                      :repo "jeffkreeftmeijer/ox-md-title.el")
@@ -2083,170 +2129,8 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (interactive)
   (readme-to-markdown "README.md"))
 
-;;; stable IDs for list-item <<targets>>
-
-;; (defun f/slugify (s)
-;;   "GitHub-style slug: lower-case ASCII, spaces & punctuation → “-”."
-;;   (when (and (stringp s) (string-match-p "\\S-" s))
-;;     (setq s (downcase s))
-;;     (setq s (replace-regexp-in-string "[^[:alnum:]#]+" "-" s)) ; keep “#” for now
-;;     (replace-regexp-in-string "[#]" "-" (replace-regexp-in-string "^-\\|-$" "" s))))
-
-;; Add a hash table to track used IDs during export
-(defvar v/used-ids-table nil
-  "Hash table to track used IDs during export to prevent conflicts.")
-
-;; Add a cache for heading-to-ID mapping to ensure consistency
-(defvar v/heading-id-cache nil
-  "Hash table to cache heading title to ID mappings for consistency.")
-
-(defun f/slugify (s)
-  "GitHub-style slug: preserve more characters, but convert problematic ones."
-  (when (and (stringp s) (string-match-p "\\S-" s))
-    (setq s (downcase s))
-    ;; Convert only truly problematic characters to hyphens
-    (setq s (replace-regexp-in-string "[[:space:]#<>\"'&]+" "-" s))
-    (replace-regexp-in-string "^-\\|-$" "" s)))
-
-(defun f/extract-first-target (item info)
-  "Return the first <<target>> object inside ITEM or nil."
-  (org-element-map (org-element-contents item) '(target radio-target)
-    #'identity info 'first-match))
-
-(defun f/get-heading-path (datum)
-  "Get the path to a heading as a list of ancestor headings."
-  (let ((path '())
-        (current datum))
-    (while (setq current (org-element-property :parent current))
-      (when (eq (org-element-type current) 'headline)
-        (push (org-element-property :raw-value current) path)))
-    path))
-
-(defun f/get-heading-cache-key (datum)
-  "Generate a cache key for a heading based on its title and position."
-  (let* ((title (org-element-property :raw-value datum))
-         (path (f/get-heading-path datum)))
-    ;; Create a unique key combining title and parent path
-    (concat (mapconcat 'identity (reverse path) "/")
-            (if path "/" "")
-            title)))
-
-(defun f/ensure-unique-id (base-id datum)
-  "Ensure BASE-ID is unique, adding disambiguation if needed."
-  (unless v/used-ids-table
-    (setq v/used-ids-table (make-hash-table :test 'equal)))
-  (unless v/heading-id-cache
-    (setq v/heading-id-cache (make-hash-table :test 'equal)))
-
-  ;; For headlines, check cache first for consistency
-  (when (eq (org-element-type datum) 'headline)
-    (let ((cache-key (f/get-heading-cache-key datum)))
-      (when-let ((cached-id (gethash cache-key v/heading-id-cache)))
-        ;; If we already determined an ID for this heading, use it
-        (puthash cached-id t v/used-ids-table)
-        ;; Return the cached ID directly instead of using cl-return-from
-        (setq base-id cached-id)
-        (setq datum nil)))) ; Signal that we should return immediately
-
-  ;; Only proceed if we didn't find a cached result
-  (when datum
-    (let ((final-id base-id)
-          (counter 1)
-          (path (f/get-heading-path datum)))
-
-      ;; Check if base-id is already used
-      (while (gethash final-id v/used-ids-table)
-        ;; Try with parent context first (if available and not too long)
-        (when (and path (= counter 1))
-          (let ((parent-slug (f/slugify (car (last path)))))
-            (when (and parent-slug (< (+ (length parent-slug) (length base-id)) 50))
-              (setq final-id (concat parent-slug "-" base-id))
-              (setq counter 2)
-              (if (not (gethash final-id v/used-ids-table))
-                  (setq counter 999))))) ; Exit loop if parent-context works
-
-        ;; If parent context didn't work or we're past first attempt, use numbers
-        (when (< counter 999)
-          (setq final-id (format "%s-%d" base-id counter))
-          (setq counter (1+ counter))))
-
-      ;; Register the final ID
-      (puthash final-id t v/used-ids-table)
-
-      ;; Cache the result for headlines to ensure TOC consistency
-      (when (eq (org-element-type datum) 'headline)
-        (let ((cache-key (f/get-heading-cache-key datum)))
-          (puthash cache-key final-id v/heading-id-cache)))
-
-      (setq base-id final-id)))
-
-  base-id)
-
-(defun f/stable-id–around (orig datum info)
-  "Supply deterministic IDs for list items, targets, tables, headings with conflict resolution."
-  (pcase (org-element-type datum)
-
-    ;; 1. A stand-alone <<target>> object --------------------------
-    ((or 'target 'radio-target)
-     (let* ((raw   (org-element-property :value datum))       ; «foo»
-            (clean (and raw (replace-regexp-in-string "[<>]" "" raw))) ; foo
-            (base-slug (f/slugify clean)))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 2. A list ITEM that *contains* a <<target>> ---------------
-    ('item
-     (if-let* ((tgt (f/extract-first-target datum info))
-               (raw (org-element-property :value tgt))
-               (clean (replace-regexp-in-string "[<>]" "" raw))
-               (base-slug (f/slugify clean)))
-         (f/ensure-unique-id base-slug datum)
-       (funcall orig datum info)))
-
-    ;; 3. A table with #+NAME: ------------------------------------
-    ('table
-     (let* ((name (org-element-property :name datum))
-            (base-slug (and name (f/slugify name))))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 4. Headlines -----------------------------------------------
-    ('headline
-     (let* ((title (org-element-property :raw-value datum))
-            (base-slug (f/slugify title)))
-       (if base-slug
-           (f/ensure-unique-id base-slug datum)
-         (funcall orig datum info))))
-
-    ;; 5. Anything else → keep package's behaviour ---------------
-    (_ (funcall orig datum info))))
-
-;; Clear the hash tables before each export
-(defun f/clear-ids-table (&rest _)
-  "Clear the used IDs table and heading cache before export."
-  (setq v/used-ids-table (make-hash-table :test 'equal))
-  (setq v/heading-id-cache (make-hash-table :test 'equal)))
-
-;; Hook to clear the tables before export starts
-(add-hook 'org-export-before-processing-functions #'f/clear-ids-table)
-
-;; Suppress noisy org-babel messages during export
-(defun f/suppress-babel-messages (orig-fun &rest args)
-  "Suppress org-babel messages during export."
-  (let ((inhibit-message t)
-        (message-log-max nil))
-    (apply orig-fun args)))
-
-;; Apply message suppression to common babel functions
-(advice-add 'org-babel-exp-src-block :around #'f/suppress-babel-messages)
-(advice-add 'org-fontify-like-in-org-mode :around #'f/suppress-babel-messages)
-
-;; Your existing advice with increased depth for priority
-(advice-add 'org-export-get-reference
-            :around #'f/stable-id–around
-            '((depth . -95)))
+(require 'org-stable-ids)
+(org-stable-ids-setup)
 #+end_src
 
 
@@ -2539,12 +2423,10 @@ Return the path to the generated output file."
 https://orgmode.org/manual/Library-of-Babel.html
 #+begin_src emacs-lisp
 (setup ob-lob
-  (:with-mode org-mode
-    (:match-file "*.org.setup" "*.setup"))
-  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup"))
-
+  (:load-after org)
+  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup")
+  (require 'org-bitwarden))
 #+end_src
-
 
 ** Troubleshooting
 
@@ -2797,57 +2679,6 @@ Wrapper for `org-get-full-outline-path'."
   (kill-new (org-get-full-outline-path)))
 #+end_src
 
-*** Insert CUSTOM_ID
-:PROPERTIES:
-:CUSTOM_ID: orgid-mqhvkq
-:END:
-
-- See
-  + [[https://zzamboni.org/post/how-to-easily-create-and-use-human-readable-ids-in-org-mode-and-doom-emacs/][zzamboni.org | How to easily create and use human-readable IDs in Org mode and Doom Emacs]]
-    # #wizard
-  + [[https://emacs.stackexchange.com/questions/46176/confused-by-property-id-versus-custom-id][org mode - Confused by property :ID: versus :CUSTOM_ID: - Emacs Stack Exchange]]
-
-#+begin_src emacs-lisp
-(defcustom org-custom-id-random-string-length 6
-  "Number of characters to be generated by `random-string-g-to-z'."
-  :type 'integer)
-
-(defun org-custom-id--create ()
-  "Create and store CUSTOM_ID for current heading path."
-  (let ((id (concat "orgid-" (random-string-g-to-z org-custom-id-random-string-length))))
-    (org-entry-put nil "CUSTOM_ID" id)
-    (org-id-add-location id (buffer-file-name (buffer-base-buffer)))
-    id))
-
-(defun org-custom-id--get-create (&optional force where)
-  "Get or create CUSTOM_ID for heading at WHERE.
-
-If FORCE is t, always recreate the property."
-  (org-with-point-at where
-    (let ((old-id (org-entry-get nil "CUSTOM_ID")))
-      ;; If CUSTOM_ID exists and FORCE is false, return it
-      (if (and (not force) old-id (stringp old-id))
-          (progn
-            (org-id-add-location old-id
-                                 (buffer-file-name (buffer-base-buffer)))
-            old-id)
-        ;; otherwise, create it
-        (org-custom-id--create)))))
-
-(defun org-custom-id (&optional arg)
-  "Get or create CUSTOM_ID for heading at point.
-
-If a `\\[universal-argument]' prefix is present FORCE is set to t."
-  (interactive "P")
-  (let ((force (not (null current-prefix-arg))))  ;; Check if C-u prefix is used
-    (org-custom-id--get-create force nil))
-  (org-store-link nil t))
-
-(keymap-global-set "C-c o i" #'org-custom-id)
-#+end_src
-- NOTE: The default =org-store-link= supports CUSTOM_IDs, then it can be
-  inserted with =org-insert-link=.
-  # [2024-03-19 Tue 23:19:34 -03] @ak
 
 *** Random characters string
 :PROPERTIES:
@@ -2950,12 +2781,10 @@ in the source Org buffer so it can get the list.
 :END:
 
 #+begin_src emacs-lisp
-<<org-functions-tangle-export-helpers>>
+;;; 11xx-org-functions-tangle-export-helpers.el --- Org babel tangle/export helpers  -*- lexical-binding: t -*-
 
-(provide '11xx-org-functions-tangle-export-helpers)
-#+end_src
-
-#+begin_src emacs-lisp :noweb-ref org-functions-tangle-export-helpers :tangle no
+;;; Code:
+;;;###autoload
 (defun org-babel-get-src-block-header-arg (header-arg)
   "Get the value of the header argument HEADER-ARG from the provided SRC-BLOCK-INFO.
 
@@ -2970,7 +2799,8 @@ for some reason that function refers to
 #+end_src
 
 for [[file:~/.config/darkman/README.org]]
-#+begin_src emacs-lisp :noweb-ref org-functions-tangle-export-helpers :tangle no
+#+begin_src emacs-lisp
+;;;###autoload
 (defun darkmandir (shfile)
   "Evaluate to a filename in a directory from `XDG_DATA_HOME' that's either `light-mode.d' or `dark-mode.d'.
 
@@ -2999,6 +2829,333 @@ Usage:
           (string= (org-entry-get nil "theme" t) "dark"))
       out-path-dark))))
 #+end_src
+
+#+begin_src emacs-lisp
+(provide '11xx-org-functions-tangle-export-helpers)
+;;; 11xx-org-functions-tangle-export-helpers.el ends here
+#+end_src
+
+* org-stable-ids.el
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/org-stable-ids.el
+:END:
+
+#+begin_seealso
+- Credits
+  + [[https://zzamboni.org/post/how-to-easily-create-and-use-human-readable-ids-in-org-mode-and-doom-emacs/][zzamboni.org | How to easily create and use human-readable IDs in Org mode and Doom Emacs]]
+  + [[https://codeberg.org/jkreeftmeijer/ox-html-stable-ids.el][jkreeftmeijer/ox-html-stable-ids.el: Stable IDs for ox-html.el - Codeberg.org]]
+- [[https://emacs.stackexchange.com/questions/46176/confused-by-property-id-versus-custom-id][org mode - Confused by property :ID: versus :CUSTOM_ID: - Emacs Stack Exchange]]
+#+end_seealso
+
+#+begin_src emacs-lisp
+;;; org-stable-ids.el --- Stable slug-based IDs for Org headings and export  -*- lexical-binding: t -*-
+
+;; Author: The Author <author@example.com>
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "30.1") (org "9.6"))
+;; Keywords: org, outlines, export, html
+;; URL: https://example.com/org-stable-ids
+
+;;; Commentary:
+
+;; Provides two composable entry points:
+;;
+;;   `org-stable-id-get-create'  — interactive command that assigns a
+;;     human-readable :CUSTOM_ID: to the heading at point, derived from
+;;     the heading title.  Collisions are resolved by prepending ancestor
+;;     heading slugs (nearest first), then by a numeric suffix.
+;;
+;;   `org-stable-ids-setup'      — activates an around-advice on
+;;     `org-export-get-reference' so that ox-html (and derived backends)
+;;     emit stable, slug-based fragment IDs that survive heading renames and
+;;     document restructuring.  Pre-existing :CUSTOM_ID: values are honoured
+;;     verbatim; <<targets>>, named tables, and list-item targets are also
+;;     handled.
+;;
+;; Suggested configuration:
+;;
+;;   (with-eval-after-load 'ox
+;;     (org-stable-ids-setup))
+;;   (keymap-global-set "C-c o i" #'org-stable-id-get-create)
+
+;;; Code:
+
+(require 'cl-lib)
+(require 'rx)
+(require 'seq)
+(require 'org)
+(require 'org-element)
+
+
+;;;; Customization
+
+;;;###autoload
+(defgroup org-stable-ids nil
+  "Stable, slug-based identifiers for Org headings and HTML export."
+  :group 'org-export
+  :prefix "org-stable-ids-"
+  :link '(url-link "https://example.com/org-stable-ids"))
+
+;;;###autoload
+(defcustom org-stable-ids-separator "-"
+  "Token separator used within generated slugs."
+  :type 'string
+  :group 'org-stable-ids
+  :safe #'stringp)
+
+;;;###autoload
+(defcustom org-stable-ids-ancestor-separator "--"
+  "Separator between an ancestor prefix and the base slug during disambiguation."
+  :type 'string
+  :group 'org-stable-ids
+  :safe #'stringp)
+
+;;;###autoload
+(defcustom org-stable-ids-max-slug-length 60
+  "Maximum character count for a generated slug; longer slugs are truncated."
+  :type 'natnum
+  :group 'org-stable-ids
+  :safe #'natnump)
+
+
+;;;; Layer 1 — Slugification (pure)
+
+(defun org-stable-ids--slugify (s)
+  "Return a URL-safe, lowercase slug for string S, or nil for blank input.
+Whitespace and HTML/shell-unsafe characters become `org-stable-ids-separator'.
+Separator runs are collapsed and leading/trailing occurrences are stripped."
+  (when (and (stringp s) (string-match-p (rx (not space)) s))
+    (let* ((sep    org-stable-ids-separator)
+           (sep-re (regexp-quote sep))
+           (slug   (downcase s))
+           (slug   (replace-regexp-in-string
+                    (rx (+ (any " \t\n#<>\"'&()"))) sep slug))
+           (slug   (replace-regexp-in-string
+                    (concat sep-re "+") sep slug))
+           (slug   (string-trim slug
+                                (concat sep-re "+")
+                                (concat sep-re "+"))))
+      (if (> (length slug) org-stable-ids-max-slug-length)
+          (substring slug 0 org-stable-ids-max-slug-length)
+        slug))))
+
+
+;;;; Layer 2 — Ancestor traversal (pure)
+
+(defun org-stable-ids--ancestors-from-element (datum)
+  "Return ancestor headline raw-values for element DATUM, nearest first.
+Relies on `:parent' links being set — available during export tree traversal."
+  (let (acc cur)
+    (setq cur datum)
+    (while (setq cur (org-element-property :parent cur))
+      (when (eq (org-element-type cur) 'headline)
+        (push (org-element-property :raw-value cur) acc)))
+    ;; push while walking root→datum yields farthest-first; reverse it.
+    (nreverse acc)))
+
+(defun org-stable-ids--cache-key (datum)
+  "Return a path string uniquely identifying headline DATUM within its tree."
+  (let ((ancestors (org-stable-ids--ancestors-from-element datum))
+        (title     (or (org-element-property :raw-value datum) "")))
+    (mapconcat #'identity (append ancestors (list title)) "/")))
+
+
+;;;; Layer 3 — Disambiguation (stateful against a hash-table)
+
+(defun org-stable-ids--resolve (base-id ancestors used-table
+                                        &optional cache-table cache-key)
+  "Return a unique variant of BASE-ID not yet recorded in USED-TABLE.
+
+ANCESTORS is a list of heading strings ordered nearest-first (used for
+contextual disambiguation before falling back to numeric suffixes).
+CACHE-TABLE and CACHE-KEY enable consistent re-resolution so that a TOC
+entry and the matching body heading always receive the same fragment ID."
+  (cl-block nil
+    ;; Cache hit: repeated calls for the same logical heading must agree.
+    (when (and cache-table cache-key)
+      (when-let* ((hit (gethash cache-key cache-table)))
+        (puthash hit t used-table)
+        (cl-return hit)))
+
+    (let ((final-id
+           (cond
+            ;; Base slug is available.
+            ((not (gethash base-id used-table))
+             base-id)
+
+            ;; Prepend each ancestor slug, nearest first.
+            ((cl-loop for anc       in ancestors
+                      for prefix    =  (org-stable-ids--slugify anc)
+                      for candidate =  (when prefix
+                                         (concat prefix
+                                                 org-stable-ids-ancestor-separator
+                                                 base-id))
+                      when (and candidate (not (gethash candidate used-table)))
+                      return candidate))
+
+            ;; Numeric suffix fallback.
+            (t (cl-loop for n         from 2
+                        for candidate =    (format "%s-%d" base-id n)
+                        unless (gethash candidate used-table)
+                        return candidate)))))
+
+      (puthash final-id t used-table)
+      (when (and cache-table cache-key)
+        (puthash cache-key final-id cache-table))
+      final-id)))
+
+
+;;;; Layer 4a — Interactive :CUSTOM_ID: assignment
+
+(defun org-stable-ids--buffer-used-table ()
+  "Return a hash-table of all :CUSTOM_ID: values in the current buffer."
+  (let ((tbl (make-hash-table :test #'equal)))
+    (org-map-entries
+     (lambda ()
+       (when-let* ((id (org-entry-get (point) "CUSTOM_ID")))
+         (puthash id t tbl))))
+    tbl))
+
+;;;###autoload
+(defun org-stable-id-get-create (&optional force)
+  "Get or create a slug-based :CUSTOM_ID: for the heading at point.
+
+With a `\\[universal-argument]' prefix (FORCE non-nil), always regenerate
+the identifier even if one already exists.
+
+The slug derives from the heading title.  Collisions are resolved by
+prepending ancestor slugs (nearest first), then by a numeric suffix.
+Does not register entries in `org-id-locations' — `org-store-link'
+handles :CUSTOM_ID: links natively without it."
+  (interactive "P")
+  (unless (org-at-heading-p)
+    (user-error "Point is not on an Org heading"))
+  (let* ((heading    (nth 4 (org-heading-components)))
+         (current-id (org-entry-get nil "CUSTOM_ID")))
+    (if (and (not force) (org-string-nw-p current-id))
+        (progn (org-store-link nil t) current-id)
+      (let* ((base      (or (org-stable-ids--slugify heading)
+                            (format "heading-%s"
+                                    (substring (md5 (or heading "")) 0 6))))
+             ;; `org-get-outline-path' is reliable in live buffers and does
+             ;; not require element :parent links to be set.
+             (ancestors (nreverse (org-get-outline-path)))
+             ;; Exclude the current heading's own ID so force-regeneration
+             ;; does not block itself.
+             (used-tbl  (let ((tbl (org-stable-ids--buffer-used-table)))
+                          (when (org-string-nw-p current-id)
+                            (remhash current-id tbl))
+                          tbl))
+             (new-id    (org-stable-ids--resolve base ancestors used-tbl)))
+        (org-entry-put nil "CUSTOM_ID" new-id)
+        (org-store-link nil t)
+        (message "CUSTOM_ID: %s" new-id)
+        new-id))))
+
+
+;;;; Layer 4b — Export stable-ID advice
+
+(defvar org-stable-ids--used nil
+  "Hash-table tracking IDs generated during the current export pass.")
+
+(defvar org-stable-ids--cache nil
+  "Hash-table mapping headline cache-keys to resolved IDs for the current export.")
+
+(defun org-stable-ids--export-reset (&rest _)
+  "Reset per-export ID tables; called via `org-export-before-processing-functions'."
+  (setq org-stable-ids--used  (make-hash-table :test #'equal)
+        org-stable-ids--cache (make-hash-table :test #'equal)))
+
+(defun org-stable-ids--first-target (item info)
+  "Return the first target or radio-target inside list ITEM, or nil."
+  (org-element-map (org-element-contents item) '(target radio-target)
+    #'identity info 'first-match))
+
+(defun org-stable-ids--get-reference (orig datum info)
+  "Around-advice for `org-export-get-reference' producing stable slug IDs.
+
+Dispatch by element type:
+  Headline  → existing :CUSTOM_ID: > slug of heading title
+  Target    → slug of target value
+  List item → slug of embedded <<target>>, else ORIG
+  Table     → slug of #+NAME:, else ORIG
+  Other     → ORIG"
+  (pcase (org-element-type datum)
+
+    ('headline
+     (let* ((custom (org-element-property :CUSTOM_ID datum))
+            (base   (or (and (org-string-nw-p custom) custom)
+                        (org-stable-ids--slugify
+                         (org-element-property :raw-value datum)))))
+       (if base
+           (org-stable-ids--resolve
+            base
+            (org-stable-ids--ancestors-from-element datum)
+            org-stable-ids--used
+            org-stable-ids--cache
+            (org-stable-ids--cache-key datum))
+         (funcall orig datum info))))
+
+    ((or 'target 'radio-target)
+     (let* ((raw   (org-element-property :value datum))
+            (clean (and raw (replace-regexp-in-string "[<>]" "" raw)))
+            (base  (org-stable-ids--slugify clean)))
+       (if base
+           (org-stable-ids--resolve
+            base
+            (org-stable-ids--ancestors-from-element datum)
+            org-stable-ids--used)
+         (funcall orig datum info))))
+
+    ('item
+     (if-let* ((tgt   (org-stable-ids--first-target datum info))
+               (raw   (org-element-property :value tgt))
+               (clean (replace-regexp-in-string "[<>]" "" raw))
+               (base  (org-stable-ids--slugify clean)))
+         (org-stable-ids--resolve
+          base
+          (org-stable-ids--ancestors-from-element datum)
+          org-stable-ids--used)
+       (funcall orig datum info)))
+
+    ('table
+     (if-let* ((name (org-element-property :name datum))
+               (base (org-stable-ids--slugify name)))
+         (org-stable-ids--resolve
+          base
+          (org-stable-ids--ancestors-from-element datum)
+          org-stable-ids--used)
+       (funcall orig datum info)))
+
+    (_ (funcall orig datum info))))
+
+
+;;;; Setup / teardown
+
+;;;###autoload
+(defun org-stable-ids-setup ()
+  "Activate the stable-ID export advice and the pre-export reset hook.
+Call this inside a `with-eval-after-load' block for \\='ox so that the
+`ox' library is guaranteed to be present."
+  (require 'ox)
+  (add-hook 'org-export-before-processing-functions
+            #'org-stable-ids--export-reset)
+  (advice-add 'org-export-get-reference
+              :around #'org-stable-ids--get-reference
+              '((depth . -95))))
+
+;;;###autoload
+(defun org-stable-ids-teardown ()
+  "Deactivate the stable-ID export advice and hook."
+  (remove-hook 'org-export-before-processing-functions
+               #'org-stable-ids--export-reset)
+  (advice-remove 'org-export-get-reference
+                 #'org-stable-ids--get-reference))
+
+(provide 'org-stable-ids)
+;;; org-stable-ids.el ends here
+#+end_src
+
 
 * 11xx-dired.el
 :PROPERTIES:
@@ -3082,96 +3239,63 @@ if not set edit the code accordinly. Don't forget to edit the call flags!
 
 NOTE: =dired-async= is provided by the =async= package.
 #+begin_src emacs-lisp
+(setup ls-lisp
+  (setopt ls-lisp-use-insert-directory-program nil
+          ls-lisp-dirs-first t
+          ls-lisp-ignore-case t
+          ls-lisp-use-string-collate nil
+          dired-use-ls-dired nil
+          dired-listing-switches "-lAhv"
+          ;; dired-listing-switches "-l --almost-all --human-readable --group-directories-first --no-group --sort=version"
+          ls-lisp-format-time-list '("%Y-%m-%d %H:%M" "%Y-%m-%d %H:%M")
+          ls-lisp-use-localized-time-format t
+          ))
+
 (setup dired
   (:require dired-x dired-aux)
-  (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
-           ls-lisp-dirs-first t ;; show directories on top of the list
-           ;; dired-omit-files-p t
-           dired-recursive-copies #'always
-           dired-recursive-deletes #'always
-           ;; Compress/Archive files
-           dired-compress-directory-default-suffix ".tar.zst"
-           dired-compress-file-alist '(("\\.zst\\'" . "zstd -qf -11 --rm -o %o %i"))
-           dired-compress-files-alist '(("\\.tar\\.zst\\'" . "tar -cf - %i | zstd -11 -o %o"))
-           ;; prompt
-           dired-deletion-confirmer #'y-or-n-p
-           dired-kill-when-opening-new-dired-buffer t ; emacs 28.1 dired-single
-           dired-dwim-target t ; [[https://emacs.stackexchange.com/questions/5603/how-to-quickly-copy-move-file-in-emacs-dired/5604#5604][How to quickly copy/move file in Emacs Dired? - Emacs Stack Exchange]]
-           dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
-           )
-
-  (:hook ;; dired-hide-details-mode
-   ;; dired-hide-dotfiles-mode
-   auto-revert-mode)
-
-  ;; Enable disabled commands
+  (:hook auto-revert-mode)
   (:put-enable dired-find-alternate-file)
+
+  (setopt
+   dired-recursive-copies #'always
+   dired-recursive-deletes #'always
+   ;; Compress/Archive files
+   dired-compress-directory-default-suffix ".tar.zst"
+   dired-compress-file-alist '(("\\.zst\\'" . "zstd -qf -11 --rm -o %o %i"))
+   dired-compress-files-alist '(("\\.tar\\.zst\\'" . "tar -cf - %i | zstd -11 -o %o"))
+   ;; prompt
+   dired-deletion-confirmer #'y-or-n-p
+   dired-kill-when-opening-new-dired-buffer t ; emacs 28.1 dired-single
+   dired-dwim-target t ; [[https://emacs.stackexchange.com/questions/5603/how-to-quickly-copy-move-file-in-emacs-dired/5604#5604][How to quickly copy/move file in Emacs Dired? - Emacs Stack Exchange]]
+   dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
+   )
 
   (defun f/dired-find-home ()
     (interactive)
     (dired (getenv "HOME")))
+
   (:bind "RET" mu-open-in-external-app
-         "." dired-hide-dotfiles-mode ;; was dired-clean-directory
          "/" dired-narrow-fuzzy
-         "TAB" dired-subtree-toggle
-         "S-TAB" dired-subtree-cycle
-         "C-c C-t" tmtxt/open-current-dir-in-terminal
+         "<tab>" dired-subtree-toggle
+         "<remap> <dired-maybe-insert-subdir>" dired-subtree-toggle
+         "<backtab>" dired-subtree-cycle
+         "t" tmtxt/open-current-dir-in-terminal
          "f" dired-find-file
          "b" dired-up-directory
-         ;; vim keys are better at this stuff i guess
-         ;; vim keys because we live life on the edge
+
          "h" dired-up-directory        ;; was M-x describe-mode
          "j" dired-next-line           ;; was M-x dired-goto-file
          "k" dired-previous-line       ;; was M-x dired-do-kill-lines
          "l" dired-find-file
+
          "SPC" dired-mark
          "~" f/dired-find-home
-         )
+         ))
 
-  ;; show current directory in the header
-  (defun f/dired-dir-header-line ()
-    "Uses `header-line-format' to display the current directory."
-    (interactive)
-    (setq-local header-line-format
-                '((:eval (abbreviate-file-name default-directory)))))
-  (add-hook 'dired-mode-hook 'f/dired-dir-header-line)
-  ) ; "(setup dired..." ends here
-
-;; customize faces with =dired-subtree-depth-[1-6]-face=
-
-(setup (:elpaca dired-rainbow)
-  (:load-after dired)
-  (require 'dired-rainbow)
-  ;; * `dired-rainbow-define` - add face by file extension
-  ;; * `dired-rainbow-define-chmod` - add face by file permissions
-  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
-  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-  (dired-rainbow-define log              "#d2a022" ("log"))
-  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-  ;; How it works:
-  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-  ;; can be individually customized on a theme file, overriding the
-  ;; default FACE-PROPS. E.g.:
-  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-  ;; is created.
-  )
+(setup dired-hide-dotfiles
+  (:elpaca dired-hide-dotfiles)
+  (keymap-set dired-mode-map "." #'dired-hide-dotfiles-mode) ; was dired-clean-directory
+  (setopt dired-hide-dotfiles-verbose nil))
 
 (setup (:elpaca dired-narrow))
 (setup (:elpaca dired-subtree))
@@ -3181,55 +3305,60 @@ NOTE: =dired-async= is provided by the =async= package.
     (:require dired-efap))
   (:with-map dired-mode-map
     (:bind "r" dired-efap))
+  (:with-hook dired-efap-mode-hooks
+    (setq-local dirvish-hide-cursor nil))
   (setopt dired-efap-initial-filename-selection nil))
 
-(setup (:elpaca all-the-icons-dired)
-  (:load-after dired)
-  ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
-  (:hook-into dired-mode))
+;; (setup (:elpaca all-the-icons-dired)
+;;   (:load-after dired)
+;;   ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
+;;   (:hook-into dired-mode))
 
 (setup (:elpaca diredfl)
   (:hook-into dired-mode))
 
-(setup dired
-  (:load-after dired)
-  (:require hl-line)
-
-  (defun f/dired-restore-cursor ()
-    "Restore cursor on current buffer."
-    (setq-local cursor-type t))
-
-  (defun f/dired-hl-line-cursor ()
-    "Hide cursor and enable hl-line for read-only dired browsing."
-    (hl-line-mode 1)
-    (setq-local cursor-type nil))
-
-  ;; Entry into read-only dired
-  (add-hook 'dired-mode-hook #'f/dired-hl-line-cursor)
-
-  ;; wdired: restore on entry, hide on exit
-  (add-hook 'wdired-mode-hook #'f/dired-restore-cursor)
-  (advice-add 'wdired-change-to-dired-mode :after #'f/dired-hl-line-cursor)
-
-  ;; efap: restore on entry, hide on exit
-  (advice-add 'dired-efap :after #'f/dired-restore-cursor)
-  (advice-add 'dired-efap--change-to-dired-mode :after #'f/dired-hl-line-cursor))
+(use-package dired-hl-line-mode
+  :hook (dired-mode . dired-hl-line-mode))
 #+end_src
 
-* 11xx-magit.el
+**** TODO dirvish
+#+begin_src emacs-lisp :tangle no :noweb-ref dummy
+(setup (:elpaca dirvish)
+  (dirvish-override-dired-mode)
+
+  ;; Fixes for dired-efap and wdired
+  (defun dirvish-hide-cursor--on ()
+    "Browsing state: Enable buffer-local `dirvish-hide-cursor'."
+    (setq-local dirvish-hide-cursor t
+                cursor-type nil))
+  (defun dirvish-hide-cursor--off ()
+    "Editing state: show cursor, disable buffer-local `dirvish-hide-cursor'."
+    (setq-local dirvish-hide-cursor nil
+                cursor-type t))
+  (add-hook   'dired-mode-hook                         #'dirvish-hide-cursor--on)
+  (add-hook   'wdired-mode-hook                        #'dirvish-hide-cursor--off)
+  (advice-add 'wdired-change-to-dired-mode      :after #'dirvish-hide-cursor--on)
+  (advice-add 'dired-efap                       :after #'dirvish-hide-cursor--off)
+  (advice-add 'dired-efap--change-to-dired-mode :after #'dirvish-hide-cursor--on)
+  )
+;; (setopt dirvish-attributes '(nerd-icons file-time file-size collapse subtree-state vc-state git-msg))
+#+end_src
+
+**** DONE Show current directory in Dired header line
+#+begin_src emacs-lisp :tangle no :noweb-ref dummy
+(defun f/dired-dir-header-line ()
+  "Uses `header-line-format' to display the current directory."
+  (interactive)
+  (setq-local header-line-format
+              '((:eval (abbreviate-file-name default-directory)))))
+(add-hook 'dired-mode-hook 'f/dired-dir-header-line)
+#+end_src
+
+* Magit
+
+** 11xx-magit.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-magit.el
-:END:
-
-#+begin_src emacs-lisp
-<<11xx-magit>>
-
-(provide '11xx-magit)
-#+end_src
-
-** Magit
-:PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-magit :tangle no
 :END:
 
 - See
@@ -3238,53 +3367,60 @@ NOTE: =dired-async= is provided by the =async= package.
   + [[https://gitlab.com/dwt1/dotfiles/-/blob/master/.emacs.d.gnu/config.org#magit][.emacs.d.gnu/config.org · master · Derek Taylor / Dotfiles · GitLab]]
   + [[https://gitlab.com/dwt1/dotfiles/-/commit/125f9d2630994911ad15425ff1cad69474bead7e][Merge branch 'emacs' into 'master' (125f9d26) · Commits · Derek Taylor / Dotfiles · GitLab]]
     # #wizard
+  + Fix elpaca version mismatch
+    * See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
 
 #+begin_src emacs-lisp
-(setup (:elpaca transient)) ; keyboard menu for magit.
-#+end_src
-- Fix elpaca version mismatch
-  + See [[https://github.com/progfolio/elpaca/issues/324][[Bug/Support]: Error installing magit · Issue #324 · progfolio/elpaca]]
+(setup magit
+  (:elpaca magit)
 
-
-#+begin_src emacs-lisp
-(setup (:elpaca magit)
-  (require 'dired)
-  (defun dired-git-add (&optional arg)
-    "Execute 'git add' command for current or marked files in Dired mode.
-With prefix ARG, prompt for additional arguments to pass to the command."
-    (interactive "P")
-    (let* ((files (dired-get-marked-files nil arg))
-           (git-cmd "git")
-           (output (mapconcat (lambda (file)
-                                (shell-command-to-string
-                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                              files
-                              "\n")))
-      (message "Git add command completed:\n%s" output)))
-  (keymap-set dired-mode-map "C-c g g a" #'dired-git-add)
-
+  ;; rely on autoloads from elpaca block so magit don't need to be required
+  ;; inside `magit-status-bare.el'.
   (require 'magit-status-bare)
-  (keymap-global-unset "C-x g") ; unbind default `magit-status'
-  (:global-set "C-x g g" magit-status-default)
-  ;; (keymap-global-set "C-x g g" #'magit-status-default)
 
+  ;; unbind default `magit-status' so g can be used as prefix
+  (keymap-global-unset "C-x g")
+
+  (keymap-global-set "C-x g g" #'magit-status-default) ; magit-status
+
+  ;;; bare repos
   (magit-status-bare :git-dir "~/.local/dotfiles.git/"
                      :work-tree (getenv "HOME")
                      :key-bind "C-x g d")
   (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
                       :work-tree (getenv "HOME")
                       :key-bind "C-c g d a")
+
+  (:with-feature dired
+    (defun dired-git-add (&optional arg)
+      "Execute 'git add' command for current or marked files in Dired mode.
+With prefix ARG, prompt for additional arguments to pass to the command."
+      (interactive "P")
+      (let* ((files (dired-get-marked-files nil arg))
+             (git-cmd "git")
+             (output (mapconcat (lambda (file)
+                                  (shell-command-to-string
+                                   (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                                files
+                                "\n")))
+        (message "Git add command completed:\n%s" output)))
+    (:bind "C-c g g a" dired-git-add))
+
   (require '11xx-vot))
+
+(setup (:elpaca transient)
+  (:load-after magit))
+
+(provide '11xx-magit)
 #+end_src
 
-** magit-status-bare
+** magit-status-bare.el
 :PROPERTIES:
 :header-args:emacs-lisp: :tangle lisp/magit-status-bare.el
 :END:
 
 #+begin_src emacs-lisp
 ;; NOTE: This requires lexical-binding = t
-(require 'magit)
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
 
@@ -4029,24 +4165,18 @@ Load theme based on Dark or Light system theme:
 ;; (elpaca (neron-themes :host codeberg
 ;;                       :repo "11xx/neron-themes"
 ;;                       :files ("neron-*.el")))
-
-;; dev
-(let ((neron-themes-dir (expand-file-name "~/code/emacs/neron-themes/")))
-  (add-to-list 'custom-theme-load-path neron-themes-dir)
-  (add-to-list 'load-path neron-themes-dir)
-  (require 'neron-themes))
+(elpaca (neron-themes :host codeberg :repo "~/clones/neron-themes" :files ("neron-*.el"))) ; dev
 
 (setup (:elpaca auto-dark)
   (setopt auto-dark-themes '((neron-dark)
                              (neron-light)))
-  (:hook-into elpaca-after-init-hook)
+  (auto-dark-mode)
   (:hide-mode))
 #+end_src
-# [2023-12-10  01:20:49 -03] @winr58
 
 **** Prevent white flashbang on startup
 :PROPERTIES:
-:header-args:emacs-lisp: :tangle no :noweb-ref dummy
+:header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
 :END:
 # :header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
 src [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]].
@@ -4067,7 +4197,11 @@ Before loading the theme
 (require 'dbus nil t)
 (defun is-dark-color-scheme-dbus ()
   ;; copy of 'auto-dark--is-dark-mode-dbus' from 'auto-dark.el'.
-  "Read color-scheme from org.freedesktop.portal.Settings appearance interface."
+  ;; 0 = light, being a fallback default
+  ;; 1 = dark
+  ;; 2 = light
+   "Read color-scheme from org.freedesktop.portal.Settings appearance interface.
+Returns t if dark, nil otherwise."
   (eq 1 (caar (dbus-ignore-errors
                 (dbus-call-method
                  :session
@@ -4076,26 +4210,17 @@ Before loading the theme
                  "org.freedesktop.portal.Settings" "Read"
                  "org.freedesktop.appearance" "color-scheme")))))
 
-;; (set-face-attribute 'default nil :foreground 'unspecified)
-;; (set-face-attribute 'default nil :background 'unspecified)
+(when (and initial-window-system (is-dark-color-scheme-dbus))
+  (setq frame-background-mode 'dark)
 
-;; the most useless nitpick
-(defun f/early-init--set-faces (fg bg alpha)
-  (set-frame-parameter nil 'alpha-background alpha)
-  (add-to-list 'initial-frame-alist `(alpha-background . ,alpha))
-  (add-to-list 'initial-frame-alist `(background-color . ,bg))
-  (add-to-list 'initial-frame-alist `(foreground-color . ,fg)))
-
-(if (is-dark-color-scheme-dbus)
-    (f/early-init--set-faces "#333333" "#ffffff" 10)
-  (f/early-init--set-faces "#eeeeee" "#222222" 10))
-
-;; reset faces
-(add-hook 'elpaca-after-init-hook
-          (lambda() (set-face-attribute 'default nil :foreground 'unspecified)
-            (set-face-attribute 'default nil :background 'unspecified)
-            (set-frame-parameter nil 'alpha-background nil)))
+  (let ((bg-color "#222222")
+        (fg-color "#eeeeee"))
+    (add-to-list 'initial-frame-alist `(background-color . ,bg-color))
+    (add-to-list 'initial-frame-alist `(foreground-color . ,fg-color))
+    (add-to-list 'default-frame-alist `(background-color . ,bg-color))
+    (add-to-list 'default-frame-alist `(foreground-color . ,fg-color))))
 #+end_src
+
 *** ibuffer mode
 [[https://www.reddit.com/r/emacs/comments/19xwk3/comment/c8sg4rq/?utm_source=share&utm_medium=web2x&context=3][wizard src]] | [[http://martinowen.net/blog/2010/02/03/tips-for-emacs-ibuffer.html][Tips for using Emacs Ibuffer]]
 #+begin_src emacs-lisp
@@ -4361,26 +4486,21 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 # [2023-06-23 Fri 13:14:22 -03]
 #+begin_src emacs-lisp
 (setup (:elpaca gptel)
-  ;; (:require auth-source) ; seems necessary, for some reason setup.el
-  (:option gptel-api-key (auth-source-pick-first-password :host "api.perplexity.ai")
-           gptel-model 'sonar-pro
-           gptel-backend (gptel-make-perplexity "Perplexity"
-                           :key (auth-source-pick-first-password :host "api.perplexity.ai")
-                           :stream t)
-           gptel-default-mode 'org-mode)
+  (setopt gptel-model 'gpt-5-nano)
 
-  (gptel-make-ollama "Ollama"             ;Any name of your choosing
-    :host "localhost:11434"               ;Where it's running
-    :stream t                             ;Stream responses
-    :models '(mistral:latest              ;List of models
-              granite-code:8b
-              granite-code:20b
-              llama3.2
-              qwen2.5-coder
-              qwen2.5-coder:7b-instruct-q8_0
-              yi-coder
-              codellama:7b
-              deepseek-coder-v2:16b)))
+  (gptel-make-gemini "Gemini"
+    :stream t
+    :key (gptel-api-key-from-auth-source "generativelanguage.googleapis.com"))
+  (gptel-make-anthropic "Claude"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.anthropic.com"))
+
+  (gptel-make-ollama "Ollama"
+    :host "localhost:11434"
+    :stream t
+    :models '(qwen3.5:9b
+              qwen2.5-coder:14b
+              )))
 #+end_src
 # test chat:
 The =auth-source-pick-first-password= function is used to
@@ -4402,21 +4522,6 @@ to the authinfo file:
 Remember to consider the security implications of using a wildcard
 character for the username, as it allows any username to match and
 retrieve the password.
-
-
-** Aider
-- [[https://github.com/tninja/aider.el][tninja/aider.el: aider emacs plugin for https://github.com/paul-gauthier/aider]]
-- [[https://github.com/Aider-AI/aider][Aider-AI/aider: aider is AI pair programming in your terminal]]
-#+begin_src emacs-lisp
-(setup (:elpaca aider :host github :repo "tninja/aider.el" :files ("aider.el"))
-  (setq aider-program (expand-file-name "venv/bin/aider" (xdg-user-dir "DESKTOP"))
-        aider-args '("--model" "ollama/qwen2.5-coder:7b-instruct-q8_0"))
-  (setenv "OLLAMA_API_BASE" "http://127.0.0.1:11434")
-  ;; (setenv "OPENAI_API_KEY" <your-openai-api-key>)
-  ;; Optional: Set a key binding for the transient menu
-  ;; (keymap-global-set "C-c a" #'aider-transient-menu)
-  )
-#+end_src
 
 * 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]
@@ -4494,17 +4599,246 @@ LaTeX preview in org-mode:
 (setup (:elpaca org-fragtog))
 #+end_src
 
-* .dir-locals.el and File Local Variables                          :noexport:
+* dired-hl-line-mode.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/dired-hl-line-mode.el
+:END:
+
+#+begin_src emacs-lisp
+;;; dired-hl-line-mode.el --- Hide block cursor and highlights current line with hl-line -*- lexical-binding: t -*-
+
+;;; Commentary
+;; Minor mode for Dired that hides the block cursor and enables `hl-line'.
+;; Automatically transitions in/out when entering wdired or dired-efap for editing.
+
+;;; Code
+
+(require 'hl-line)
+
+(defun dired-hl-line-mode--on ()
+  "Enable hl-line and hide cursor."
+  (hl-line-mode 1)
+  (setq-local cursor-type nil))
+
+(defun dired-hl-line-mode--off ()
+  "Disable hl-line and restore cursor."
+  (hl-line-mode -1)
+  (setq-local cursor-type t))
+
+(defun dired-hl-line-mode--maybe-on (&rest _)
+  "Re-enable if mode is active in this buffer."
+  (when dired-hl-line-mode
+    (dired-hl-line-mode--on)))
+
+(defun dired-hl-line-mode--maybe-off (&rest _)
+  "Disable if mode is active in this buffer."
+  (when dired-hl-line-mode
+    (dired-hl-line-mode--off)))
+
+(define-minor-mode dired-hl-line-mode
+  "Toggle hl-line + hidden cursor for read-only Dired browsing."
+  :lighter " HlC"
+  :group 'dired
+  (if dired-hl-line-mode
+      (progn
+        (add-hook 'wdired-mode-hook #'dired-hl-line-mode--maybe-off nil t)
+        (advice-add 'wdired-change-to-dired-mode      :after #'dired-hl-line-mode--maybe-on)
+        (advice-add 'dired-efap                       :after #'dired-hl-line-mode--maybe-off)
+        (advice-add 'dired-efap--change-to-dired-mode :after #'dired-hl-line-mode--maybe-on)
+        (dired-hl-line-mode--on))
+    (remove-hook 'wdired-mode-hook                   #'dired-hl-line-mode--maybe-off t)
+    (advice-remove 'wdired-change-to-dired-mode      #'dired-hl-line-mode--maybe-on)
+    (advice-remove 'dired-efap                       #'dired-hl-line-mode--maybe-off)
+    (advice-remove 'dired-efap--change-to-dired-mode #'dired-hl-line-mode--maybe-on)
+    (dired-hl-line-mode--off)))
+
+(provide 'dired-hl-line-mode)
+;;; dired-hl-line-mode.el ends here
+#+end_src
+
+
+* org-bitwarden.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/org-bitwarden.el :noweb no
+:END:
+
+#+begin_src emacs-lisp
+;;; org-bitwarden.el --- Bitwarden secret helper for Org Babel -*- lexical-binding: t -*-
+
+;; Author: 11xx
+;; Version: 20260313
+;; Package-Requires: ((emacs "27.1") (org "9.7"))
+;; Keywords: org, babel, bitwarden, secrets
+
+;;; Commentary:
+;; Registers a `bw' named block in the Org Library of Babel so any org
+;; file can retrieve Bitwarden secrets via noweb references:
+;;
+;;   <<bw(uuid="3e8a1f42-dc4b-4f2a-b7e1-0c9a3d7b2e15")>>
+;;   <<bw(uuid="3e8a1f42-dc4b-4f2a-b7e1-0c9a3d7b2e15", field="username")>>
+;;
+;; Setup — add to init.el:
+;;   (require 'org-bitwarden)
+;;
+;; Selecting a backend:
+;;   (setq org-bitwarden-backend 'rbw)   ; default
+;;   (setq org-bitwarden-backend 'bw)    ; official Bitwarden CLI
+;;
+;; Registering a custom backend:
+;;   (org-bitwarden-register-backend 'my-backend #'my-getter-fn)
+;;   ;; my-getter-fn signature: (uuid-or-name field) -> string
+;;
+;; Suppress confirmation prompts in an org file by adding at the bottom:
+;;   # Local Variables:
+;;   # org-confirm-babel-evaluate: nil
+;;   # End:
+
+;;; Code:
+
+(require 'ob-lob)
+
+
+(defgroup org-bitwarden nil
+  "Bitwarden secret retrieval for Org Babel."
+  :group 'org-babel
+  :prefix "org-bitwarden-")
+
+
+(defvar org-bitwarden--backends '()
+  "Alist of (SYMBOL . FUNCTION) backend entries.
+Each function must accept (uuid-or-name field) and return a string.
+Use `org-bitwarden-register-backend' to add entries.")
+
+(defcustom org-bitwarden-backend 'rbw
+  "Backend used to retrieve Bitwarden secrets.
+
+Built-in values:
+  `rbw'  — unofficial Rust client with background daemon (recommended)
+  `bw'   — official Bitwarden Node.js CLI
+
+Custom backends can be added via `org-bitwarden-register-backend'."
+  :type '(symbol)
+  :group 'org-bitwarden)
+
+(defun org-bitwarden-register-backend (name fn)
+  "Register a Bitwarden retrieval backend.
+
+NAME is a symbol identifying the backend (e.g. \\='my-backend).
+FN is a function of two string arguments (UUID-OR-NAME FIELD)
+that returns the secret as a string, or signals an error.
+
+Example:
+  (org-bitwarden-register-backend
+   \\='my-backend
+   (lambda (uuid field)
+     (my-vault-get uuid field)))
+
+After registering, select it with:
+  (setq org-bitwarden-backend \\='my-backend)"
+  (unless (symbolp name)
+    (error "org-bitwarden: backend name must be a symbol, got %S" name))
+  (unless (functionp fn)
+    (error "org-bitwarden: backend function must be callable, got %S" fn))
+  (setf (alist-get name org-bitwarden--backends) fn))
+
+(defun org-bitwarden--rbw-get (uuid field)
+  "Retrieve FIELD from Bitwarden item UUID-OR-NAME using rbw."
+  (unless (executable-find "rbw")
+    (error "org-bitwarden: `rbw' not found in PATH"))
+  (string-trim
+   (shell-command-to-string
+    (format "rbw get --field %s %s"
+            (shell-quote-argument field)
+            (shell-quote-argument uuid)))))
+
+(defun org-bitwarden--bw-get (uuid field)
+  "Retrieve FIELD from Bitwarden item UUID-OR-NAME using the official bw CLI."
+  (unless (executable-find "bw")
+    (error "org-bitwarden: `bw' not found in PATH"))
+  (unless (getenv "BW_SESSION")
+    (error (concat "org-bitwarden: BW_SESSION not set — "
+                   "run `bw unlock' and export the session token")))
+  ;; bw uses positional subcommands, not --field, for standard fields
+  (let* ((subcmd (if (member field '("password" "username" "uri" "notes" "name"))
+                     field
+                   ;; custom fields require --raw + jq; fall back to a
+                   ;; clear error since bw has no --field flag
+                   (error (concat "org-bitwarden: `bw' backend does not support "
+                                  "custom field %S — use `rbw' instead")
+                          field)))
+         (val (string-trim
+               (shell-command-to-string
+                (format "bw get %s %s"
+                        (shell-quote-argument subcmd)
+                        (shell-quote-argument uuid))))))
+    val))
+
+(org-bitwarden-register-backend 'rbw #'org-bitwarden--rbw-get)
+(org-bitwarden-register-backend 'bw  #'org-bitwarden--bw-get)
+
+;; retrieval
+(defun org-bitwarden-get (uuid field)
+  "Retrieve FIELD from Bitwarden item UUID-OR-NAME using `org-bitwarden-backend'.
+
+UUID is a Bitwarden item UUID (preferred) or item name.
+FIELD is the field name: \"password\" (default), \"username\",
+or any custom field name defined on the item.
+
+Signals an error if the result is empty or the backend fails."
+  (let ((fn (alist-get org-bitwarden-backend org-bitwarden--backends)))
+    (unless fn
+      (error "org-bitwarden: unknown backend `%s' — register it with \
+`org-bitwarden-register-backend'" org-bitwarden-backend))
+    (let ((val (funcall fn uuid field)))
+      (cond
+       ((not (stringp val))
+        (error "org-bitwarden: backend returned non-string %S" val))
+       ((string-empty-p val)
+        (error "org-bitwarden: empty result — uuid=%s field=%s" uuid field))
+       (t val)))))
+
+;; Library of Babel
+(defconst org-bitwarden--lob-source
+  "
+,#+NAME: bw
+,#+begin_src emacs-lisp :var uuid=\"\" field=\"password\" :tangle no :exports none
+(org-bitwarden-get uuid field)
+,#+end_src
+"
+  "Org source for the `bw' Library of Babel block.
+Calls `org-bitwarden-get' which dispatches to `org-bitwarden-backend'.")
+
+(defun org-bitwarden-lob-ingest ()
+  "Idempotently register the `bw' block in the Org Library of Babel."
+  (unless (assq 'bw org-babel-library-of-babel)
+    (with-temp-buffer
+      (insert org-bitwarden--lob-source)
+      (org-mode)
+      (org-babel-lob-ingest))))
+
+(defun org-bitwarden-unload-function ()
+  "Clean up LOB entry when package is unloaded via `unload-feature'."
+  (setq org-babel-library-of-babel
+        (assq-delete-all 'bw org-babel-library-of-babel))
+  nil)
+
+;; Init
+(org-bitwarden-lob-ingest)
+
+(provide 'org-bitwarden)
+;;; org-bitwarden.el ends here
+
+#+end_src
+
+
+* File Local Variables                                             :noexport:
 - [[https://www.reddit.com/r/orgmode/comments/jy8fuc/orgbabeltangle_on_save/][org-babel-tangle on save? : r/orgmode]]
 - [[https://gitlab.com/joseph8th/literatemacs/-/blob/master/README.org?ref_type=heads&plain=1#L1915][README.org · master · Joseph E. Edwards VIII / literatemacs · GitLab]]
 - [[https://web.archive.org/web/20230117073433/https://github.com/joseph8th/literatemacs#conclusion][GitHub - joseph8th/literatemacs: My literate Emacs config]]
 
-# crazy hack just not to have lexical-binding prop code blocks at the top 😿
-#+BEGIN_src emacs-lisp :tangle .dir-locals.el
-
-#+end_src
-
+#+begin_comment
 # Local Variables:
 # eval: (add-hook 'org-babel-tangle-finished-hook #'org-babel-tangle-add-lexical-prop-to-el-tangled-files nil nil)
 # eval: (add-hook 'after-save-hook (lambda nil (org-babel-tangle)) nil t)
 # End:
+#+end_comment

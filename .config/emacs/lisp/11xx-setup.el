@@ -126,5 +126,13 @@ the feature prefix."
   :documentation "Globally bind KEY to COMMAND using keymap-global-set."
   :debug '(form sexp)
   :repeatable t)
+(setup-define :config
+  (lambda (&rest body)
+    `(with-eval-after-load ',(setup-get 'feature)
+       ,@body))
+  :documentation "Defer BODY until the current feature is actually loaded.
+Analogous to use-package's :config — runs on first require, not on elpaca activation."
+  :debug '(&rest form)
+  :repeatable nil)
 
 (provide '11xx-setup)

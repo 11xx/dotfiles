@@ -16,8 +16,7 @@
    "C-c M-t"    toggle-truncate-lines
    ;; Insert text
    "C-c i t" f/current-timestamp-insert
-   ;; UI Changes
-   "C-c d c" visual-fill-column-mode
+
    "C-x C-z" org-set-property
    "C-z" org-set-property
    ;; [[https://www.emacswiki.org/emacs/WindowResize][EmacsWiki: Window Resize]] [2022-04-20 Wed 02:50:51]
@@ -64,8 +63,7 @@
  tab-width 2
  tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
  tab-always-indent t ; when using the TAB key
- org-edit-src-content-indentation 0
- org-src-preserve-indentation nil  ; default is nil
+ fill-column 79
  ;; inhibit-startup-echo-area-message "lobster"
  inhibit-startup-message 't
  ;; initial-major-mode 'fundamental-mode

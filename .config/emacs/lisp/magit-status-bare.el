@@ -1,5 +1,4 @@
 ;; NOTE: This requires lexical-binding = t  -*- lexical-binding: t; -*-
-(require 'magit)
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
 

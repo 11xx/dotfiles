@@ -1,4 +1,7 @@
-;; -*- lexical-binding: t; -*-
+;;; 11xx-org-functions-tangle-export-helpers.el --- Org babel tangle/export helpers  -*- lexical-binding: t; -*-
+
+;;; Code:
+;;;###autoload
 (defun org-babel-get-src-block-header-arg (header-arg)
   "Get the value of the header argument HEADER-ARG from the provided SRC-BLOCK-INFO.
 
@@ -10,6 +13,8 @@ for some reason that function refers to
   (let* ((src-block-info (org-babel-get-src-block-info t)) ; t for NO-EVAL, otherwise it will infinite loop
          (params (nth 2 src-block-info)))
     (assoc-default header-arg params)))
+
+;;;###autoload
 (defun darkmandir (shfile)
   "Evaluate to a filename in a directory from `XDG_DATA_HOME' that's either `light-mode.d' or `dark-mode.d'.
 
@@ -39,3 +44,4 @@ Usage:
       out-path-dark))))
 
 (provide '11xx-org-functions-tangle-export-helpers)
+;;; 11xx-org-functions-tangle-export-helpers.el ends here

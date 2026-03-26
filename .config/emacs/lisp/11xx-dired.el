@@ -30,96 +30,63 @@ The app is chosen from your OS's preference."
                   (shell-quote-argument (file-truename default-directory)))))
 
 ;; (define-key dired-mode-map (kbd "<f4>") 'tmtxt/open-current-dir-in-terminal) ;; was kmacro-end-or-call-macro
+(setup ls-lisp
+  (setopt ls-lisp-use-insert-directory-program nil
+          ls-lisp-dirs-first t
+          ls-lisp-ignore-case t
+          ls-lisp-use-string-collate nil
+          dired-use-ls-dired nil
+          dired-listing-switches "-lAhv"
+          ;; dired-listing-switches "-l --almost-all --human-readable --group-directories-first --no-group --sort=version"
+          ls-lisp-format-time-list '("%Y-%m-%d %H:%M" "%Y-%m-%d %H:%M")
+          ls-lisp-use-localized-time-format t
+          ))
+
 (setup dired
   (:require dired-x dired-aux)
-  (:option dired-listing-switches "-lFAh1v --si --group-directories-first" ;; ls flags
-           ls-lisp-dirs-first t ;; show directories on top of the list
-           ;; dired-omit-files-p t
-           dired-recursive-copies #'always
-           dired-recursive-deletes #'always
-           ;; Compress/Archive files
-           dired-compress-directory-default-suffix ".tar.zst"
-           dired-compress-file-alist '(("\\.zst\\'" . "zstd -qf -11 --rm -o %o %i"))
-           dired-compress-files-alist '(("\\.tar\\.zst\\'" . "tar -cf - %i | zstd -11 -o %o"))
-           ;; prompt
-           dired-deletion-confirmer #'y-or-n-p
-           dired-kill-when-opening-new-dired-buffer t ; emacs 28.1 dired-single
-           dired-dwim-target t ; [[https://emacs.stackexchange.com/questions/5603/how-to-quickly-copy-move-file-in-emacs-dired/5604#5604][How to quickly copy/move file in Emacs Dired? - Emacs Stack Exchange]]
-           dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
-           )
-
-  (:hook ;; dired-hide-details-mode
-   ;; dired-hide-dotfiles-mode
-   auto-revert-mode)
-
-  ;; Enable disabled commands
+  (:hook auto-revert-mode)
   (:put-enable dired-find-alternate-file)
+
+  (setopt
+   dired-recursive-copies #'always
+   dired-recursive-deletes #'always
+   ;; Compress/Archive files
+   dired-compress-directory-default-suffix ".tar.zst"
+   dired-compress-file-alist '(("\\.zst\\'" . "zstd -qf -11 --rm -o %o %i"))
+   dired-compress-files-alist '(("\\.tar\\.zst\\'" . "tar -cf - %i | zstd -11 -o %o"))
+   ;; prompt
+   dired-deletion-confirmer #'y-or-n-p
+   dired-kill-when-opening-new-dired-buffer t ; emacs 28.1 dired-single
+   dired-dwim-target t ; [[https://emacs.stackexchange.com/questions/5603/how-to-quickly-copy-move-file-in-emacs-dired/5604#5604][How to quickly copy/move file in Emacs Dired? - Emacs Stack Exchange]]
+   dired-hide-details-hide-symlink-targets nil ; always show where symlink points to
+   )
 
   (defun f/dired-find-home ()
     (interactive)
     (dired (getenv "HOME")))
+
   (:bind "RET" mu-open-in-external-app
-         "." dired-hide-dotfiles-mode ;; was dired-clean-directory
          "/" dired-narrow-fuzzy
-         "TAB" dired-subtree-toggle
-         "S-TAB" dired-subtree-cycle
-         "C-c C-t" tmtxt/open-current-dir-in-terminal
+         "<tab>" dired-subtree-toggle
+         "<remap> <dired-maybe-insert-subdir>" dired-subtree-toggle
+         "<backtab>" dired-subtree-cycle
+         "t" tmtxt/open-current-dir-in-terminal
          "f" dired-find-file
          "b" dired-up-directory
-         ;; vim keys are better at this stuff i guess
-         ;; vim keys because we live life on the edge
+
          "h" dired-up-directory        ;; was M-x describe-mode
          "j" dired-next-line           ;; was M-x dired-goto-file
          "k" dired-previous-line       ;; was M-x dired-do-kill-lines
          "l" dired-find-file
+
          "SPC" dired-mark
          "~" f/dired-find-home
-         )
+         ))
 
-  ;; show current directory in the header
-  (defun f/dired-dir-header-line ()
-    "Uses `header-line-format' to display the current directory."
-    (interactive)
-    (setq-local header-line-format
-                '((:eval (abbreviate-file-name default-directory)))))
-  (add-hook 'dired-mode-hook 'f/dired-dir-header-line)
-  ) ; "(setup dired..." ends here
-
-;; customize faces with =dired-subtree-depth-[1-6]-face=
-
-(setup (:elpaca dired-rainbow)
-  (:load-after dired)
-  (require 'dired-rainbow)
-  ;; * `dired-rainbow-define` - add face by file extension
-  ;; * `dired-rainbow-define-chmod` - add face by file permissions
-  (dired-rainbow-define-chmod directory       "#69aaff" "d.*")
-  (dired-rainbow-define-chmod executable-unix "#61bd09" "-.*x.*")
-  (dired-rainbow-define html             "#f88785" ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml              "#b8aa07" ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document         "#a89bff" ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown         "#bda38e" ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database         "#69aaff" ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media            "#fd892c" ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image            "#f88785" ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-  (dired-rainbow-define log              "#d2a022" ("log"))
-  (dired-rainbow-define shell            "#fd892c" ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted      "#61bd09" ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled         "#00bbb7" ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable       "#61bd09" ("exe" "msi"))
-  (dired-rainbow-define compressed       "#61bd09" ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-  (dired-rainbow-define packaged         "#fd892c" ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted        "#b8aa07" ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts            "#69aaff" ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition        "#f88785" ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc               "#69aaff" ("git" "gitignore" "gitattributes" "gitmodules"))
-  ;; How it works:
-  ;; After defining `dired-rainbow-define'[-chmod], it creates faces with
-  ;; the provided SYMBOLs and FACE-PROPS as the default. Then the faces
-  ;; can be individually customized on a theme file, overriding the
-  ;; default FACE-PROPS. E.g.:
-  ;; For (dired-rainbow-define markdown...), the face `dired-rainbow-markdown-face'
-  ;; is created.
-  )
+(setup dired-hide-dotfiles
+  (:elpaca dired-hide-dotfiles)
+  (keymap-set dired-mode-map "." #'dired-hide-dotfiles-mode) ; was dired-clean-directory
+  (setopt dired-hide-dotfiles-verbose nil))
 
 (setup (:elpaca dired-narrow))
 (setup (:elpaca dired-subtree))
@@ -129,38 +96,19 @@ The app is chosen from your OS's preference."
     (:require dired-efap))
   (:with-map dired-mode-map
     (:bind "r" dired-efap))
+  (:with-hook dired-efap-mode-hooks
+    (setq-local dirvish-hide-cursor nil))
   (setopt dired-efap-initial-filename-selection nil))
 
-(setup (:elpaca all-the-icons-dired)
-  (:load-after dired)
-  ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
-  (:hook-into dired-mode))
+;; (setup (:elpaca all-the-icons-dired)
+;;   (:load-after dired)
+;;   ;; (all-the-icons-install-fonts t) ; on first run to fix missing icons
+;;   (:hook-into dired-mode))
 
 (setup (:elpaca diredfl)
   (:hook-into dired-mode))
 
-(setup dired
-  (:load-after dired)
-  (:require hl-line)
-
-  (defun f/dired-restore-cursor ()
-    "Restore cursor on current buffer."
-    (setq-local cursor-type t))
-
-  (defun f/dired-hl-line-cursor ()
-    "Hide cursor and enable hl-line for read-only dired browsing."
-    (hl-line-mode 1)
-    (setq-local cursor-type nil))
-
-  ;; Entry into read-only dired
-  (add-hook 'dired-mode-hook #'f/dired-hl-line-cursor)
-
-  ;; wdired: restore on entry, hide on exit
-  (add-hook 'wdired-mode-hook #'f/dired-restore-cursor)
-  (advice-add 'wdired-change-to-dired-mode :after #'f/dired-hl-line-cursor)
-
-  ;; efap: restore on entry, hide on exit
-  (advice-add 'dired-efap :after #'f/dired-restore-cursor)
-  (advice-add 'dired-efap--change-to-dired-mode :after #'f/dired-hl-line-cursor))
+(use-package dired-hl-line-mode
+  :hook (dired-mode . dired-hl-line-mode))
 
 (provide '11xx-dired)

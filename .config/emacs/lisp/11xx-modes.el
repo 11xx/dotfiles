@@ -56,8 +56,11 @@
 (setup (:elpaca yuck-mode))
 (setup ron-mode
   (:elpaca ron-mode)
-  (autoload 'ron-mode "ron-mode" nil t)
-  (add-to-list 'auto-mode-alist '("\\.ron\\'" . ron-mode)))
+  (:autoload ron-mode)
+  (:match-file "*.ron"))
+(setup (:elpaca hyprlang-ts-mode)
+  (:autoload hyprlang-ts-mode)
+  (:match-file "*hyprland.conf"))
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
 
@@ -144,10 +147,13 @@ Null prefix argument turns off the mode."
   (:option typescript-indent-level 2)
   (:hook-into js-mode-hook))
 (setup cc-mode
-  ;; (electric-pair-local-mode -1) ;; #manual-smartparens
-  ;; (smartparens-mode) ;; #manual-smartparens
-  (add-hook 'c-mode-hook #'c-ts-mode)
-  )
+  (setopt c-default-style '((java-mode . "java")
+                            (awk-mode  . "awk")
+                            (other     . "k&r"))
+          c-basic-offset 2))
+
+;; (setup c-ts-mode
+;;   (setopt c-ts-mode-indent-style 'k&r))
 (defun org-babel-execute:c-ts (body params)
   "Execute a block of `c-ts-mode' as `c-mode' with Org Babel."
   (org-babel-execute:C body params))
@@ -203,9 +209,5 @@ using the function `compile' build a command like:
   (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
 (setup (:elpaca lua-mode))
 (setup picard-mode)
-
-(add-hook 'prog-mode-hook
-          (lambda ()
-            (setq-local fill-column 120)))
 
 (provide '11xx-modes)
