@@ -95,5 +95,13 @@
   "key_undoCloseWindow": {
     "modifiers": "accel,alt,shift",
     "key": "\""
+  },
+  "key_newNavigatorTab": {
+    "modifiers": "accel",
+    "key": "T"
+  },
+  "key_quitApplication": {
+    "modifiers": "accel,alt,shift",
+    "key": "Q"
   }
 }

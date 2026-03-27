@@ -73,7 +73,7 @@ user_pref("extensions.enabledScopes", 5);
 user_pref("extensions.installDistroAddons", false);
 user_pref("extensions.update.enabled", false);
 user_pref("extensions.update.notifyUser", false);
-user_pref("focusmanager.testmode", true);
+// user_pref("focusmanager.testmode", true);
 user_pref("general.useragent.updates.enabled", false);
 user_pref("geo.provider.testing", true);
 user_pref("geo.wifi.scan", false);
