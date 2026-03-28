@@ -566,9 +566,8 @@ Personal config modularized into "pseudo-packages"
   (:load-after org))
 
 (require '11xx-modes)
-;; (run-with-idle-timer 3 nil #'require '11xx-modes)
-(run-with-idle-timer 5 nil #'require 'llm-ai-assistants)
-(run-with-idle-timer 2 nil #'require '11xx-pdf-viewer)
+(require 'llm-ai-assistants)
+(require '11xx-pdf-viewer)
 #+end_src
 
 * 11xx-defaults.el: New defaults
@@ -4485,8 +4484,37 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
     https://platform.openai.com/account/api-keys
 # [2023-06-23 Fri 13:14:22 -03]
 #+begin_src emacs-lisp
-(setup (:elpaca gptel)
-  (setopt gptel-model 'gpt-5-nano)
+(setup gptel
+  (:elpaca gptel)
+  (setopt gptel-model 'gpt-5.4-nano
+          gptel-default-mode 'org-mode)
+
+  (with-eval-after-load 'gptel-openai
+    (dolist (model
+             ;; info from 20260327 https://developers.openai.com/api/docs/models
+             '((gpt-5.4-mini
+                :description "Strong mini model for coding, computer use, and subagents"
+                :capabilities (media tool-use json url)
+                :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
+                :context-window 400
+                :input-cost 0.75
+                :output-cost 4.5
+                :cutoff-date "2025-08")
+               (gpt-5.4-nano
+                :description "Cheapest GPT-5.4-class model for simple high-volume tasks"
+                :capabilities (media tool-use json url)
+                :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
+                :context-window 400
+                :input-cost 0.2
+                :output-cost 1.25
+                :cutoff-date "2025-08")))
+      (setq gptel--openai-models
+            (assq-delete-all (car model) gptel--openai-models))
+      (setq gptel--openai-models
+            (append gptel--openai-models (list model))))
+    (gptel-make-openai "ChatGPT"
+      :stream t
+      :models gptel--openai-models))
 
   (gptel-make-gemini "Gemini"
     :stream t
@@ -4500,28 +4528,15 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
     :stream t
     :models '(qwen3.5:9b
               qwen2.5-coder:14b
-              )))
+              ))
+
+  (with-eval-after-load 'org
+    (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")
+    (add-to-list 'org-use-property-inheritance "GPTEL_BACKEND")
+    (add-to-list 'org-use-property-inheritance "GPTEL_SYSTEM")
+    (add-to-list 'org-use-property-inheritance "GPTEL_TEMPERATURE"))
+  )
 #+end_src
-# test chat:
-The =auth-source-pick-first-password= function is used to
-retrieve passwords from the Emacs auth-source database. To add an entry
-to the authinfo file:
-
-1. Open or create your authinfo file (typically =~/.authinfo= or
-   =~/.authinfo.gpg=).
-2. Add an entry in the format:
-   =machine HOSTNAME login USERNAME password PASSWORD=. Replace
-   =HOSTNAME= with the target host, =USERNAME= with your account
-   username (or use =*= as a wildcard), and =PASSWORD= with the
-   corresponding password.
-3. In your Emacs configuration or code, use
-   =(setq gptel-api-key (auth-source-pick-first-password :host "openai.com"))=
-   to retrieve the password associated with the host "openai.com".
-   Adjust the host as needed.
-
-Remember to consider the security implications of using a wildcard
-character for the username, as it allows any username to match and
-retrieve the password.
 
 * 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]

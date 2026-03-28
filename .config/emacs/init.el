@@ -62,6 +62,5 @@ file is newer than all source files.  The generated file is stored in
   (:load-after org))
 
 (require '11xx-modes)
-;; (run-with-idle-timer 3 nil #'require '11xx-modes)
-(run-with-idle-timer 5 nil #'require 'llm-ai-assistants)
-(run-with-idle-timer 2 nil #'require '11xx-pdf-viewer)
+(require 'llm-ai-assistants)
+(require '11xx-pdf-viewer)
