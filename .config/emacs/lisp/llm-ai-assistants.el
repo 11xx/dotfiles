@@ -27,9 +27,9 @@
             (assq-delete-all (car model) gptel--openai-models))
       (setq gptel--openai-models
             (append gptel--openai-models (list model))))
-    (gptel-make-openai "ChatGPT"
-      :stream t
-      :models gptel--openai-models))
+    (setopt gptel-backend (gptel-make-openai "ChatGPT"
+                            :stream t
+                            :models gptel--openai-models)))
 
   (gptel-make-gemini "Gemini"
     :stream t
