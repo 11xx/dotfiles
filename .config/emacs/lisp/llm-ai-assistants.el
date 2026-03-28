@@ -52,4 +52,15 @@
     (add-to-list 'org-use-property-inheritance "GPTEL_TEMPERATURE"))
   )
 
+(elpaca (ob-gptel :host github :repo "jwiegley/ob-gptel")
+  (use-package ob-gptel
+    :config
+    (add-to-list 'org-babel-load-languages '(gptel . t))
+    (defun ob-gptel-setup-completions ()
+      (add-hook 'completion-at-point-functions
+                'ob-gptel-capf nil t))
+    :hook (org-mode . ob-gptel-setup-completions))
+  (use-package ob-gptel-escape-fix
+    :after ob-gptel))
+
 (provide 'llm-ai-assistants)
