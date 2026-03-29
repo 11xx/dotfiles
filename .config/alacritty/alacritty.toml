@@ -29,17 +29,6 @@ style = "Regular"
 bindings = [
 { action = "Paste", key = "Y", mode = "~Vi", mods = "Control|Alt" },
 { action = "Copy", key = "W", mods = "Control|Alt" },
-{ action = "none", key = "Paste" },
-{ action = "none", key = "Copy" },
-{ action = "none", key = "Home", mode = "~Alt", mods = "Shift" },
-{ action = "none", key = "End", mode = "~Alt", mods = "Shift" },
-{ action = "none", key = "F", mode = "~Search", mods = "Control|Shift" },
-{ action = "none", key = "B", mode = "~Search", mods = "Control|Shift" },
-{ action = "none", key = "C", mode = "Vi|~Search", mods = "Control|Shift" },
-{ action = "none", key = "Insert", mods = "Shift" },
-{ action = "none", key = "NumpadAdd", mods = "Control" },
-{ action = "none", key = "Minus", mods = "Control" },
-{ action = "none", key = "NumpadSubtract", mods = "Control" }
 ]
 
 [mouse]
