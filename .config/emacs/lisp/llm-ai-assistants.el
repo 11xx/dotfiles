@@ -62,5 +62,18 @@
     :hook (org-mode . ob-gptel-setup-completions))
   (use-package ob-gptel-escape-fix
     :after ob-gptel))
+(elpaca mcp
+  (use-package mcp
+    :init
+    (setopt mcp-hub-servers
+            '(("searxng" . (:command "podman"
+                                     :args ("run" "--rm" "-i"
+                                            "--network" "host"
+                                            "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                            "docker.io/icewreck/searxng-mcp-server:latest")))))
+    :config
+    (add-hook 'gptel-mode-hook #'mcp-hub-start-all-server)
+    (add-hook 'gptel-mode-hook #'gptel-mcp-connect)
+    ))
 
 (provide 'llm-ai-assistants)
