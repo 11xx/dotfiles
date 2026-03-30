@@ -182,6 +182,7 @@ block.
 This installs around-advice on `gptel--convert-markdown->org' and
 `org-babel-execute:gptel'.  Disabling the mode removes both."
   :global t
+  :lighter nil
   :group 'ob-gptel-escape
   (if ob-gptel-escape-mode
       (progn

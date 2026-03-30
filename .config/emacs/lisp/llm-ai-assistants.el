@@ -70,10 +70,12 @@
                                      :args ("run" "--rm" "-i"
                                             "--network" "host"
                                             "-e" "SEARXNG_URL=http://127.0.0.1:32768"
-                                            "docker.io/icewreck/searxng-mcp-server:latest")))))
+                                            "isokoliuk/mcp-searxng:latest")))))
     :config
     (add-hook 'gptel-mode-hook #'mcp-hub-start-all-server)
-    (add-hook 'gptel-mode-hook #'gptel-mcp-connect)
     ))
+
+(use-package gptel-integrations
+  :after mcp)
 
 (provide 'llm-ai-assistants)
