@@ -746,7 +746,7 @@ Environment=WAYLAND_DISPLAY=wayland-1
 
 ** QT live change outside of KDE
 :PROPERTIES:
-:header-args:conf: :tangle (expand-file-name "environment.d/gtk-qt.conf" (xdg-config-home))
+:header-args:conf: :tangle (expand-file-name "environment.d/qt.conf" (xdg-config-home))
 :header-args:shell+: :tangle setup-modules/gtk-qt.sh
 :CUSTOM_ID: orgid-twrkwj
 :END:
@@ -756,22 +756,11 @@ Environment=WAYLAND_DISPLAY=wayland-1
 
 Make Qt apps listen to =plasma-apply-colorscheme=
 #+begin_src conf
-QT_QPA_PLATFORMTHEME=qt6ct
+QT_QPA_PLATFORMTHEME=kde
 #+end_src
 
-Make GTK apps use a different file picker and read settings form the
-portal depending on the XDG Desktop Portal (e.g. KDE's).
-- *NOTE*:
-  + To use this install =xdg-desktop-portal-gtk=.
-    # [2024-09-07 Sat 12:54:06 -03] @ak
-  + This may break more GTK apps than help and since
-    =xdg-desktop-portal= doesn't really (yet) respect the config file
-    order and it may cause slowdowns at Window Manager's startup.
-    * See note in:
-      - [[file:~/.config/xdg-desktop-portal/README.org::#orgid-uxoxxl][GTK apps lost font rendering, cursor theme or other settings]]
-  + An alternative to this is to enable it on specific programs that
-    should use it instead of enabling globally.
-
+Prepend a directory to PATH that takes precedence over system ones, like
+=/usr/bin=, so wrappers that override env. vars. can be defined.
 #+begin_src conf
 PATH=${XDG_DATA_HOME}/qt-platform-theme-wrappers:${PATH}
 #+end_src
@@ -832,13 +821,17 @@ qtct
 gsettings_plasma dark
 #+end_src
 
-*** TODO QGnomePlatform environment variable wrappers
+*** QT_QPA_PLATFORMTHEME wrappers
 :PROPERTIES:
 :tangle-dir: (expand-file-name "qt-platform-theme-wrappers" (xdg-data-home))
 :header-args:bash: :tangle-mode o775 :mkdirp yes
+:header-args:shell: :tangle-mode o775 :mkdirp yes
 :header-args:python: :tangle-mode o775 :mkdirp yes
 :CUSTOM_ID: orgid-jwzzky
 :END:
 
+**** picard (MusicBrainz)
+#+begin_src shell :tangle (tdir "picard")
+QT_QPA_PLATFORMTHEME=qt5ct /usr/bin/picard
+#+end_src
 
-*** qt5ct update
