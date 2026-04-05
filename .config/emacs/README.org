@@ -518,34 +518,19 @@ Increase Garbage Collection threshold:
 ** Load autoloads
 #+begin_src emacs-lisp
 (defun loaddefs-setup (&optional lisp-dir)
-  "Ensure autoloads for LISP-DIR are current, then load them.
+  "Generate and load autoloads for Lisp files in LISP-DIR.
 
-Scans LISP-DIR (default: `config-lisp-directory') for `;;;###autoload'
-cookies via `loaddefs-generate', skipping regeneration when the output
-file is newer than all source files.  The generated file is stored in
-`no-littering-var-directory' and LISP-DIR is added to `load-path'."
-  (require 'cl-lib)
+Scans LISP-DIR (defaults to `config-lisp-directory') for autoload
+cookies and writes the result to config-loaddefs.el in
+`no-littering-var-directory', adding LISP-DIR to `load-path'."
   (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
-         (out (expand-file-name "config-loaddefs.el"
-                                no-littering-var-directory))
-         (sources (directory-files dir t "\\.el\\'"))
-         (out-attrs (and (file-exists-p out) (file-attributes out)))
-         (out-mtime  (and out-attrs
-                          (file-attribute-modification-time out-attrs))))
+         (out (expand-file-name "config-loaddefs.el" no-littering-var-directory)))
     (add-to-list 'load-path dir)
-    (when (or (not out-mtime)
-              (cl-some (lambda (f)
-                         (time-less-p
-                          out-mtime
-                          (file-attribute-modification-time
-                           (file-attributes f))))
-                       sources))
-      (loaddefs-generate dir out))
+    (loaddefs-generate dir out)
     (load out nil :nomessage)))
 
 (loaddefs-setup config-lisp-directory)
 #+end_src
-
 
 ** Load config
 Personal config modularized into "pseudo-packages"
