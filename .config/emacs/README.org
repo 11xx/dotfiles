@@ -30,6 +30,14 @@ Here are some complete configuration examples:
 - [[https://tecosaur.github.io/emacs-config/config.html][tecosaur's Doom Emacs Configuration]]
 - [[https://github.com/zw963/.emacs.d/tree/master][GitHub - zw963/.emacs.d: My own .emacs.d]]
 
+
+* early-init.el
+#+begin_src emacs-lisp :tangle early-init.el
+;; -*- lexical-binding: t; -*-
+
+(setq-default lexical-binding t)
+#+end_src
+
 * init.el
 :PROPERTIES:
 :CUSTOM_ID: orgid-uvktht
@@ -4456,13 +4464,13 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 
 * llm-ai-assistants.el: Large Language Models (LLM) AI Assistants
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref llm-ai-assistants-setup
+:header-args:emacs-lisp: :tangle lisp/llm-ai-assistants.el
 :END:
 
-#+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/llm-ai-assistants.el
-<<llm-ai-assistants-setup>>
+#+begin_src emacs-lisp
+;;; llm-ai-assistants.el --- AI assistant features config -*- lexical-binding: t -*-
 
-(provide 'llm-ai-assistants)
+;;; Code
 #+end_src
 
 ** gptel
@@ -4538,6 +4546,28 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
   (add-to-list 'org-structure-template-alist '("gp" . "src gptel"))
 
   :hook (org-mode . ob-gptel-setup-completions))
+
+(with-eval-after-load 'gptel
+  (defun gptel--append-response-footer (beg end)
+    "Append a footer after a completed gptel response."
+    (when (> end beg)
+      (save-excursion
+        (goto-char end)
+        (insert
+         (pcase major-mode
+           ('markdown-mode
+            (concat "\n\n[comment]: <> (Responded: "
+                    (format-time-string "%Y-%m-%d %a %H:%M:%S %:::z")
+                    ")"))
+           ('org-mode
+            (concat "\n\n# Responded: "
+                    (format-time-string "%Y-%m-%d %a %H:%M:%S %:::z")))
+           (_ ""))))))
+
+  (add-hook 'gptel-post-response-functions #'gptel--append-response-footer))
+
+(use-package gptel-titler
+  :load-path "~/code/emacs/gptel-titler/")
 #+end_src
 
 mcp
@@ -4561,6 +4591,23 @@ mcp
 (use-package gptel-integrations
   :after mcp)
 #+end_src
+
+** chat file helper
+#+begin_src emacs-lisp
+(defun new-ai-chat-file (&optional new-file)
+  (interactive)
+  (let* ((defoutfile (expand-file-name (concat (time-stamp-string "%Y%m%dT%H%M%S") ".org") "~/ai/chats/"))
+         (outfile (file-truename (or new-file defoutfile))))
+    (find-file outfile)))
+#+end_src
+
+
+** provide pseudo-package
+#+begin_src emacs-lisp
+(provide 'llm-ai-assistants)
+;;; llm-ai-assistants.el ends here
+#+end_src
+
 
 * 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]

@@ -1,4 +1,7 @@
-;; -*- lexical-binding: t; -*-
+;;; llm-ai-assistants.el --- AI assistant features config -*- lexical-binding: t; -*-
+
+;;; Code
+
 (setup gptel
   (:elpaca gptel)
   (setopt gptel-model 'gpt-5.4-nano
@@ -63,6 +66,29 @@
   (add-to-list 'org-structure-template-alist '("gp" . "src gptel"))
 
   :hook (org-mode . ob-gptel-setup-completions))
+
+(with-eval-after-load 'gptel
+  (defun gptel--append-response-footer (beg end)
+    "Append a footer after a completed gptel response."
+    (when (> end beg)
+      (save-excursion
+        (goto-char end)
+        (insert
+         (pcase major-mode
+           ('markdown-mode
+            (concat "\n\n[comment]: <> (Responded: "
+                    (format-time-string "%Y-%m-%d %a %H:%M:%S %:::z")
+                    ")"))
+           ('org-mode
+            (concat "\n\n# Responded: "
+                    (format-time-string "%Y-%m-%d %a %H:%M:%S %:::z")))
+           (_ ""))))))
+
+  (add-hook 'gptel-post-response-functions #'gptel--append-response-footer))
+
+(use-package gptel-titler
+  :load-path "~/code/emacs/gptel-titler/")
+
 (elpaca mcp
   (use-package mcp
     :init
@@ -82,4 +108,11 @@
 (use-package gptel-integrations
   :after mcp)
 
+(defun new-ai-chat-file (&optional new-file)
+  (interactive)
+  (let* ((defoutfile (expand-file-name (concat (time-stamp-string "%Y%m%dT%H%M%S") ".org") "~/ai/chats/"))
+         (outfile (file-truename (or new-file defoutfile))))
+    (find-file outfile)))
+
 (provide 'llm-ai-assistants)
+;;; llm-ai-assistants.el ends here

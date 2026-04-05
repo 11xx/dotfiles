@@ -1,4 +1,7 @@
 ;; -*- lexical-binding: t; -*-
+
+(setq-default lexical-binding t)
+
 (setq package-enable-at-startup nil)
 
 (add-hook 'emacs-startup-hook
