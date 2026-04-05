@@ -32,11 +32,87 @@ Here are some complete configuration examples:
 
 
 * early-init.el
-#+begin_src emacs-lisp :tangle early-init.el
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle early-init.el
+:END:
+
+Enable lexical binding default.
+# Had bad luck with this actually being set globally in the past but let's see
+#+begin_src emacs-lisp
 ;; -*- lexical-binding: t; -*-
 
 (setq-default lexical-binding t)
 #+end_src
+
+** Disable =package.el=
+In favour of [[#elpaca-bootstrap.el][elpaca]]
+# TODO thinking about changing to package.el+use-package at some point
+#+begin_src emacs-lisp
+(setq package-enable-at-startup nil)
+#+end_src
+
+** Startup time report
+#+begin_src emacs-lisp
+(add-hook 'emacs-startup-hook
+  (lambda ()
+    (message "*** Emacs loaded in %s seconds with %d garbage collections."
+             (emacs-init-time "%.2f")
+             gcs-done)))
+#+end_src
+#+begin_seealso
+- https://blog.d46.us/advanced-emacs-startup/
+- Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
+#+end_seealso
+
+** Prevent white flashbang on startup
+:PROPERTIES:
+:CUSTOM_ID: prevent-white-flashbang-on-startup
+:END:
+
+#+begin_seealso
+Credits: [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]]
+#+end_seealso
+
+When starting a fresh Emacs instance the frame may display a white background
+for a few moments. To fix this simply change the default =background-color=
+from the =early-init.el= file, just so it loads before the frame is created:
+# "#17191a"
+#+begin_example
+(add-to-list 'default-frame-alist '(background-color . "#222222"))
+#+end_example
+# [2022-12-02 Fri 21:23:24 -03]
+
+***** Set initial background color based on system's color scheme
+# pcase example from [[https://www.reddit.com/r/emacs/comments/108kwyl/comment/j3w5j88/?context=3][New package: Darkman integration with Emacs. : emacs]]
+Before loading the theme
+#+begin_src emacs-lisp
+(require 'dbus nil t)
+(defun is-dark-color-scheme-dbus ()
+  ;; copy of 'auto-dark--is-dark-mode-dbus' from 'auto-dark.el'.
+  ;; 0 = light, being a fallback default
+  ;; 1 = dark
+  ;; 2 = light
+   "Read color-scheme from org.freedesktop.portal.Settings appearance interface.
+Returns t if dark, nil otherwise."
+  (eq 1 (caar (dbus-ignore-errors
+                (dbus-call-method
+                 :session
+                 "org.freedesktop.portal.Desktop"
+                 "/org/freedesktop/portal/desktop"
+                 "org.freedesktop.portal.Settings" "Read"
+                 "org.freedesktop.appearance" "color-scheme")))))
+
+(when (and initial-window-system (is-dark-color-scheme-dbus))
+  (setq frame-background-mode 'dark)
+
+  (let ((bg-color "#222222")
+        (fg-color "#eeeeee"))
+    (add-to-list 'initial-frame-alist `(background-color . ,bg-color))
+    (add-to-list 'initial-frame-alist `(foreground-color . ,fg-color))
+    (add-to-list 'default-frame-alist `(background-color . ,bg-color))
+    (add-to-list 'default-frame-alist `(foreground-color . ,fg-color))))
+#+end_src
+
 
 * init.el
 :PROPERTIES:
@@ -54,11 +130,6 @@ Add subdirectory to load path containing custom modules.
 #+end_src
 
 ** Elpaca package manager bootstrap & setup.el
-First disable =package.el= as early as possible in =early-init.el=
-#+begin_src emacs-lisp :tangle early-init.el
-(setq package-enable-at-startup nil)
-#+end_src
-
 Bootstrap elpaca
 #+begin_src emacs-lisp
 (require 'elpaca-bootstrap)
@@ -72,6 +143,7 @@ Install setup with Elpaca and define macros
 *** elpaca-bootstrap.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/elpaca-bootstrap.el
+:CUSTOM_ID: elpaca-bootstrap.el
 :END:
 
 #+begin_src emacs-lisp
@@ -506,21 +578,6 @@ Increase Garbage Collection threshold:
 #+begin_src emacs-lisp
 (setq gc-cons-threshold (* 500 1024 1024))
 (add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
-#+end_src
-
-** Startup report
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle early-init.el
-:END:
-
-- https://blog.d46.us/advanced-emacs-startup/
-  Defun [[https://youtu.be/9i_9hse_Y08?t=234]]
-#+begin_src emacs-lisp
-(add-hook 'emacs-startup-hook
-  (lambda ()
-    (message "*** Emacs loaded in %s seconds with %d garbage collections."
-             (emacs-init-time "%.2f")
-             gcs-done)))
 #+end_src
 
 ** Load autoloads
@@ -4105,9 +4162,12 @@ number."
 #+end_src
 
 *** Theme
+#+begin_seealso
+- [[#prevent-white-flashbang-on-startup][Prevent white flashbang on startup]]
 - [[https://emacs.stackexchange.com/questions/2797/emacs-wont-load-theme-on-startup/19271#19271][init file - Emacs won't load theme on startup - Emacs Stack Exchange]]
 - [[https://stackoverflow.com/questions/22977387/setting-the-emacs-theme-on-startup-without-the-interactive-mode][elisp - setting the emacs theme on startup without the interactive mode - Stack Overflow]]
 - [[https://stackoverflow.com/questions/18904529/after-emacs-deamon-i-can-not-see-new-theme-in-emacsclient-frame-it-works-fr/23668935#23668935][After 'emacs --deamon' I can not see new theme in emacsclient frame. It works from 'emacs M-x server-start' - Stack Overflow]]
+#+end_seealso
 
 **** Load theme path
 *NOTE:* Make sure to save a custom theme with the =-theme= suffix,
@@ -4169,53 +4229,6 @@ Load theme based on Dark or Light system theme:
                              (neron-light)))
   (auto-dark-mode)
   (:hide-mode))
-#+end_src
-
-**** Prevent white flashbang on startup
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
-:END:
-# :header-args:emacs-lisp: :tangle early-init.el :noweb-ref dummy
-src [[https://github.com/doomemacs/doomemacs/issues/2828#issuecomment-627095431][White flash on initial open · Issue #2828 · doomemacs/doomemacs]].
-
-When starting a fresh Emacs instance the frame may display a white background
-for a few moments. To fix this simply change the default =background-color=
-from the =early-init.el= file, just so it loads before the frame is created:
-# "#17191a"
-#+begin_example
-(add-to-list 'default-frame-alist '(background-color . "#222222"))
-#+end_example
-# [2022-12-02 Fri 21:23:24 -03]
-
-***** Set initial background color based on system's color scheme
-# pcase example from [[https://www.reddit.com/r/emacs/comments/108kwyl/comment/j3w5j88/?context=3][New package: Darkman integration with Emacs. : emacs]]
-Before loading the theme
-#+begin_src emacs-lisp
-(require 'dbus nil t)
-(defun is-dark-color-scheme-dbus ()
-  ;; copy of 'auto-dark--is-dark-mode-dbus' from 'auto-dark.el'.
-  ;; 0 = light, being a fallback default
-  ;; 1 = dark
-  ;; 2 = light
-   "Read color-scheme from org.freedesktop.portal.Settings appearance interface.
-Returns t if dark, nil otherwise."
-  (eq 1 (caar (dbus-ignore-errors
-                (dbus-call-method
-                 :session
-                 "org.freedesktop.portal.Desktop"
-                 "/org/freedesktop/portal/desktop"
-                 "org.freedesktop.portal.Settings" "Read"
-                 "org.freedesktop.appearance" "color-scheme")))))
-
-(when (and initial-window-system (is-dark-color-scheme-dbus))
-  (setq frame-background-mode 'dark)
-
-  (let ((bg-color "#222222")
-        (fg-color "#eeeeee"))
-    (add-to-list 'initial-frame-alist `(background-color . ,bg-color))
-    (add-to-list 'initial-frame-alist `(foreground-color . ,fg-color))
-    (add-to-list 'default-frame-alist `(background-color . ,bg-color))
-    (add-to-list 'default-frame-alist `(foreground-color . ,fg-color))))
 #+end_src
 
 *** ibuffer mode
