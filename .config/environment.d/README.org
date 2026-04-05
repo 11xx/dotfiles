@@ -144,3 +144,12 @@ PATH=${PATH}:${XDG_BIN_HOME}/git
 PATH=${PATH}:${HOME}/code/linux-scripts
 #+end_src
 
+* gtk.conf: GTK customization
+:PROPERTIES:
+:header-args:conf: :tangle gtk.conf
+:END:
+
+specially on non-DE window manager environments
+#+begin_src conf
+LD_PRELOAD=/usr/lib/libgtk-nocsd.so.0
+#+end_src
