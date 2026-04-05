@@ -1,5 +1,6 @@
 ;;; org-stable-ids.el --- Stable slug-based IDs for Org headings and export  -*- lexical-binding: t; -*-
 
+;; should this be a separate package?
 ;; Author: The Author <author@example.com>
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "30.1") (org "9.6"))
@@ -22,11 +23,13 @@
 ;;     verbatim; <<targets>>, named tables, and list-item targets are also
 ;;     handled.
 ;;
-;; Suggested configuration:
+;; Example usage:
 ;;
-;;   (with-eval-after-load 'ox
-;;     (org-stable-ids-setup))
-;;   (keymap-global-set "C-c o i" #'org-stable-id-get-create)
+;;     (with-eval-after-load 'ox
+;;       (require 'org-stable-ids)
+;;       (org-stable-ids-setup)
+;;       (keymap-global-set "C-c o i" #'org-stable-id-get-create))
+
 
 ;;; Code:
 

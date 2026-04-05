@@ -177,8 +177,10 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (interactive)
   (readme-to-markdown "README.md"))
 
-(require 'org-stable-ids)
-(org-stable-ids-setup)
+(with-eval-after-load 'ox
+  (require 'org-stable-ids)
+  (org-stable-ids-setup)
+  (keymap-global-set "C-c o i" #'org-stable-id-get-create))
 ;; Publish
 (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
   (unless (file-exists-p dir) (make-directory dir t))

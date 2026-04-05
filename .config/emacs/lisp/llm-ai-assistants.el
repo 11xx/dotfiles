@@ -52,27 +52,31 @@
     (add-to-list 'org-use-property-inheritance "GPTEL_TEMPERATURE"))
   )
 
-(elpaca (ob-gptel :host github :repo "jwiegley/ob-gptel")
-  (use-package ob-gptel
-    :config
-    (add-to-list 'org-babel-load-languages '(gptel . t))
-    (defun ob-gptel-setup-completions ()
-      (add-hook 'completion-at-point-functions
-                'ob-gptel-capf nil t))
-    :hook (org-mode . ob-gptel-setup-completions))
-  (use-package ob-gptel-escape-fix
-    :after ob-gptel))
+(use-package ob-gptel
+  :load-path "~/clones/11xx-ob-gptel/"
+  :config
+  (add-to-list 'org-babel-load-languages '(gptel . t))
+  (defun ob-gptel-setup-completions ()
+    (add-hook 'completion-at-point-functions
+              'ob-gptel-capf nil t))
+
+  (add-to-list 'org-structure-template-alist '("gp" . "src gptel"))
+
+  :hook (org-mode . ob-gptel-setup-completions))
 (elpaca mcp
   (use-package mcp
     :init
     (setopt mcp-hub-servers
-            '(("searxng" . (:command "podman"
-                                     :args ("run" "--rm" "-i"
-                                            "--network" "host"
-                                            "-e" "SEARXNG_URL=http://127.0.0.1:32768"
-                                            "isokoliuk/mcp-searxng:latest")))))
-    :config
-    (add-hook 'gptel-mode-hook #'mcp-hub-start-all-server)
+            '(("searxng-isokoliuk" . (:command "podman"
+                                               :args ("run" "--rm" "-i"
+                                                      "--network" "host"
+                                                      "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                      "isokoliuk/mcp-searxng:latest")))
+              ("searxng-icewreck" . (:command "podman"
+                                              :args ("run" "--rm" "-i"
+                                                     "--network" "host"
+                                                     "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                     "docker.io/icewreck/searxng-mcp-server:latest")))))
     ))
 
 (use-package gptel-integrations
