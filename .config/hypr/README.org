@@ -943,6 +943,11 @@ windowrule = match:class com.github.hluk.copyq, float on
 bind = SUPER, grave, exec, copyq toggle
 #+end_src
 
+** dev.conf
+stuff for development
+#+begin_src hyprlang-ts
+source = dev.conf
+#+end_src
 
 * =hypridle.conf=: Idle management daemon
 :PROPERTIES:
