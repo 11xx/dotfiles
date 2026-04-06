@@ -116,12 +116,81 @@ Returns t if dark, nil otherwise."
 
 * init.el
 :PROPERTIES:
-:header-args:emacs-lisp+: :tangle init.el
+:header-args:emacs-lisp+: :tangle init.el :padline no
 :CUSTOM_ID: init-el
 :END:
 
-Add subdirectory to load path containing custom modules.
+** Customise Options/Variables
 #+begin_src emacs-lisp
+(setopt read-process-output-max (* 3 (* 1024 1024)))
+#+end_src
+"Increase the amount of data which Emacs reads from the process.
+Again the emacs default is too low 4k considering that the some of
+the language server responses are in 800k - 3M range."
+[[https://emacs-lsp.github.io/lsp-mode/page/performance/][emacs-lsp - Performance Guide]]
+
+- Indentation options
+  + See
+    * [[https://www.emacswiki.org/emacs/NoTabs#h5o-1][So How Do I Insert a Tab If I Really Have To?]]
+    * [[https://kb.iu.edu/d/abde][Set tab size]]
+    * [[https://www.emacswiki.org/emacs/NoTabs][No Tabs]]
+
+Disable tabs for spaces.
+#+begin_src emacs-lisp
+(setopt indent-tabs-mode nil ; disable tabs
+        tab-width 2
+        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
+        tab-always-indent t)
+#+end_src
+
+Where paragraph breaks
+#+begin_src emacs-lisp
+(setopt fill-column 79)
+#+end_src
+
+start up behavior
+See [[https://tychoish.com/post/towards-faster-emacs-start-times/][Towards Faster Emacs Start Times#Helpful Settings]]
+#+begin_src emacs-lisp
+(setopt inhibit-startup-message t
+        initial-scratch-message nil)
+#+end_src
+
+undo/redo
+[[https://emacs.stackexchange.com/questions/51956/no-further-undo-information/51970#51970][No further undo information - Emacs Stack Exchange]]
+#+begin_src emacs-lisp
+(setopt undo-limit (* 1024 1024 1024)
+        undo-strong-limit (* 1024 1024 1024)
+        undo-outer-limit (* 1024 1024 1024))
+#+end_src
+
+Turn off sounds
+- [[https://emacs.stackexchange.com/questions/28906/how-to-switch-off-the-sounds][bell - How to switch off the sounds? - Emacs Stack Exchange]]
+#+begin_src emacs-lisp
+(setopt ring-bell-function 'ignore)
+#+end_src
+# [2024-02-03 Sat 23:36:30 -03:00] @winr58
+
+- Laggy/Sluggish cursor movement
+  #+begin_seealso
+  - [[https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746#28746][motion - Emacs point(cursor) movement lag - Emacs Stack Exchange]]
+  # [2023-06-20 Tue 12:58:11 -03]
+  - [[https://www.reddit.com/r/emacs/comments/819v0h/how_to_speed_up_cursor_movement_by_10x/][How to speed up cursor movement by 10x : emacs]]
+    As pointed in the command, this is probably a package issue, since running
+    ~emacs -Q~ doesn't present this issue.
+  - ~auto-window-vscroll~ made the most difference, go figure 🤷‍
+  #+end_seealso
+#+begin_src emacs-lisp
+(setopt auto-window-vscroll nil)
+#+end_src
+
+Little safety-net for internal deletion functions
+#+begin_src emacs-lisp
+(setopt delete-by-moving-to-trash t)
+#+end_src
+
+** Additional load-path directories
+Add subdirectory to load path containing custom modules.
+#+begin_src emacs-lisp :padline yes
 (defvar config-lisp-directory
   (expand-file-name "lisp/" user-emacs-directory)
   "Directory containing local configuration Lisp source files.")
@@ -800,75 +869,6 @@ Backup & auto-save
   (add-to-list 'ispell-skip-region-alist '("=" "="))
   (add-to-list 'ispell-skip-region-alist '("^#\\+BEGIN_SRC" . "^#\\+END_SRC")))
 (add-hook 'org-mode-hook #'endless/org-ispell)
-#+end_src
-
-*** Set Options/Variables
-#+begin_src emacs-lisp
-(setopt read-process-output-max (* 3 (* 1024 1024)))
-#+end_src
-"Increase the amount of data which Emacs reads from the process.
-Again the emacs default is too low 4k considering that the some of
-the language server responses are in 800k - 3M range."
-[[https://emacs-lsp.github.io/lsp-mode/page/performance/][emacs-lsp - Performance Guide]]
-
-- Indentation options
-  + See
-    * [[https://www.emacswiki.org/emacs/NoTabs#h5o-1][So How Do I Insert a Tab If I Really Have To?]]
-    * [[https://kb.iu.edu/d/abde][Set tab size]]
-    * [[https://www.emacswiki.org/emacs/NoTabs][No Tabs]]
-
-Disable tabs for spaces.
-#+begin_src emacs-lisp
-(setopt indent-tabs-mode nil ; disable tabs
-        tab-width 2
-        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
-        tab-always-indent t)
-#+end_src
-
-Where paragraph breaks
-#+begin_src emacs-lisp
-(setopt fill-column 79)
-#+end_src
-
-
-start up behavior
-See [[https://tychoish.com/post/towards-faster-emacs-start-times/][Towards Faster Emacs Start Times#Helpful Settings]]
-#+begin_src emacs-lisp
-(setopt inhibit-startup-message t
-        initial-scratch-message nil)
-#+end_src
-
-undo/redo
-[[https://emacs.stackexchange.com/questions/51956/no-further-undo-information/51970#51970][No further undo information - Emacs Stack Exchange]]
-#+begin_src emacs-lisp
-(setopt undo-limit (* 1024 1024 1024)
-        undo-strong-limit (* 1024 1024 1024)
-        undo-outer-limit (* 1024 1024 1024))
-#+end_src
-
-Turn off sounds
-- [[https://emacs.stackexchange.com/questions/28906/how-to-switch-off-the-sounds][bell - How to switch off the sounds? - Emacs Stack Exchange]]
-#+begin_src emacs-lisp
-(setopt ring-bell-function 'ignore)
-#+end_src
-# [2024-02-03 Sat 23:36:30 -03:00] @winr58
-
-- Laggy/Sluggish cursor movement
-  #+begin_seealso
-  - [[https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746#28746][motion - Emacs point(cursor) movement lag - Emacs Stack Exchange]]
-  # [2023-06-20 Tue 12:58:11 -03]
-  - [[https://www.reddit.com/r/emacs/comments/819v0h/how_to_speed_up_cursor_movement_by_10x/][How to speed up cursor movement by 10x : emacs]]
-    As pointed in the command, this is probably a package issue, since running
-    ~emacs -Q~ doesn't present this issue.
-  - ~auto-window-vscroll~ made the most difference, go figure 🤷‍
-  #+end_seealso
-#+begin_src emacs-lisp
-(setopt auto-window-vscroll nil)
-#+end_src
-
-Little safety-net for internal deletion functions
-#+begin_src emacs-lisp
-(setopt delete-by-moving-to-trash t)
 #+end_src
 
 ** =custom.el= file

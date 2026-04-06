@@ -1,24 +1,33 @@
 ;; -*- lexical-binding: t; -*-
+(setopt read-process-output-max (* 3 (* 1024 1024)))
+(setopt indent-tabs-mode nil ; disable tabs
+        tab-width 2
+        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
+        tab-always-indent t)
+(setopt fill-column 79)
+(setopt inhibit-startup-message t
+        initial-scratch-message nil)
+(setopt undo-limit (* 1024 1024 1024)
+        undo-strong-limit (* 1024 1024 1024)
+        undo-outer-limit (* 1024 1024 1024))
+(setopt ring-bell-function 'ignore)
+(setopt auto-window-vscroll nil)
+(setopt delete-by-moving-to-trash t)
+
 (defvar config-lisp-directory
   (expand-file-name "lisp/" user-emacs-directory)
   "Directory containing local configuration Lisp source files.")
 
 (add-to-list 'load-path config-lisp-directory)
-
 (require 'elpaca-bootstrap)
-
 (require '11xx-setup)
-
 (require 'init-no-littering)
 (require 'init-backup-auto-save)
-
 (setopt native-comp-jit-compilation t
         package-native-compile t
         native-comp-async-report-warnings-errors 'silent)
-
 (setq gc-cons-threshold (* 500 1024 1024))
 (add-hook 'elpaca-after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
-
 (defun loaddefs-setup (&optional lisp-dir)
   "Generate and load autoloads for Lisp files in LISP-DIR.
 
@@ -31,7 +40,6 @@ cookies and writes the result to config-loaddefs.el in
     (load out nil :nomessage)))
 
 (loaddefs-setup config-lisp-directory)
-
 (require '11xx-functions)
 (require 'utf-8-default)
 (require '11xx-defaults)

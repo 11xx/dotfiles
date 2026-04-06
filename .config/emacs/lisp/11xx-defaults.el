@@ -118,28 +118,6 @@
 
 (setup (:elpaca delight))
 
-(setopt read-process-output-max (* 3 (* 1024 1024)))
-
-(setopt indent-tabs-mode nil ; disable tabs
-        tab-width 2
-        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
-        tab-always-indent t)
-
-(setopt fill-column 79)
-
-(setopt inhibit-startup-message t
-        initial-scratch-message nil)
-
-(setopt undo-limit (* 1024 1024 1024)
-        undo-strong-limit (* 1024 1024 1024)
-        undo-outer-limit (* 1024 1024 1024))
-
-(setopt ring-bell-function 'ignore)
-
-(setopt auto-window-vscroll nil)
-
-(setopt delete-by-moving-to-trash t)
-
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
 (load custom-file 'noerror 'nomessage)
