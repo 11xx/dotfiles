@@ -9,7 +9,8 @@
 
 (require '11xx-setup)
 
-(require 'clean-emacs-user-directory)
+(require 'init-no-littering)
+(require 'init-backup-auto-save)
 
 (setopt native-comp-jit-compilation t
         package-native-compile t
@@ -26,7 +27,6 @@ cookies and writes the result to config-loaddefs.el in
 `no-littering-var-directory', adding LISP-DIR to `load-path'."
   (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
          (out (expand-file-name "config-loaddefs.el" no-littering-var-directory)))
-    (add-to-list 'load-path dir)
     (loaddefs-generate dir out)
     (load out nil :nomessage)))
 

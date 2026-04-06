@@ -142,113 +142,9 @@ Install setup with Elpaca and define macros
 
 ** Clean Emacs directory
 #+begin_src emacs-lisp
-(require 'clean-emacs-user-directory)
-#+end_src
-
-*** Clean Emacs directory
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/clean-emacs-user-directory.el
-:END:
-
-#+begin_src emacs-lisp
 (require 'init-no-littering)
 (require 'init-backup-auto-save)
-
-(provide 'clean-emacs-user-directory)
 #+end_src
-
-*** init-no-littering.el: Keep user-emacs-directory clean
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/init-no-littering.el :noweb-ref no-littering
-:END:
-
-#+begin_src emacs-lisp
-(elpaca no-littering (require 'no-littering))
-(elpaca-wait)
-
-(when (fboundp 'startup-redirect-eln-cache)
-  (startup-redirect-eln-cache
-   (convert-standard-filename
-    (expand-file-name  "eln-cache" no-littering-var-directory))))
-
-(add-to-list 'native-comp-eln-load-path
-             (convert-standard-filename
-              (expand-file-name "eln-cache" no-littering-var-directory)))
-
-(provide 'init-no-littering)
-#+end_src
-
-*** init-backup-auto-save.el: Move back-up and auto-save files
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/init-backup-auto-save.el
-:END:
-
-Backup & auto-save
-#+begin_seealso
-- See
-  + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
-  + [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][backup files config example]]
-  + [[https://emacs.stackexchange.com/questions/60970/how-to-replace-focus-out-hook-with-after-focus-change-function-in-emacs-27/60971#60971][replacing focus-out-hook]]
-  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files#437563]]
-  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
-#+end_seealso
-
-#+begin_src emacs-lisp
-(require '11xx-functions)
-
-(defvar 11xx--backup-directory
-  (expand-file-name "backups"
-                    (expand-file-name "var" user-emacs-directory))
-  "Custom backup-files directory.")
-
-;; Auto-save directory variable
-(defvar 11xx--auto-save-directory
-  (expand-file-name "auto-save"
-                    (expand-file-name "var" user-emacs-directory))
-  "Custom auto-save files directory.")
-
-(f/check-make-directory 11xx--backup-directory)
-(f/check-make-directory 11xx--auto-save-directory)
-
-;; ;; add random number to auto save file list
-;; (defun f/auto-save-list-file-name-function ()
-;;   (let ((basename (concat 11xx--auto-save-directory "/auto-save-list-"))
-;;         (random-number (number-to-string (random))))
-;;     (concat basename (substring random-number 0 8) "~")))
-;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
-
-(setopt backup-directory-alist `((".*" . ,11xx--backup-directory))
-        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat 11xx--auto-save-directory "\\\\1") t))
-        auto-save-list-file-prefix 11xx--auto-save-directory
-        auto-save-list-file-name (concat 11xx--auto-save-directory "/auto-save-list")
-        make-backup-files t    ; backup of a file the first time it is saved.
-        backup-by-copying t    ; don't clobber symlinks
-        version-control t      ; version numbers for backup files
-        delete-old-versions t  ; delete excess backup files silently
-        kept-old-versions 6    ; oldest versions to keep when a new numbered backup is made (default: 2)
-        kept-new-versions 9    ; newest versions to keep when a new numbered backup is made (default: 2)
-        auto-save-default t    ; auto-save every buffer that visits a file
-        auto-save-timeout 10   ; number of seconds idle time before auto-save (default: 30)
-        auto-save-interval 150) ; number of keystrokes between auto-saves (default: 300)
-
-;; silence "Auto-saving..." messages on minibuffer
-(advice-add 'do-auto-save :around
-  (lambda (orig-fn &rest args)
-    (let ((inhibit-message t))
-      (apply orig-fn args))))
-
-(provide 'init-backup-auto-save)
-#+end_src
-- *NOTE* about =.#filename@=: They're lock files and are meant to be
-  alongside the file being edited until a save occurs.
-
-  Instead, disable lock files (=.#file@=).
-  + See https://emacs.stackexchange.com/a/78802.
-  #+begin_src emacs-lisp
-  (setopt create-lockfiles nil)
-  #+end_src
-  +Is this legacy stuff from the ancient times of shared terminals?+
-  # [2024-02-14 Wed 11:00:23 -03] @ak
 
 ** Native compilation settings
 #+begin_src emacs-lisp
@@ -277,7 +173,6 @@ cookies and writes the result to config-loaddefs.el in
 `no-littering-var-directory', adding LISP-DIR to `load-path'."
   (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
          (out (expand-file-name "config-loaddefs.el" no-littering-var-directory)))
-    (add-to-list 'load-path dir)
     (loaddefs-generate dir out)
     (load out nil :nomessage)))
 
@@ -621,6 +516,101 @@ Analogous to use-package's :config — runs on first require, not on elpaca acti
 (provide '11xx-setup)
 ;;; 11xx-setup.el ends here
 #+end_src
+
+
+
+* init-no-littering.el: Keep user-emacs-directory clean
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/init-no-littering.el
+:END:
+
+#+begin_src emacs-lisp
+(elpaca no-littering (require 'no-littering))
+(elpaca-wait)
+
+(when (fboundp 'startup-redirect-eln-cache)
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name  "eln-cache" no-littering-var-directory))))
+
+(add-to-list 'native-comp-eln-load-path
+             (convert-standard-filename
+              (expand-file-name "eln-cache" no-littering-var-directory)))
+
+(provide 'init-no-littering)
+#+end_src
+
+* init-backup-auto-save.el: Move back-up and auto-save files
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/init-backup-auto-save.el
+:END:
+
+Backup & auto-save
+#+begin_seealso
+- See
+  + [[https://lucidmanager.org/productivity/manage-files-with-emacs/][manage-files-with-emacs]]
+  + [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][backup files config example]]
+  + [[https://emacs.stackexchange.com/questions/60970/how-to-replace-focus-out-hook-with-after-focus-change-function-in-emacs-27/60971#60971][replacing focus-out-hook]]
+  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/437563#437563][Emacs: Changing the location of auto-save files#437563]]
+  + [[https://superuser.com/questions/411982/emacs-changing-the-location-of-auto-save-files/412007#412007][Emacs: Changing the location of auto-save files#412007]]
+#+end_seealso
+
+#+begin_src emacs-lisp
+(require '11xx-functions)
+
+(defvar 11xx--backup-directory
+  (expand-file-name "backups"
+                    (expand-file-name "var" user-emacs-directory))
+  "Custom backup-files directory.")
+
+;; Auto-save directory variable
+(defvar 11xx--auto-save-directory
+  (expand-file-name "auto-save"
+                    (expand-file-name "var" user-emacs-directory))
+  "Custom auto-save files directory.")
+
+(f/check-make-directory 11xx--backup-directory)
+(f/check-make-directory 11xx--auto-save-directory)
+
+;; ;; add random number to auto save file list
+;; (defun f/auto-save-list-file-name-function ()
+;;   (let ((basename (concat 11xx--auto-save-directory "/auto-save-list-"))
+;;         (random-number (number-to-string (random))))
+;;     (concat basename (substring random-number 0 8) "~")))
+;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
+
+(setopt backup-directory-alist `((".*" . ,11xx--backup-directory))
+        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat 11xx--auto-save-directory "\\\\1") t))
+        auto-save-list-file-prefix 11xx--auto-save-directory
+        auto-save-list-file-name (concat 11xx--auto-save-directory "/auto-save-list")
+        make-backup-files t    ; backup of a file the first time it is saved.
+        backup-by-copying t    ; don't clobber symlinks
+        version-control t      ; version numbers for backup files
+        delete-old-versions t  ; delete excess backup files silently
+        kept-old-versions 6    ; oldest versions to keep when a new numbered backup is made (default: 2)
+        kept-new-versions 9    ; newest versions to keep when a new numbered backup is made (default: 2)
+        auto-save-default t    ; auto-save every buffer that visits a file
+        auto-save-timeout 10   ; number of seconds idle time before auto-save (default: 30)
+        auto-save-interval 150) ; number of keystrokes between auto-saves (default: 300)
+
+;; silence "Auto-saving..." messages on minibuffer
+(advice-add 'do-auto-save :around
+  (lambda (orig-fn &rest args)
+    (let ((inhibit-message t))
+      (apply orig-fn args))))
+
+(provide 'init-backup-auto-save)
+#+end_src
+- *NOTE* about =.#filename@=: They're lock files and are meant to be
+  alongside the file being edited until a save occurs.
+
+  Instead, disable lock files (=.#file@=).
+  + See https://emacs.stackexchange.com/a/78802.
+  #+begin_src emacs-lisp
+  (setopt create-lockfiles nil)
+  #+end_src
+  +Is this legacy stuff from the ancient times of shared terminals?+
+  # [2024-02-14 Wed 11:00:23 -03] @ak
 
 
 * 11xx-defaults.el: New defaults
