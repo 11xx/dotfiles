@@ -80,9 +80,7 @@
                messages-buffer-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
 
-(setup (:elpaca syntax-subword)
-  (:hide-mode global-subword-mode)
-  (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
+(add-hook 'elpaca-after-init-hook #'global-superword-mode)
 
 (setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
@@ -118,7 +116,26 @@
 
 (setup (:elpaca delight))
 
+(setopt ispell-dictionary "en_GB")
+
+(defun endless/org-ispell ()
+  "Configure `ispell-skip-region-alist' for `org-mode'."
+  (make-local-variable 'ispell-skip-region-alist)
+  (add-to-list 'ispell-skip-region-alist '(org-property-drawer-re))
+  (add-to-list 'ispell-skip-region-alist '("~" "~"))
+  (add-to-list 'ispell-skip-region-alist '("=" "="))
+  (add-to-list 'ispell-skip-region-alist '("^#\\+BEGIN_SRC" . "^#\\+END_SRC")))
+(add-hook 'org-mode-hook #'endless/org-ispell)
+
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
+
+(defun check-file-touch (file)
+  "Check if FILE exists and create it if it doesn't.
+It uses `make-empty-file' PARENTS argument 't'."
+  (if (not (file-exists-p file))
+      (make-empty-file file)))
+
+(check-file-touch custom-file)
 
 (load custom-file 'noerror 'nomessage)
 

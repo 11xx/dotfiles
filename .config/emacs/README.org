@@ -786,28 +786,15 @@ Backup & auto-save
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
 #+end_src
 
-- Built-in syntax-based word cursor movement
-  + use of =forward-same-syntax=:
-  + [[https://stackoverflow.com/questions/1771102/changing-emacs-forward-word-behaviour/2565961#2565961][emacs23 - Changing Emacs Forward-Word Behaviour - Stack Overflow]]
-  + [[https://stackoverflow.com/questions/58300666/backward-same-syntax-in-emacs/58306071#58306071]["backward-same-syntax" in Emacs - Stack Overflow]]
-    #+begin_example
-    (defun f/backward-same-syntax ()
-      "Wrapper for `forward-same-syntax' with negative argument."
-      (interactive)
-      (forward-same-syntax -1))
-    #+end_example
-
-- But a better alternative includes subword same-syntax (aka support
-  =camelCase= cursor movement):
-  + [[https://github.com/jpkotta/syntax-subword/blob/master/syntax-subword.el][syntax-subword/syntax-subword.el at master · jpkotta/syntax-subword]]
+- sexp movement
+  #+begin_seealso
+  - [[https://stackoverflow.com/questions/1771102/changing-emacs-forward-word-behaviour/2565961#2565961][emacs23 - Changing Emacs Forward-Word Behaviour - Stack Overflow]]
+  - [[https://stackoverflow.com/questions/58300666/backward-same-syntax-in-emacs/58306071#58306071]["backward-same-syntax" in Emacs - Stack Overflow]]
+  #+end_seealso
 #+begin_src emacs-lisp
-(setup (:elpaca syntax-subword)
-  (:hide-mode global-subword-mode)
-  (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
+(add-hook 'elpaca-after-init-hook #'global-superword-mode)
 #+end_src
-# ;; ;; assigning `syntax-subword-forward' is not necessary just enable `global-syntax-subword-mode'
-# ;; "M-f" forward-word ; syntax-subword-forward ; alt: forward-same-syntax ; was forward-word
-# ;; "M-b" backward-word ; syntax-subword-backward ; alt: f/backward-same-syntax ; was backward-word
+
 
 #+begin_src emacs-lisp
 (setup (:elpaca ace-window)
@@ -850,17 +837,16 @@ Backup & auto-save
 (setup (:elpaca delight))
 #+end_src
 
-#TODO
 - Spell check
-  + =ispell-program-name= should be set when a supported program is installed
-#+begin_src emacs-lisp :noweb-ref dummy :tangle no
-(setopt ispell-alternate-dictionary "en")
+  + =ispell-program-name= should be automatically set when a supported program is
+    installed
+  #+begin_seealso
+  [[https://endlessparentheses.com/ispell-and-org-mode.html][Making Ispell work with org-mode in Emacs · Endless Parentheses]]
+  #+end_seealso
 
-;;         ispell-library-directory "/usr/lib/aspell-0.60/")
-;; ispell-dictionary "en"
-;;         ;; ispell-extra-args '("--sug-mode=ultra" "--lang=en")
+#+begin_src emacs-lisp
+(setopt ispell-dictionary "en_GB")
 
-;; [[https://endlessparentheses.com/ispell-and-org-mode.html][Making Ispell work with org-mode in Emacs · Endless Parentheses]]
 (defun endless/org-ispell ()
   "Configure `ispell-skip-region-alist' for `org-mode'."
   (make-local-variable 'ispell-skip-region-alist)
@@ -880,16 +866,16 @@ Defined in Emacs setup
 #+begin_src emacs-lisp
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
+(defun check-file-touch (file)
+  "Check if FILE exists and create it if it doesn't.
+It uses `make-empty-file' PARENTS argument 't'."
+  (if (not (file-exists-p file))
+      (make-empty-file file)))
+
+(check-file-touch custom-file)
+
 (load custom-file 'noerror 'nomessage)
 #+end_src
-# ;;; Disabling this, uncomment if necessary
-# ;; (defun f/check-file-touch (file)
-# ;;   "Check if FILE exists and create it if it doesn't.
-# ;; It uses `make-empty-file' PARENTS argument 't'."
-# ;;   (if (not (file-exists-p file))
-# ;;       (make-empty-file file)))
-# ;; (f/check-file-touch custom-file)
-
 ** Async
 [[https://github.com/jwiegley/emacs-async][jwiegley/emacs-async: Simple library for asynchronous processing in Emacs]]
 #+begin_src emacs-lisp
