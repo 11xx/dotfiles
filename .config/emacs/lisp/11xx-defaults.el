@@ -1,4 +1,5 @@
 ;; -*- lexical-binding: t; -*-
+
 (setup emacs
   ;; Keybindings
   (:global-set
@@ -57,42 +58,6 @@
   (electric-pair-mode 1)
   (electric-indent-mode 1))
 
-(setopt
- read-process-output-max (* 3 (* 1024 1024)) ;; 3M
- indent-tabs-mode nil ; disable tabs
- tab-width 2
- tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
- tab-always-indent t ; when using the TAB key
- fill-column 79
- ;; inhibit-startup-echo-area-message "lobster"
- inhibit-startup-message 't
- ;; initial-major-mode 'fundamental-mode
- ;; initial-scratch-message 'nil
- undo-limit 1000000000
- undo-strong-limit 1000000000
- undo-outer-limit 1010000000
- ring-bell-function 'ignore
- auto-window-vscroll nil
- delete-by-moving-to-trash t
- )
-
-;; #manual-smartparens
-;; (use-package smartparens
-;;   :ensure t
-;;   :init
-;;   ;; [[https://xenodium.com/emacs-smartparens-auto-indent/][Emacs smartparens auto-indent]]
-;;   ;; [[https://github.com/Fuco1/smartparens/issues/80][Newline and indent on appropriate pairs · Issue #80 · Fuco1/smartparens · GitHub]]
-;;   (defun indent-between-pair (&rest _ignored)
-;;     (newline)
-;;     (indent-according-to-mode)
-;;     (forward-line -1)
-;;     (indent-according-to-mode))
-
-;;   (sp-local-pair 'prog-mode "{" nil :post-handlers '((indent-between-pair "RET")))
-;;   (sp-local-pair 'prog-mode "[" nil :post-handlers '((indent-between-pair "RET")))
-;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
-;;   :config
-;;   (smartparens-global-mode 1))
 (setup whitespace
   (:hide-mode)
   (:hook-into prog-mode text-mode)
@@ -114,9 +79,11 @@
                diff-mode-hook
                messages-buffer-mode-hook)
     (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
+
 (setup (:elpaca syntax-subword)
   (:hide-mode global-subword-mode)
   (add-hook 'elpaca-after-init-hook #'global-syntax-subword-mode))
+
 (setup (:elpaca ace-window)
   ;; Prefixed with C-u swaps, see 'M-h f ace-window'
   (:global-set "M-o" ace-window)
@@ -150,10 +117,35 @@
    "C-c j m b" jump-char-backward-set-mark))
 
 (setup (:elpaca delight))
+
+(setopt read-process-output-max (* 3 (* 1024 1024)))
+
+(setopt indent-tabs-mode nil ; disable tabs
+        tab-width 2
+        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
+        tab-always-indent t)
+
+(setopt fill-column 79)
+
+(setopt inhibit-startup-message t
+        initial-scratch-message nil)
+
+(setopt undo-limit (* 1024 1024 1024)
+        undo-strong-limit (* 1024 1024 1024)
+        undo-outer-limit (* 1024 1024 1024))
+
+(setopt ring-bell-function 'ignore)
+
+(setopt auto-window-vscroll nil)
+
+(setopt delete-by-moving-to-trash t)
+
 (setq custom-file (expand-file-name "custom.el" no-littering-var-directory))
 
 (load custom-file 'noerror 'nomessage)
+
 (setup (:elpaca async))
+
 (setup (:elpaca detached)
   (:global-set
    ;; Replace `async-shell-command' with `detached-shell-command'
@@ -165,13 +157,15 @@
    "<remap> <detached-open-session>" detached-consult-session)
   (:option detached-show-output-on-attach t)
   (detached-init))
+
 (setup tramp
   (:require tramp)
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+
 (setup desktop
   (:require)
 
-  (defvar v/daemon-name
+  (defvar 11xx--daemon-name
     (let ((d (daemonp)))
       (cond
        ((stringp d) d)
@@ -181,14 +175,15 @@
 Mirrors `daemonp': a string for named daemons (--daemon=NAME), \"default\"
 for unnamed (--daemon), nil for interactive sessions.")
 
-  (when v/daemon-name
-    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)
-            desktop-base-lock-name (format ".emacs-%s.desktop.lock" v/daemon-name)))
+  (when 11xx--daemon-name
+    (setopt desktop-base-file-name (format ".emacs-%s.desktop" 11xx--daemon-name)
+            desktop-base-lock-name (format ".emacs-%s.desktop.lock" 11xx--daemon-name)))
 
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
           desktop-auto-save-timeout 1
           desktop-save 'ask-if-new)
   (desktop-save-mode))
+
 (setup (:elpaca eros)
   (:load-after org-mode)
   (:hook-into org-mode)
@@ -197,3 +192,4 @@ for unnamed (--daemon), nil for interactive sessions.")
            eros-overlays-use-font-lock t))
 
 (provide '11xx-defaults)
+;;; 11xx-defaults.el ends here

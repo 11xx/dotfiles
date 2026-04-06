@@ -14,23 +14,23 @@
 ;; (toggle-truncate-lines -1)
 ;; Font configuration
 ;; Check if on Windows and change font (Windows-NT)
-(defvar v/get-default-font
+(defvar 11xx--get-default-font
   (if (eq system-type 'windows-nt)
       ;; "Consolas"
       ;; "Literation Mono Nerd Font" on Linux or "LiterationMono Nerd Font" on (Windows-NT)
       "LiterationMono Nerd Font"
     "Literation Mono Nerd Font")
   "Sets the default font based on the system type.
-To be used with `f/set-font'.")
+To be used with `set-font'.")
 
-(defvar v/get-default-font-size
+(defvar 11xx--get-default-font-size
   (if (eq system-type 'windows-nt)
       11
     11)
   "Sets the default font size based on the system type.
-To be used with `f/set-font'.")
+To be used with `set-font'.")
 
-(defun f/set-font (&rest args)
+(defun set-font (&rest args)
   "Set font face using `set-face-attribute' and keywords.
 Available keywords are:
 
@@ -42,8 +42,8 @@ function `f/get-default-font' that returns a string.
 \":height\" to `set-face-attribute'. It defaults to the value
 from the helper function `f/get-default-font-size' that returns a
 number."
-  (let* ((font (or (plist-get args :name) v/get-default-font))
-         (size (or (plist-get args :size) v/get-default-font-size)))
+  (let* ((font (or (plist-get args :name) 11xx--get-default-font))
+         (size (or (plist-get args :size) 11xx--get-default-font-size)))
     (set-face-attribute 'default nil
                         :font font
                         :height (* size 10))))
@@ -52,9 +52,9 @@ number."
     (add-hook 'after-make-frame-functions
               (lambda (frame)
                 (with-selected-frame frame
-                  (f/set-font))))
+                  (set-font))))
   (add-hook 'elpaca-after-init-hook
-            (lambda () (f/set-font))))
+            (lambda () (set-font))))
 ;; end set font
 (setopt cursor-type 'box
         ;; display-line-numbers-type 'relative

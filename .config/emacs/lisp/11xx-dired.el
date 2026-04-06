@@ -16,14 +16,14 @@ The app is chosen from your OS's preference."
          (start-process "" nil "launch" file-path)))
      file-list)))
 ;; default terminal application path
-(defvar v/terminal (getenv "TERMINAL")
+(defvar 11xx--terminal (getenv "TERMINAL")
   "The default terminal as in the TERMINAL environment variable.")
 ;;; function to open new terminal window at current directory
 (defun tmtxt/open-current-dir-in-terminal ()
   "Open current directory in 'dired-mode' in terminal application."
   (interactive)
   (shell-command (concat
-                  (shell-quote-argument v/terminal)
+                  (shell-quote-argument 11xx--terminal)
                   " "
                   "--working-directory"
                   " "

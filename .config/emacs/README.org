@@ -140,319 +140,6 @@ Install setup with Elpaca and define macros
 (require '11xx-setup)
 #+end_src
 
-*** elpaca-bootstrap.el
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/elpaca-bootstrap.el
-:CUSTOM_ID: elpaca-bootstrap.el
-:END:
-
-#+begin_src emacs-lisp
-(defvar elpaca-installer-version 0.11)
-(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
-(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
-                              :ref nil :depth 1 :inherit ignore
-                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca--activate-package)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
-       (build (expand-file-name "elpaca/" elpaca-builds-directory))
-       (order (cdr elpaca-order))
-       (default-directory repo))
-  (add-to-list 'load-path (if (file-exists-p build) build repo))
-  (unless (file-exists-p repo)
-    (make-directory repo t)
-    (when (<= emacs-major-version 28) (require 'subr-x))
-    (condition-case-unless-debug err
-        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                  ,@(when-let* ((depth (plist-get order :depth)))
-                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                  ,(plist-get order :repo) ,repo))))
-                  ((zerop (call-process "git" nil buffer t "checkout"
-                                        (or (plist-get order :ref) "--"))))
-                  (emacs (concat invocation-directory invocation-name))
-                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
-                  ((require 'elpaca))
-                  ((elpaca-generate-autoloads "elpaca" repo)))
-            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
-          (error "%s" (with-current-buffer buffer (buffer-string))))
-      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
-  (unless (require 'elpaca-autoloads nil t)
-    (require 'elpaca)
-    (elpaca-generate-autoloads "elpaca" repo)
-    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
-(add-hook 'after-init-hook #'elpaca-process-queues)
-(elpaca `(,@elpaca-order))
-#+end_src
-
-/(Separated this provide line to make updating the previous bootstrap
-block easier)/
-#+begin_src emacs-lisp
-(provide 'elpaca-bootstrap)
-#+end_src
-
-
-- *NOTE*: If the following error is given after =M-x elpaca-fetch -> pull -> merge= ::
-  : ⛔ Warning (elpaca): Init installer version does not match [...]
-  Update the install bootstrap: [[https://github.com/progfolio/elpaca/blob/master/doc/manual.md#installer][progfolio/elpaca/doc/manual.md at master]].
-  + [[https://github.com/progfolio/elpaca/issues/70#issuecomment-1440633070][[Bug]: Warning (emacs): Elpaca installer version mismatch · Issue #70 · progfolio/elpaca]]
-
-*** 11xx-setup.el
-:PROPERTIES:
-:header-args:emacs-lisp+: :tangle lisp/11xx-setup.el
-:END:
-
-#+begin_src emacs-lisp
-<<setup-el>>
-
-(provide '11xx-setup)
-#+end_src
-
-**** =setup.el=
-:PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref setup-el :tangle no
-:END:
-#+ATTR_HTML: :class seealso
-- See:
-  + [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
-  + [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
-
-Install pkal's =setup.el= and define its macros
-#+begin_src emacs-lisp
-(elpaca setup (require 'setup))
-(elpaca-wait)
-#+end_src
-
-- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=the%20above%20example-,transforming%20configuration%20errors%20into%20warnings,-This%20code%20transforms][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
-#+begin_src emacs-lisp :noweb-ref
-(defun setup-config-error-into-warning (expansion)
-  "Wrap `setup' output with `condition-case'."
-  (let ((err (gensym "setup-err")))
-    `(condition-case ,err
-   ,expansion
-       (error
-  (display-warning 'setup (concat "Problem in config: "
-          (error-message-string ,err)
-          ": \n"
-          (with-output-to-string
-            (pp (quote ,expansion))))
-                   :error)))))
-
-(advice-add 'setup :filter-return #'setup-config-error-into-warning)
-#+end_src
-
-***** =setup.el= additional macros
-
-****** :elpaca
-- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=elpaca%20is%20an%20elisp%20package%20manager.][EmacsWiki/Setup El#Elpaca]]
-
-Two ways of using elpaca with these macros:
-: (setup-elpaca package-name)
-or
-: (setup (:elpaca package-name))
-also note that elpaca isn't really compatible with setup's lists so
-instead of multiple packages being assigned to the same macro,
-multiple macro calls have to be used, e.g.:
-: (setup (:elpaca package-name1))
-: (setup (:elpaca package-name2))
-
-This macro is a replacement for =(setup)= that uses elpaca to install packages.
-#+begin_src emacs-lisp
-(defmacro setup-elpaca (order &rest body)
-  "Execute BODY in `setup' declaration after ORDER is finished.
-The elpaca package manager installs ORDER."
-  (declare (indent 1))
-  (let ((o order))
-    (when-let ((ensure (cl-position :ensure body)))
-      (setq o (if (null (nth (1+ ensure) body)) nil order)
-            body (append (cl-subseq body 0 ensure)
-                         (cl-subseq body (+ ensure 2)))))
-    `(elpaca ,o (setup
-                    ,(if-let (((memq (car-safe order) '(quote \`)))
-                              (feature (flatten-tree order)))
-                         (cadr feature)
-                       (elpaca--first order))
-                  ,@body))))
-#+end_src
-
-This method uses =setup='s internal keyword and defines =:elpaca= for
-installing packages or if using =(:elpaca nil)= Elpaca won't install but
-still allow execution of BODY.
-#+begin_src emacs-lisp
-(defun setup-wrap-to-install-package (body _name)
-  "Wrap BODY in an `elpaca' block if necessary.
-The body is wrapped in an `elpaca' block if `setup-attributes'
-contains an alist with the key `elpaca'."
-  (if (assq 'elpaca setup-attributes)
-      `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
-    body))
-
-;; Add the wrapper function
-(add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
-
-(setup-define :elpaca
-  (lambda (order &rest recipe)
-    (push (cond
-           ((eq order t) `(elpaca . ,(setup-get 'feature)))
-           ((eq order nil) '(elpaca . nil))
-           (`(elpaca . (,order ,@recipe))))
-          setup-attributes)
-    ;; If the macro wouldn't return nil, it would try to insert the result of
-    ;; `push' which is the new value of the modified list. As this value usually
-    ;; cannot be evaluated, it is better to return nil which the byte compiler
-    ;; would optimize away anyway.
-    nil)
-  :documentation "Install ORDER with `elpaca'.
-The ORDER can be used to deduce the feature context."
-  :shorthand #'cadr)
-#+end_src
-
-****** :local-or-package
-from [[https://www.emacswiki.org/emacs/SetupEl#:~:text=setup-define%20%3Alocal-or-package][EmacsWiki/Setup El#Install a package if not available locally]]
-#+begin_src emacs-lisp
-(setup-define :local-or-package
-  (lambda (feature-or-package)
-    `(unless (locate-file ,(symbol-name feature-or-package)
-                          load-path
-                          (get-load-suffixes))
-       (:elpaca ,feature-or-package)))
-  :documentation "Install PACKAGE if it is not available locally.
-This macro can be used as NAME, and it will replace itself with
-the first PACKAGE."
-  :repeatable t
-  :shorthand #'cadr)
-#+end_src
-
-****** :disabled
-https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
-#+begin_src emacs-lisp
-(setup-define :disabled
-  (lambda ()
-    (setup-quit))
-  :documentation "Always stop evaluating the body.")
-#+end_src
-
-****** :advise
-[[https://www.emacswiki.org/emacs/SetupEl#h5o-11][Add advice]]
-
-Simplify the definition of [[https://www.emacswiki.org/emacs/Advice][Advice]]:
-#+begin_src emacs-lisp
-(setup-define :advise
-    (lambda (symbol where function)
-      `(advice-add ',symbol ,where ,function))
-  :documentation "Add a piece of advice on a function.
-See `advice-add' for more details."
-  :after-loaded t
-  :debug '(sexp sexp function-form)
-  :ensure '(nil nil func)
-  :repeatable t)
-#+end_src
-
-****** :load-after
-#+begin_src emacs-lisp
-(setup-define :load-after
-  (lambda (&rest features)
-    (let ((body `(require ',(setup-get 'feature))))
-      (dolist (feature (nreverse features))
-        (setq body `(with-eval-after-load ',feature ,body)))
-      body))
-  :documentation "Load the current feature after FEATURES.")
-#+end_src
-
-****** :hide-mode
-#+begin_src emacs-lisp
-(setup-define :hide-mode
-  (lambda (&optional mode)
-    (let* ((mode (or mode (setup-get 'mode)))
-           (mode (if (string-match-p "-mode\\'" (symbol-name mode))
-                     mode
-                   (intern (format "%s-mode" mode)))))
-      `(setq minor-mode-alist
-             (delq (assq ',mode minor-mode-alist)
-                   minor-mode-alist))))
-  :documentation "Hide the mode-line lighter of the current mode.
-Alternatively, MODE can be specified manually, and override the
-current mode."
-  :after-loaded t)
-#+end_src
-
-****** :put-enable
-#+begin_src emacs-lisp
-(setup-define :put-enable
-  (lambda (commands)
-    `(put ',commands 'disabled nil))
-  :documentation "Enable disabled COMMANDS."
-  :after-loaded t
-  :repeatable t)
-#+end_src
-
-****** :face
-#+begin_src emacs-lisp
-(setup-define :face
-  (lambda (face spec) `(custom-set-faces (quote (,face ,spec))))
-  :documentation "Customize FACE to SPEC."
-  :signature '(face spec ...)
-  :debug '(setup)
-  :repeatable t
-  :after-loaded t)
-#+end_src
-
-****** :autoload
-#+begin_src emacs-lisp
-(setup-define :autoload
-  (lambda (func)
-    (let ((fn (if (memq (car-safe func) '(quote function))
-                  (cadr func)
-                func)))
-      `(unless (fboundp (quote ,fn))
-         (autoload (function ,fn) ,(symbol-name (setup-get 'feature)) nil t))))
-  :documentation "Autoload COMMAND if not already bound."
-  :repeatable t
-  :signature '(FUNC ...))
-#+end_src
-
-****** =:option*= prefix-less alternative to =:option=
-#+begin_src emacs-lisp
-(setup-define :option*
-  (lambda (name val)
-    `(customize-set-variable
-      ',(intern (format "%s-%s" (setup-get 'feature) name))
-      ,val
-      ,(format "Set for %s's setup block" (setup-get 'feature))))
-  :documentation "Set the option NAME to VAL.
-NAME is not the name of the option itself, but of the option with
-the feature prefix."
-  :debug '(sexp form)
-  :repeatable t)
-#+end_src
-
-****** :global-set
-Adress =:global= deprecation:
-: The ‘:global’ macro for setup has been deprecated, please use ‘keymap-global-set’.
-#+begin_src emacs-lisp
-(setup-define :global-set
-  (lambda (key command)
-    `(keymap-global-set ,key #',command))
-  :documentation "Globally bind KEY to COMMAND using keymap-global-set."
-  :debug '(form sexp)
-  :repeatable t)
-#+end_src
-
-
-****** :config
-#+begin_src emacs-lisp
-(setup-define :config
-  (lambda (&rest body)
-    `(with-eval-after-load ',(setup-get 'feature)
-       ,@body))
-  :documentation "Defer BODY until the current feature is actually loaded.
-Analogous to use-package's :config — runs on first require, not on elpaca activation."
-  :debug '(&rest form)
-  :repeatable nil)
-#+end_src
-
 ** Clean Emacs directory
 #+begin_src emacs-lisp
 (require 'clean-emacs-user-directory)
@@ -509,31 +196,31 @@ Backup & auto-save
 #+begin_src emacs-lisp
 (require '11xx-functions)
 
-(defvar v/backup-directory
+(defvar 11xx--backup-directory
   (expand-file-name "backups"
                     (expand-file-name "var" user-emacs-directory))
   "Custom backup-files directory.")
 
 ;; Auto-save directory variable
-(defvar v/auto-save-directory
+(defvar 11xx--auto-save-directory
   (expand-file-name "auto-save"
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
 
-(f/check-make-directory v/backup-directory)
-(f/check-make-directory v/auto-save-directory)
+(f/check-make-directory 11xx--backup-directory)
+(f/check-make-directory 11xx--auto-save-directory)
 
 ;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
-;;   (let ((basename (concat v/auto-save-directory "/auto-save-list-"))
+;;   (let ((basename (concat 11xx--auto-save-directory "/auto-save-list-"))
 ;;         (random-number (number-to-string (random))))
 ;;     (concat basename (substring random-number 0 8) "~")))
 ;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
 
-(setopt backup-directory-alist `((".*" . ,v/backup-directory))
-        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t))
-        auto-save-list-file-prefix v/auto-save-directory
-        auto-save-list-file-name (concat v/auto-save-directory "/auto-save-list")
+(setopt backup-directory-alist `((".*" . ,11xx--backup-directory))
+        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat 11xx--auto-save-directory "\\\\1") t))
+        auto-save-list-file-prefix 11xx--auto-save-directory
+        auto-save-list-file-name (concat 11xx--auto-save-directory "/auto-save-list")
         make-backup-files t    ; backup of a file the first time it is saved.
         backup-by-copying t    ; don't clobber symlinks
         version-control t      ; version numbers for backup files
@@ -620,21 +307,331 @@ Personal config modularized into "pseudo-packages"
 (require '11xx-pdf-viewer)
 #+end_src
 
-* 11xx-defaults.el: New defaults
-:PROPERTIES:
-:header-args:emacs-lisp: :tangle lisp/11xx-defaults.el :noweb yes
-:END:
-#+begin_src emacs-lisp
-<<new-defaults>>
 
-(provide '11xx-defaults)
+
+* elpaca-bootstrap.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/elpaca-bootstrap.el
+:CUSTOM_ID: elpaca-bootstrap.el
+:END:
+
+#+begin_src emacs-lisp
+(defvar elpaca-installer-version 0.11)
+(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                              :ref nil :depth 1 :inherit ignore
+                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                              :build (:not elpaca--activate-package)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+       (build (expand-file-name "elpaca/" elpaca-builds-directory))
+       (order (cdr elpaca-order))
+       (default-directory repo))
+  (add-to-list 'load-path (if (file-exists-p build) build repo))
+  (unless (file-exists-p repo)
+    (make-directory repo t)
+    (when (<= emacs-major-version 28) (require 'subr-x))
+    (condition-case-unless-debug err
+        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                  ,@(when-let* ((depth (plist-get order :depth)))
+                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                  ,(plist-get order :repo) ,repo))))
+                  ((zerop (call-process "git" nil buffer t "checkout"
+                                        (or (plist-get order :ref) "--"))))
+                  (emacs (concat invocation-directory invocation-name))
+                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                  ((require 'elpaca))
+                  ((elpaca-generate-autoloads "elpaca" repo)))
+            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+          (error "%s" (with-current-buffer buffer (buffer-string))))
+      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+  (unless (require 'elpaca-autoloads nil t)
+    (require 'elpaca)
+    (elpaca-generate-autoloads "elpaca" repo)
+    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+(add-hook 'after-init-hook #'elpaca-process-queues)
+(elpaca `(,@elpaca-order))
 #+end_src
 
-** emacs new defaults def
+/(Separated this provide line to make updating the previous bootstrap
+block easier)/
+#+begin_src emacs-lisp
+(provide 'elpaca-bootstrap)
+#+end_src
+
+
+- *NOTE*: If the following error is given after =M-x elpaca-fetch -> pull -> merge= ::
+  : ⛔ Warning (elpaca): Init installer version does not match [...]
+  Update the install bootstrap: [[https://github.com/progfolio/elpaca/blob/master/doc/manual.md#installer][progfolio/elpaca/doc/manual.md at master]].
+  + [[https://github.com/progfolio/elpaca/issues/70#issuecomment-1440633070][[Bug]: Warning (emacs): Elpaca installer version mismatch · Issue #70 · progfolio/elpaca]]
+
+* 11xx-setup.el
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref new-defaults :tangle no
+:header-args:emacs-lisp: :tangle lisp/11xx-setup.el
 :END:
-*** Emacs setup
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+#+begin_seealso
+- [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#streamlined-configuration-with-setupel][daviwil/dotfiles/Emacs.org#streamlined-configuration-with-setupel]]
+- [[https://git.sr.ht/~pkal/setup/tree/master/item/setup.el][~pkal/setup (master): setup.el - sourcehut git]]
+#+end_seealso
+
+Install pkal's =setup.el= and define its macros
+#+begin_src emacs-lisp
+(elpaca setup (require 'setup))
+(elpaca-wait)
+#+end_src
+
+- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=the%20above%20example-,transforming%20configuration%20errors%20into%20warnings,-This%20code%20transforms][Transforming Configuration Errors Into Warnings | EmacsWiki: Setup El]]
+#+begin_src emacs-lisp :noweb-ref
+(defun setup-config-error-into-warning (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+            (pp (quote ,expansion))))
+                   :error)))))
+
+(advice-add 'setup :filter-return #'setup-config-error-into-warning)
+#+end_src
+
+** =setup.el= additional macros
+
+*** :elpaca
+- [[https://www.emacswiki.org/emacs/SetupEl#:~:text=elpaca%20is%20an%20elisp%20package%20manager.][EmacsWiki/Setup El#Elpaca]]
+
+Two ways of using elpaca with these macros:
+: (setup-elpaca package-name)
+or
+: (setup (:elpaca package-name))
+also note that elpaca isn't really compatible with setup's lists so
+instead of multiple packages being assigned to the same macro,
+multiple macro calls have to be used, e.g.:
+: (setup (:elpaca package-name1))
+: (setup (:elpaca package-name2))
+
+This macro is a replacement for =(setup)= that uses elpaca to install packages.
+#+begin_src emacs-lisp
+(defmacro setup-elpaca (order &rest body)
+  "Execute BODY in `setup' declaration after ORDER is finished.
+The elpaca package manager installs ORDER."
+  (declare (indent 1))
+  (let ((o order))
+    (when-let ((ensure (cl-position :ensure body)))
+      (setq o (if (null (nth (1+ ensure) body)) nil order)
+            body (append (cl-subseq body 0 ensure)
+                         (cl-subseq body (+ ensure 2)))))
+    `(elpaca ,o (setup
+                    ,(if-let (((memq (car-safe order) '(quote \`)))
+                              (feature (flatten-tree order)))
+                         (cadr feature)
+                       (elpaca--first order))
+                  ,@body))))
+#+end_src
+
+This method uses =setup='s internal keyword and defines =:elpaca= for
+installing packages or if using =(:elpaca nil)= Elpaca won't install but
+still allow execution of BODY.
+#+begin_src emacs-lisp
+(defun setup-wrap-to-install-package (body _name)
+  "Wrap BODY in an `elpaca' block if necessary.
+The body is wrapped in an `elpaca' block if `setup-attributes'
+contains an alist with the key `elpaca'."
+  (if (assq 'elpaca setup-attributes)
+      `(elpaca ,(cdr (assq 'elpaca setup-attributes)) ,@(macroexp-unprogn body))
+    body))
+
+;; Add the wrapper function
+(add-to-list 'setup-modifier-list #'setup-wrap-to-install-package)
+
+(setup-define :elpaca
+  (lambda (order &rest recipe)
+    (push (cond
+           ((eq order t) `(elpaca . ,(setup-get 'feature)))
+           ((eq order nil) '(elpaca . nil))
+           (`(elpaca . (,order ,@recipe))))
+          setup-attributes)
+    ;; If the macro wouldn't return nil, it would try to insert the result of
+    ;; `push' which is the new value of the modified list. As this value usually
+    ;; cannot be evaluated, it is better to return nil which the byte compiler
+    ;; would optimize away anyway.
+    nil)
+  :documentation "Install ORDER with `elpaca'.
+The ORDER can be used to deduce the feature context."
+  :shorthand #'cadr)
+#+end_src
+
+*** :local-or-package
+from [[https://www.emacswiki.org/emacs/SetupEl#:~:text=setup-define%20%3Alocal-or-package][EmacsWiki/Setup El#Install a package if not available locally]]
+#+begin_src emacs-lisp
+(setup-define :local-or-package
+  (lambda (feature-or-package)
+    `(unless (locate-file ,(symbol-name feature-or-package)
+                          load-path
+                          (get-load-suffixes))
+       (:elpaca ,feature-or-package)))
+  :documentation "Install PACKAGE if it is not available locally.
+This macro can be used as NAME, and it will replace itself with
+the first PACKAGE."
+  :repeatable t
+  :shorthand #'cadr)
+#+end_src
+
+*** :disabled
+https://github.com/daviwil/dotfiles/blob/master/Emacs.org#disabled
+#+begin_src emacs-lisp
+(setup-define :disabled
+  (lambda ()
+    (setup-quit))
+  :documentation "Always stop evaluating the body.")
+#+end_src
+
+*** :advise
+[[https://www.emacswiki.org/emacs/SetupEl#h5o-11][Add advice]]
+
+Simplify the definition of [[https://www.emacswiki.org/emacs/Advice][Advice]]:
+#+begin_src emacs-lisp
+(setup-define :advise
+    (lambda (symbol where function)
+      `(advice-add ',symbol ,where ,function))
+  :documentation "Add a piece of advice on a function.
+See `advice-add' for more details."
+  :after-loaded t
+  :debug '(sexp sexp function-form)
+  :ensure '(nil nil func)
+  :repeatable t)
+#+end_src
+
+*** :load-after
+#+begin_src emacs-lisp
+(setup-define :load-after
+  (lambda (&rest features)
+    (let ((body `(require ',(setup-get 'feature))))
+      (dolist (feature (nreverse features))
+        (setq body `(with-eval-after-load ',feature ,body)))
+      body))
+  :documentation "Load the current feature after FEATURES.")
+#+end_src
+
+*** :hide-mode
+#+begin_src emacs-lisp
+(setup-define :hide-mode
+  (lambda (&optional mode)
+    (let* ((mode (or mode (setup-get 'mode)))
+           (mode (if (string-match-p "-mode\\'" (symbol-name mode))
+                     mode
+                   (intern (format "%s-mode" mode)))))
+      `(setq minor-mode-alist
+             (delq (assq ',mode minor-mode-alist)
+                   minor-mode-alist))))
+  :documentation "Hide the mode-line lighter of the current mode.
+Alternatively, MODE can be specified manually, and override the
+current mode."
+  :after-loaded t)
+#+end_src
+
+*** :put-enable
+#+begin_src emacs-lisp
+(setup-define :put-enable
+  (lambda (commands)
+    `(put ',commands 'disabled nil))
+  :documentation "Enable disabled COMMANDS."
+  :after-loaded t
+  :repeatable t)
+#+end_src
+
+*** :face
+#+begin_src emacs-lisp
+(setup-define :face
+  (lambda (face spec) `(custom-set-faces (quote (,face ,spec))))
+  :documentation "Customize FACE to SPEC."
+  :signature '(face spec ...)
+  :debug '(setup)
+  :repeatable t
+  :after-loaded t)
+#+end_src
+
+*** :autoload
+#+begin_src emacs-lisp
+(setup-define :autoload
+  (lambda (func)
+    (let ((fn (if (memq (car-safe func) '(quote function))
+                  (cadr func)
+                func)))
+      `(unless (fboundp (quote ,fn))
+         (autoload (function ,fn) ,(symbol-name (setup-get 'feature)) nil t))))
+  :documentation "Autoload COMMAND if not already bound."
+  :repeatable t
+  :signature '(FUNC ...))
+#+end_src
+
+*** =:option*= prefix-less alternative to =:option=
+#+begin_src emacs-lisp
+(setup-define :option*
+  (lambda (name val)
+    `(customize-set-variable
+      ',(intern (format "%s-%s" (setup-get 'feature) name))
+      ,val
+      ,(format "Set for %s's setup block" (setup-get 'feature))))
+  :documentation "Set the option NAME to VAL.
+NAME is not the name of the option itself, but of the option with
+the feature prefix."
+  :debug '(sexp form)
+  :repeatable t)
+#+end_src
+
+*** :global-set
+Adress =:global= deprecation:
+: The ‘:global’ macro for setup has been deprecated, please use ‘keymap-global-set’.
+#+begin_src emacs-lisp
+(setup-define :global-set
+  (lambda (key command)
+    `(keymap-global-set ,key #',command))
+  :documentation "Globally bind KEY to COMMAND using keymap-global-set."
+  :debug '(form sexp)
+  :repeatable t)
+#+end_src
+
+
+*** :config
+#+begin_src emacs-lisp
+(setup-define :config
+  (lambda (&rest body)
+    `(with-eval-after-load ',(setup-get 'feature)
+       ,@body))
+  :documentation "Defer BODY until the current feature is actually loaded.
+Analogous to use-package's :config — runs on first require, not on elpaca activation."
+  :debug '(&rest form)
+  :repeatable nil)
+#+end_src
+
+** provide footer
+#+begin_src emacs-lisp
+(provide '11xx-setup)
+;;; 11xx-setup.el ends here
+#+end_src
+
+
+* 11xx-defaults.el: New defaults
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-defaults.el
+:END:
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+** Emacs setup
 - Notes:
   + *Modes not starting:* Probably due to them being local-buffer specific.
     See [[https://stackoverflow.com/questions/22968922/function-defined-in-emacs-does-not-start-automatically][Function defined in .emacs does not start automatically]].
@@ -702,28 +699,6 @@ Personal config modularized into "pseudo-packages"
   ;; #manual-smartparens
   (electric-pair-mode 1)
   (electric-indent-mode 1))
-
-(setopt
- <<emacs-setup-options>>
- )
-
-;; #manual-smartparens
-;; (use-package smartparens
-;;   :ensure t
-;;   :init
-;;   ;; [[https://xenodium.com/emacs-smartparens-auto-indent/][Emacs smartparens auto-indent]]
-;;   ;; [[https://github.com/Fuco1/smartparens/issues/80][Newline and indent on appropriate pairs · Issue #80 · Fuco1/smartparens · GitHub]]
-;;   (defun indent-between-pair (&rest _ignored)
-;;     (newline)
-;;     (indent-according-to-mode)
-;;     (forward-line -1)
-;;     (indent-according-to-mode))
-
-;;   (sp-local-pair 'prog-mode "{" nil :post-handlers '((indent-between-pair "RET")))
-;;   (sp-local-pair 'prog-mode "[" nil :post-handlers '((indent-between-pair "RET")))
-;;   (sp-local-pair 'prog-mode "(" nil :post-handlers '((indent-between-pair "RET")))
-;;   :config
-;;   (smartparens-global-mode 1))
 #+end_src
 
 - Show whitespace but disable in some modes
@@ -837,15 +812,9 @@ Personal config modularized into "pseudo-packages"
 (add-hook 'org-mode-hook #'endless/org-ispell)
 #+end_src
 
-**** Options/Variables
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref emacs-setup-options
-:END:
-
-This section will go inside =(:option ...)= from =(setup emacs ...)=
-
+*** Set Options/Variables
 #+begin_src emacs-lisp
-read-process-output-max (* 3 (* 1024 1024)) ;; 3M
+(setopt read-process-output-max (* 3 (* 1024 1024)))
 #+end_src
 "Increase the amount of data which Emacs reads from the process.
 Again the emacs default is too low 4k considering that the some of
@@ -860,61 +829,59 @@ the language server responses are in 800k - 3M range."
 
 Disable tabs for spaces.
 #+begin_src emacs-lisp
-indent-tabs-mode nil ; disable tabs
-tab-width 2
-tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
-tab-always-indent t ; when using the TAB key
+(setopt indent-tabs-mode nil ; disable tabs
+        tab-width 2
+        tab-stop-list (number-sequence 2 4 2) ; if `tab-width' in not read, use this
+        tab-always-indent t)
 #+end_src
 
+Where paragraph breaks
 #+begin_src emacs-lisp
-fill-column 79
+(setopt fill-column 79)
 #+end_src
 
 
 start up behavior
 See [[https://tychoish.com/post/towards-faster-emacs-start-times/][Towards Faster Emacs Start Times#Helpful Settings]]
 #+begin_src emacs-lisp
-;; inhibit-startup-echo-area-message "lobster"
-inhibit-startup-message 't
-;; initial-major-mode 'fundamental-mode
-;; initial-scratch-message 'nil
+(setopt inhibit-startup-message t
+        initial-scratch-message nil)
 #+end_src
 
 undo/redo
 [[https://emacs.stackexchange.com/questions/51956/no-further-undo-information/51970#51970][No further undo information - Emacs Stack Exchange]]
-
-These are about 1G each (in bytes)
 #+begin_src emacs-lisp
-undo-limit 1000000000
-undo-strong-limit 1000000000
-undo-outer-limit 1010000000
+(setopt undo-limit (* 1024 1024 1024)
+        undo-strong-limit (* 1024 1024 1024)
+        undo-outer-limit (* 1024 1024 1024))
 #+end_src
 
 Turn off sounds
 - [[https://emacs.stackexchange.com/questions/28906/how-to-switch-off-the-sounds][bell - How to switch off the sounds? - Emacs Stack Exchange]]
 #+begin_src emacs-lisp
-ring-bell-function 'ignore
+(setopt ring-bell-function 'ignore)
 #+end_src
 # [2024-02-03 Sat 23:36:30 -03:00] @winr58
 
 - Laggy/Sluggish cursor movement
-  + See
-    * [[https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746#28746][motion - Emacs point(cursor) movement lag - Emacs Stack Exchange]]
-      # [2023-06-20 Tue 12:58:11 -03]
-    * [[https://www.reddit.com/r/emacs/comments/819v0h/how_to_speed_up_cursor_movement_by_10x/][How to speed up cursor movement by 10x : emacs]]
-      As pointed in the command, this is probably a package issue, since
-      running ~emacs -Q~ doesn't present this issue.
-  + ~auto-window-vscroll~ made the most difference, go figure 🤷‍
+  #+begin_seealso
+  - [[https://emacs.stackexchange.com/questions/28736/emacs-pointcursor-movement-lag/28746#28746][motion - Emacs point(cursor) movement lag - Emacs Stack Exchange]]
+  # [2023-06-20 Tue 12:58:11 -03]
+  - [[https://www.reddit.com/r/emacs/comments/819v0h/how_to_speed_up_cursor_movement_by_10x/][How to speed up cursor movement by 10x : emacs]]
+    As pointed in the command, this is probably a package issue, since running
+    ~emacs -Q~ doesn't present this issue.
+  - ~auto-window-vscroll~ made the most difference, go figure 🤷‍
+  #+end_seealso
 #+begin_src emacs-lisp
-auto-window-vscroll nil
+(setopt auto-window-vscroll nil)
 #+end_src
 
 Little safety-net for internal deletion functions
 #+begin_src emacs-lisp
-delete-by-moving-to-trash t
+(setopt delete-by-moving-to-trash t)
 #+end_src
 
-*** =custom.el= file
+** =custom.el= file
 file to store ~customize~ options. This can be disabled but
 ~init.el~ will receive all generated code. It's also useful
 for preventing Org Babel Tangle to override =Customize= changes. [[https://stackoverflow.com/questions/5052088/what-is-custom-set-variables-and-faces-in-my-emacs/5058752#5058752][src]]
@@ -933,13 +900,13 @@ Defined in Emacs setup
 # ;;       (make-empty-file file)))
 # ;; (f/check-file-touch custom-file)
 
-*** Async
+** Async
 [[https://github.com/jwiegley/emacs-async][jwiegley/emacs-async: Simple library for asynchronous processing in Emacs]]
 #+begin_src emacs-lisp
 (setup (:elpaca async))
 #+end_src
 
-**** =detached.el=
+*** =detached.el=
 [[https://git.sr.ht/~niklaseklund/detached.el][~niklaseklund/detached.el - sourcehut git]]
 
 Install the AUR =dtach= package, or the newer fork =dtach-ng=.
@@ -959,7 +926,7 @@ The full path is required.
   (detached-init))
 #+end_src
 
-*** TRAMP
+** TRAMP
 Fix connecting to a GUIX system, e.g. when given the errors:
 : Tramp: Opening connection nil for user@192.168.xx.xx using ssh...done
 : File error: Couldn't find a proper `ls' command
@@ -980,13 +947,13 @@ needs.
 #+end_quote
 # (Retrieved at [2024-11-12 Tue 01:14])
 
-*** desktop-save
+** desktop-save
 Save state for session restoring
 #+begin_src emacs-lisp
 (setup desktop
   (:require)
 
-  (defvar v/daemon-name
+  (defvar 11xx--daemon-name
     (let ((d (daemonp)))
       (cond
        ((stringp d) d)
@@ -996,9 +963,9 @@ Save state for session restoring
 Mirrors `daemonp': a string for named daemons (--daemon=NAME), \"default\"
 for unnamed (--daemon), nil for interactive sessions.")
 
-  (when v/daemon-name
-    (setopt desktop-base-file-name (format ".emacs-%s.desktop" v/daemon-name)
-            desktop-base-lock-name (format ".emacs-%s.desktop.lock" v/daemon-name)))
+  (when 11xx--daemon-name
+    (setopt desktop-base-file-name (format ".emacs-%s.desktop" 11xx--daemon-name)
+            desktop-base-lock-name (format ".emacs-%s.desktop.lock" 11xx--daemon-name)))
 
   (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
           desktop-auto-save-timeout 1
@@ -1006,7 +973,7 @@ for unnamed (--daemon), nil for interactive sessions.")
   (desktop-save-mode))
 #+end_src
 
-*** eros: Overlay eval result (better C-x C-e)
+** eros: Overlay eval result (better C-x C-e)
 #+begin_src emacs-lisp
 (setup (:elpaca eros)
   (:load-after org-mode)
@@ -1016,16 +983,10 @@ for unnamed (--daemon), nil for interactive sessions.")
            eros-overlays-use-font-lock t))
 #+end_src
 
-
-*** mwim: Custom C-e/C-a
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
-
+** provide footer
 #+begin_src emacs-lisp
-(setup (:elpaca mwim)
-  (:global-set "<remap> <move-beginning-of-line>" mwim-beginning
-               "<remap> <move-end-of-line>" mwim-end))
+(provide '11xx-defaults)
+;;; 11xx-defaults.el ends here
 #+end_src
 
 
@@ -1271,7 +1232,7 @@ colored by the stylesheet on the HTML file.
 # [2022-04-25 Mon 05:44:00]
 
 Additional Tree-Sitter content
-- [[https://siraben.dev/2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
+- [[https://siraben.de11xx--2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
   # [2022-04-28 Thu 16:46:45]
 
 # #TODO moving to built-in `treesit' package
@@ -2101,7 +2062,7 @@ aka literate (?hopefully)
                                    (:foreground nil :background nil))))
 #+end_src
 - For supported html charsets see
-  + [[https://help.hcltechsw.com/dom_designer/9.0.1/appdev/LSAZ_APPENDIX_E_MIME_CHARSET_NAMES.html][MIME Charset Names]]
+  + [[https://help.hcltechsw.com/dom_designer/9.0.1/appde11xx--LSAZ_APPENDIX_E_MIME_CHARSET_NAMES.html][MIME Charset Names]]
   + [[https://www.w3schools.com/charsets/][HTML Character Sets]]
   + [[https://en.wikipedia.org/wiki/Character_encodings_in_HTML][Character encodings in HTML - Wikipedia]]
 - Notes:
@@ -2540,7 +2501,7 @@ group package.
   + [[https://emacs.stackexchange.com/questions/46479/how-to-set-a-tangled-parent-directory-for-each-subtree-in-org-mode/55859#55859][How to set a tangled parent directory for each subtree in org mode?]]
 # [2023-05-19 Fri 23:48:32 -03]
 #+begin_src emacs-lisp
-(defvar v/tdir-allowed-functions
+(defvar 11xx--tdir-allowed-functions
   '(tdir-base
     expand-file-name
     concat
@@ -2559,7 +2520,7 @@ All must return strings or path components.")
 (defun f/tdir-safe-form-p (form)
   "Return t if FORM is safe to evaluate as a :tangle-dir: expression.
 Safe means: a self-evaluating atom, or a list whose car is in
-`v/tdir-allowed-functions' and whose every argument is also safe."
+`11xx--tdir-allowed-functions' and whose every argument is also safe."
   (cond
    ((stringp form)          t)
    ((numberp form)          t)
@@ -2567,7 +2528,7 @@ Safe means: a self-evaluating atom, or a list whose car is in
    ((keywordp form)         t)
    ((and (consp form)
          (symbolp (car form))
-         (memq (car form) v/tdir-allowed-functions)
+         (memq (car form) 11xx--tdir-allowed-functions)
          (cl-every #'f/tdir-safe-form-p (cdr form)))
     t)
    (t nil)))
@@ -2585,7 +2546,7 @@ Returns STRING as-is if it does not start with '('."
         (unless (f/tdir-safe-form-p form)
           (user-error
            "tdir: unsafe form in :tangle-dir: %s\n  Only %s with literal/whitelisted args are permitted"
-           form v/tdir-allowed-functions))
+           form 11xx--tdir-allowed-functions))
         (let ((result (eval form t)))
           (unless (stringp result)
             (user-error "tdir: :tangle-dir: sexp must return a string, got: %S" result))
@@ -2947,14 +2908,14 @@ this gets the terminal name from the environment variable ~$TERMINAL~,
 if not set edit the code accordinly. Don't forget to edit the call flags!
 #+begin_src emacs-lisp
 ;; default terminal application path
-(defvar v/terminal (getenv "TERMINAL")
+(defvar 11xx--terminal (getenv "TERMINAL")
   "The default terminal as in the TERMINAL environment variable.")
 ;;; function to open new terminal window at current directory
 (defun tmtxt/open-current-dir-in-terminal ()
   "Open current directory in 'dired-mode' in terminal application."
   (interactive)
   (shell-command (concat
-                  (shell-quote-argument v/terminal)
+                  (shell-quote-argument 11xx--terminal)
                   " "
                   "--working-directory"
                   " "
@@ -3272,7 +3233,7 @@ ARGS is a property list that supports the following keys:
   + [[https://github.com/minad/vertico][VERTical Interactive COmpletion - GitHub]]
   + [[https://github.com/axelf4/hotfuzz][hotfuzz]]
   + [[https://www.youtube.com/watch?v=J0OaRy85MOo][Streamline Your Emacs Completions with Vertico]]
-  + [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6nxsv/?context=3][What these packages do migrating from ivy]]
+  + [[https://www.reddit.com/r/emacs/comments/qfrxgb/comment/hi6nxs11xx--?context=3][What these packages do migrating from ivy]]
   + [[https://stackoverflow.com/questions/6133799/delete-a-word-without-adding-it-to-the-kill-ring-in-emacs/6133921#6133921][Delete a word without adding it to the kill-ring in Emacs - Stack Overflow]]
   + https://systemcrafters.cc/live-streams/may-21-2021/
   # [2022-02-24 Thu 00:01:03]
@@ -3659,9 +3620,9 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 - To sandbox the pip dependencies do:
   + On Linux
     : ❯ python -m venv ./.python-venv
-    : ❯ ./.python-venv/bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
+    : ❯ ./.python-ven11xx--bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
     then source the venv before launching Emacs:
-    : ❯ source ./python-venv/bin/activate
+    : ❯ source ./python-ven11xx--bin/activate
     : ❯ emacs
   # + On Windows (#TODO does it work on windows-nt?)
   #   : python -m venv .\.python-venv
@@ -3758,23 +3719,23 @@ See [[*Corfu][Corfu]].
 #+begin_src emacs-lisp
 ;; Font configuration
 ;; Check if on Windows and change font (Windows-NT)
-(defvar v/get-default-font
+(defvar 11xx--get-default-font
   (if (eq system-type 'windows-nt)
       ;; "Consolas"
       ;; "Literation Mono Nerd Font" on Linux or "LiterationMono Nerd Font" on (Windows-NT)
       "LiterationMono Nerd Font"
     "Literation Mono Nerd Font")
   "Sets the default font based on the system type.
-To be used with `f/set-font'.")
+To be used with `set-font'.")
 
-(defvar v/get-default-font-size
+(defvar 11xx--get-default-font-size
   (if (eq system-type 'windows-nt)
       11
     11)
   "Sets the default font size based on the system type.
-To be used with `f/set-font'.")
+To be used with `set-font'.")
 
-(defun f/set-font (&rest args)
+(defun set-font (&rest args)
   "Set font face using `set-face-attribute' and keywords.
 Available keywords are:
 
@@ -3786,8 +3747,8 @@ function `f/get-default-font' that returns a string.
 \":height\" to `set-face-attribute'. It defaults to the value
 from the helper function `f/get-default-font-size' that returns a
 number."
-  (let* ((font (or (plist-get args :name) v/get-default-font))
-         (size (or (plist-get args :size) v/get-default-font-size)))
+  (let* ((font (or (plist-get args :name) 11xx--get-default-font))
+         (size (or (plist-get args :size) 11xx--get-default-font-size)))
     (set-face-attribute 'default nil
                         :font font
                         :height (* size 10))))
@@ -3796,9 +3757,9 @@ number."
     (add-hook 'after-make-frame-functions
               (lambda (frame)
                 (with-selected-frame frame
-                  (f/set-font))))
+                  (set-font))))
   (add-hook 'elpaca-after-init-hook
-            (lambda () (f/set-font))))
+            (lambda () (set-font))))
 ;; end set font
 #+end_src
 

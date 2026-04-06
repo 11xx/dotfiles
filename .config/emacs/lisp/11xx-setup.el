@@ -1,6 +1,23 @@
 ;; -*- lexical-binding: t; -*-
+
 (elpaca setup (require 'setup))
 (elpaca-wait)
+
+(defun setup-config-error-into-warning (expansion)
+  "Wrap `setup' output with `condition-case'."
+  (let ((err (gensym "setup-err")))
+    `(condition-case ,err
+   ,expansion
+       (error
+  (display-warning 'setup (concat "Problem in config: "
+          (error-message-string ,err)
+          ": \n"
+          (with-output-to-string
+            (pp (quote ,expansion))))
+                   :error)))))
+
+(advice-add 'setup :filter-return #'setup-config-error-into-warning)
+
 (defmacro setup-elpaca (order &rest body)
   "Execute BODY in `setup' declaration after ORDER is finished.
 The elpaca package manager installs ORDER."
@@ -16,6 +33,7 @@ The elpaca package manager installs ORDER."
                          (cadr feature)
                        (elpaca--first order))
                   ,@body))))
+
 (defun setup-wrap-to-install-package (body _name)
   "Wrap BODY in an `elpaca' block if necessary.
 The body is wrapped in an `elpaca' block if `setup-attributes'
@@ -42,6 +60,7 @@ contains an alist with the key `elpaca'."
   :documentation "Install ORDER with `elpaca'.
 The ORDER can be used to deduce the feature context."
   :shorthand #'cadr)
+
 (setup-define :local-or-package
   (lambda (feature-or-package)
     `(unless (locate-file ,(symbol-name feature-or-package)
@@ -53,10 +72,12 @@ This macro can be used as NAME, and it will replace itself with
 the first PACKAGE."
   :repeatable t
   :shorthand #'cadr)
+
 (setup-define :disabled
   (lambda ()
     (setup-quit))
   :documentation "Always stop evaluating the body.")
+
 (setup-define :advise
     (lambda (symbol where function)
       `(advice-add ',symbol ,where ,function))
@@ -66,6 +87,7 @@ See `advice-add' for more details."
   :debug '(sexp sexp function-form)
   :ensure '(nil nil func)
   :repeatable t)
+
 (setup-define :load-after
   (lambda (&rest features)
     (let ((body `(require ',(setup-get 'feature))))
@@ -73,6 +95,7 @@ See `advice-add' for more details."
         (setq body `(with-eval-after-load ',feature ,body)))
       body))
   :documentation "Load the current feature after FEATURES.")
+
 (setup-define :hide-mode
   (lambda (&optional mode)
     (let* ((mode (or mode (setup-get 'mode)))
@@ -86,12 +109,14 @@ See `advice-add' for more details."
 Alternatively, MODE can be specified manually, and override the
 current mode."
   :after-loaded t)
+
 (setup-define :put-enable
   (lambda (commands)
     `(put ',commands 'disabled nil))
   :documentation "Enable disabled COMMANDS."
   :after-loaded t
   :repeatable t)
+
 (setup-define :face
   (lambda (face spec) `(custom-set-faces (quote (,face ,spec))))
   :documentation "Customize FACE to SPEC."
@@ -99,6 +124,7 @@ current mode."
   :debug '(setup)
   :repeatable t
   :after-loaded t)
+
 (setup-define :autoload
   (lambda (func)
     (let ((fn (if (memq (car-safe func) '(quote function))
@@ -109,6 +135,7 @@ current mode."
   :documentation "Autoload COMMAND if not already bound."
   :repeatable t
   :signature '(FUNC ...))
+
 (setup-define :option*
   (lambda (name val)
     `(customize-set-variable
@@ -120,12 +147,14 @@ NAME is not the name of the option itself, but of the option with
 the feature prefix."
   :debug '(sexp form)
   :repeatable t)
+
 (setup-define :global-set
   (lambda (key command)
     `(keymap-global-set ,key #',command))
   :documentation "Globally bind KEY to COMMAND using keymap-global-set."
   :debug '(form sexp)
   :repeatable t)
+
 (setup-define :config
   (lambda (&rest body)
     `(with-eval-after-load ',(setup-get 'feature)
@@ -136,3 +165,4 @@ Analogous to use-package's :config — runs on first require, not on elpaca acti
   :repeatable nil)
 
 (provide '11xx-setup)
+;;; 11xx-setup.el ends here

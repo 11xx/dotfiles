@@ -22,7 +22,7 @@
     (and result (insert result))
     (forward-line -2))
   (recenter-top-bottom))
-(defvar v/tdir-allowed-functions
+(defvar 11xx--tdir-allowed-functions
   '(tdir-base
     expand-file-name
     concat
@@ -41,7 +41,7 @@ All must return strings or path components.")
 (defun f/tdir-safe-form-p (form)
   "Return t if FORM is safe to evaluate as a :tangle-dir: expression.
 Safe means: a self-evaluating atom, or a list whose car is in
-`v/tdir-allowed-functions' and whose every argument is also safe."
+`11xx--tdir-allowed-functions' and whose every argument is also safe."
   (cond
    ((stringp form)          t)
    ((numberp form)          t)
@@ -49,7 +49,7 @@ Safe means: a self-evaluating atom, or a list whose car is in
    ((keywordp form)         t)
    ((and (consp form)
          (symbolp (car form))
-         (memq (car form) v/tdir-allowed-functions)
+         (memq (car form) 11xx--tdir-allowed-functions)
          (cl-every #'f/tdir-safe-form-p (cdr form)))
     t)
    (t nil)))
@@ -67,7 +67,7 @@ Returns STRING as-is if it does not start with '('."
         (unless (f/tdir-safe-form-p form)
           (user-error
            "tdir: unsafe form in :tangle-dir: %s\n  Only %s with literal/whitelisted args are permitted"
-           form v/tdir-allowed-functions))
+           form 11xx--tdir-allowed-functions))
         (let ((result (eval form t)))
           (unless (stringp result)
             (user-error "tdir: :tangle-dir: sexp must return a string, got: %S" result))

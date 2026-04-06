@@ -1,31 +1,31 @@
 ;; -*- lexical-binding: t; -*-
 (require '11xx-functions)
 
-(defvar v/backup-directory
+(defvar 11xx--backup-directory
   (expand-file-name "backups"
                     (expand-file-name "var" user-emacs-directory))
   "Custom backup-files directory.")
 
 ;; Auto-save directory variable
-(defvar v/auto-save-directory
+(defvar 11xx--auto-save-directory
   (expand-file-name "auto-save"
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
 
-(f/check-make-directory v/backup-directory)
-(f/check-make-directory v/auto-save-directory)
+(f/check-make-directory 11xx--backup-directory)
+(f/check-make-directory 11xx--auto-save-directory)
 
 ;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
-;;   (let ((basename (concat v/auto-save-directory "/auto-save-list-"))
+;;   (let ((basename (concat 11xx--auto-save-directory "/auto-save-list-"))
 ;;         (random-number (number-to-string (random))))
 ;;     (concat basename (substring random-number 0 8) "~")))
 ;; (setq auto-save-list-file-name-function #'f/auto-save-list-file-name-function)
 
-(setopt backup-directory-alist `((".*" . ,v/backup-directory))
-        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat v/auto-save-directory "\\\\1") t))
-        auto-save-list-file-prefix v/auto-save-directory
-        auto-save-list-file-name (concat v/auto-save-directory "/auto-save-list")
+(setopt backup-directory-alist `((".*" . ,11xx--backup-directory))
+        auto-save-file-name-transforms `(("\\(?:[^/]*/\\)*\\(.*\\)" ,(concat 11xx--auto-save-directory "\\\\1") t))
+        auto-save-list-file-prefix 11xx--auto-save-directory
+        auto-save-list-file-name (concat 11xx--auto-save-directory "/auto-save-list")
         make-backup-files t    ; backup of a file the first time it is saved.
         backup-by-copying t    ; don't clobber symlinks
         version-control t      ; version numbers for backup files
