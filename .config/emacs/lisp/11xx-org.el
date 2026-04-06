@@ -177,10 +177,13 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (interactive)
   (readme-to-markdown "README.md"))
 
-(with-eval-after-load 'ox
-  (require 'org-stable-ids)
-  (org-stable-ids-setup)
-  (keymap-global-set "C-c o i" #'org-stable-id-get-create))
+
+(elpaca (org-stable-ids :host codeberg :repo "useless-utils/org-stable-ids")
+  (use-package org-stable-ids
+    :init
+    (keymap-global-set "C-c o i" #'org-stable-ids-get-create)
+    :config
+    (org-stable-ids-enable)))
 ;; Publish
 (let ((dir (expand-file-name "org-timestamps/" no-littering-var-directory)))
   (unless (file-exists-p dir) (make-directory dir t))

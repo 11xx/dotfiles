@@ -56,6 +56,7 @@
   )
 
 (use-package ob-gptel
+  :after gptel
   :load-path "~/clones/11xx-ob-gptel/"
   :config
   (add-to-list 'org-babel-load-languages '(gptel . t))
@@ -87,6 +88,7 @@
   (add-hook 'gptel-post-response-functions #'gptel--append-response-footer))
 
 (use-package gptel-titler
+  :after gptel
   :load-path "~/code/emacs/gptel-titler/")
 
 (elpaca mcp
