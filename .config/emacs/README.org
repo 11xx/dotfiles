@@ -1017,72 +1017,106 @@ or
 : M-x add-file-local-variable RET coding RET utf-8 RET
 # [2022-11-08 Tue 17:10:44 -03]
 
-* TODO 11xx-modes.el
+* 11xx-modes.el
 :PROPERTIES:
 :header-args:emacs-lisp+: :tangle lisp/11xx-modes.el
 :END:
 
 #+begin_src emacs-lisp
-<<11xx-modes>>
-
-(provide '11xx-modes)
+;; -*- lexical-binding: t; -*-
 #+end_src
 
-** Modes
+
+** Add =modes= directory to Emacs path
+Local mode-providing files
+# [2022-04-27 Wed 07:19:42]
+# [2026-04-07 Tue 05:50:12 -03] @ak
+#+begin_src emacs-lisp
+(add-to-list 'load-path (expand-file-name "modes" user-emacs-directory))
+#+end_src
+
+** Make shebang (#!) file executable when saved
+[[https://youtu.be/764zoG1TxVk?t=1845][emacs early-init.el and general tips and tricks - YouTube]]
+
+#+begin_src emacs-lisp
+;; Make shebang (#!) file executable when saved
+(add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p)
+#+end_src
+
+** Minor modes, Customisation, Hacks
+
+*** Tree-Sitter Syntax Highlighting
+[[https://emacs-tree-sitter.github.io/syntax-highlighting/][Tree-sitter Syntax Highlighting]]
+
+- Emacs 29+, using =treesit=
+  + [[https://git.savannah.gnu.org/cgit/emacs.git/tree/admin/notes/tree-sitter/starter-guide?h=feature/tree-sitter][starter-guide\tree-sitter\notes\admin - emacs.git - Emacs source repository]]
+  + [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
+  + [[https://emacs.stackexchange.com/questions/78605/language-specific-tree-sitter-major-mode-wont-show-up][language specific tree-sitter major mode wont show up - Emacs Stack Exchange]]
+  + use =treesit= instead of the third-party =tree-sitter= and:
+    #+begin_quote
+    Note that, just because you have installed a grammar, does /not/
+    mean Emacs supports it. Someone still has to write the –
+    admittedly, /way/ easier – syntax and indentation logic and all that
+    good stuff.
+
+    ----- [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
+    #+end_quote
+    # (Retrieved at # [2024-03-16 Sat 07:03:10 -03] @ak
+
+- Tree-Sitter supports Org-Mode code blocks since:
+  + [[https://github.com/nvim-orgmode/orgmode/pull/139][Pull Request #139]].
+  + [[https://github.com/nvim-orgmode/orgmode/issues/31][would it be possible to use treesitter in this · Issue #31 · nvim-orgmode/orgmode]]
+  + [[https://www.masteringemacs.org/article/lets-write-a-treesitter-major-mode][Let's Write a Tree-Sitter Major Mode - Mastering Emacs]]
+
+*NOTE*: =htmlize= uses different CSS selectors for =tree-sitter-hl-mode=
+code highlighting, prefixed by something like
+=org-tree-sitter-hl-faceX=, so CSS templetes that rely on normal
+selectors may not work, causing exported code snippets to not be
+colored by the stylesheet on the HTML file.
+# [2022-04-25 Mon 05:44:00]
+
+Additional Tree-Sitter content
+- [[https://siraben.de11xx--2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
+  # [2022-04-28 Thu 16:46:45]
+
+# #TODO moving to built-in `treesit' package
+#+begin_src emacs-lisp
+(add-to-list 'treesit-extra-load-path
+             (expand-file-name "tree-sitter" user-emacs-directory))
+#+end_src
+
+*** Colour codes highlighting
+#+begin_src emacs-lisp
+(setup (:elpaca rainbow-mode)
+  (:hook-into css-mode))
+#+end_src
+
+** Require split files
+#+begin_src emacs-lisp
+(require '11xx-modes-edit)
+(require '11xx-modes-terminal)
+(require '11xx-modes-langs)
+(require '11xx-modes-special)
+(require '11xx-modes-web)
+#+end_src
+
+** Edit Modes
 :PROPERTIES:
-:header-args:emacs-lisp+: :noweb-ref 11xx-modes :tangle no
+:header-args:emacs-lisp: :tangle lisp/11xx-modes-edit.el
 :END:
 
-*** Edit Modes
-**** Add =modes= directory to Emacs path
-Custom mode files should sit here.
-# [2022-04-27 Wed 07:19:42]
 #+begin_src emacs-lisp
-(add-to-list 'load-path (concat user-emacs-directory "modes"))
+;; -*- lexical-binding: t; -*-
 #+end_src
 
-**** Systemd
+*** Systemd
 Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated repo]], better for use with native-comp.
 #+begin_src emacs-lisp
 (setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
 #+end_src
 # :files ("*.txt" "systemd.el" (:exclude ".git"))
 
-**** Haskell
-#+begin_src emacs-lisp
-(setup (:elpaca haskell-mode))
-#+end_src
-# (setup (:elpaca haskell-ts-mode)
-#   (:disabled)
-#   (:load-after haskell-mode)
-#   ;; (:elpaca haskell-snippets) ; yasnippets
-#   (:file-match "*.hs" "*.lhs")
-#   (defun org-babel-execute:haskell-ts (body params)
-#     "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
-#     (org-babel-execute:haskell body params))
-
-#   ;; use haskell-ts-mode for "haskell" code-blocks
-#   (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
-
-#   (defun haskell-setup-hs-initialize ()
-#     "Insert default content into a new Setup.hs file."
-#     (when (and (string= (buffer-name) "Setup.hs")
-#                (= (buffer-size) 0)) ;; Only if the buffer is empty
-#       (insert "import Distribution.Simple\nmain = defaultMain\n")
-#       (save-buffer)))
-#   (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
-
-#   (:with-mode haskell-cabal-mode
-#     (:file-match "stack.yaml" "package.yaml"))
-
-#   ;; hoogle
-#   (setopt haskell-hoogle-port-number "4141")
-
-#   (setopt haskell-ts-use-indent nil)
-#   (:hook haskell-indentation-mode)
-#   )
-
-**** YAML
+*** YAML
 #+begin_src emacs-lisp
 (elpaca yaml-mode)
 (elpaca-wait)
@@ -1131,104 +1165,58 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
                                  'face 'font-lock-comment-face)))))))))
 #+end_src
 
-**** PKGBUILD
+*** PKGBUILD
 #+begin_src emacs-lisp
 (setup (:elpaca pkgbuild-mode)
   (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
 #+end_src
 
-**** PowerShell
+*** PowerShell
 # [2024-01-14 Sun 13:58:20 -03:00] @winr58
 #+begin_src emacs-lisp
 (setup (:elpaca powershell))
 #+end_src
 
-**** Ansible
+*** Ansible
 #+begin_src emacs-lisp
 (setup (:elpaca ansible))
 (setup (:elpaca ansible-vault))
 (setup (:elpaca ansible-doc))
 #+end_src
 
-**** =yuck-mode=: Specifically for EWW's (bar) config file
+*** =yuck-mode=: Specifically for EWW's (bar) config file
 #+begin_src emacs-lisp
 (setup (:elpaca yuck-mode))
 #+end_src
 
-**** Rust Object Notation (ron)
-- Used by
-  + [[https://github.com/mierak/rmpc][mierak/rmpc]] \\
-    /"A configurable, terminal based Media Player Client with album art
-    support via various terminal image protocols."/
-#+begin_src emacs-lisp
-(setup ron-mode
-  (:elpaca ron-mode)
-  (:autoload ron-mode)
-  (:match-file "*.ron"))
-#+end_src
-
-**** hyprlang/hyprland config language
+*** hyprlang/hyprland config language
 #+begin_src emacs-lisp
 (setup (:elpaca hyprlang-ts-mode)
   (:autoload hyprlang-ts-mode)
   (:match-file "*hyprland.conf"))
 #+end_src
+*** Picard
 
-
-*** Minor modes
-
-**** TODO Tree-Sitter Syntax Highlighting
-[[https://emacs-tree-sitter.github.io/syntax-highlighting/][Tree-sitter Syntax Highlighting]]
-
-- Emacs 29+, using =treesit=
-  + [[https://git.savannah.gnu.org/cgit/emacs.git/tree/admin/notes/tree-sitter/starter-guide?h=feature/tree-sitter][starter-guide\tree-sitter\notes\admin - emacs.git - Emacs source repository]]
-  + [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
-  + [[https://emacs.stackexchange.com/questions/78605/language-specific-tree-sitter-major-mode-wont-show-up][language specific tree-sitter major mode wont show up - Emacs Stack Exchange]]
-  + use =treesit= instead of the third-party =tree-sitter= and:
-    #+begin_quote
-    Note that, just because you have installed a grammar, does /not/
-    mean Emacs supports it. Someone still has to write the –
-    admittedly, /way/ easier – syntax and indentation logic and all that
-    good stuff.
-
-    ----- [[https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][How to Get Started with Tree-Sitter - Mastering Emacs]]
-    #+end_quote
-    # (Retrieved at # [2024-03-16 Sat 07:03:10 -03] @ak
-
-- Tree-Sitter supports Org-Mode code blocks since:
-  + [[https://github.com/nvim-orgmode/orgmode/pull/139][Pull Request #139]].
-  + [[https://github.com/nvim-orgmode/orgmode/issues/31][would it be possible to use treesitter in this · Issue #31 · nvim-orgmode/orgmode]]
-  + [[https://www.masteringemacs.org/article/lets-write-a-treesitter-major-mode][Let's Write a Tree-Sitter Major Mode - Mastering Emacs]]
-
-*NOTE*: =htmlize= uses different CSS selectors for =tree-sitter-hl-mode=
-code highlighting, prefixed by something like
-=org-tree-sitter-hl-faceX=, so CSS templetes that rely on normal
-selectors may not work, causing exported code snippets to not be
-colored by the stylesheet on the HTML file.
-# [2022-04-25 Mon 05:44:00]
-
-Additional Tree-Sitter content
-- [[https://siraben.de11xx--2022/03/01/tree-sitter.html][How to write a tree-sitter grammar in an afternoon | siraben’s musings]]
-  # [2022-04-28 Thu 16:46:45]
-
-# #TODO moving to built-in `treesit' package
 #+begin_src emacs-lisp
-(add-to-list 'treesit-extra-load-path
-             (expand-file-name "tree-sitter" user-emacs-directory))
-
-(setopt treesit-font-lock-level 4)
+(setup picard-mode)
 #+end_src
 
-**** Colour highlighting
+*** provide footer
 #+begin_src emacs-lisp
-(setup (:elpaca rainbow-mode)
-  (:hook-into css-mode))
+(provide '11xx-modes-edit)
+;;; 11xx-modes-edit.el ends here
 #+end_src
 
-**** Custom minor modes
-Expanding without packages
+** Special
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-modes-special.el
+:END:
 
-***** =sensitive-mode=: Disable backup files on sensitive files
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+*** =sensitive-mode=: Disable backup files on sensitive files
 wizard [[https://anirudhsasikumar.net/blog/2005.01.21.html][Disabling Backup and Auto-save in Emacs]],
 src [[https://stackoverflow.com/questions/151945/how-do-i-control-how-emacs-makes-backup-files/18330742#18330742][How do I control how Emacs makes backup files? - Stack Overflow]]
 # [2022-11-11 Fri 03:15:47 -03]
@@ -1280,10 +1268,24 @@ or use a list:
    auto-mode-alist))
 #+end_example
 
-*** Terminal modes
+*** provide footer
+#+begin_src emacs-lisp
+(provide '11xx-modes-special)
+;;; 11xx-modes-special.el ends here
+#+end_src
+
+** Terminal modes
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-modes-terminal.el
+:END:
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
 [[https://www.youtube.com/watch?v=wa_wZIuT9Vw&t=2126s][Emacs From Scratch #9 - Learn to Love the Terminal Modes - YouTube]]
 # [2022-04-30 Sat 13:45:02]
-**** =eshell=: Emacs Lisp shell
+*** =eshell=: Emacs Lisp shell
 [[https://www.emacswiki.org/emacs/EshellAlias][EmacsWiki: Eshell Alias]]
 # [2022-05-03 Tue 17:49:09]
 #+begin_src emacs-lisp
@@ -1300,7 +1302,7 @@ or use a list:
                   (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)))))
 #+end_src
 
-**** eterm-256color
+*** eterm-256color
 256color for =term-mode=
 #+begin_src emacs-lisp
 (setup term (:elpaca eterm-256color)
@@ -1309,25 +1311,221 @@ or use a list:
          (:hook-into term-mode)))
 #+end_src
 
-**** vterm
+*** vterm
 #+begin_src emacs-lisp
 (setup (:elpaca multi-vterm))
 #+end_src
 
-*** Coding
-
-**** Make shebang (#!) file executable when saved
-[[https://youtu.be/764zoG1TxVk?t=1845][emacs early-init.el and general tips and tricks - YouTube]]
-
+*** provide footer
 #+begin_src emacs-lisp
-;; Make shebang (#!) file executable when saved
-(add-hook 'after-save-hook 'executable-make-buffer-file-executable-if-script-p)
+(provide '11xx-modes-terminal)
+;;; 11xx-modes-terminal.el ends here
 #+end_src
 
-**** Web
-***** HTML
+** Languages
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-modes-langs.el
+:END:
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+*** Haskell
+#+begin_src emacs-lisp
+(setup (:elpaca haskell-mode))
+#+end_src
+# (setup (:elpaca haskell-ts-mode)
+#   (:disabled)
+#   (:load-after haskell-mode)
+#   ;; (:elpaca haskell-snippets) ; yasnippets
+#   (:file-match "*.hs" "*.lhs")
+#   (defun org-babel-execute:haskell-ts (body params)
+#     "Execute a code block of `haskell-ts-mode' as `haskell-mode' with Org Babel."
+#     (org-babel-execute:haskell body params))
+
+#   ;; use haskell-ts-mode for "haskell" code-blocks
+#   (add-to-list 'org-src-lang-modes '("haskell" . haskell-ts))
+
+#   (defun haskell-setup-hs-initialize ()
+#     "Insert default content into a new Setup.hs file."
+#     (when (and (string= (buffer-name) "Setup.hs")
+#                (= (buffer-size) 0)) ;; Only if the buffer is empty
+#       (insert "import Distribution.Simple\nmain = defaultMain\n")
+#       (save-buffer)))
+#   (add-hook 'find-file-hooks #'haskell-setup-hs-initialize)
+
+#   (:with-mode haskell-cabal-mode
+#     (:file-match "stack.yaml" "package.yaml"))
+
+#   ;; hoogle
+#   (setopt haskell-hoogle-port-number "4141")
+
+#   (setopt haskell-ts-use-indent nil)
+#   (:hook haskell-indentation-mode)
+#   )
+
+*** C
+#+begin_src emacs-lisp
+(setup cc-mode
+  (setopt c-default-style '((java-mode . "java")
+                            (awk-mode  . "awk")
+                            (other     . "k&r"))
+          c-basic-offset 2))
+#+end_src
+
+#+begin_src emacs-lisp
+(defun org-babel-execute:c-ts (body params)
+  "Execute a block of `c-ts-mode' as `c-mode' with Org Babel."
+  (org-babel-execute:C body params))
+#+end_src
+
+**** TODO COMMENT Compile helper functions
+# #TODO update # [2024-03-18 Mon 22:34:43 -03] @ak
+# lol [2026-04-07 Tue 05:39:52 -03] @ak
+***** Compile current C file
+The =(compile)= function already defines the workin directory as the same
+as the buffer's file location.
+#+begin_src emacs-lisp
+(defun f/gcc-compile-current-file ()
+  "Compile current file with gcc.
+
+Get the current buffer's filename with the function `buffer-file-name' and
+using the function `compile' build a command like:
+   \"gcc -o filename.c.out /path/to/filename.c\""
+  (interactive)
+  (defvar-local fullpath-filename (file-truename (buffer-file-name))
+    "Get filename of the current buffer")
+  (let ((filename (file-name-nondirectory fullpath-filename)))
+    (if (string= (file-name-extension filename) "c")
+        (compile (concat "gcc -o " (shell-quote-argument
+                                    (file-name-base filename)) ".out"
+                                    " "
+                                    (shell-quote-argument filename))))
+    (if (string= (file-name-extension filename) "cpp")
+        (compile (concat "g++ -o " (shell-quote-argument
+                                    (file-name-base filename)) ".out"
+                                    " "
+                                    (shell-quote-argument filename)))))
+  (message (concat "\"" fullpath-filename ".out\"")))
+#+end_src
+
+****** Hide compilation info buffer
+wizard [[https://emacs.stackexchange.com/questions/62/hide-compilation-window/110#110][Hide *compilation* window - Emacs Stack Exchange]]
+# [2022-04-25 Mon 05:32:31]
+It continues open as =*compilation*=
+#+begin_src emacs-lisp
+(add-hook 'compilation-finish-functions
+          (lambda (buf strg)
+            (let ((win  (get-buffer-window buf 'visible)))
+              (when win (delete-window win)))))
+#+end_src
+
+***** Floating terminal
+#+begin_src emacs-lisp
+(defun f/run-executable-in-floating-terminal (exe-file)
+  "Open Alacritty with class=float and run executable EXE-FILE."
+  (interactive)
+  (message "Opening executable file: " exe-file ".")
+  (shell-command
+   (concat
+    "alacritty --class=float"
+    " "
+    "--option window.dimensions.columns=\"${w:-80}\""
+    " "
+    "window.dimensions.lines=\"${h:-20}\""
+    " "
+    "--command sh -c " (shell-quote-argument
+                        (concat exe-file " | bat --paging=always")))))
+;; removed --hold bc bat paging holds the terminal until othewise [2022-04-24 Sun 14:41:04]
+#+end_src
+
+#+RESULTS:
+: f/run-executable-in-floating-terminal
+***** C compile current file and run in the terminal
+#+begin_src emacs-lisp
+(defun f/c-comp-and-run()
+  "Compile current C/C++ file and run it in the terminal."
+  (interactive)
+  (f/run-executable-in-floating-terminal
+   ;; (f/gcc-compile-current-file v-local/compiled-file-out)
+   (f/gcc-compile-current-file)
+   ))
+#+end_src
+
+***** keybindings for compile functions
+[[https://tr.wikibooks.org/wiki/Emacs/Windows_%C4%B0%C3%A7in_Emacs_Dosyas%C4%B1][Emacs/Windows İçin Emacs Dosyası - Vikikitap: Özgür kütüphane]]
+# ;; keybindings for all supported languages.  We can put these in
+# ;; c-mode-base-map because c-mode-map, c++-mode-map, objc-mode-map,
+# ;; java-mode-map, and idl-mode-map inherit from it.
+
+[[https://stackoverflow.com/questions/34067495/binding-a-key-in-c-c-mode-only][emacs - Binding a key in C/C++ mode only? - Stack Overflow]]
+# [2022-04-23 Sat 19:08:13]
+
+Using =define-key= inside a hook instead of =setup='s =:bind= because =c-mode= seems
+to conflict with it.
+#+begin_src emacs-lisp
+(with-eval-after-load 'cc-mode
+  (define-key c-mode-base-map (kbd "C-c '") #'f/c-comp-and-run)
+  (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
+#+end_src
+
+*** Rust
+#+begin_seealso
+- [[https://github.crookster.org/my-emacs-rust-language-config/][My Emacs Rust Language Config | David Crook]]
+- [[https://robert.kra.hn/posts/rust-emacs-setup/][Configuring Emacs for Rust development | Robert Krahn]]
+#+end_seealso
+# [2022-05-03 Tue 17:50:00]
+
+#+begin_src emacs-lisp :tangle no
+(setup (:elpaca rust-mode))
+#+end_src
+# theres one called rustic
+
+Install Org Babel rust library:
+
+*NOTE*: this requires the program =rust-script= (available in standard Arch repos).
+#+begin_src emacs-lisp
+(setup (:elpaca ob-rust)
+  (:load-after org))
+#+end_src
+
+**** Rust Object Notation (ron)
+- Used by
+  + [[https://github.com/mierak/rmpc][mierak/rmpc]] \\
+    /"A configurable, terminal based Media Player Client with album art
+    support via various terminal image protocols."/
+#+begin_src emacs-lisp
+(setup ron-mode
+  (:elpaca ron-mode)
+  (:autoload ron-mode)
+  (:match-file "*.ron"))
+#+end_src
+
+
+*** Lua
+#+begin_src emacs-lisp
+(setup (:elpaca lua-mode))
+#+end_src
+
+*** provide footer
+#+begin_src emacs-lisp
+(provide '11xx-modes-langs)
+;;; 11xx-modes-langs.el ends here
+#+end_src
+
+** Web
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle lisp/11xx-modes-web.el
+:END:
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+*** HTML
 [[https://docs.emmet.io/cheat-sheet/][Emmet Cheat Sheet]] [2022-04-02 Sat 15:54:53]
-****** Emmet
+**** Emmet
 #+begin_src emacs-lisp
 (setup (:elpaca emmet-mode)
   ;; (:with-map emmet-mode-keymap
@@ -1335,13 +1533,13 @@ or use a list:
   (:hook-into html-mode))
 #+end_src
 
-***** CSS/SCSS
+*** CSS/SCSS
 #+begin_src emacs-lisp
 (setup css
   (:option css-indent-offset 2))
 #+end_src
 
-***** Web-mode
+*** Web-mode
 [[https://timunkert.net/2021/12/emacs-setup.html][Emacs Setup for my Front-End Development Course with Calculus]] [2022-04-20 Wed 01:02:24]
 [[https://github.com/glynnforrest/emacs.d/blob/master/site-lisp/setup-web-mode.el][emacs.d/setup-web-mode.el at master · glynnforrest/emacs.d]] [2022-04-20 Wed 01:02:45]
 
@@ -1371,162 +1569,26 @@ or use a list:
                   web-mode-enable-auto-indentation t)))
 #+end_src
 
-***** Javascript
+*** Javascript
 Javascript related packages
 #+begin_src emacs-lisp
 (setup (:elpaca typescript-mode)
   (:option typescript-indent-level 2)
-  (:hook-into js-mode-hook))
+  (:hook-into js-mode))
 #+end_src
 
-**** TODO Rust
-[[https://github.crookster.org/my-emacs-rust-language-config/][My Emacs Rust Language Config | David Crook]]
-# [2022-05-03 Tue 17:50:00]
-[[https://robert.kra.hn/posts/rust-emacs-setup/][Configuring Emacs for Rust development | Robert Krahn]]
-
-
-# :PROPERTIES:
-# :header-args:emacs-lisp: :noweb-ref export-preview
-# :END:
-
-*** TODO Languages
-**** TODO C
+*** provide footer
 #+begin_src emacs-lisp
-(setup cc-mode
-  (setopt c-default-style '((java-mode . "java")
-                            (awk-mode  . "awk")
-                            (other     . "k&r"))
-          c-basic-offset 2))
-
-;; (setup c-ts-mode
-;;   (setopt c-ts-mode-indent-style 'k&r))
+(provide '11xx-modes-web)
+;;; 11xx-modes-web.el ends here
 #+end_src
 
+** provide footer
 #+begin_src emacs-lisp
-(defun org-babel-execute:c-ts (body params)
-  "Execute a block of `c-ts-mode' as `c-mode' with Org Babel."
-  (org-babel-execute:C body params))
+(provide '11xx-modes)
+;;; 11xx-modes.el ends here
 #+end_src
 
-***** TODO Compile helper functions
-# #TODO update # [2024-03-18 Mon 22:34:43 -03] @ak
-****** Compile current C file
-The =(compile)= function already defines the workin directory as the same
-as the buffer's file location.
-#+begin_src emacs-lisp
-(defun f/gcc-compile-current-file ()
-  "Compile current file with gcc.
-
-Get the current buffer's filename with the function `buffer-file-name' and
-using the function `compile' build a command like:
-   \"gcc -o filename.c.out /path/to/filename.c\""
-  (interactive)
-  (defvar-local fullpath-filename (file-truename (buffer-file-name))
-    "Get filename of the current buffer")
-  (let ((filename (file-name-nondirectory fullpath-filename)))
-    (if (string= (file-name-extension filename) "c")
-        (compile (concat "gcc -o " (shell-quote-argument
-                                    (file-name-base filename)) ".out"
-                                    " "
-                                    (shell-quote-argument filename))))
-    (if (string= (file-name-extension filename) "cpp")
-        (compile (concat "g++ -o " (shell-quote-argument
-                                    (file-name-base filename)) ".out"
-                                    " "
-                                    (shell-quote-argument filename)))))
-  (message (concat "\"" fullpath-filename ".out\"")))
-#+end_src
-
-******* Hide compilation info buffer
-wizard [[https://emacs.stackexchange.com/questions/62/hide-compilation-window/110#110][Hide *compilation* window - Emacs Stack Exchange]]
-# [2022-04-25 Mon 05:32:31]
-It continues open as =*compilation*=
-#+begin_src emacs-lisp
-(add-hook 'compilation-finish-functions
-          (lambda (buf strg)
-            (let ((win  (get-buffer-window buf 'visible)))
-              (when win (delete-window win)))))
-#+end_src
-
-****** Floating terminal
-#+begin_src emacs-lisp
-(defun f/run-executable-in-floating-terminal (exe-file)
-  "Open Alacritty with class=float and run executable EXE-FILE."
-  (interactive)
-  (message "Opening executable file: " exe-file ".")
-  (shell-command
-   (concat
-    "alacritty --class=float"
-    " "
-    "--option window.dimensions.columns=\"${w:-80}\""
-    " "
-    "window.dimensions.lines=\"${h:-20}\""
-    " "
-    "--command sh -c " (shell-quote-argument
-                        (concat exe-file " | bat --paging=always")))))
-;; removed --hold bc bat paging holds the terminal until othewise [2022-04-24 Sun 14:41:04]
-#+end_src
-
-#+RESULTS:
-: f/run-executable-in-floating-terminal
-****** C compile current file and run in the terminal
-#+begin_src emacs-lisp
-(defun f/c-comp-and-run()
-  "Compile current C/C++ file and run it in the terminal."
-  (interactive)
-  (f/run-executable-in-floating-terminal
-   ;; (f/gcc-compile-current-file v-local/compiled-file-out)
-   (f/gcc-compile-current-file)
-   ))
-#+end_src
-
-***** C mode keybindings
-[[https://tr.wikibooks.org/wiki/Emacs/Windows_%C4%B0%C3%A7in_Emacs_Dosyas%C4%B1][Emacs/Windows İçin Emacs Dosyası - Vikikitap: Özgür kütüphane]]
-# ;; keybindings for all supported languages.  We can put these in
-# ;; c-mode-base-map because c-mode-map, c++-mode-map, objc-mode-map,
-# ;; java-mode-map, and idl-mode-map inherit from it.
-
-[[https://stackoverflow.com/questions/34067495/binding-a-key-in-c-c-mode-only][emacs - Binding a key in C/C++ mode only? - Stack Overflow]]
-# [2022-04-23 Sat 19:08:13]
-
-Using =define-key= inside a hook instead of =setup='s =:bind= because =c-mode= seems
-to conflict with it.
-#+begin_src emacs-lisp
-(with-eval-after-load 'cc-mode
-  (define-key c-mode-base-map (kbd "C-c '") #'f/c-comp-and-run)
-  (define-key c-mode-base-map (kbd "C-c C-c") #'f/c-comp-and-run))
-#+end_src
-
-**** TODO Rust
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
-#+begin_src emacs-lisp
-(setup (:elpaca rust-mode))
-;; rustic
-#+end_src
-
-Install Org Babel rust library:
-*NOTE*: this requires the program =rust-script= (available in standard
-Arch repos).
-#+begin_src emacs-lisp
-(setup (:elpaca ob-rust)
-  (:load-after org))
-#+end_src
-
-**** Lua
-#+begin_src emacs-lisp
-(setup (:elpaca lua-mode))
-#+end_src
-
-**** Special Languages
-Configuration for obscure scripting languages and such
-
-***** Picard
-
-#+begin_src emacs-lisp
-(setup picard-mode)
-#+end_src
 
 * 11xx-functions.el: Utility functions
 :PROPERTIES:
