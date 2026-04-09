@@ -1,0 +1,130 @@
+* Containerfile
+:PROPERTIES:
+:header-args:dockerfile: :tangle Containerfile
+:END:
+
+#+begin_src dockerfile
+FROM docker.io/node:22-bookworm-slim
+
+ARG OPENCODE_NPM_PACKAGE="opencode-ai"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # VCS & network
+    ca-certificates \
+    curl \
+    git \
+    openssh-client \
+    wget \
+    # Shell utilities
+    less \
+    procps \
+    unzip \
+    xz-utils \
+    # JSON / search
+    jq \
+    ripgrep \
+    # Editors
+    emacs-nox \
+    nano \
+    vim \
+    # Build toolchain
+    g++ \
+    make \
+    python3 \
+    # Code navigation
+    fd-find \
+    universal-ctags \
+    tree \
+    # Code reading
+    bat \
+    # Linting & validation
+    shellcheck \
+    strace \
+    entr \
+    # Data
+    sqlite3 \
+    python3-csvkit \
+  && rm -rf /var/lib/apt/lists/*
+
+# Tools not in bookworm repos — install via npm or binary
+RUN npm install -g @ast-grep/cli
+
+RUN curl -sSL https://github.com/dandavison/delta/releases/latest/download/delta-$(curl -sSL https://api.github.com/repos/dandavison/delta/releases/latest | jq -r .tag_name)-x86_64-unknown-linux-musl.tar.gz \
+    | tar -xz --wildcards --strip-components=1 -C /usr/local/bin '*/delta'
+
+RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
+    -o /usr/local/bin/hadolint && chmod +x /usr/local/bin/hadolint
+
+RUN curl -sSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+    -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
+
+# ast-grep
+RUN npm install -g @ast-grep/cli
+
+USER node
+WORKDIR /workspace
+
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH=/home/node/.npm-global/bin:$PATH
+ENV HOME=/home/node
+
+RUN mkdir -p /home/node/.npm-global \
+    /home/node/.config/opencode \
+    /home/node/.local/share/opencode \
+    /home/node/.local/state/opencode \
+    /workspace && \
+    npm install -g "${OPENCODE_NPM_PACKAGE}" && \
+    opencode --version
+
+COPY --chown=node:node entrypoint.sh /home/node/entrypoint.sh
+RUN chmod +x /home/node/entrypoint.sh
+
+ENTRYPOINT ["/home/node/entrypoint.sh"]
+CMD ["opencode", "/workspace"]
+#+end_src
+
+** Container entrypoint
+:PROPERTIES:
+:header-args:bash: :tangle entrypoint.sh
+:END:
+
+#+begin_src bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p \
+  /home/node/.config/opencode \
+  /home/node/.local/share/opencode \
+  /home/node/.local/state/opencode \
+  /workspace
+
+cd /workspace
+exec "$@"
+#+end_src
+
+* compose
+:PROPERTIES:
+:header-args:yaml-ts: :tangle compose.yaml
+:END:
+#+begin_src yaml-ts
+services:
+  opencode:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/opencode:local
+    container_name: opencode
+    working_dir: /workspace
+    userns_mode: keep-id
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      HOME: /home/node
+    volumes:
+      - ./workspace:/workspace:Z
+      - ./config:/home/node/.config/opencode:Z
+      - ./share:/home/node/.local/share/opencode:Z
+      - ./state:/home/node/.local/state/opencode:Z
+#+end_src
+

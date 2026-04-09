@@ -1,0 +1,19 @@
+services:
+  opencode:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/opencode:local
+    container_name: opencode
+    working_dir: /workspace
+    userns_mode: keep-id
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      HOME: /home/node
+    volumes:
+      - ./workspace:/workspace:Z
+      - ./config:/home/node/.config/opencode:Z
+      - ./share:/home/node/.local/share/opencode:Z
+      - ./state:/home/node/.local/state/opencode:Z

@@ -1,0 +1,20 @@
+name: openclaw-agent
+services:
+  gateway:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    ports:
+      - "18789:18789"
+    env_file:
+      - .env
+    volumes:
+      # State (config, logs, tasks, etc.)
+      - openclaw_data:/home/node/.openclaw:Z
+      # Workspace for agents
+      - ./workspace:/workspace:Z
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  openclaw_data:
