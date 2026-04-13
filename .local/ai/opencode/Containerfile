@@ -2,14 +2,19 @@ FROM docker.io/node:22-bookworm-slim
 
 ARG OPENCODE_NPM_PACKAGE="opencode-ai"
 
+# Essentials for opencode:
+# - Network + VCS
+# - Text search and JSON tools
+# - Editors
+# - Minimal build toolchain
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # VCS & network
+    # Network & VCS (required by opencode workflows)
     ca-certificates \
     curl \
     git \
     openssh-client \
     wget \
-    # Shell utilities
+    # Core shell utilities
     less \
     procps \
     unzip \
@@ -21,10 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     emacs-nox \
     nano \
     vim \
-    # Build toolchain
+    # Build toolchain (for native addons, small utilities, etc.)
     g++ \
     make \
     python3 \
+    # Additional CLI tooling (recommended but not strictly required)
     # Code navigation
     fd-find \
     universal-ctags \
@@ -35,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shellcheck \
     strace \
     entr \
-    # Data
+    # Data utilities
     sqlite3 \
     python3-csvkit \
   && rm -rf /var/lib/apt/lists/*
@@ -52,8 +58,8 @@ RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hado
 RUN curl -sSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
     -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
 
-# ast-grep
 RUN npm install -g @ast-grep/cli
+
 
 USER node
 WORKDIR /workspace
