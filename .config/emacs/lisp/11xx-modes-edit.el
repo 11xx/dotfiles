@@ -63,7 +63,13 @@
   (:autoload hyprlang-ts-mode)
   (:match-file "*hyprland.conf"))
 
-(setup picard-mode)
+(elpaca (picard-mode :host codeberg
+                     :repo "useless-utils/picard-mode")
+  (use-package picard-mode
+    :config
+    (use-package picard-ts-mode
+      :after picard-mode
+      :if (treesit-available-p))))
 
 (provide '11xx-modes-edit)
 ;;; 11xx-modes-edit.el ends here

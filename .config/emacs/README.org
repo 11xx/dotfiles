@@ -1195,10 +1195,16 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
   (:autoload hyprlang-ts-mode)
   (:match-file "*hyprland.conf"))
 #+end_src
-*** Picard
 
+*** Picard
 #+begin_src emacs-lisp
-(setup picard-mode)
+(elpaca (picard-mode :host codeberg
+                     :repo "useless-utils/picard-mode")
+  (use-package picard-mode
+    :config
+    (use-package picard-ts-mode
+      :after picard-mode
+      :if (treesit-available-p))))
 #+end_src
 
 *** provide footer
