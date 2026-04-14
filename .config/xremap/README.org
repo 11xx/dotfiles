@@ -120,6 +120,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=exec
+ExecStartPre=/usr/bin/sleep 40
 ExecStart=sh -c 'xremap-default --service'
 Restart=always
 RestartSec=3

@@ -38,6 +38,7 @@ keymap:
       C-slash: [C-z, { set_mark: false }]
       C-SHIFT-ro: C-z
       C-space: { set_mark: true }
+
       C-s: f3
       C-r: SHIFT-f3
       C-g: [esc, { set_mark: false }]
@@ -47,16 +48,12 @@ keymap:
       M-SHIFT-b: M-left
       M-SHIFT-f: M-right
       C-x:
-      - name: C-x chord
         remap:
           h: [C-home, C-a, { set_mark: true }] # C-x h (select all)
           C-f: C-t # New Tab
           C-w: C-M-SHIFT-insert # Save Page As...
-          # C-x k (kill tab)
           k: C-f4
-          # C-x C-c (exit)
           C-c: C-M-SHIFT-q
-          # C-x u (undo)
           u: C-M-SHIFT-slash
           "4":
           - name: Window actions
