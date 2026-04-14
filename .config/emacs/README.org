@@ -280,15 +280,15 @@ Personal config modularized into "pseudo-packages"
 :END:
 
 #+begin_src emacs-lisp
-(defvar elpaca-installer-version 0.11)
+(defvar elpaca-installer-version 0.12)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
 (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
                               :ref nil :depth 1 :inherit ignore
                               :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca--activate-package)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+                              :build (:not elpaca-activate)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
        (build (expand-file-name "elpaca/" elpaca-builds-directory))
        (order (cdr elpaca-order))
        (default-directory repo))
@@ -3906,7 +3906,8 @@ Load theme based on Dark or Light system theme:
 ;; (elpaca (neron-themes :host codeberg
 ;;                       :repo "11xx/neron-themes"
 ;;                       :files ("neron-*.el")))
-(elpaca (neron-themes :host codeberg :repo "~/clones/neron-themes" :files ("neron-*.el"))) ; dev
+(use-package neron-themes
+  :load-path "~/code/emacs/neron-themes")
 
 (setup (:elpaca auto-dark)
   (setopt auto-dark-themes '((neron-dark)
@@ -4183,33 +4184,6 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
   (:elpaca gptel)
   (setopt gptel-model 'gpt-5.4-nano
           gptel-default-mode 'org-mode)
-
-  (with-eval-after-load 'gptel-openai
-    (dolist (model
-             ;; info from 20260327 https://developers.openai.com/api/docs/models
-             '((gpt-5.4-mini
-                :description "Strong mini model for coding, computer use, and subagents"
-                :capabilities (media tool-use json url)
-                :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
-                :context-window 400
-                :input-cost 0.75
-                :output-cost 4.5
-                :cutoff-date "2025-08")
-               (gpt-5.4-nano
-                :description "Cheapest GPT-5.4-class model for simple high-volume tasks"
-                :capabilities (media tool-use json url)
-                :mime-types ("image/jpeg" "image/png" "image/gif" "image/webp")
-                :context-window 400
-                :input-cost 0.2
-                :output-cost 1.25
-                :cutoff-date "2025-08")))
-      (setq gptel--openai-models
-            (assq-delete-all (car model) gptel--openai-models))
-      (setq gptel--openai-models
-            (append gptel--openai-models (list model))))
-    (setopt gptel-backend (gptel-make-openai "ChatGPT"
-                            :stream t
-                            :models gptel--openai-models)))
 
   (gptel-make-gemini "Gemini"
     :stream t

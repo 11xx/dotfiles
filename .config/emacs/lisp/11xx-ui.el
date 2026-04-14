@@ -101,7 +101,8 @@ number."
 ;; (elpaca (neron-themes :host codeberg
 ;;                       :repo "11xx/neron-themes"
 ;;                       :files ("neron-*.el")))
-(elpaca (neron-themes :host codeberg :repo "~/clones/neron-themes" :files ("neron-*.el"))) ; dev
+(use-package neron-themes
+  :load-path "~/code/emacs/neron-themes")
 
 (setup (:elpaca auto-dark)
   (setopt auto-dark-themes '((neron-dark)
