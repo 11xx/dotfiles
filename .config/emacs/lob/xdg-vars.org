@@ -1,0 +1,44 @@
+
+#+PROPERTY: header-args :tangle no :exports none
+
+#+NAME: xdg-data-home
+#+begin_src emacs-lisp
+(xdg-data-home)
+#+end_src
+
+#+NAME: xdg-state-home
+#+begin_src emacs-lisp
+(xdg-state-home)
+#+end_src
+
+#+NAME: xdg-config-home
+#+begin_src emacs-lisp
+(xdg-config-home)
+#+end_src
+
+#+NAME: xdg-bin-home
+#+begin_src emacs-lisp
+(getenv "XDG_BIN_HOME")
+#+end_src
+
+#+NAME: xdg-runtime-dir
+#+begin_src emacs-lisp
+(getenv "XDG_RUNTIME_DIR")
+#+end_src
+
+#+NAME: homedir
+#+begin_src emacs-lisp
+(getenv "HOME")
+#+end_src
+
+
+
+
+
+
+
+
+* COMMENT Local variables
+# Local Variables:
+# mode: org
+# End:

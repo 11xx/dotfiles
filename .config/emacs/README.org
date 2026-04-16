@@ -2483,7 +2483,7 @@ https://orgmode.org/manual/Library-of-Babel.html
 #+begin_src emacs-lisp
 (setup ob-lob
   (:load-after org)
-  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup")
+  (org-babel-lob-ingest (expand-file-name "lob/xdg-vars.org" user-emacs-directory))
   (require 'org-bitwarden))
 #+end_src
 

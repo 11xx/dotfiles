@@ -199,7 +199,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
     (require '11xx-org-publish)))
 (setup ob-lob
   (:load-after org)
-  (org-babel-lob-ingest "~/org/.setup/xdg.org.setup")
+  (org-babel-lob-ingest (expand-file-name "lob/xdg-vars.org" user-emacs-directory))
   (require 'org-bitwarden))
 
 (provide '11xx-org)
