@@ -1,55 +1,25 @@
-OpenClaw Rootless Podman setup
-
-First setup directories with with
 #+begin_src shell
-mkdir -pv ~/.local/ai/openclaw
-mkdir -v  ~/.local/ai/openclaw/data
-mkdir -v  ~/.local/ai/openclaw/workspace
+git clone https://github.com/openclaw/openclaw.git
+cd openclaw
 #+end_src
 
-* Compose
-:PROPERTIES:
-:header-args:yaml-ts: :tangle compose.yaml
-:END:
-
-#+begin_src yaml-ts
-name: openclaw-agent
-services:
-  gateway:
-    image: ghcr.io/openclaw/openclaw:latest
-    container_name: openclaw
-    restart: unless-stopped
-    ports:
-      - "18789:18789"
-    env_file:
-      - .env
-    volumes:
-      # State (config, logs, tasks, etc.)
-      - openclaw_data:/home/node/.openclaw:Z
-      # Workspace for agents
-      - ./workspace:/workspace:Z
-    security_opt:
-      - no-new-privileges:true
-
-volumes:
-  openclaw_data:
+build rootless podman container
+#+begin_src shell
+OPENCLAW_CONFIG_DIR="$HOME/.local/ai/openclaw" \
+OPENCLAW_WORKSPACE_DIR="$HOME/.local/ai/openclaw/workspace" \
+./scripts/podman/setup.sh --container
 #+end_src
 
-* .env
-:PROPERTIES:
-:header-args:conf: :tangle .env
-:END:
-
-#+begin_src conf :noweb tangle
-OPENCLAW_GATEWAY_BIND=0.0.0.0
+Initial setup wizard
+#+begin_src shell
+OPENCLAW_CONFIG_DIR="$HOME/.local/ai/openclaw" \
+OPENCLAW_WORKSPACE_DIR="$HOME/.local/ai/openclaw/workspace" \
+./scripts/run-openclaw-podman.sh launch setup
 #+end_src
 
-* Getting dashboard token
-
-run
-: podman exec -it openclaw_gateway openclaw dashboard
-
-* COMMENT Local variables                                                  :noexport:
-# Local Variables:
-# org-confirm-babel-evaluate: nil
-# End:
+Launch
+#+begin_src shell
+OPENCLAW_CONFIG_DIR="$HOME/.local/ai/openclaw" \
+OPENCLAW_WORKSPACE_DIR="$HOME/.local/ai/openclaw/workspace" \
+./scripts/run-openclaw-podman.sh launch
+#+end_src
