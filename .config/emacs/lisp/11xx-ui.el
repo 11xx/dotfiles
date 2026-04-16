@@ -128,14 +128,14 @@ number."
   (display-fill-column-indicator-mode 1))
 (setup (:elpaca doom-modeline)
   (:hook-into elpaca-after-init-hook)
-  (:option doom-modeline-height 15
-           doom-modeline-buffer-encoding nil
-           ;; display-time-format '%H:%M'
-           doom-modeline-percent-position nil
-           doom-modeline-icon nil
-           doom-modeline-enable-word-count nil ; Performance
-           doom-modeline-buffer-file-name-style 'relative-from-project
-           ))
-(set-window-margins nil 1)
+  (setopt doom-modeline-height 15
+          doom-modeline-buffer-encoding nil
+          ;; display-time-format '%H:%M'
+          doom-modeline-percent-position nil
+          doom-modeline-icon nil
+          doom-modeline-enable-word-count nil ; Performance
+          doom-modeline-buffer-file-name-style 'truncate-nil
+          ))
+(set-window-margins nil 5 5)
 
 (provide '11xx-ui)

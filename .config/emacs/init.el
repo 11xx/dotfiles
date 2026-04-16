@@ -49,8 +49,8 @@ cookies and writes the result to config-loaddefs.el in
 (require '11xx-half-scroll)
 (require '11xx-pixel-scroll)
 
-(setup 11xx-dired
-  (:load-after dired))
+(use-package 11xx-dired)
+
 (require '11xx-magit)
 (setup 11xx-org
   (:load-after org))
