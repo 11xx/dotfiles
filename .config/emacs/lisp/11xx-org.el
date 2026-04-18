@@ -200,6 +200,8 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 (setup ob-lob
   (:load-after org)
   (org-babel-lob-ingest (expand-file-name "lob/xdg-vars.org" user-emacs-directory))
-  (require 'org-bitwarden))
+
+  (elpaca (org-bitwarden :url "https://codeberg.org/useless-utils/org-bitwarden")
+    (require 'org-bitwarden)))
 
 (provide '11xx-org)
