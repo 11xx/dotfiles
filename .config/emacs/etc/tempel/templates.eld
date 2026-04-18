@@ -98,6 +98,7 @@ org-mode
 (verse "#+begin_verse" n> r> n> "#+end_verse")
 (src "#+begin_src " p n> r> n> "#+end_src" :post (org-edit-src-code))
 (elisp "#+begin_src emacs-lisp" n> r> n "#+end_src" :post (org-edit-src-code))
+(tp ":PROPERTIES:" n ":header-args:" (p "MODE") ": :tangle " (p "PATH") n ":END:")
 (tpropsh ":PROPERTIES:" n ":header-args:shell: :tangle " "~/.local/bin/" (p "scriptname") " :shebang #!/usr/bin/env sh" n ":END:") ; tangle prop sh
 (tpropshul ":PROPERTIES:" n ":header-args:shell: :tangle " "/usr/local/bin/" (p "scriptname") " :shebang #!/usr/bin/env sh" n ":END:") ; tangle prop usr/local
 (tpropsd ":PROPERTIES:" n ":header-args:systemd: :tangle /sudo::/etc/systemd/system/"(p"servicename")".service.d/override.conf :mkdirp yes" n ":END:")
