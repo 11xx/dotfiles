@@ -16,7 +16,7 @@ The following set variables and script generators shall be used with
 : /usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator
 to print the variables to a shell, for example.
 
-* xdg.conf: XDG Base Directory
+* 20-xdg.conf: XDG Base Directory
 :PROPERTIES:
 :header-args:conf: :tangle "20-xdg.conf"
 :END:
@@ -99,7 +99,7 @@ RUSTUP_HOME=${XDG_DATA_HOME}/rustup
 CALCHISTFILE=${XDG_CACHE_HOME}/calc_history
 RANDFILE=${XDG_CACHE_HOME}/rnd
 SQLITE_HISTORY=${XDG_CACHE_HOME}/sqlite_history
-WGETRC=${XDG_CONFIG_HOME}/wgetrc
+WGETRC=${XDG_CONFIG_HOME}/wgetrc # manual touch "$WGETRC" may be needed
 #+end_src
 
 #+begin_src conf
@@ -119,14 +119,13 @@ NOTE: setting =GEM_HOME= now causes issues, in special the error:
 # # ~/.slime: https://github.com/slime/slime/issues/610
 # export KERAS_HOME="$XDG_DATA_HOME/keras" # don't seem to work but whatever :c [2022-03-29 Tue 21:46:37 ] https://github.com/tensorflow/tensorflow/issues/38831 and https://github.com/keras-team/keras/issues/11923
 
-* path-subdirs.conf: PATH subdir hierarchy
+* 50-path-subdirs.conf: PATH subdir hierarchy
 :PROPERTIES:
 :header-args:conf: :tangle 50-path-subdirs.conf
 :END:
 #+begin_src conf
 PATH=${PATH}:${XDG_BIN_HOME}/mpd
 PATH=${PATH}:${XDG_BIN_HOME}/hyprland
-PATH=${PATH}:${XDG_BIN_HOME}/wrappers
 PATH=${PATH}:${XDG_BIN_HOME}/yt
 PATH=${PATH}:${XDG_BIN_HOME}/fd-helpers
 PATH=${PATH}:${XDG_BIN_HOME}/fzf-scripts
@@ -134,6 +133,16 @@ PATH=${PATH}:${XDG_BIN_HOME}/stash
 PATH=${PATH}:${XDG_BIN_HOME}/emacs
 PATH=${PATH}:${XDG_BIN_HOME}/git
 #+end_src
+
+* 50-path-precedence.conf: PATH directories that take precedence over system ones
+:PROPERTIES:
+:header-args:conf: :tangle 50-path-precedence.conf
+:END:
+
+#+begin_src conf :noweb yes
+PATH=${XDG_BIN_HOME}/wrappers:${PATH}
+#+end_src
+
 
 * scripts-path.conf: Additional scripts directories to PATH
 :PROPERTIES:
@@ -144,12 +153,8 @@ PATH=${PATH}:${XDG_BIN_HOME}/git
 PATH=${PATH}:${HOME}/code/linux-scripts
 #+end_src
 
-* gtk.conf: GTK customization
-:PROPERTIES:
-:header-args:conf: :tangle gtk.conf
-:END:
+* COMMENT Local Variables
 
-specially on non-DE window manager environments
-#+begin_src conf
-LD_PRELOAD=/usr/lib/libgtk-nocsd.so.0
-#+end_src
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:

@@ -17,14 +17,14 @@ check-integrity=true
 
 * Command-line wrapper
 :PROPERTIES:
-:CUSTOM_ID: orgid-nolkgp
+:CUSTOM_ID: command-line-wrapper
 :END:
 For making sure the log file will be in an existing directory.
 
 #+begin_src shell :tangle (concat (xdg-bin-home) "/wrappers/aria2c") :tangle-mode o755 :mkdirp yes
 mkdir -pv "${XDG_STATE_HOME}"/aria2
 
-aria2c "$@"
+/usr/bin/aria2c "$@"
 #+end_src
 
 

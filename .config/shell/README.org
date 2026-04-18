@@ -1594,7 +1594,6 @@ alias wget='wget --hsts-file=${XDG_DATA_HOME}/wget-hsts'
 alias podman-compose-update='podman compose down && podman compose pull && podman compose up -d'
 #+end_src
 
-
 * Local file variables                                             :noexport:
 # Local Variables:
 # org-confirm-babel-evaluate: nil
