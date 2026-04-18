@@ -109,31 +109,80 @@ cd /workspace
 exec "$@"
 #+end_src
 
-* compose
+* Quadlets
 :PROPERTIES:
-:header-args:yaml-ts: :tangle compose.yaml
+:tangle-dir: (expand-file-name "containers/systemd/" (xdg-config-home))
+:header-args:systemd: :noweb tangle
 :END:
-#+begin_src yaml-ts
-services:
-  opencode:
-    build:
-      context: .
-      dockerfile: Containerfile
-    image: localhost/opencode:local
-    container_name: opencode
-    working_dir: /workspace
-    userns_mode: keep-id
-    stdin_open: true
-    tty: true
-    restart: unless-stopped
-    environment:
-      HOME: /home/node
-    volumes:
-      - ./workspace:/workspace:Z
-      - ./config:/home/node/.config/opencode:Z
-      - ./share:/home/node/.local/share/opencode:Z
-      - ./state:/home/node/.local/state/opencode:Z
+
+#+NAME: opencode-home
+#+begin_src text
+%h/.local/ai/opencode
 #+end_src
+
+** opencode.build: containerfile image build
+:PROPERTIES:
+:header-args:systemd+: :tangle (tdir "opencode.build")
+:END:
+#+begin_src systemd
+[Unit]
+Description=Build Opencode Custom Image
+
+[Build]
+ImageTag=localhost/opencode:latest
+File=<<opencode-home>>/Containerfile
+# Pull=newer checks if the base image (node:22) has updates before building
+Pull=newer
+#+end_src
+
+** opencode.container
+:PROPERTIES:
+:header-args:systemd+: :tangle (tdir "opencode.container")
+:END:
+#+begin_src systemd
+[Unit]
+Description=Opencode AI Container
+
+[Container]
+Image=opencode.build
+AutoUpdate=local
+ContainerName=opencode
+WorkingDir=/workspace
+UserNS=keep-id
+Environment=HOME=/home/node
+Volume=<<opencode-home>>/workspace:/workspace:Z
+Volume=<<opencode-home>>/config:/home/node/.config/opencode:Z
+Volume=<<opencode-home>>/share:/home/node/.local/share/opencode:Z
+Volume=<<opencode-home>>/state:/home/node/.local/state/opencode:Z
+Exec=opencode /workspace
+
+[Install]
+WantedBy=default.target
+#+end_src
+
+* opencode config
+:PROPERTIES:
+:header-args:json-ts: :tangle config/opencode.json
+:END:
+
+#+NAME: tavily-url
+#+begin_src emacs-lisp :var u="<bitwarden-item-id>" f="mcp-api" :results none :exports none :eval never-export
+(org-bitwarden-get u f)
+#+end_src
+
+# #+begin_src json-ts :noweb tangle
+#+begin_src json-ts :noweb yes
+{
+  "mcp": {
+    "tavily": {
+      "type": "remote",
+      "url": "<<tavily-url()>>",
+      "enabled": false
+    }
+  }
+}
+#+end_src
+
 
 * Skills
 
