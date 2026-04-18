@@ -526,7 +526,7 @@ swaybg_fork '#382738'
 
 ** Hyprland
 :PROPERTIES:
-:CUSTOM_ID: orgid-xivkrg
+:CUSTOM_ID: hyprland
 :END:
 This method relies on an 'import' in =hyprland.conf=, a file containing
 only relevant color theme definitions for border colors (and any other

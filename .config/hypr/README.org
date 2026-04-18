@@ -16,6 +16,23 @@ The default example config file can be found in:
 # ** Additional configuration modules
 # Split config files with specific functionality
 
+** Theming source
+:PROPERTIES:
+:CUSTOM_ID: theming-source
+:END:
+
+See the full theming config at [[#theming][Theming]]
+
+#+begin_src hyprlang-ts
+# file containing nested sourcing for color definitions, useful for
+# editing/automating changes from scripts like darkman.
+source = themes/theme.conf # (ref:hyprland-conf-theming-sourcing)
+source = shadows.conf
+source = animations.conf
+source = blur.conf
+source = mouse.conf
+#+end_src
+
 ** Displays & Workspaces
 - See
   + [[https://wiki.hyprland.org/Configuring/Monitors/][Monitors – Hyprland Wiki]]
@@ -58,7 +75,6 @@ exec-once = kdeconnectd # KDE connect daemon
 exec-once = sleep 2 && hypr-eww-open
 exec-once = sleep 10 && hypr-eww-restart-on-monitor-change
 exec-once = xsettingsd # GTK2-3 theme live changes
-exec-once = emacsclient-def
 # exec-once = gammastep -P
 exec-once = hypridle
 #+end_src
@@ -273,6 +289,8 @@ windowrule = match:initial_class ^(dragon-drop)$, float on, pin on
 source = window-rules.conf
 
 windowrule = suppress_event maximize, match:class .*
+
+windowrule = border_color $neron-pink rgba(00000080), match:float 1
 #+end_src
 
 
@@ -605,15 +623,13 @@ binde = SUPER, XF86AudioRaiseVolume, exec, env WOB_PIPE=/tmp/wob-firefox-sink.pi
 #+end_src
 
 ** Theming
-#+begin_src hyprlang-ts
-# file containing nested sourcing for color definitions, useful for
-# editing/automating changes from scripts like darkman.
-source = themes/theme.conf # (ref:hyprland-conf-theming-sourcing)
-source = shadows.conf
-source = animations.conf
-source = blur.conf
-source = mouse.conf
-#+end_src
+:PROPERTIES:
+:CUSTOM_ID: theming
+:END:
+
+Theming config files are [[#theming-source][sourced early]] to propagate variables down the lexical
+scope.
+
 Settings that use IPC like =gsettings= or =hyprctl= could and probably
 should also be set from darkman.
 
@@ -813,7 +829,8 @@ decoration {
 #+end_src
 
 *** Auto dark/light theme change with =darkman=
-#+INCLUDE: ~/.config/darkman/README.org::#orgid-xivkrg
+#+INCLUDE: ~/.config/darkman/README.org::#hyprland
+
 
 ** =nvidia.conf=: Nvidia-specific settings for Hyprland
 # Nvidia support
