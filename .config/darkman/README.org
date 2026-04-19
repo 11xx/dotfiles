@@ -625,30 +625,36 @@ eww_scss_source_theme dark
 ** Alacritty
 
 Shared setup functions:
-#+NAME: darkman-alacritty-colors-replace
+#+NAME: darkman-alacritty-setup
 #+begin_src shell :tangle no
-replace_theme_import() {
-    sed -i -E "s|^(import = \[ \"~/.config/alacritty/themes/)(.*)(\.toml.*)|\1$1\3|" \
-        "$2"
-}
+alacrittyDir="${XDG_CONFIG_HOME}"/alacritty
 
-replace_theme_import "${theme}" "${XDG_CONFIG_HOME}"/alacritty/alacritty.toml
+alacritty_link_theme() {
+    (
+        cd "${alacrittyDir}"/themes
+        ln -sf "${themeFile}" current-theme.toml
+    )
+}
 #+end_src
 
 - Light
 Using toml import where =$theme= is the filename of them theme without
 extension.
 #+begin_src shell :tangle (darkmandir "/alacritty.sh") :theme light
-theme=neron-light
+«darkman-alacritty-setup»
 
-«darkman-alacritty-colors-replace»
+themeFile=neron-light.toml
+
+alacritty_link_theme
 #+end_src
 
 - Dark
 #+begin_src shell :tangle (darkmandir "/alacritty.sh") :theme dark
-theme=neron-dark
+«darkman-alacritty-setup»
 
-«darkman-alacritty-colors-replace»
+themeFile=neron-dark.toml
+
+alacritty_link_theme
 #+end_src
 
 ** tofi

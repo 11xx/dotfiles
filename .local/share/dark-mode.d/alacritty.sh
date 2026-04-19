@@ -1,9 +1,13 @@
 #!/usr/bin/env sh
-theme=neron-dark
+alacrittyDir="${XDG_CONFIG_HOME}"/alacritty
 
-replace_theme_import() {
-    sed -i -E "s|^(import = \[ \"~/.config/alacritty/themes/)(.*)(\.toml.*)|\1$1\3|" \
-        "$2"
+alacritty_link_theme() {
+    (
+        cd "${alacrittyDir}"/themes
+        ln -sf "${themeFile}" current-theme.toml
+    )
 }
 
-replace_theme_import "${theme}" "${XDG_CONFIG_HOME}"/alacritty/alacritty.toml
+themeFile=neron-dark.toml
+
+alacritty_link_theme
