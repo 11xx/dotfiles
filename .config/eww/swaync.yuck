@@ -1,51 +1,51 @@
 (deflisten swaync_data :initial '{"text": "0", "alt": "none", "tooltip": "", "class": "none"}'
-  "swaync-client -swb")
+           "swaync-client -swb")
 
 (defwidget swaync_btn []
-  (eventbox
-    :onclick "swaync-client -t -sw"
-    :onrightclick "swaync-client -d -sw"
-    :onmiddleclick "swaync-client -C -sw"
-    :tooltip "${swaync_data.tooltip}"
-    :class "notification-button ${swaync_data.alt} ${swaync_data.class}"
-    (box
-      :class "notification-content"
-      :space-evenly false
-      :spacing 6
-      ;; Icon based on alt status
-      (label
-        :text "${swaync_data.alt == 'dnd-notification' || swaync_data.alt == 'dnd-inhibited-notification' || swaync_data.alt == 'dnd-none' ? '󰂛' : '󰂚'}"
-        :class "notification-icon")
-      ;; Notification count
-      (label
-        :text "${swaync_data.text}"
-        :class "notification-count"
-        :visible {swaync_data.text != "0"}))))
+           (eventbox
+            :onclick "swaync-client -t -sw"
+            :onrightclick "swaync-client -d -sw"
+            :onmiddleclick "swaync-client -C -sw"
+            :tooltip "${swaync_data.tooltip}"
+            :class "notification-button ${swaync_data.alt} ${swaync_data.class}"
+            (box
+             :class "notification-content"
+             :space-evenly false
+             :spacing 6
+             ;; Icon based on alt status
+             (label
+              :text "${swaync_data.alt == 'dnd-notification' || swaync_data.alt == 'dnd-inhibited-notification' || swaync_data.alt == 'dnd-none' ? '󰂛' : '󰂚'}"
+              :class "notification-icon")
+             ;; Notification count
+             (label
+              :text "${swaync_data.text}"
+              :class "notification-count"
+              :visible {swaync_data.text != "0"}))))
 
 ;; More detailed notification widget
 (defwidget swaync_icon []
-  (eventbox
-    :onclick "swaync-client -t -sw"
-    :onrightclick "swaync-client -d -sw"
-    :onmiddleclick "swaync-client -C -sw"
-    :tooltip "Notifications: ${swaync_data.text} ${swaync_data.alt == 'none' ? '' : '(' + swaync_data.alt + ')'}"
-    :class "notification-widget ${swaync_data.alt} ${swaync_data.class}"
-    (box
-      :orientation "h"
-      :space-evenly false
-      :spacing 6
-      ;; Dynamic icon based on status
-      (label
-        :text "${swaync_data.alt == 'dnd-notification' ? '󰂛' :
+           (eventbox
+            :onclick "swaync-client -t -sw"
+            :onrightclick "swaync-client -d -sw"
+            :onmiddleclick "swaync-client -C -sw"
+            :tooltip "Notifications: ${swaync_data.text} ${swaync_data.alt == 'none' ? '' : '(' + swaync_data.alt + ')'}"
+            :class "notification-widget ${swaync_data.alt} ${swaync_data.class}"
+            (box
+             :orientation "h"
+             :space-evenly false
+             :spacing 6
+             ;; Dynamic icon based on status
+             (label
+              :text "${swaync_data.alt == 'dnd-notification' ? '󰂛' :
                 swaync_data.alt == 'dnd-none' ? '󰂛' :
                 swaync_data.alt == 'dnd-inhibited-notification' ? '󰂛' :
                 swaync_data.alt == 'dnd-inhibited-none' ? '󰂛' :
                 swaync_data.alt == 'inhibited-notification' ? '󰂚' :
                 swaync_data.alt == 'inhibited-none' ? '󰂚' :
                 swaync_data.alt == 'notification' ? '󰂚' : '󰂚'}"
-        :class "notification-icon")
-      ;; Count badge (only show when > 0)
-      (label
-        :text "${swaync_data.text}"
-        :class "notification-count ${swaync_data.text != '0' ? 'has-count' : ''}"
-        :visible {swaync_data.text != "0"}))))
+              :class "notification-icon")
+             ;; Count badge (only show when > 0)
+             (label
+              :text "${swaync_data.text}"
+              :class "notification-count ${swaync_data.text != '0' ? 'has-count' : ''}"
+              :visible {swaync_data.text != "0"}))))

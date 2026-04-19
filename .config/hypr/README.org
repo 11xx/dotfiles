@@ -1158,7 +1158,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 * Eww - Widgets
 :PROPERTIES:
-:tangle-dir: (expand-file-name "eww" (xdg-bin-home))
+:tangle-dir: (expand-file-name "eww" (xdg-config-home))
 :END:
 
 - Arch Linux Note:
@@ -1486,7 +1486,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 :header-args:scss: :tangle (tdir "/eww.scss") :mkdirp yes
 :END:
 
-Variables files, first dark:
+Themes defined by shared variable names.
+
+dark:
 #+begin_src scss :tangle (tdir "/dark-colors.scss") :mkdirp yes
 $bar-bg: #222;
 $neon-green: #76ee00;
@@ -1521,7 +1523,8 @@ $neron-black: #414a44;
 $middle-gray: #808080;
 $current-icon: #666666;
 #+end_src
-then light:
+
+light:
 #+begin_src scss :tangle (tdir "/light-colors.scss") :mkdirp yes
 $bar-bg: #ffffff;
 $neon-green: #76ee00;
@@ -1550,13 +1553,13 @@ $middle-gray: #808080;
 $current-icon: #666666;
 #+end_src
 
-Now import /one/ of them on the normal file =eww= expects to read:
-#+begin_src scss :noweb yes
-@import "<<lightordark()>>-colors.scss";
+Now, import a generic target where it is a symlink to one of the theme files.
+#+begin_src scss
+@import "colors.scss";
 #+end_src
 
 Based on the variables, customize the widgets:
-#+begin_src scss :noweb yes
+#+begin_src scss
 @import "swaync.scss";
 
 $current-bb-t: .15em;

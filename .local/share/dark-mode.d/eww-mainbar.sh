@@ -12,14 +12,16 @@ dark=dark-colors.scss
 check_file "${ewwDir}"/"${light}"
 check_file "${ewwDir}"/"${dark}"
 
-eww_scss_source_theme() {
+eww_link_theme() {
     case "$1" in
         dark) themeFile="${dark}" ;;
         light) themeFile="${light}" ;;
     esac
 
-    sed -i "s/^\(@import\) *\"\(${light}\|${dark}\)\".*/\1 \"${themeFile}\";/" \
-        "${ewwDir}"/eww.scss
+    (
+        cd "${ewwDir}"
+        ln -sf "${themeFile}" colors.scss
+    )
 }
 
-eww_scss_source_theme dark
+eww_link_theme dark

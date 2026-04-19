@@ -1,4 +1,4 @@
-@import "dark-colors.scss";
+@import "colors.scss";
 
 @import "swaync.scss";
 
@@ -23,7 +23,7 @@ $focused-monitor-pad: 0 0 0 3px;
 .workspace-entry {
   padding: 0 .2em;
   border-bottom: $current-bb-t solid transparent; /* to make text not shift position when
-                                                    * .current uses border-bottom too */
+                                                   * .current uses border-bottom too */
   &:hover {
     background-color: $middle-gray;
   }
