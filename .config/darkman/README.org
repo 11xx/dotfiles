@@ -713,27 +713,32 @@ source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 xsettingsdConf=${XDG_CONFIG_HOME:-$HOME/.config}/xsettingsd/xsettingsd.conf
 
-check_file "${xsettingsdConf}"
+reload_xsettingsd() {
+    running_check xsettingsd && killall -HUP xsettingsd
+}
 
-trap 'running_check xsettingsd && killall -HUP xsettingsd' EXIT INT
+xsettingsd_link_theme() {
+    (
+        cd "$(dirname "${xsettingsdConf}")"
+        ln -sf xsettingsd.conf."$1" xsettingsd.conf
+    )
+}
+
+trap 'reload_xsettingsd' EXIT HUP INT QUIT TERM
 #+end_src
 
 - Light
 #+begin_src shell :tangle (darkmandir "/xsettingsd.sh") :theme light
 «darkman-xsettingsd-setup»
 
-themeName=Adwaita
-
-sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+xsettingsd_link_theme light
 #+end_src
 
 - Dark
 #+begin_src shell :tangle (darkmandir "/xsettingsd.sh") :theme dark
 «darkman-xsettingsd-setup»
 
-themeName=Adwaita-dark
-
-sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+xsettingsd_link_theme dark
 #+end_src
 
 * systemd override file

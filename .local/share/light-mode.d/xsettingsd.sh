@@ -3,10 +3,17 @@ source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 
 xsettingsdConf=${XDG_CONFIG_HOME:-$HOME/.config}/xsettingsd/xsettingsd.conf
 
-check_file "${xsettingsdConf}"
+reload_xsettingsd() {
+    running_check xsettingsd && killall -HUP xsettingsd
+}
 
-trap 'running_check xsettingsd && killall -HUP xsettingsd' EXIT INT
+xsettingsd_link_theme() {
+    (
+        cd "$(dirname "${xsettingsdConf}")"
+        ln -sf xsettingsd.conf."$1" xsettingsd.conf
+    )
+}
 
-themeName=Adwaita
+trap 'reload_xsettingsd' EXIT HUP INT QUIT TERM
 
-sed -i "s|^\(Net/ThemeName\).*|\1 \"${themeName}\"|" "${xsettingsdConf}"
+xsettingsd_link_theme light
