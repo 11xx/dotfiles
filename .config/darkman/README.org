@@ -528,27 +528,19 @@ swaybg_fork '#382738'
 :PROPERTIES:
 :CUSTOM_ID: hyprland
 :END:
-This method relies on an 'import' in =hyprland.conf=, a file containing
-only relevant color theme definitions for border colors (and any other
-customization made within Hyprland) is sourced so that any changes do
-that file makes only those settings update. Instead of using the IPC
-this makes changes last even if the configuration is reloaded, since
-it sources a written file.
 
-- The setup is:
-  + =themes/= directory inside =$XDG_CONFIG_HOME/hypr=
-  + =themes.conf= file containing /only/ a =source= to a standard dark or
-    light filename, =00-dark-theme.conf= or =00-light-theme.conf=. e.g the
-    line:
-    : source = themes/00-light-theme.conf
+This method relies on an 'import' in =hyprland.conf= of a standard symlink theme
+file called =theme.conf=, this file is a symlink from a separately defined
+"theme" file that customizes the colors and look and feel, and more importantly
+define overriden standard color variables for use after it. E.g. if =$colorBg= is
+defined there anything else lexically after in the config can refer to this
+variable and inherit its value, that were defined by the symlinked theme file.
 
-  + both the =00-dark-theme.conf= or =00-light-theme.conf= files can
-    contain either =hyprland.conf= settings directly or another =source=
-    of a (final) specific theme.
-  + Nesting sources like this, though more abstract, allows for easier
-    maintanance/changing of themes with scripts.
+- Basically, =$XDG_CONFIG_HOME/hypr/themes/themes.conf= is a symlink to a [[file:~/.config/hypr/README.org::#theme-conf-light-dark-dynamic-themes-support][theme file]].
+- Theme file names are obviously arbitrary so I'm using the
+  =[symlink-target].[light|dark]= format, where one suffixed file is symlinked to
+  the one without suffix.
 
-Actual theming done & prepared withing Hyprland's directory.
 #+NAME: hyprland-setup
 #+begin_src shell
 source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
@@ -556,20 +548,14 @@ source "${XDG_DATA_HOME}"/shlib/darkman_helpers.sh
 hyprDir=${XDG_CONFIG_HOME}/hypr
 themeConfFile=${hyprDir}/themes/theme.conf
 
-lightFile=00-light-theme.conf
-darkFile=00-dark-theme.conf
+check_file "${themeConfFile}".light
+check_file "${themeConfFile}".dark
 
-check_file "${themeConfFile}"
-check_file "${themeConfFile%/*}/${lightFile}"
-check_file "${themeConfFile%/*}/${darkFile}"
-
-hyprland_source_theme() {
-    case "$1" in
-        dark) themeFile=${darkFile} ;;
-        light) themeFile=${lightFile} ;;
-    esac
-
-    sed -Ei "s,^source([[:blank:]]+|)=([[:blank:]]+|)(${lightFile}|${darkFile})$,source = ${themeFile}," "${themeConfFile}"
+hyprland_link_theme() {
+    (
+        cd "$(dirname "${themeConfFile}")"
+        ln -sf theme.conf."$1" theme.conf
+    )
 }
 #+end_src
 
@@ -577,14 +563,14 @@ hyprland_source_theme() {
 #+begin_src shell :tangle (darkmandir "/hyprland.sh") :theme light
 «hyprland-setup»
 
-hyprland_source_theme light
+hyprland_link_theme light
 #+end_src
 
 - Dark
 #+begin_src shell :tangle (darkmandir "/hyprland.sh") :theme dark
 «hyprland-setup»
 
-hyprland_source_theme dark
+hyprland_link_theme dark
 #+end_src
 
 ** Eww

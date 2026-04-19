@@ -25,7 +25,7 @@ Net/ThemeName "Adwaita"
 #+NAME: icons-theme
 #+begin_src conf :tangle no
 Net/IconThemeName "Papirus"
-Gtk/CursorThemeName "simp1e-amber"
+Gtk/CursorThemeName "simp1e-amber-neron"
 #+end_src
 
 

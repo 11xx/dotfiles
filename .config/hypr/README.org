@@ -23,10 +23,10 @@ The default example config file can be found in:
 
 See the full theming config at [[#theming][Theming]]
 
-#+begin_src hyprlang-ts
+#+begin_src hyprlang-ts -r
 # file containing nested sourcing for color definitions, useful for
 # editing/automating changes from scripts like darkman.
-source = themes/theme.conf # (ref:hyprland-conf-theming-sourcing)
+source = themes/theme.conf (ref:hyprland-conf-theming-sourcing)
 source = shadows.conf
 source = animations.conf
 source = blur.conf
@@ -290,7 +290,7 @@ source = window-rules.conf
 
 windowrule = suppress_event maximize, match:class .*
 
-windowrule = border_color $neron-pink rgba(00000080), match:float 1
+windowrule = border_color $colorNeronPink rgba(000000ff), match:float 1
 #+end_src
 
 
@@ -654,8 +654,8 @@ theme directory should be installed preferably user-local in
 # because Linux is easy 😿
 
 # Cursor theme names are their directory names
-$XCursorTheme = simp1e-amber
-$hyprcursorTheme = simp1e-amber
+$XCursorTheme = simp1e-amber-neron
+$hyprcursorTheme = simp1e-amber-neron
 $XCursorSize = 24
 $hyprcursorSize = 24
 
@@ -677,24 +677,102 @@ cursor {
 #+end_src
 
 
-*** =theme.conf=: General visual customization
+*** =theme.conf.[light|dark]=: Dynamic theme change support
 :PROPERTIES:
-:header-args:hyprlang-ts: :tangle themes/theme.conf :mkdirp yes
+:CUSTOM_ID: theme-conf-light-dark-dynamic-themes-support
 :END:
 
-Split files, sourcing them at [[(hyprland-conf-theming-sourcing)][hyprland.conf Theming sourcing]]
-#+begin_src hyprlang-ts
+The .light|.dark suffix is to distinguish a theme file so it can be symlinked
+to the "current theme" file =theme.conf=, e.g.:
+: ln -sf theme.conf.light theme.conf
+
+- This is an artefact of a darkman setup, for dynamic auto dark/light theme
+  change.
+
+  See [[file:~/.config/darkman/README.org::#hyprland][darkman#Hyprland]]
+
+=theme.conf= is sourced [[(hyprland-conf-theming-sourcing)][here]]
+
+Shared 'library' of color definitions
+#+begin_src hyprlang-ts :tangle themes/colors-lib.conf
+# basic
+$colorBlack = rgb(000000)
+$colorWhite = rgb(ffffff)
+$colorGrayBg = rgb(cccccc)
+
+# light theme
+$colorMonowhiteBg = $colorWhite
+$colorMonowhiteFg = rgb(545e62)
+$colorMonowhiteRed = rgb(ba0d0d)
+$colorMonowhiteCyan = rgb(006861)
+$colorMonowhitePink = rgb(b30071)
+$colorMonowhiteGreen = rgb(1c6b00)
+
+# dark theme (neron)
+$colorNeronBg = rgb(222222)
+$colorNeronGreen = rgb(61bd09)
+$colorNeronPink = rgb(ff77cf)
+$colorNeronCyan = rgb(16b0cf)
+$colorNeronFg = rgb(a6a8a9)
+$colorNeronCurrent = rgb(2f2f2f)
+$colorNeronOrange = rgb(fd892c)
+
+# misc
+$colorCurrentIcon = rgb(666666)
+$colorYtOrange = rgb(ef6c00)
+$colorTransparent = rgba(ff000000)
+#+end_src
+
+
+#+begin_src hyprlang-ts :tangle themes/theme.conf.light
+# -*- mode: hyprlang-ts; -*-
+source = colors-lib.conf
+
+$colorBg = $colorMonowhiteBg
+$colorFg = $colorMonowhiteFg
+$colorBgSecondary = rgb(f6f6f6)
+
+$hyprbarsColorClose = $colorMonowhitePink
+$hyprbarsColorMaximize = $colorMonowhiteGreen
+$hyprbarsColorFloat = $colorMonowhiteCyan
+
+decoration {
+  rounding = 4
+}
+
 general {
   gaps_in = 4
   gaps_out = 8
-  border_size = 1
-}
+  border_size = 3
 
-decoration {
-  rounding = 4 # def 10
+  col.active_border = $colorMonowhitePink 45deg
+  col.inactive_border = $colorTransparent
 }
 #+end_src
 
+#+begin_src hyprlang-ts :tangle themes/theme.conf.dark
+# -*- mode: hyprlang-ts; -*-
+source = colors-lib.conf
+
+$colorBg = $colorNeronBg
+$colorFg = $colorNeronFg
+$colorBgSecondary = rgb(27282c)
+
+$hyprbarsColorClose = $colorNeronPink
+$hyprbarsColorMaximize = $colorNeronGreen
+$hyprbarsColorFloat = $colorNeronCyan
+
+general {
+  gaps_in = 4
+  gaps_out = 8
+  border_size = 1 # dark border is easier to see in dark theme
+
+  col.active_border = $colorYtOrange
+  col.inactive_border = $colorTransparent
+}
+#+end_src
+
+*** =blur.conf=
 #+begin_src hyprlang-ts :tangle blur.conf
 decoration {
   blur {
@@ -706,6 +784,7 @@ decoration {
 }
 #+end_src
 
+*** =animations.conf=
 - Animations are declared with the =animation=  keyword.
   : animation=NAME,ONOFF,SPEED,CURVE[,STYLE]
   + =ONOFF= can be either 0 or 1, 0 to disable, 1 to enable. /note:/  if it’s 0, you can omit further args.
@@ -730,88 +809,6 @@ animations {
 }
 #+end_src
 
-
-Since =theme.conf= is in a subdirectory, if it sources a file in the
-same directory as itself the source path should also be relative to
-itself and not to =hyprland.conf=. +(or just use fullpaths)+
-#+begin_src hyprlang-ts :noweb yes
-source = 00-<<lightordark()>>-theme.conf
-#+end_src
-
-#+begin_src hyprlang-ts :tangle themes/00-light-theme.conf :mkdirp yes
-source = neron-color-vars.conf
-source = light-color-vars.conf
-
-$bg-color = $lt-bg
-$fg-color = $lt-fg
-$hyprbars-close-color = $lt-pink
-$hyprbars-maximize-color = $lt-green
-$hyprbars-float-color = $lt-cyan
-
-source = light-borders.conf
-#+end_src
-
-#+begin_src hyprlang-ts :tangle themes/00-dark-theme.conf :mkdirp yes
-source = neron-color-vars.conf
-
-$bg-color = $neron-bg
-$fg-color = $neron-fg
-$hyprbars-close-color = $neron-pink
-$hyprbars-maximize-color = $neron-green
-$hyprbars-float-color = $neron-cyan
-
-source = neon-dark-borders.conf
-#+end_src
-
-*** Border color themes
-#+begin_src hyprlang-ts :tangle themes/neon-dark-borders.conf :mkdirp yes
-general {
-  col.active_border = $yt-orange
-  col.inactive_border = rgba(25252500)
-}
-#+end_src
-
-#+begin_src hyprlang-ts :tangle themes/light-borders.conf :mkdirp yes
-general {
-  # col.active_border = rgb(ff00aa)
-  col.active_border = $neron-pink 45deg
-  col.inactive_border = rgba(eeeeee00)
-
-  gaps_in = 4
-  gaps_out = 8
-  border_size = 3
-}
-#+end_src
-
-*** Theme color variables
-#+begin_src hyprlang-ts :tangle themes/neron-color-vars.conf :mkdirp yes
-$neron-bg = rgb(222222)
-$neron-green = rgb(61bd09)
-$neron-pink = rgb(ff77cf)
-$neron-cyan = rgb(16b0cf)
-$neron-fg = rgb(a6a8a9)
-$neron-current = rgb(2f2f2f)
-$current-icon = rgb(666666)
-$neron-orange = rgb(fd892c)
-$yt-orange = rgb(ef6c00)
-
-$bg-secondary = rgb(27282c)
-#+end_src
-
-#+begin_src hyprlang-ts :tangle themes/light-color-vars.conf :mkdirp yes
-$black = rgb(000000)
-$gray-bg = rgb(cccccc)
-$white = rgb(ffffff)
-$lt-bg = $white
-$lt-fg = rgb(545e62)
-$lt-red = rgb(ba0d0d)
-$lt-cyan = rgb(006861)
-$lt-pink = rgb(b30071)
-$lt-green = rgb(1c6b00)
-
-$bg-secondary = rgb(f6f6f6)
-#+end_src
-
 *** =shadows.conf=: Disable shadows
 #+begin_src hyprlang-ts :tangle shadows.conf
 decoration {
@@ -827,10 +824,6 @@ decoration {
   }
 }
 #+end_src
-
-*** Auto dark/light theme change with =darkman=
-#+INCLUDE: ~/.config/darkman/README.org::#hyprland
-
 
 ** =nvidia.conf=: Nvidia-specific settings for Hyprland
 # Nvidia support
@@ -891,16 +884,16 @@ source = vrr.conf
 plugin {
   hyprbars {
     bar_height = 20
-    bar_color = $bg-secondary
-    col.text = $fg-color
+    bar_color = $colorBgSecondary
+    col.text = $colorFg
     bar_text_size = 9
     bar_text_font = Noto Sans
     bar_button_padding = 10
     bar_padding = 5
     bar_precedence_over_border = true
-    hyprbars-button = $hyprbars-close-color, 16, , hyprctl dispatch killactive
-    hyprbars-button = $hyprbars-maximize-color, 16, , hyprctl dispatch fullscreen 2
-    hyprbars-button = $hyprbars-float-color, 16, , hyprctl dispatch togglefloating
+    hyprbars-button = $hyprbarsColorClose, 16, , hyprctl dispatch killactive
+    hyprbars-button = $hyprbarsColorMaximize, 16, , hyprctl dispatch fullscreen 2
+    hyprbars-button = $hyprbarsColorFloat, 16, , hyprctl dispatch togglefloating
   }
 }
 #+end_src
