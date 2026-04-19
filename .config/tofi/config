@@ -26,5 +26,6 @@ text-cursor = true
 outline-width = 0
 border-width = 0
 
-# theme-specific colors, default to dark
-include=./def-dark
+# non-version-controlled file to keep clean logs when using dynamic changes
+# ./def-current-theme can then be symlinked from one of the the "theme" files.
+include=./def-current-theme

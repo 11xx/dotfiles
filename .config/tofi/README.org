@@ -10,9 +10,9 @@
 - [[https://github.com/philj56/tofi][philj56/tofi: Tiny dynamic menu for Wayland]]
 
 * Default =tofi= config
-- dmenu theme
+- dmenu-style
 #+NAME: tofi-config-defaults
-#+begin_src conf :tangle config :mkdirp yes
+#+begin_src conf :tangle config
 anchor = top
 width = 100%
 height = 30
@@ -41,12 +41,13 @@ text-cursor = true
 outline-width = 0
 border-width = 0
 
-# theme-specific colors, default to dark
-include=./def-dark
+# non-version-controlled file to keep clean logs when using dynamic changes
+# ./def-current-theme can then be symlinked from one of the the "theme" files.
+include=./def-current-theme
 #+end_src
 
 - Dark
-#+begin_src conf :tangle def-dark :mkdirp yes
+#+begin_src conf :tangle def-dark
 text-color = #ffffff
 background-color = #22222233
 selection-color = #222222ff
@@ -57,7 +58,7 @@ border-color = #ff77cfee
 #+end_src
 
 - Light
-#+begin_src conf :tangle def-light :mkdirp yes
+#+begin_src conf :tangle def-light
 text-color = #333333
 background-color = #ffffffff
 selection-color = #ffffffff
@@ -67,9 +68,9 @@ outline-color = #333333
 border-color = #333333
 #+end_src
 
-* =tofi= center box
+* center box
 
-#+begin_src conf :tangle center-box :mkdirp yes
+#+begin_src conf :tangle center-box
 font-size = 16
 prompt-text = ""
 prompt-padding = 10
@@ -99,28 +100,12 @@ height = 40%
 anchor=left
 margin-left=45%
 
-include=center-box-dark
+include=center-box-outline
+
+include=def-current-theme
 #+end_src
 
-#+begin_src conf :tangle center-box-light :mkdirp yes
-include=center-box-colors-light
-#+end_src
-
-#+begin_src conf :tangle center-box-dark :mkdirp yes
-include=center-box-colors-dark
-#+end_src
-
-#+begin_src conf :tangle center-box-outline :mkdirp yes
+#+begin_src conf :tangle center-box-outline
 outline-width = 0
 border-width = 3
-#+end_src
-
-#+begin_src conf :tangle center-box-colors-light :mkdirp yes
-include=def-light
-include=center-box-outline
-#+end_src
-
-#+begin_src conf :tangle center-box-colors-dark :mkdirp yes
-include=def-dark
-include=center-box-outline
 #+end_src

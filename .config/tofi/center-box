@@ -27,4 +27,6 @@ height = 40%
 anchor=left
 margin-left=45%
 
-include=center-box-dark
+include=center-box-outline
+
+include=def-current-theme
