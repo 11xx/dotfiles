@@ -638,8 +638,8 @@ Backup & auto-save
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
 
-(f/check-make-directory 11xx--backup-directory)
-(f/check-make-directory 11xx--auto-save-directory)
+(ensure-directory 11xx--backup-directory)
+(ensure-directory 11xx--auto-save-directory)
 
 ;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
@@ -1727,12 +1727,10 @@ even beep.)"
 
 *** Check if directory exists and create it if not
 #+begin_src emacs-lisp :results code
-(defun f/check-make-directory (dir)
-  "Check if DIR exists and create it if it doesn't.
-
-It uses `make-directory' PARENTS argument 't'."
-  (if (not (file-exists-p dir))
-      (make-directory dir t)))
+(defun ensure-directory (dir)
+  "Ensure DIR exists."
+  (unless (file-directory-p dir)
+    (make-directory dir t)))
 #+end_src
 
 *** Return XDG home directories

@@ -81,12 +81,10 @@ even beep.)"
   (unless (and buffer-read-only kill-read-only-ok)
     ;; Delete lines or make the "Buffer is read-only" error.
     (flush-lines regexp rstart rend interactive)))
-(defun f/check-make-directory (dir)
-  "Check if DIR exists and create it if it doesn't.
-
-It uses `make-directory' PARENTS argument 't'."
-  (if (not (file-exists-p dir))
-      (make-directory dir t)))
+(defun ensure-directory (dir)
+  "Ensure DIR exists."
+  (unless (file-directory-p dir)
+    (make-directory dir t)))
 (defun xdg-bin-home ()
   "Return the base directory for user specific executable files."
   (xdg--dir-home "XDG_BIN_HOME" "~/.local/bin"))

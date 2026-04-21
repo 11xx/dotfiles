@@ -12,8 +12,8 @@
                     (expand-file-name "var" user-emacs-directory))
   "Custom auto-save files directory.")
 
-(f/check-make-directory 11xx--backup-directory)
-(f/check-make-directory 11xx--auto-save-directory)
+(ensure-directory 11xx--backup-directory)
+(ensure-directory 11xx--auto-save-directory)
 
 ;; ;; add random number to auto save file list
 ;; (defun f/auto-save-list-file-name-function ()
