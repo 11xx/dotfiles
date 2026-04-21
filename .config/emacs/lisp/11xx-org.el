@@ -193,6 +193,28 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (:hook-into org-mode))
 
 ) ;; (setup org ends here
+(elpaca (org-tangle-dir :host codeberg :repo "useless-utils/org-tangle-dir")
+  (use-package org-tangle-dir
+    :config
+    (defun tdir-set-heading-property ()
+      "Set :tangle-dir: for the current heading to (tdir-base \"SLUG\").
+SLUG is derived from the heading title and confirmed in the minibuffer."
+      (interactive)
+      (let* ((title (substring-no-properties (org-entry-get nil "ITEM")))
+             (slug  (thread-last title
+                                 (downcase)
+                                 (replace-regexp-in-string "[[:space:]]+" "-")
+                                 (replace-regexp-in-string "[^a-z0-9_-]" "")
+                                 (replace-regexp-in-string "-+" "-")
+                                 (string-trim "-")))
+             (slug  (read-string "Slug for tdir-base: " slug))
+             (value (format "(tdir-base \"%s\")" slug)))
+        (org-set-property "tangle-dir" value)
+        (message "Set :tangle-dir: %s" value)))
+
+    (with-eval-after-load 'org
+      (keymap-set org-mode-map "C-c C-x T" #'tdir-set-heading-property))
+    ))
 (when (file-exists-p "~/www/11xx.org/lisp/11xx-org-publish.el")
   (add-to-list 'load-path "~/www/11xx.org/lisp/")
   (with-eval-after-load 'ox-publish
