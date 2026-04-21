@@ -1,6 +1,7 @@
 FROM docker.io/node:22-bookworm-slim
 
 ARG OPENCODE_NPM_PACKAGE="opencode-ai"
+ARG OPENCODE_VERSION="1.14.19"
 
 # Essentials for opencode:
 # - Network + VCS
@@ -68,13 +69,13 @@ ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV PATH=/home/node/.npm-global/bin:$PATH
 ENV HOME=/home/node
 
-RUN mkdir -p /home/node/.npm-global \
+RUN mkdir -pv /home/node/.npm-global \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
-    /workspace && \
-    npm install -g "${OPENCODE_NPM_PACKAGE}" && \
-    opencode --version
+    /workspace
+
+RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" && opencode --version
 
 COPY --chown=node:node entrypoint.sh /home/node/entrypoint.sh
 RUN chmod +x /home/node/entrypoint.sh
