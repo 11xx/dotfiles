@@ -1,69 +1,61 @@
-FROM docker.io/node:22-bookworm-slim
+FROM quay.io/fedora/fedora:43
 
-ARG OPENCODE_NPM_PACKAGE="opencode-ai"
 ARG OPENCODE_VERSION="latest"
 
-# Essentials for opencode:
-# - Network + VCS
-# - Text search and JSON tools
-# - Editors
-# - Minimal build toolchain
+RUN dnf -y upgrade --refresh
 
-RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' > /etc/apt/sources.list.d/backports.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    # Network & VCS (required by opencode workflows)
+RUN dnf -y install --setopt=install_weak_deps=False \
+    # === Essentials for OpenCode ===
+    # Required for Node environment, native addon builds, VCS, and core agent tools
     ca-certificates \
     curl \
+    findutils \
+    gcc-c++ \
     git \
-    openssh-client \
-    wget \
-    # Core shell utilities
-    less \
-    procps \
-    unzip \
-    xz-utils \
-    # JSON / search
+    gzip \
     jq \
-    ripgrep \
-    # Editors
-    nano \
-    vim \
-    # Build toolchain (for native addons, small utilities, etc.)
-    g++ \
     make \
+    nodejs \
+    npm \
+    openssh-clients \
+    procps-ng \
     python3 \
-    # Additional CLI tooling (recommended but not strictly required)
-    # Code navigation
-    fd-find \
-    universal-ctags \
-    tree \
-    # Code reading
+    ripgrep \
+    shadow-utils \
+    tar \
+    unzip \
+    wget \
+    which \
+    xz \
+    # === Arbitrary Additional Tools ===
+    # Optional editors, linters, and CLI utilities (safe to modify or remove)
     bat \
-    # Linting & validation
-    shellcheck \
-    strace \
+    emacs \
     entr \
-    # Data utilities
-    sqlite3 \
-    python3-csvkit \
-    && apt-get install -y --no-install-recommends -t bookworm-backports emacs-nox \
-    && rm -rf /var/lib/apt/lists/*
+    git-delta \
+    less \
+    nano \
+    shellcheck \
+    sqlite \
+    strace \
+    tree \
+    uv \
+    vim-enhanced \
+    yq \
+    ctags \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
 
-# Tools not in bookworm repos — install via npm or binary
+# Global Node-based tools
 RUN npm install -g @ast-grep/cli
 
-RUN curl -sSL https://github.com/dandavison/delta/releases/latest/download/delta-$(curl -sSL https://api.github.com/repos/dandavison/delta/releases/latest | jq -r .tag_name)-x86_64-unknown-linux-musl.tar.gz \
-    | tar -xz --wildcards --strip-components=1 -C /usr/local/bin '*/delta'
-
+# Hadolint (Haskell binary not in Fedora core)
 RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
-    -o /usr/local/bin/hadolint && chmod +x /usr/local/bin/hadolint
+    -o /usr/local/bin/hadolint \
+ && chmod +x /usr/local/bin/hadolint
 
-RUN curl -sSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
-    -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
-
-RUN npm install -g @ast-grep/cli
-
+RUN groupadd -g 1000 node \
+ && useradd -m -u 1000 -g 1000 -s /bin/bash node
 
 USER node
 WORKDIR /workspace
@@ -72,13 +64,19 @@ ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV PATH=/home/node/.npm-global/bin:$PATH
 ENV HOME=/home/node
 
-RUN mkdir -pv /home/node/.npm-global \
+RUN mkdir -pv \
+    /home/node/.npm-global \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /workspace
 
-RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" && opencode --version
+RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
+ && opencode --version \
+ && emacs --version | head -n 1 \
+ && node --version \
+ && npm --version \
+ && uv --version
 
 COPY --chown=node:node entrypoint.sh /home/node/entrypoint.sh
 RUN chmod +x /home/node/entrypoint.sh
