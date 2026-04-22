@@ -37,8 +37,8 @@ When matching, reference is stored in match group 1."
             (? (*? any) (not (or " " "\t" "\n"))))
            (or ">>" "»"))))
 
-  (defun f/org-babel-noweb-wrap-insert-chars ()
-    "Insert \"«\" and \"»\" "
+  (defun org-babel-noweb-wrap-insert-chars ()
+    "Insert « and »." 
     (interactive)
     (insert "«»")
     (backward-char)))

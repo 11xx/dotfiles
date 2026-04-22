@@ -1,120 +1,92 @@
 ;; -*- lexical-binding: t; -*-
 
-(setup emacs
-  ;; Keybindings
-  (:global-set
-   "C-c C-/"          comment-region
-   "C-c C-M-/"        uncomment-region
-   "<remap> <mark-word>"  f/mark-whole-word
-   ;; Local file variables
-   "C-c a f v"        add-file-local-variable
-   "C-c d f v"        delete-file-local-variable
-   "C-c a f p"        add-file-local-variable-prop-line
-   "C-c d f p"        delete-file-local-variable-prop-line
-   ;; Custom functions
-   ;; Text display
-   "C-c C-M-t"  visual-line-mode
-   "C-c M-t"    toggle-truncate-lines
-   ;; Insert text
-   "C-c i t" f/current-timestamp-insert
+(keymap-global-set "C-c C-/" #'comment-region)
+(keymap-global-set "C-c C-M-/" #'uncomment-region)
+(keymap-global-set "<remap> <mark-word>" #'mark-whole-word)
+(keymap-global-set "C-c a f v" #'add-file-local-variable)
+(keymap-global-set "C-c d f v" #'delete-file-local-variable)
+(keymap-global-set "C-c a f p" #'add-file-local-variable-prop-line)
+(keymap-global-set "C-c d f p" #'delete-file-local-variable-prop-line)
+(keymap-global-set "C-c C-M-t" #'visual-line-mode)
+(keymap-global-set "C-c M-t" #'toggle-truncate-lines)
+(keymap-global-set "C-c i t" #'current-timestamp-insert)
+(keymap-global-set "C-x C-z" #'org-set-property)
+(keymap-global-set "C-z" #'org-set-property)
+(keymap-global-set "C-S-<left>" #'shrink-window-horizontally)
+(keymap-global-set "C-S-<right>" #'enlarge-window-horizontally)
+(keymap-global-set "C-S-<down>" #'shrink-window)
+(keymap-global-set "C-S-<up>" #'enlarge-window)
+(keymap-global-set "C-M-d" #'delete-pair)
+(keymap-global-set "M-D" #'delete-pair)
+(keymap-global-set "M-." #'forward-list)
+(keymap-global-set "M-," #'backward-list)
+(keymap-global-set "C-M-." #'down-list)
+(keymap-global-set "C-M-," #'backward-up-list)
 
-   "C-x C-z" org-set-property
-   "C-z" org-set-property
-   ;; [[https://www.emacswiki.org/emacs/WindowResize][EmacsWiki: Window Resize]] [2022-04-20 Wed 02:50:51]
-   "C-S-<left>"   shrink-window-horizontally
-   "C-S-<right>"  enlarge-window-horizontally
-   "C-S-<down>"   shrink-window
-   "C-S-<up>"     enlarge-window
-   ;; Cursor
-   ;; "C-M-d" backward-delete-char ; was down-list
-   "C-M-d" delete-pair ; was down-list
-   ;; "M-D"   backward-kill-word
-   "M-D"   delete-pair
-   ;; "M-h"          backward-delete-char ; was `mark-paragraph' global
-   ;; "M-H"          backward-kill-word ; was `mark-paragraph' global, separate override may be necessary for local maps
-   "M-." forward-list
-   "M-," backward-list
-   "C-M-." down-list ; up-list
-   "C-M-," backward-up-list
-   )
+(put 'narrow-to-region 'disabled nil)
+(put 'narrow-to-page 'disabled nil)
+(put 'narrow-to-defun 'disabled nil)
+(put 'widen 'disabled nil)
+(put 'downcase-region 'disabled nil)
 
-  ;; Enable disabled 'advanced' commands
-  (:put-enable narrow-to-region
-               narrow-to-page
-               narrow-to-defun
-               widen
-               downcase-region)
+(add-function :after after-focus-change-function
+              (lambda () (save-some-buffers t)))
 
-  (add-function :after after-focus-change-function
-                (lambda() (save-some-buffers t)))
+(save-place-mode 1)
+(delete-selection-mode 1)
+(electric-pair-mode 1)
+(electric-indent-mode 1)
 
-  ;;; Minor modes
-  ;; (:also-load mouse)
-  ;; (xterm-mouse-mode 1) ;; xterm mouse support
-  (save-place-mode 1)
-  (delete-selection-mode 1) ; delete marked region with backspace
+(use-package whitespace
+  :hook ((prog-mode . whitespace-mode)
+         (text-mode . whitespace-mode))
+  :init
+  (setq whitespace-style '(face tabs missing-newline-at-eof)
+        show-trailing-whitespace t)
+  :config
+  (dolist (hook '(special-mode-hook
+                  term-mode-hook
+                  vterm-mode-hook
+                  comint-mode-hook
+                  compilation-mode-hook
+                  minibuffer-setup-hook
+                  minibuffer-mode-hook
+                  calendar-mode-hook
+                  eshell-mode-hook
+                  completion-list-mode-hook
+                  messages-buffer-mode-hook
+                  diff-mode-hook))
+    (add-hook hook (lambda () (setq-local show-trailing-whitespace nil)))))
 
-  ;; #manual-smartparens
-  (electric-pair-mode 1)
-  (electric-indent-mode 1))
+(add-hook 'after-init-hook #'global-superword-mode)
 
-(setup whitespace
-  (:hide-mode)
-  (:hook-into prog-mode text-mode)
-  (:option whitespace-style '(face tabs missing-newline-at-eof)
-           show-trailing-whitespace t)
-  ;; Disable `show-trailing-whitespace' in some modes:
-  (:with-hook (special-mode-hook
-               term-mode-hook
-               vterm-mode-hook
-               comint-mode-hook
-               compilation-mode-hook
-               minibuffer-setup-hook
-               minibuffer-mode-hook
-               calendar-mode-hook
-               ;; embark-mode-hook
-               eshell-mode-hook
-               completion-list-mode-hook
-               messages-buffer-mode-hook
-               diff-mode-hook
-               messages-buffer-mode-hook)
-    (:hook (lambda() (setq-local show-trailing-whitespace nil)))))
-
-(add-hook 'elpaca-after-init-hook #'global-superword-mode)
-
-(setup (:elpaca ace-window)
-  ;; Prefixed with C-u swaps, see 'M-h f ace-window'
-  (:global-set "M-o" ace-window)
-
-  ;; https://github.com/abo-abo/ace-window?tab=readme-ov-file#aw-keys
-  (setopt aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)
-          aw-scope 'frame))
+(use-package ace-window
+  :bind (("M-o" . ace-window))
+  :init
+  (setq aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l)
+        aw-scope 'frame))
 
 ;; new remap format is "<remap> <what-to-remap>" #'my-function
-(setup (:elpaca helpful)
-  ;; Helpful.el
-  (:global-set
-   "<remap> <describe-function>" helpful-callable
-   "<remap> <describe-command>" helpful-command
-   "<remap> <describe-variable>" helpful-variable
-   "<remap> <describe-key>" helpful-key
-   "<remap> <describe-symbol>" helpful-symbol))
+(use-package helpful
+  :bind (("<remap> <describe-function>" . helpful-callable)
+         ("<remap> <describe-command>" . helpful-command)
+         ("<remap> <describe-variable>" . helpful-variable)
+         ("<remap> <describe-key>" . helpful-key)
+         ("<remap> <describe-symbol>" . helpful-symbol)))
 
-(setup (:elpaca which-key)
-  ;; :defer 10
-  (setopt which-key-idle-delay 2.0))
+(use-package which-key
+  :init
+  (setq which-key-idle-delay 2.0))
 
 
-(setup (:elpaca jump-char)
-  (:load-after kmacro) ; bc I only use this for macro-ing anyway
+(use-package jump-char
+  :after kmacro
+  :bind (("C-c j f" . jump-char-forward)
+         ("C-c j b" . jump-char-backward)
+         ("C-c j m f" . jump-char-forward-set-mark)
+         ("C-c j m b" . jump-char-backward-set-mark)))
 
-  (:global-set
-   "C-c j f" jump-char-forward
-   "C-c j b" jump-char-backward
-   "C-c j m f" jump-char-forward-set-mark
-   "C-c j m b" jump-char-backward-set-mark))
-
-(setup (:elpaca delight))
+(use-package delight)
 
 (setopt ispell-dictionary "en_GB")
 
@@ -139,27 +111,26 @@ It uses `make-empty-file' PARENTS argument 't'."
 
 (load custom-file 'noerror 'nomessage)
 
-(setup (:elpaca async))
+(use-package async)
 
-(setup (:elpaca detached)
-  (:global-set
-   ;; Replace `async-shell-command' with `detached-shell-command'
-   "<remap> <async-shell-command>" detached-shell-command
-   ;; Replace `compile' with `detached-compile'
-   "<remap> <compile>" detached-compile
-   "<remap> <recompile>" detached-compile-recompile
-   ;; Replace built in completion of sessions with `consult'
-   "<remap> <detached-open-session>" detached-consult-session)
-  (:option detached-show-output-on-attach t)
+(use-package detached
+  :bind (("<remap> <async-shell-command>" . detached-shell-command)
+         ("<remap> <compile>" . detached-compile)
+         ("<remap> <recompile>" . detached-compile-recompile)
+         ("<remap> <detached-open-session>" . detached-consult-session))
+  :init
+  (setq detached-show-output-on-attach t)
+  :config
   (detached-init))
 
-(setup tramp
-  (:require tramp)
+(use-package tramp
+  :ensure nil
+  :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
-(setup desktop
-  (:require)
-
+(use-package desktop
+  :ensure nil
+  :init
   (defvar 11xx--daemon-name
     (let ((d (daemonp)))
       (cond
@@ -170,21 +141,22 @@ It uses `make-empty-file' PARENTS argument 't'."
 Mirrors `daemonp': a string for named daemons (--daemon=NAME), \"default\"
 for unnamed (--daemon), nil for interactive sessions.")
 
+  :config
   (when 11xx--daemon-name
-    (setopt desktop-base-file-name (format ".emacs-%s.desktop" 11xx--daemon-name)
-            desktop-base-lock-name (format ".emacs-%s.desktop.lock" 11xx--daemon-name)))
+    (setq desktop-base-file-name (format ".emacs-%s.desktop" 11xx--daemon-name)
+          desktop-base-lock-name (format ".emacs-%s.desktop.lock" 11xx--daemon-name)))
 
-  (setopt desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
-          desktop-auto-save-timeout 1
-          desktop-save 'ask-if-new)
+  (setq desktop-dirname (expand-file-name "desktop/" no-littering-var-directory)
+        desktop-auto-save-timeout 1
+        desktop-save 'ask-if-new)
   (desktop-save-mode))
 
-(setup (:elpaca eros)
-  (:load-after org-mode)
-  (:hook-into org-mode)
-  (setopt ;; eros-eval-result-prefix    "∷ "
-           eros-eval-result-duration  'command
-           eros-overlays-use-font-lock t))
+(use-package eros
+  :after org-mode
+  :hook (org-mode . eros-mode)
+  :init
+  (setq eros-eval-result-duration 'command
+        eros-overlays-use-font-lock t))
 
 (provide '11xx-defaults)
 ;;; 11xx-defaults.el ends here

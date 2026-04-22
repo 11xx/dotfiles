@@ -1,7 +1,8 @@
 ;; -*- lexical-binding: t; -*-
-(setup tex-mode
+(use-package tex-mode
+  :ensure nil)
 
-(:elpaca auctex)
+(use-package auctex)
 
 (with-eval-after-load 'ox-html
   (setq org-html-head
@@ -10,6 +11,4 @@
          ".org-svg { width: auto; }"
          org-html-style-default)))
 
-) ; end of (setup tex-mode
-
-(setup (:elpaca org-fragtog))
+(use-package org-fragtog)

@@ -36,11 +36,11 @@ Available keywords are:
 
 `:name' = a string with the font name like \"Liberation Mono\" or
 \"DejaVu Sans Mono\". It defaults to the value from the helper
-function `f/get-default-font' that returns a string.
+    function `11xx--get-default-font' that returns a string.
 
 `:size' = a number that is multiplied by 10 internally to pass as
 \":height\" to `set-face-attribute'. It defaults to the value
-from the helper function `f/get-default-font-size' that returns a
+  from the helper function `11xx--get-default-font-size' that returns a
 number."
   (let* ((font (or (plist-get args :name) 11xx--get-default-font))
          (size (or (plist-get args :size) 11xx--get-default-font-size)))
@@ -53,7 +53,7 @@ number."
               (lambda (frame)
                 (with-selected-frame frame
                   (set-font))))
-  (add-hook 'elpaca-after-init-hook
+  (add-hook 'after-init-hook
             (lambda () (set-font))))
 ;; end set font
 (setopt cursor-type 'box
@@ -62,26 +62,21 @@ number."
         inhibit-startup-screen t
         auto-hscroll-mode 'current-line ; nano-like line horizontal scrolling ; https://emacs.stackexchange.com/questions/40864/scroll-only-current-line-when-truncating-lines
         use-dialog-box nil)
-(setup display-line-numbers
-  (:disabled)
-  ;; disable line numbers for some modes
-
-  (:option* grow-only t) ;; prevents difference between 10s, 100s,
-                         ;; etc, line numbers from ;; flicker-pushing
-                         ;; content to the side.
-
-  (:hook-into prog-mode text-mode html-mode)
-  (:with-hook (term-mode-hook
-               shell-mode-hook
-               eshell-mode-hook
-               org-mode-hook)
-    (:hook (lambda() (display-line-numbers-mode -1)))))
+(setq display-line-numbers-grow-only t)
+(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+(add-hook 'text-mode-hook #'display-line-numbers-mode)
+(add-hook 'html-mode-hook #'display-line-numbers-mode)
+(dolist (hook '(term-mode-hook
+                shell-mode-hook
+                eshell-mode-hook
+                org-mode-hook))
+  (add-hook hook (lambda () (display-line-numbers-mode -1))))
 (setopt show-paren-mode t
         show-paren-delay 0.01
         show-paren-style 'parenthesis)
 
-(setup (:elpaca rainbow-delimiters)
-  (:hook-into emacs-lisp-mode))
+(use-package rainbow-delimiters
+  :hook (emacs-lisp-mode . rainbow-delimiters-mode))
 (let ((themedir (expand-file-name "themes/" user-emacs-directory)))
   (add-to-list 'custom-theme-load-path themedir)
   (add-to-list 'load-path themedir))
@@ -98,44 +93,44 @@ number."
   (unless (display-graphic-p frame)
     (set-face-background 'default "unspecified-bg" frame)))
 (add-hook 'after-make-frame-functions #'on-frame-open)
-;; (elpaca (neron-themes :host codeberg
-;;                       :repo "11xx/neron-themes"
-;;                       :files ("neron-*.el")))
 (use-package neron-themes
   :load-path "~/code/emacs/neron-themes")
 
-(setup (:elpaca auto-dark)
-  (setopt auto-dark-themes '((neron-dark)
-                             (neron-light)))
+(use-package auto-dark
+  :init
+  (setq auto-dark-themes '((neron-dark)
+                           (neron-light)))
+  :config
   (auto-dark-mode)
-  (:hide-mode))
-(setup ibuffer
-  (:option ibuffer-show-empty-filter-groups nil
-           ibuffer-saved-filter-groups (quote
-                                        (("default"
-                                          ("shell"      (mode . shell-mode))
-                                          ("dired"      (mode . dired-mode))
-                                          ("org"        (mode . org-mode))
-                                          ("emacs-lisp" (mode . emacs-lisp)))))
-           ibuffer-expert t)
-  (:hook (lambda() (ibuffer-switch-to-saved-filter-groups "default")))
-  (:global-set "C-x C-b" ibuffer))
-(setup display-fill-column-indicator-mode
-  (:hook-into prog-mode text-mode)
-  (:option display-fill-column-indicator-column 79)
-  (:with-hook prog-mode
-    (:hook (lambda() (setq-local display-fill-column-indicator-column 120))))
-  (display-fill-column-indicator-mode 1))
-(setup (:elpaca doom-modeline)
-  (:hook-into elpaca-after-init-hook)
-  (setopt doom-modeline-height 15
-          doom-modeline-buffer-encoding nil
-          ;; display-time-format '%H:%M'
-          doom-modeline-percent-position nil
-          doom-modeline-icon nil
-          doom-modeline-enable-word-count nil ; Performance
-          doom-modeline-buffer-file-name-style 'truncate-nil
-          ))
+  (setq minor-mode-alist
+        (delq (assq 'auto-dark-mode minor-mode-alist) minor-mode-alist)))
+(use-package ibuffer
+  :ensure nil
+  :bind (("C-x C-b" . ibuffer))
+  :hook (ibuffer-mode . (lambda () (ibuffer-switch-to-saved-filter-groups "default")))
+  :init
+  (setq ibuffer-show-empty-filter-groups nil
+        ibuffer-saved-filter-groups
+        '(("default"
+           ("shell" (mode . shell-mode))
+           ("dired" (mode . dired-mode))
+           ("org" (mode . org-mode))
+           ("emacs-lisp" (mode . emacs-lisp))))
+        ibuffer-expert t))
+(setq display-fill-column-indicator-column 79)
+(add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
+(add-hook 'text-mode-hook #'display-fill-column-indicator-mode)
+(add-hook 'prog-mode-hook
+          (lambda () (setq-local display-fill-column-indicator-column 120)))
+(use-package doom-modeline
+  :hook (after-init . doom-modeline-mode)
+  :init
+  (setq doom-modeline-height 15
+        doom-modeline-buffer-encoding nil
+        doom-modeline-percent-position nil
+        doom-modeline-icon nil
+        doom-modeline-enable-word-count nil
+        doom-modeline-buffer-file-name-style 'truncate-nil))
 (set-window-margins nil 5 5)
 
 (provide '11xx-ui)

@@ -1,5 +1,5 @@
 ;; -*- lexical-binding: t; -*-
-(defun f/mark-whole-word (&optional arg allow-extend)
+(defun mark-whole-word (&optional arg allow-extend)
   "Like `mark-word', but select whole words and skips over whitespace.
 If you use a negative prefix ARG then select words backward.
 Otherwise select them forward.
@@ -29,7 +29,7 @@ See `mark-word' for more."
           (left-word)
         (right-word)))
     (mark-word arg allow-extend)))
-(defun f/infer-indentation-style ()
+(defun infer-indentation-style ()
   "Compare number of spaces and tabs and define `indent-tabs-mode' to t or nil.
 
 If the current buffer or file has more tabs than spaces,
@@ -38,25 +38,24 @@ and if inconclusive, use current `indent-tabs-mode'."
   (interactive)
   (let ((space-count (how-many "^  " (point-min) (point-max)))
         (tab-count (how-many "^\t" (point-min) (point-max))))
-    (if (> space-count tab-count) (setq indent-tabs-mode nil))
-    (if (> tab-count space-count) (setq indent-tabs-mode t))))
-(add-hook 'prog-mode-hook #'f/infer-indentation-style)
-(defun f/current-timestamp-format ()
+    (setq-local indent-tabs-mode (> tab-count space-count))))
+(add-hook 'prog-mode-hook #'infer-indentation-style)
+(defun current-timestamp-format ()
   "Return current timestamp and hostname in a formatted string."
   (concat "[" (format-time-string "%Y-%m-%d %a %H:%M:%S %Z" (current-time)) "] @" (system-name)))
 
 ;;;###autoload
-(defun f/current-timestamp-insert ()
+(defun current-timestamp-insert ()
   "Insert the current timestamp and hostname in a formatted string as a comment."
   (interactive)
-  (let ((str (f/current-timestamp-format))
+  (let ((str (current-timestamp-format))
         (start-point (point)))
     (insert str)
     (set-mark start-point)
     (comment-region (region-beginning) (region-end))))
 ;; [2024-08-28 Wed 03:14:39 -03] @ak
 ;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
-(defun f/kill-matching-lines (regexp &optional rstart rend interactive)
+(defun kill-matching-lines (regexp &optional rstart rend interactive)
   "Kill lines containing matches for REGEXP.
 
 Second and third arg RSTART and REND specify the region to operate on.
@@ -91,7 +90,7 @@ even beep.)"
 (defun xdg-state-home ()
   "Return the base directory for user specific log files."
   (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
-(defun f/read-file-contents (file-path)
+(defun read-file-contents (file-path)
   "Read the contents of the file at FILE-PATH and return it as a string."
   (with-temp-buffer
     (insert-file-contents file-path)

@@ -1,25 +1,17 @@
 ;; -*- lexical-binding: t; -*-
-(setup magit
-  (:elpaca magit)
-
-  ;; rely on autoloads from elpaca block so magit don't need to be required
-  ;; inside `magit-status-bare.el'.
+(use-package magit
+  :init
   (require 'magit-status-bare)
-
-  ;; unbind default `magit-status' so g can be used as prefix
   (keymap-global-unset "C-x g")
-
-  (keymap-global-set "C-x g g" #'magit-status-default) ; magit-status
-
-  ;;; bare repos
+  (keymap-global-set "C-x g g" #'magit-status-default)
   (magit-status-bare :git-dir "~/.local/dotfiles.git/"
                      :work-tree (getenv "HOME")
                      :key-bind "C-x g d")
   (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
                       :work-tree (getenv "HOME")
                       :key-bind "C-c g d a")
-
-  (:with-feature dired
+  :config
+  (with-eval-after-load 'dired
     (defun dired-git-add (&optional arg)
       "Execute 'git add' command for current or marked files in Dired mode.
 With prefix ARG, prompt for additional arguments to pass to the command."
@@ -32,11 +24,8 @@ With prefix ARG, prompt for additional arguments to pass to the command."
                                 files
                                 "\n")))
         (message "Git add command completed:\n%s" output)))
-    (:bind "C-c g g a" dired-git-add))
+    (keymap-set dired-mode-map "C-c g g a" #'dired-git-add))
 
   (require '11xx-vot))
-
-(setup (:elpaca transient)
-  (:load-after magit))
 
 (provide '11xx-magit)

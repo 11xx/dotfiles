@@ -1,30 +1,29 @@
 ;; -*- lexical-binding: t; -*-
-(setup (:elpaca transpose-frame)
-  (defun f/rotate-frame-clockwise-or-default ()
+(use-package transpose-frame
+  :bind (("M-r" . rotate-frame-clockwise-or-default)
+         ("M-S-r" . rotate-frame-anticlockwise-or-default))
+  :config
+  (defun rotate-frame-clockwise-or-default ()
     "Rotate frame clockwise if more than one frame exists; otherwise, execute default command."
     (interactive)
-    (if (window-parent)
+    (if (cdr (frame-list))
         (rotate-frame-clockwise)
       ;; Default command:
       (call-interactively #'move-to-window-line-top-bottom)))
 
-  (defun f/rotate-frame-anticlockwise-or-default ()
+  (defun rotate-frame-anticlockwise-or-default ()
     "Rotate frame anticlockwise if more than one frame exists; otherwise, execute default command."
     (interactive)
-    (if (window-parent)
+    (if (cdr (frame-list))
         (rotate-frame-anticlockwise)
       ;; Default command:
       (call-interactively #'move-to-window-line-top-bottom)))
 
-  (:global-set
-   "M-r" #'f/rotate-frame-clockwise-or-default ;; was #'move-to-window-line-top-bottom
-   "M-S-r" #'f/rotate-frame-anticlockwise-or-default ;; was #'move-to-window-line-top-bottom
-   ))
-(setup (:elpaca multiple-cursors)
-  (:global-set
-   "C-S-c C-S-c" mc/edit-lines
-   "C-<" mc/mark-previous-like-this
-   "C->" mc/mark-next-like-this
-   "C-c C-<" mc/mark-all-like-this))
+  )
+(use-package multiple-cursors
+  :bind (("C-S-c C-S-c" . mc/edit-lines)
+         ("C-<" . mc/mark-previous-like-this)
+         ("C->" . mc/mark-next-like-this)
+         ("C-c C-<" . mc/mark-all-like-this)))
 
 (provide '11xx-navigation)

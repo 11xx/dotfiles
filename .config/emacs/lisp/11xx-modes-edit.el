@@ -1,9 +1,9 @@
 ;; -*- lexical-binding: t; -*-
 
-(setup (:elpaca systemd :host github :repo "pdbrown/systemd-mode"))
+(use-package systemd
+  :vc (:url "https://github.com/pdbrown/systemd-mode"))
 
-(elpaca yaml-mode)
-(elpaca-wait)
+(use-package yaml-mode)
 
 ;; considering `yaml-ts-mode' is already provided by Emacs
 ;; use `yaml-indent-line' with it.
@@ -48,28 +48,27 @@
               (put-text-property beg (+ beg (length str))
                                  'face 'font-lock-comment-face)))))))))
 
-(setup (:elpaca pkgbuild-mode)
-  (add-hook 'pkgbuild-mode-hook (lambda() (flymake-mode -1))))
+(use-package pkgbuild-mode
+  :hook (pkgbuild-mode . (lambda () (flymake-mode -1))))
 
-(setup (:elpaca powershell))
+(use-package powershell)
 
-(setup (:elpaca ansible))
-(setup (:elpaca ansible-vault))
-(setup (:elpaca ansible-doc))
+(use-package ansible)
+(use-package ansible-vault)
+(use-package ansible-doc)
 
-(setup (:elpaca yuck-mode))
+(use-package yuck-mode)
 
-(setup (:elpaca hyprlang-ts-mode)
-  (:autoload hyprlang-ts-mode)
-  (:match-file "*hyprland.conf"))
+(use-package hyprlang-ts-mode
+  :mode "*hyprland.conf")
 
-(elpaca (picard-mode :host codeberg
-                     :repo "useless-utils/picard-mode")
-  (use-package picard-mode
-    :config
-    (use-package picard-ts-mode
-      :after picard-mode
-      :if (treesit-available-p))))
+(use-package picard-mode
+  :vc (:url "https://codeberg.org/useless-utils/picard-mode" :rev :newest)
+  :config
+  (use-package picard-ts-mode
+    :ensure nil
+    :after picard-mode
+    :if (treesit-available-p)))
 
 (provide '11xx-modes-edit)
 ;;; 11xx-modes-edit.el ends here

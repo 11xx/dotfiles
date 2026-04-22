@@ -8,8 +8,8 @@
 (add-to-list 'treesit-extra-load-path
              (expand-file-name "tree-sitter" user-emacs-directory))
 
-(setup (:elpaca rainbow-mode)
-  (:hook-into css-mode))
+(use-package rainbow-mode
+  :hook (css-mode . rainbow-mode))
 
 (require '11xx-modes-edit)
 (require '11xx-modes-terminal)

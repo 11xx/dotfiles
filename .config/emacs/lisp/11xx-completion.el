@@ -1,189 +1,139 @@
 ;; -*- lexical-binding: t; -*-
-(setup (:elpaca vertico)
-  (defun f/minibuffer-backward-delete-word (arg)
+(use-package vertico
+  :bind (:map vertico-map
+              ("?" . minibuffer-completion-help)
+              ("M-RET" . minibuffer-force-complete-and-exit)
+              ("M-TAB" . minibuffer-complete)
+              ("M-<backspace>" . minibuffer-backward-delete-word)
+              ("M-D" . minibuffer-backward-delete-word)
+              ("C-M-d" . backward-delete-char)
+              ("M-d" . minibuffer-delete-word)
+              ("C-k" . minibuffer-delete-line)
+              ("C-M-k" . kill-line))
+  :init
+  (defun minibuffer-backward-delete-word (arg)
     "Delete characters backward until encountering the beginning of a word.
 With argument ARG, do this that many times."
     (interactive "p")
     (delete-region (point) (progn (backward-word arg) (point))))
 
-  (defun f/minibuffer-delete-word (arg)
+  (defun minibuffer-delete-word (arg)
     "Delete characters forward until the end of a word.
 Like `kill-word' but doesn't add deleted words to kill ring."
     (interactive "p")
     (delete-region (point) (progn (forward-word arg) (point))))
 
-  (defun f/minibuffer-delete-line (arg)
+  (defun minibuffer-delete-line (arg)
     "Delete characters forward until the end of the line.
 Like `kill-line' but doesn't add deleted characters to kill ring."
     (interactive "p")
     (delete-region (point) (progn (end-of-line arg) (point))))
-  ;; prevent cursor on minibuffer
-  (:with-hook minibuffer-setup-hook
-    (:hook cursor-intangible-mode))
 
-  (:with-map vertico-map
-    (:bind "?" minibuffer-completion-help
-           "M-RET" minibuffer-force-complete-and-exit
-           "M-TAB" minibuffer-complete
-           "M-<backspace>" f/minibuffer-backward-delete-word
-           "M-D" f/minibuffer-backward-delete-word ; was down-list
-           "C-M-d" backward-delete-char ; was down-list
-           "M-d" f/minibuffer-delete-word
-           "C-k" f/minibuffer-delete-line
-           "C-M-k" kill-line
-           ;; "M-h" dw/minibuffer-backward-kill
-
-           ;; can be reversed because of `vertico-reverse-mode', but no:
-           ;; "C-p" vertico-next
-           ;; "C-n" vertico-previous
-           ))
-  (:option vertico-scroll-margin 4 ;; Different scroll margin
-           ;;;; Show more candidates
-           ;; setq vertico-count 20
-           ;;;; Grow and shrink the Vertico minibuffer
-           ;; vertico-resize t
-           ;;;; Optionally enable cycling for `vertico-next' and `vertico-previous'.
-           vertico-cycle t)
-
-  ;; vertico-minibuffer-settings
-  ;; - Hide commands in M-x which do not work in the current mode.
-  ;; # Emacs 28
-  ;; - Vertico commands are hidden in normal buffers.
-  (setopt read-extended-command-predicate #'command-completion-default-include-p
-          enable-recursive-minibuffers t
-          completion-cycle-threshold 3 ; TAB cycle if there are only few candidates
-          ;; Do not allow the cursor in the minibuffer prompt
-          minibuffer-prompt-properties '(read-only
-                                         t
-                                         cursor-intangible
-                                         t face minibuffer-prompt))
-  (:with-hook elpaca-after-init-hook
-    (:hook vertico-mode)))
+  (setq vertico-scroll-margin 4
+        vertico-cycle t
+        read-extended-command-predicate #'command-completion-default-include-p
+        enable-recursive-minibuffers t
+        completion-cycle-threshold 3
+        minibuffer-prompt-properties '(read-only t cursor-intangible t face minibuffer-prompt))
+  :hook ((minibuffer-setup . cursor-intangible-mode)
+         (after-init . vertico-mode)))
 ;; Persist history over Emacs restarts. Vertico sorts by history position.
-(setup savehist
-  (:option savehist-additional-variables '(kill-ring
-                                           compile-command
-                                           search-ring
-                                           regexp-search-ring)
-           history-length 1000
-           history-delete-duplicates t)
-
-  ;; History lengths can also be limited:
-  ;; See [[https://www.reddit.com/r/emacs/comments/i961nn/comment/g1d87tf/?context=3][Emacs dragged down by massive 'history' file : emacs#demosthenex]]
-  ;; Found my savehist was HUGE and locking up emacs every 5 min
+(use-package savehist
+  :ensure nil
+  :init
+  (setq savehist-additional-variables '(kill-ring compile-command search-ring regexp-search-ring)
+        history-length 1000
+        history-delete-duplicates t)
+  :config
   (put 'savehist-minibuffer-history-variables 'history-length 1000)
-  (put 'org-read-date-history                 'history-length 1000)
-  (put 'read-expression-history               'history-length 1000)
-  (put 'org-table-formula-history             'history-length 1000)
-  (put 'extended-command-history              'history-length 1000)
-  (put 'ido-file-history                      'history-length 1000)
-  (put 'helm-M-x-input-history                'history-length 1000)
-  (put 'minibuffer-history                    'history-length 1000)
-  (put 'ido-buffer-history                    'history-length 1000)
-  (put 'buffer-name-history                   'history-length 1000)
-  (put 'file-name-history                     'history-length 1000)
-  ;; # [2022-11-09 Wed 17:15:35 -03]
-
-  (:hook-into elpaca-after-init-hook))
-(setup (:elpaca orderless)
-  (:option completion-category-defaults nil
-           ;; served well completion-styles '(substring orderless flex)
-           completion-styles '(orderless initials substring basic)
-           completion-category-overrides '((file (styles basic partial-completion)))
-           ;; completion-category-overrides '((command (styles orderless+initialism))
-           ;;                                 (symbol (styles orderless+initialism))
-           ;;                                 (variable (styles orderless+initialism)))
-           ;; Integrate with company
-           orderless-component-separator "[ &]"
-           ;; Case matching
-           orderless-smart-case t
-           ;; completion-ignore-case t
-           ;; read-file-name-completion-ignore-case t
-           ;; read-buffer-completion-ignore-case t
-           )
-
+  (put 'org-read-date-history 'history-length 1000)
+  (put 'read-expression-history 'history-length 1000)
+  (put 'org-table-formula-history 'history-length 1000)
+  (put 'extended-command-history 'history-length 1000)
+  (put 'ido-file-history 'history-length 1000)
+  (put 'helm-M-x-input-history 'history-length 1000)
+  (put 'minibuffer-history 'history-length 1000)
+  (put 'ido-buffer-history 'history-length 1000)
+  (put 'buffer-name-history 'history-length 1000)
+  (put 'file-name-history 'history-length 1000)
+  :hook (after-init . savehist-mode))
+(use-package orderless
+  :init
+  (setq completion-category-defaults nil
+        completion-styles '(orderless initials substring basic)
+        completion-category-overrides '((file (styles basic partial-completion)))
+        orderless-component-separator "[ &]"
+        orderless-smart-case t)
+  :config
   (defun just-one-face (fn &rest args)
     (let ((orderless-match-faces [completions-common-part]))
       (apply fn args)))
-
-  (:advise company-capf--candidates :around #'just-one-face)
-  )
+  (advice-add 'company-capf--candidates :around #'just-one-face))
 ;; Enable richer annotations using the Marginalia package
-(setup (:elpaca marginalia)
-  (:hook-into elpaca-after-init-hook)
-  ;; Either bind `marginalia-cycle` globally or only in the minibuffer
-  ;; (:bind "M-A" marginalia-cycle)
-  (:with-map minibuffer-local-map
-    (:bind "M-A" marginalia-cycle))
-  (setopt marginalia-align 'left
-          marginalia-field-width 120))
-(setup (:elpaca consult)
-  (:global-set
-   "C-s" consult-line ;; Was search-forward
-   "C-x b" consult-buffer ;; Was switch-to-buffer
-   "C-r" consult-history ;; #TODO-ithink was isearch-backward
-   "C-c o s" consult-org-heading
-   ))
+(use-package marginalia
+  :hook (after-init . marginalia-mode)
+  :bind (:map minibuffer-local-map ("M-A" . marginalia-cycle))
+  :init
+  (setq marginalia-align 'left
+        marginalia-field-width 120))
+(use-package consult
+  :bind (("C-s" . consult-line)
+         ("C-x b" . consult-buffer)
+         ("C-r" . consult-history)
+         ("C-c o s" . consult-org-heading)))
 ;; note: consult-outline & consult-org-heading
-(setup (:elpaca embark)
-       (:elpaca embark-consult)
-  (:load-after consult)
-  (:global-set
-   "C-." embark-act
-   ;; "C-;" embark-dwim
-   "C-h B" embark-bindings)
-  ;; Optionally replace the key help with a completing-read interface
+(use-package embark
+  :after consult
+  :bind (("C-." . embark-act)
+         ("C-h B" . embark-bindings))
+  :init
   (setq prefix-help-command #'embark-prefix-help-command)
-
-  ;; Hide the mode line of the Embark live/completions buffers
+  :config
   (add-to-list 'display-buffer-alist
                '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                  nil
-                 (window-parameters (mode-line-format . none))))
-  ;; (:hook embark-collect-mode consult-preview-at-point-mode)
-  )
-(setup (:elpaca corfu)
-  (:global-set "<tab>" completion-at-point)
+                 (window-parameters (mode-line-format . none)))))
 
-  (:with-map corfu-map
-    (:bind "M-SPC" corfu-insert-separator)
-    (:unbind "C-n"
-             "C-p"))
-  (:option corfu-cycle t
-           ;; corfu-auto t
-           corfu-auto-delay 0.1
-           corfu-auto-prefix 4
-           ;; corfu-quit-at-boundary 'separator ; Using M-SPC will activate orderless-style matching with space-separated fields.
-           ;; See [[https://www.reddit.com/r/emacs/comments/sh3lio/orderless_corfu_make_the_component_separator/][Orderless + Corfu: Make '*' the component separator? : emacs]]
-           ;; lsp-completion-provider :none ; this otherwise conflicts with corfu
-           corfu-preview-current nil)
-
-  (:with-hook elpaca-after-init-hook
-    (:hook global-corfu-mode))
+(use-package embark-consult
+  :after embark)
+(use-package corfu
+  :bind (("<tab>" . completion-at-point))
+  :bind (:map corfu-map
+              ("M-SPC" . corfu-insert-separator)
+              ([remap next-line] . nil)
+              ([remap previous-line] . nil))
+  :init
+  (setq corfu-cycle t
+        corfu-auto-delay 0.1
+        corfu-auto-prefix 4
+        corfu-preview-current nil)
+  :hook (after-init . global-corfu-mode)
+  :config
   (global-corfu-mode 1)
-
-  ;; enable corfu on minibuffers like eval-expression
   (defun corfu-enable-in-minibuffer ()
     "Enable Corfu in the minibuffer if `completion-at-point' is bound."
     (when (where-is-internal #'completion-at-point (list (current-local-map)))
-      ;; (setq-local corfu-auto nil) ;; Enable/disable auto completion
-      (setq-local corfu-echo-delay nil ;; Disable automatic echo and popup
+      (setq-local corfu-echo-delay nil
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
 
-(setup (:elpaca corfu-terminal)
-  ;; https://codeberg.org/akib/emacs-corfu-terminal#headline-6
+(use-package corfu-terminal
+  :after corfu
+  :config
   (unless (display-graphic-p)
     (corfu-terminal-mode 1)))
-(setup (:elpaca prescient)
-       (:elpaca corfu-prescient)
-  (:load-after corfu)
-  (:with-hook corfu-mode-hook
-    (:hook corfu-prescient-mode))
-  (:option prescient-persist-mode t))
+(use-package prescient
+  :after corfu
+  :config
+  (prescient-persist-mode 1))
+
+(use-package corfu-prescient
+  :after corfu
+  :hook (corfu-mode . corfu-prescient-mode))
 ;; Add extensions
-(setup (:elpaca cape)
+(use-package cape
+  :config
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
   ;; (:global-set
@@ -221,14 +171,10 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;;(add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
   ;;(add-to-list 'completion-at-point-functions #'cape-line)
   )
-(setup (:elpaca tempel)
-
-  ;; Require trigger prefix before template name when completing.
-  ;; (:option tempel-trigger-prefix "<")
-  (:global-set
-   "M-+" tempel-complete ;; Alternative tempel-expand
-   "M-*" tempel-insert)
-
+(use-package tempel
+  :bind (("M-+" . tempel-complete)
+         ("M-*" . tempel-insert))
+  :init
   ;; Setup completion at point
   (defun tempel-setup-capf ()
     ;; Add the Tempel Capf to `completion-at-point-functions'.
@@ -247,38 +193,31 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   ;; either locally or globally. `expand-abbrev' is bound to C-x '.
   ;; (add-hook 'prog-mode-hook #'tempel-abbrev-mode)
   ;; (global-tempel-abbrev-mode)
-  (:with-hook prog-mode-hook text-mode-hook
-              (:hook tempel-setup-capf)))
+  :hook ((prog-mode . tempel-setup-capf)
+         (text-mode . tempel-setup-capf)))
 (setq lsp-use-plists t)
-;; (setup (:elpaca lsp-haskell))
-(setup (:elpaca lsp-ui)
-  ;; (:option lsp-ui-doc-show-with-cursor t
-  ;;          lsp-ui-doc-delay 0.5)
-  )
-(setup (:elpaca lsp-mode)
-  ;; LSP Language server starter packages
-  (:option lsp-idle-delay 0.1 ; 0.5 ; 0.1
-           lsp-keymap-prefix "C-c l"
-           lsp-log-io nil)
 
-  ;; (setq lsp-ui-doc-enable nil) ; set to nil for better performance
-  ) ; "(setup lsp-mode..." ends here
-(setup (:elpaca flycheck))
-(setup (:elpaca eldoc-box))
-(setup eglot ; built-in since Emacs 29
-  (:option eglot-send-changes-idle-time 0.01)
-  (:with-feature eldoc ; eglot uses eldoc for ui documentation
-    ;; (add-hook 'eglot-managed-mode-hook #'eldoc-box-hover-mode)
-    (:option eldoc-idle-delay 0.01
-             eldoc-echo-area-prefer-doc-buffer t) ; e.g. display doc on a second monitor
-    (:with-feature eldoc-box
-      ;; prefixes eldoc-box- to options
-      (:option* doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n") ; code \u2501
-                clear-with-C-g t
-                max-pixel-height 1400))
-    (:with-feature whitespace
-      ;; Disable `show-trailing-whitespace' in eldox box hover childframe
-      (:with-hook (eldoc-box-buffer-hook)
-        (:hook (lambda() (setq-local show-trailing-whitespace nil)))))))
+(use-package lsp-ui)
+(use-package lsp-mode
+  :init
+  (setq lsp-idle-delay 0.1
+        lsp-keymap-prefix "C-c l"
+        lsp-log-io nil))
+(use-package flycheck)
+(use-package eldoc-box
+  :init
+  (setq eldoc-box-doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n")
+        eldoc-box-clear-with-C-g t
+        eldoc-box-max-pixel-height 1400)
+  :config
+  (add-hook 'eldoc-box-buffer-hook
+            (lambda () (setq-local show-trailing-whitespace nil))))
+
+(use-package eglot
+  :ensure nil
+  :init
+  (setq eglot-send-changes-idle-time 0.01
+        eldoc-idle-delay 0.01
+        eldoc-echo-area-prefer-doc-buffer t))
 
 (provide '11xx-completion)
