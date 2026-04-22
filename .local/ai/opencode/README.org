@@ -8,14 +8,17 @@
 FROM docker.io/node:22-bookworm-slim
 
 ARG OPENCODE_NPM_PACKAGE="opencode-ai"
-ARG OPENCODE_VERSION="1.14.19"
+ARG OPENCODE_VERSION="latest"
 
 # Essentials for opencode:
 # - Network + VCS
 # - Text search and JSON tools
 # - Editors
 # - Minimal build toolchain
-RUN apt-get update && apt-get install -y --no-install-recommends \
+
+RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
     # Network & VCS (required by opencode workflows)
     ca-certificates \
     curl \
@@ -31,7 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
     ripgrep \
     # Editors
-    emacs-nox \
     nano \
     vim \
     # Build toolchain (for native addons, small utilities, etc.)
@@ -52,7 +54,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Data utilities
     sqlite3 \
     python3-csvkit \
-  && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends -t bookworm-backports emacs-nox \
+    && rm -rf /var/lib/apt/lists/*
 
 # Tools not in bookworm repos — install via npm or binary
 RUN npm install -g @ast-grep/cli
@@ -163,7 +166,9 @@ WantedBy=default.target
 
 * opencode config
 :PROPERTIES:
-:header-args:json-ts: :tangle config/opencode.json
+# :header-args:json-ts: :tangle config/opencode.json
+:header-args:json-ts: :tangle no
+# if changing, toggle the comments, to prevent making this call when no need.
 :END:
 
 #+NAME: tavily-url
