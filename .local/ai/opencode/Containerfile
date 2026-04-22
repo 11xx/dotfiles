@@ -29,7 +29,9 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     xz \
     # === Arbitrary Additional Tools ===
     # Optional editors, linters, and CLI utilities (safe to modify or remove)
+    fd-find \
     bat \
+    eza \
     emacs \
     entr \
     git-delta \
@@ -47,12 +49,14 @@ RUN dnf -y install --setopt=install_weak_deps=False \
  && rm -rf /var/cache/dnf
 
 # Global Node-based tools
-RUN npm install -g @ast-grep/cli
+RUN npm install -g @ast-grep/cli \
+ && npm cache clean --force
 
 # Hadolint (Haskell binary not in Fedora core)
 RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
     -o /usr/local/bin/hadolint \
  && chmod +x /usr/local/bin/hadolint
+
 
 RUN groupadd -g 1000 node \
  && useradd -m -u 1000 -g 1000 -s /bin/bash node
@@ -61,8 +65,15 @@ USER node
 WORKDIR /workspace
 
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
-ENV PATH=/home/node/.npm-global/bin:$PATH
+ENV UV_TOOL_BIN_DIR=/home/node/.local/bin
+ENV PATH=/home/node/.local/bin:/home/node/.npm-global/bin:$PATH
+
 ENV HOME=/home/node
+
+# user-scope installs
+# Python LSP
+RUN uv tool install pyright \
+ && uv cache clean
 
 RUN mkdir -pv \
     /home/node/.npm-global \
