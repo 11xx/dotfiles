@@ -14,12 +14,16 @@ Separate theme files so one of them can be symlinked by darkman like
 Net/ThemeName "Adwaita-dark"
 
 <<icons-theme>>
+
+<<font-settings>>
 #+end_src
 
 #+begin_src conf :tangle xsettingsd.conf.light :noweb tangle
 Net/ThemeName "Adwaita"
 
 <<icons-theme>>
+
+<<font-settings>>
 #+end_src
 
 #+NAME: icons-theme
@@ -27,6 +31,24 @@ Net/ThemeName "Adwaita"
 Net/IconThemeName "Papirus"
 Gtk/CursorThemeName "simp1e-amber-neron"
 #+end_src
+
+#+NAME: font-settings
+#+begin_src conf
+Xft/Antialias 1
+Xft/Hinting 1
+Xft/HintStyle "hintslight"
+Xft/RGBA "rgb"
+Xft/lcdfilter "lcddefault"
+# Xft/DPI 112640
+Xft/DPI 117760 # 115 DPI × 1024.
+#+end_src
+
+- =Xft/Hinting 1= = enable hinting at all
+- =Xft/HintStyle= = choose strength/style
+  + =hintnone=: no hinting; most faithful outlines, blurrier at small sizes
+  + =hintslight=: light alignment mainly vertically; usually best-looking default
+  + =hintmedium=: stronger alignment; sharper, a bit more shape distortion
+  + =hintfull=: strongest alignment to pixel grid; crispest/smallest text, most distortion
 
 
 * More settings

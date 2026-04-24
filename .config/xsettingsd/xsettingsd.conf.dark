@@ -2,3 +2,11 @@ Net/ThemeName "Adwaita-dark"
 
 Net/IconThemeName "Papirus"
 Gtk/CursorThemeName "simp1e-amber-neron"
+
+Xft/Antialias 1
+Xft/Hinting 1
+Xft/HintStyle "hintslight"
+Xft/RGBA "rgb"
+Xft/lcdfilter "lcddefault"
+# Xft/DPI 112640
+Xft/DPI 117760 # 115 DPI × 1024.
