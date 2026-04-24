@@ -4,7 +4,7 @@
 
 (use-package gptel
   :init
-  (setq gptel-model 'gpt-5.4-nano
+  (setq gptel-model 'MiniMax-M2.7
         gptel-default-mode 'org-mode)
   :config
   (gptel-make-gemini "Gemini"
@@ -14,12 +14,58 @@
     :stream t
     :key (gptel-api-key-from-auth-source "api.anthropic.com"))
 
+  (gptel-make-openai "MiniMax"
+    :host "api.minimax.io"
+    :endpoint "/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.minimax.io")
+    :models '(MiniMax-M2.5
+              MiniMax-M2.5-highspeed
+              MiniMax-M2.1
+              MiniMax-M2.1-highspeed
+              MiniMax-M2
+              MiniMax-M2.7
+              MiniMax-M2.7-highspeed))
+
   (gptel-make-ollama "Ollama"
     :host "localhost:11434"
     :stream t
     :models '(qwen3.5:9b
-              qwen2.5-coder:14b
               ))
+
+  (gptel-make-openai "OpenRouter"
+    :host "openrouter.ai"
+    :endpoint "/api/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "openrouter.ai")
+    :models '(
+              ;; 1. CODING & LOGIC
+              deepseek/deepseek-v4-pro
+              deepseek/deepseek-v4-flash
+              moonshotai/kimi-k2.6
+              xiaomi/mimo-v2.5-pro
+              mistralai/devstral-2-2512:free ; Free Fallback
+              inclusionai/ling-2.6-1t:free ;; until April 30
+              
+              ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
+              qwen/qwen-3.5-plus
+              qwen/qwen3.6-plus:free
+              qwen/qwen3.6-plus-preview
+              stepfun/step-3.5-flash
+              nvidia/nemotron-3-super-120b:free ; Free Fallback
+              
+              ;; 3. DATA EXTRACTION / TOOL USE
+              ;; minimax/minimax-m2.7
+              meta-llama/llama-3.3-70b-instruct:nitro
+              qwen/qwen3.5-flash-02-23
+              qwen/qwen3-next-80b:free ; Free Fallback
+              
+              ;; THE LAZY FREE OPTION
+              openrouter/free
+              )
+    :request-params '(:provider (:allow_fallbacks t
+                                 :sort "price"
+                                 :preferredMinThroughput (:p90 50))))
 
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")

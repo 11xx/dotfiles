@@ -2437,44 +2437,18 @@ NOTE: =dired-async= is provided by the =async= package.
 (use-package ls-lisp
   :ensure nil
   :init
+  (setq dired-hacks-datetime-regexp "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [0-9]\\{2\\}:[0-9]\\{2\\}")
   (setq ls-lisp-use-insert-directory-program nil
         ls-lisp-dirs-first t
         ls-lisp-ignore-case t
         ls-lisp-use-string-collate nil
         dired-use-ls-dired nil
-        dired-listing-switches "-lAhv"
+        dired-listing-switches "-lA"
         ls-lisp-format-time-list '("%Y-%m-%d %H:%M" "%Y-%m-%d %H:%M")
         ls-lisp-use-localized-time-format t))
 
-(use-package dired-rainbow
-  :after dired
-  :init
-  (setq dired-hacks-datetime-regexp "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [0-9]\\{2\\}:[0-9]\\{2\\}")
-  :config
-  (dired-rainbow-define-chmod directory nil "d.*")
-  (dired-rainbow-define-chmod executable-unix nil "-.*x.*")
-  (dired-rainbow-define html nil ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
-  (dired-rainbow-define xml nil ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
-  (dired-rainbow-define document nil ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
-  (dired-rainbow-define markdown nil ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
-  (dired-rainbow-define database nil ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
-  (dired-rainbow-define media nil ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
-  (dired-rainbow-define image nil ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
-  (dired-rainbow-define log nil ("log"))
-  (dired-rainbow-define shell nil ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
-  (dired-rainbow-define interpreted nil ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
-  (dired-rainbow-define compiled nil ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
-  (dired-rainbow-define executable nil ("exe" "msi"))
-  (dired-rainbow-define compressed nil ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
-  (dired-rainbow-define packaged nil ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
-  (dired-rainbow-define encrypted nil ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
-  (dired-rainbow-define fonts nil ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
-  (dired-rainbow-define partition nil ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
-  (dired-rainbow-define vc nil ("git" "gitignore" "gitattributes" "gitmodules")))
-
 (use-package dired
   :ensure nil
-  :after (dired-x dired-aux)
   :hook (dired-mode . auto-revert-mode)
   :init
   (put 'dired-find-alternate-file 'disabled nil)
@@ -2502,6 +2476,32 @@ NOTE: =dired-async= is provided by the =async= package.
               ("l" . dired-find-file)
               ("SPC" . dired-mark)
               ("~" . dired-open-home-directory)))
+#+end_src
+
+#+begin_src emacs-lisp
+(use-package dired-rainbow
+  :after dired
+  :config
+  (dired-rainbow-define-chmod directory nil "d.*")
+  (dired-rainbow-define-chmod executable-unix nil "-.*x.*")
+  (dired-rainbow-define html nil ("css" "less" "sass" "scss" "htm" "html" "jhtm" "mht" "eml" "mustache" "xhtml"))
+  (dired-rainbow-define xml nil ("xml" "xsd" "xsl" "xslt" "wsdl" "bib" "json" "msg" "pgn" "rss" "yaml" "yml" "rdata"))
+  (dired-rainbow-define document nil ("docm" "doc" "docx" "odb" "odt" "pdb" "pdf" "ps" "rtf" "djvu" "epub" "odp" "ppt" "pptx"))
+  (dired-rainbow-define markdown nil ("org" "etx" "info" "markdown" "md" "mkd" "nfo" "pod" "rst" "tex" "textfile" "txt"))
+  (dired-rainbow-define database nil ("xlsx" "xls" "csv" "accdb" "db" "mdb" "sqlite" "nc"))
+  (dired-rainbow-define media nil ("mp3" "mp4" "MP3" "MP4" "avi" "mpeg" "mpg" "flv" "ogg" "mov" "mid" "midi" "wav" "aiff" "flac"))
+  (dired-rainbow-define image nil ("tiff" "tif" "cdr" "gif" "ico" "jpeg" "jpg" "png" "psd" "eps" "svg" "webp"))
+  (dired-rainbow-define log nil ("log"))
+  (dired-rainbow-define shell nil ("awk" "bash" "bat" "sed" "sh" "zsh" "vim"))
+  (dired-rainbow-define interpreted nil ("py" "ipynb" "rb" "pl" "t" "msql" "mysql" "pgsql" "sql" "r" "clj" "cljs" "scala" "js"))
+  (dired-rainbow-define compiled nil ("asm" "cl" "lisp" "el" "elc" "eln" "c" "h" "c++" "h++" "hpp" "hxx" "m" "cc" "cs" "cp" "cpp" "go" "f" "for" "ftn" "f90" "f95" "f03" "f08" "s" "rs" "hi" "hs" "pyc" ".java"))
+  (dired-rainbow-define executable nil ("exe" "msi"))
+  (dired-rainbow-define compressed nil ("7z" "zip" "bz2" "tgz" "txz" "gz" "xz" "z" "Z" "jar" "war" "ear" "rar" "sar" "xpi" "apk" "xz" "tar" "rsn" "vsix"))
+  (dired-rainbow-define packaged nil ("deb" "rpm" "apk" "jad" "jar" "cab" "pak" "pk3" "vdf" "vpk" "bsp"))
+  (dired-rainbow-define encrypted nil ("gpg" "pgp" "asc" "bfe" "enc" "signature" "sig" "p12" "pem"))
+  (dired-rainbow-define fonts nil ("afm" "fon" "fnt" "pfb" "pfm" "ttf" "otf"))
+  (dired-rainbow-define partition nil ("dmg" "iso" "bin" "nrg" "qcow" "toast" "vcd" "vmdk" "bak"))
+  (dired-rainbow-define vc nil ("git" "gitignore" "gitattributes" "gitmodules")))
 
 (defun dired-open-home-directory ()
   (interactive)
@@ -2518,10 +2518,8 @@ NOTE: =dired-async= is provided by the =async= package.
 
 (use-package dired-efap
   :after dired
-  :hook (dired-mode . dired-efap)
   :bind (:map dired-mode-map ("r" . dired-efap))
   :config
-  (add-hook 'dired-efap-mode-hooks (lambda () (setq-local dirvish-hide-cursor nil)))
   (setq dired-efap-initial-filename-selection nil))
 
 (use-package all-the-icons-dired
@@ -3070,9 +3068,9 @@ See [[https://emacs-lsp.github.io/lsp-mode/page/performance/][Performance - LSP 
 - To sandbox the pip dependencies do:
   + On Linux
     : ❯ python -m venv ./.python-venv
-    : ❯ ./.python-ven11xx--bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
+    : ❯ ./.python-venv/bin/pip install epc orjson sexpdata six setuptools paramiko rapidfuzz
     then source the venv before launching Emacs:
-    : ❯ source ./python-ven11xx--bin/activate
+    : ❯ source ./.python-venv/bin/activate
     : ❯ emacs
   # + On Windows (#TODO does it work on windows-nt?)
   #   : python -m venv .\.python-venv
@@ -3125,7 +3123,7 @@ See [[*Corfu][Corfu]].
 ;;; UI
 (menu-bar-mode -1)    ; Disable menu bar
 (tool-bar-mode -1)    ; Disable toolbar
-;; (ALARM-EMACS27-conflict): scroll-bar-mode is void on emacs-nox
+;; scroll-bar-mode is void on emacs-nox
 (scroll-bar-mode -1)  ; Disable scrolllbar
 
 (blink-cursor-mode 1)
@@ -3142,7 +3140,7 @@ See [[*Corfu][Corfu]].
 #+begin_src emacs-lisp
 ;; Font configuration
 ;; Check if on Windows and change font (Windows-NT)
-(defvar 11xx--get-default-font
+(defvar 11xx--default-font
   (if (eq system-type 'windows-nt)
       ;; "Consolas"
       ;; "Literation Mono Nerd Font" on Linux or "LiterationMono Nerd Font" on (Windows-NT)
@@ -3151,7 +3149,7 @@ See [[*Corfu][Corfu]].
   "Sets the default font based on the system type.
 To be used with `set-font'.")
 
-(defvar 11xx--get-default-font-size
+(defvar 11xx--default-font-size
   (if (eq system-type 'windows-nt)
       11
     11)
@@ -3164,14 +3162,14 @@ Available keywords are:
 
 `:name' = a string with the font name like \"Liberation Mono\" or
 \"DejaVu Sans Mono\". It defaults to the value from the helper
-    function `11xx--get-default-font' that returns a string.
+    function `11xx--default-font' that returns a string.
 
 `:size' = a number that is multiplied by 10 internally to pass as
 \":height\" to `set-face-attribute'. It defaults to the value
-  from the helper function `11xx--get-default-font-size' that returns a
+  from the helper function `11xx--default-font-size' that returns a
 number."
-  (let* ((font (or (plist-get args :name) 11xx--get-default-font))
-         (size (or (plist-get args :size) 11xx--get-default-font-size)))
+  (let* ((font (or (plist-get args :name) 11xx--default-font))
+         (size (or (plist-get args :size) 11xx--default-font-size)))
     (set-face-attribute 'default nil
                         :font font
                         :height (* size 10))))
@@ -3349,9 +3347,6 @@ and more examples [[https://www.reddit.com/r/emacs/comments/izksoi/2020_modeline
   # [2023-06-06 07:35:53]
 
 *** Fira Code ligatures minor mode
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
 [[https://melpa.org/#/fira-code-mode][fira-code-mode - MELPA]]
 
 Display code ligatures using supported font symbols.
@@ -3370,39 +3365,11 @@ Fira Code Symbol externally.
 
 #+begin_src emacs-lisp
 (use-package fira-code-mode
-  :hook (prog-mode . fira-code-mode)
   :config
-  (dolist (ligature '("-}"))
-    (add-to-list 'fira-code-mode-disabled-ligatures ligature)))
+  (fira-code-mode-set-font)
+  (global-fira-code-mode))
 #+end_src
 - Note: It doesn't work properly on terminal
-
-*** ligature.el
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref dummy :tangle no
-:END:
-# this doesnt work as "secondary" just for ligatures, or i couldn't figure out
-- [[https://github.com/tonsky/FiraCode/wiki/Emacs-instructions#using-ligatureel][Emacs instructions · tonsky/FiraCode Wiki]]
-#+begin_src emacs-lisp
-(use-package ligature
-  :config
-  ;; Enable the www ligature in every possible major mode
-  (ligature-set-ligatures 't '("www"))
-
-  ;; Enable ligatures in programming modes
-  (ligature-set-ligatures 'prog-mode '("www" "**" "***" "**/" "*>" "*/" "\\\\" "\\\\\\" "{-" "::"
-                                       ":::" ":=" "!!" "!=" "!==" "-}" "----" "-->" "->" "->>"
-                                       "-<" "-<<" "-~" "#{" "#[" "##" "###" "####" "#(" "#?" "#_"
-                                       "#_(" ".-" ".=" ".." "..<" "..." "?=" "??" ";;" "/*" "/**"
-                                       "/=" "/==" "/>" "//" "///" "&&" "||" "||=" "|=" "|>" "$>" "^="
-                                       "++" "+++" "+>" "=:=" "==" "===" "==>" "=>" "=>>" "<="
-                                       "=<<" "=/=" ">-" ">=" ">=>" ">>" ">>-" ">>=" ">>>" "<*"
-                                       "<*>" "<|" "<|>" "<$" "<$>" "<!--" "<-" "<--" "<->" "<+"
-                                       "<+>" "<=" "<==" "<=>" "<=<" "<>" "<<" "<<-" "<<=" "<<<"
-                                       "<~" "<~~" "</" "</>" "~@" "~-" "~>" "~~" "~~>" "%%"))
-
-  (global-ligature-mode t))
-#+end_src
 
 * 11xx-half-scroll.el
 :PROPERTIES:
@@ -3556,7 +3523,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 #+begin_src emacs-lisp
 (use-package gptel
   :init
-  (setq gptel-model 'gpt-5.4-nano
+  (setq gptel-model 'MiniMax-M2.7
         gptel-default-mode 'org-mode)
   :config
   (gptel-make-gemini "Gemini"
@@ -3566,12 +3533,58 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
     :stream t
     :key (gptel-api-key-from-auth-source "api.anthropic.com"))
 
+  (gptel-make-openai "MiniMax"
+    :host "api.minimax.io"
+    :endpoint "/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.minimax.io")
+    :models '(MiniMax-M2.5
+              MiniMax-M2.5-highspeed
+              MiniMax-M2.1
+              MiniMax-M2.1-highspeed
+              MiniMax-M2
+              MiniMax-M2.7
+              MiniMax-M2.7-highspeed))
+
   (gptel-make-ollama "Ollama"
     :host "localhost:11434"
     :stream t
     :models '(qwen3.5:9b
-              qwen2.5-coder:14b
               ))
+
+  (gptel-make-openai "OpenRouter"
+    :host "openrouter.ai"
+    :endpoint "/api/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "openrouter.ai")
+    :models '(
+              ;; 1. CODING & LOGIC
+              deepseek/deepseek-v4-pro
+              deepseek/deepseek-v4-flash
+              moonshotai/kimi-k2.6
+              xiaomi/mimo-v2.5-pro
+              mistralai/devstral-2-2512:free ; Free Fallback
+              inclusionai/ling-2.6-1t:free ;; until April 30
+              
+              ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
+              qwen/qwen-3.5-plus
+              qwen/qwen3.6-plus:free
+              qwen/qwen3.6-plus-preview
+              stepfun/step-3.5-flash
+              nvidia/nemotron-3-super-120b:free ; Free Fallback
+              
+              ;; 3. DATA EXTRACTION / TOOL USE
+              ;; minimax/minimax-m2.7
+              meta-llama/llama-3.3-70b-instruct:nitro
+              qwen/qwen3.5-flash-02-23
+              qwen/qwen3-next-80b:free ; Free Fallback
+              
+              ;; THE LAZY FREE OPTION
+              openrouter/free
+              )
+    :request-params '(:provider (:allow_fallbacks t
+                                 :sort "price"
+                                 :preferredMinThroughput (:p90 50))))
 
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")

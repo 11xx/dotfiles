@@ -1,7 +1,7 @@
 ;;; UI  -*- lexical-binding: t; -*-
 (menu-bar-mode -1)    ; Disable menu bar
 (tool-bar-mode -1)    ; Disable toolbar
-;; (ALARM-EMACS27-conflict): scroll-bar-mode is void on emacs-nox
+;; scroll-bar-mode is void on emacs-nox
 (scroll-bar-mode -1)  ; Disable scrolllbar
 
 (blink-cursor-mode 1)
@@ -14,7 +14,7 @@
 ;; (toggle-truncate-lines -1)
 ;; Font configuration
 ;; Check if on Windows and change font (Windows-NT)
-(defvar 11xx--get-default-font
+(defvar 11xx--default-font
   (if (eq system-type 'windows-nt)
       ;; "Consolas"
       ;; "Literation Mono Nerd Font" on Linux or "LiterationMono Nerd Font" on (Windows-NT)
@@ -23,7 +23,7 @@
   "Sets the default font based on the system type.
 To be used with `set-font'.")
 
-(defvar 11xx--get-default-font-size
+(defvar 11xx--default-font-size
   (if (eq system-type 'windows-nt)
       11
     11)
@@ -36,14 +36,14 @@ Available keywords are:
 
 `:name' = a string with the font name like \"Liberation Mono\" or
 \"DejaVu Sans Mono\". It defaults to the value from the helper
-    function `11xx--get-default-font' that returns a string.
+    function `11xx--default-font' that returns a string.
 
 `:size' = a number that is multiplied by 10 internally to pass as
 \":height\" to `set-face-attribute'. It defaults to the value
-  from the helper function `11xx--get-default-font-size' that returns a
+  from the helper function `11xx--default-font-size' that returns a
 number."
-  (let* ((font (or (plist-get args :name) 11xx--get-default-font))
-         (size (or (plist-get args :size) 11xx--get-default-font-size)))
+  (let* ((font (or (plist-get args :name) 11xx--default-font))
+         (size (or (plist-get args :size) 11xx--default-font-size)))
     (set-face-attribute 'default nil
                         :font font
                         :height (* size 10))))
@@ -132,5 +132,9 @@ number."
         doom-modeline-enable-word-count nil
         doom-modeline-buffer-file-name-style 'truncate-nil))
 (set-window-margins nil 5 5)
+(use-package fira-code-mode
+  :config
+  (fira-code-mode-set-font)
+  (global-fira-code-mode))
 
 (provide '11xx-ui)
