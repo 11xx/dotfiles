@@ -175,7 +175,7 @@ WantedBy=default.target
 
 * opencode config
 :PROPERTIES:
-# :header-args:json-ts: :tangle config/opencode.json
+# :header-args:json-ts: :tangle config/opencode.json :noweb tangle
 :header-args:json-ts: :tangle no
 # if changing, toggle the comments, to prevent making this call when no need.
 :END:
@@ -185,8 +185,7 @@ WantedBy=default.target
 (org-bitwarden-get u f)
 #+end_src
 
-# #+begin_src json-ts :noweb tangle
-#+begin_src json-ts :noweb yes
+#+begin_src json-ts
 {
   "mcp": {
     "tavily": {
@@ -198,3 +197,24 @@ WantedBy=default.target
 }
 #+end_src
 
+
+#+begin_src json-ts :tangle config/opencode.jsonc
+{
+  "provider": {
+    "openrouter": {
+      "models": {
+        "moonshotai/kimi-k2.6": {
+          "options": {
+            "provider": {
+              "sort": "throughput"
+            }
+          }
+        },
+        "inclusionai/ling-2.6-1t:free": {
+          "name": "Ling 2.6 1T (Free Promo)"
+        },
+      }
+    }
+  }
+}
+#+end_src
