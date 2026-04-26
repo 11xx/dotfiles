@@ -36,6 +36,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     xz \
     # === Arbitrary Additional Tools ===
     # Optional editors, linters, and CLI utilities (safe to modify or remove)
+    podman \
     fd-find \
     bat \
     eza \
@@ -85,9 +86,12 @@ RUN uv tool install pyright \
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.config/opencode \
+    /home/node/.local/bin \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /workspace
+
+RUN mkdir -pv /home/node/.local/run
 
 RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
  && opencode --version \
@@ -113,10 +117,10 @@ CMD ["opencode", "/workspace"]
 set -euo pipefail
 
 mkdir -p \
-  /home/node/.config/opencode \
-  /home/node/.local/share/opencode \
-  /home/node/.local/state/opencode \
-  /workspace
+      /home/node/.config/opencode \
+      /home/node/.local/share/opencode \
+      /home/node/.local/state/opencode \
+      /workspace
 
 cd /workspace
 exec "$@"
@@ -173,12 +177,27 @@ Exec=opencode /workspace
 WantedBy=default.target
 #+end_src
 
+*** 10-podman.conf: add podman support inside container using host socket
+:PROPERTIES:
+:header-args:systemd+: :tangle (tdir "opencode.container.d/10-podman.conf")
+:END:
+
+Necessary =systemctl --user start podman.socket=
+#+begin_src systemd
+[Container]
+Environment=XDG_RUNTIME_DIR=/home/node/.local/run
+Environment=CONTAINER_HOST=unix:///home/node/.local/run/podman.sock
+Volume=%t/podman/podman.sock:/home/node/.local/run/podman.sock
+SecurityLabelDisable=true
+#+end_src
+
+
 * opencode config
 :PROPERTIES:
-# :header-args:json-ts: :tangle config/opencode.json :noweb tangle
 :header-args:json-ts: :tangle no
-# if changing, toggle the comments, to prevent making this call when no need.
 :END:
+# :header-args:json-ts: :tangle config/opencode.json :noweb tangle
+# if changing, toggle the comments, to prevent making this call when no need.
 
 #+NAME: tavily-url
 #+begin_src emacs-lisp :var u="<bitwarden-item-id>" f="mcp-api" :results none :exports none :eval never-export
@@ -191,8 +210,18 @@ WantedBy=default.target
     "tavily": {
       "type": "remote",
       "url": "<<tavily-url()>>",
-      "enabled": false
-    }
+      "enabled": true
+    },
+    "searxng": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "podman", "run", "--rm", "-i",
+        "--network", "host",
+        "-e", "SEARXNG_URL=http://host.containers.internal:32768",
+        "docker.io/icewreck/searxng-mcp-server:latest"
+      ]
+    },
   }
 }
 #+end_src

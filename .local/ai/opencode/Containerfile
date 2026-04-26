@@ -29,6 +29,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     xz \
     # === Arbitrary Additional Tools ===
     # Optional editors, linters, and CLI utilities (safe to modify or remove)
+    podman \
     fd-find \
     bat \
     eza \
@@ -78,9 +79,12 @@ RUN uv tool install pyright \
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.config/opencode \
+    /home/node/.local/bin \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /workspace
+
+RUN mkdir -pv /home/node/.local/run
 
 RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
  && opencode --version \
