@@ -1,5 +1,4 @@
-;; -*- lexical-binding: t; -*-
-(setq org-modules '(ol-info ol-docview ol-doi))
+;; (setq org-modules '(ol-info ol-docview ol-doi))  -*- lexical-binding: t; -*-
 
 (require '11xx-org-functions)
 

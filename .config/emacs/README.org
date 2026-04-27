@@ -6,7 +6,7 @@
 # #+STARTUP: hidestars
 
 # Export as HTML
-# #+SETUPFILE: ~/org/.setup/theme-readtheorg.setup
+#+SETUPFILE: ~/org/setupfiles/theme-readtheorg.setup
 
 # #+OPTIONS: toc:2
 
@@ -1528,7 +1528,7 @@ Examples:
     # [2022-05-14 Sat 20:54:33]
 
 #+begin_src emacs-lisp
-(setq org-modules '(ol-info ol-docview ol-doi))
+;; (setq org-modules '(ol-info ol-docview ol-doi))
 
 (require '11xx-org-functions)
 
@@ -3199,7 +3199,7 @@ number."
 (setq display-line-numbers-grow-only t)
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 (add-hook 'text-mode-hook #'display-line-numbers-mode)
-(add-hook 'html-mode-hook #'display-line-numbers-mode)
+
 (dolist (hook '(term-mode-hook
                 shell-mode-hook
                 eshell-mode-hook
@@ -3366,8 +3366,24 @@ Fira Code Symbol externally.
 #+begin_src emacs-lisp
 (use-package fira-code-mode
   :config
-  (fira-code-mode-set-font)
-  (global-fira-code-mode))
+  ;; most of this boiler plate is to handle loading order when in daemon mode
+  (defun fira-code-init ()
+    (fira-code-mode-set-font))
+
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions
+                (defun fira-code-daemon-init (frame)
+                  (when (display-graphic-p frame)
+                    (with-selected-frame frame
+                      (fira-code-init))
+                    ;; fontset is global, only needs to run once
+                    (remove-hook 'after-make-frame-functions
+                                 #'fira-code-daemon-init))))
+    (fira-code-init))
+
+  :hook ((prog-mode text-mode) . (lambda ()
+                                   (when (display-graphic-p)
+                                     (fira-code-mode 1)))))
 #+end_src
 - Note: It doesn't work properly on terminal
 
@@ -3561,30 +3577,28 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
               ;; 1. CODING & LOGIC
               deepseek/deepseek-v4-pro
               deepseek/deepseek-v4-flash
-              moonshotai/kimi-k2.6
+              moonshotai/kimi-k2.6:nitro
               xiaomi/mimo-v2.5-pro
               mistralai/devstral-2-2512:free ; Free Fallback
               inclusionai/ling-2.6-1t:free ;; until April 30
               
               ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
-              qwen/qwen-3.5-plus
+              gpt-oss-120b:floor
+              gpt-oss-120b:nitro
+              stepfun/step-3.5-flash:nitro
+
               qwen/qwen3.6-plus:free
-              qwen/qwen3.6-plus-preview
-              stepfun/step-3.5-flash
-              nvidia/nemotron-3-super-120b:free ; Free Fallback
+              tencent/hy3-preview:free
               
               ;; 3. DATA EXTRACTION / TOOL USE
-              ;; minimax/minimax-m2.7
               meta-llama/llama-3.3-70b-instruct:nitro
-              qwen/qwen3.5-flash-02-23
-              qwen/qwen3-next-80b:free ; Free Fallback
               
               ;; THE LAZY FREE OPTION
               openrouter/free
               )
-    :request-params '(:provider (:allow_fallbacks t
-                                 :sort "price"
-                                 :preferredMinThroughput (:p90 50))))
+    ;; :request-params '(:provider (:allow_fallbacks t
+    ;;                              :sort "price"))
+    )
 
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")
@@ -3636,12 +3650,12 @@ mcp
         '(("searxng-isokoliuk" . (:command "podman"
                                            :args ("run" "--rm" "-i"
                                                   "--network" "host"
-                                                  "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                  "--env-file" "~/ai/searxng/.env"
                                                   "isokoliuk/mcp-searxng:latest")))
           ("searxng-icewreck" . (:command "podman"
                                           :args ("run" "--rm" "-i"
                                                  "--network" "host"
-                                                 "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                 "--env-file" "~/ai/searxng/.env"
                                                  "docker.io/icewreck/searxng-mcp-server:latest"))))))
 
 (use-package gptel-integrations

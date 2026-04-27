@@ -65,7 +65,7 @@ number."
 (setq display-line-numbers-grow-only t)
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
 (add-hook 'text-mode-hook #'display-line-numbers-mode)
-(add-hook 'html-mode-hook #'display-line-numbers-mode)
+
 (dolist (hook '(term-mode-hook
                 shell-mode-hook
                 eshell-mode-hook
@@ -134,7 +134,23 @@ number."
 (set-window-margins nil 5 5)
 (use-package fira-code-mode
   :config
-  (fira-code-mode-set-font)
-  (global-fira-code-mode))
+  ;; most of this boiler plate is to handle loading order when in daemon mode
+  (defun fira-code-init ()
+    (fira-code-mode-set-font))
+
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions
+                (defun fira-code-daemon-init (frame)
+                  (when (display-graphic-p frame)
+                    (with-selected-frame frame
+                      (fira-code-init))
+                    ;; fontset is global, only needs to run once
+                    (remove-hook 'after-make-frame-functions
+                                 #'fira-code-daemon-init))))
+    (fira-code-init))
+
+  :hook ((prog-mode text-mode) . (lambda ()
+                                   (when (display-graphic-p)
+                                     (fira-code-mode 1)))))
 
 (provide '11xx-ui)

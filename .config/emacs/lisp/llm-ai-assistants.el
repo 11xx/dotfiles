@@ -42,30 +42,28 @@
               ;; 1. CODING & LOGIC
               deepseek/deepseek-v4-pro
               deepseek/deepseek-v4-flash
-              moonshotai/kimi-k2.6
+              moonshotai/kimi-k2.6:nitro
               xiaomi/mimo-v2.5-pro
               mistralai/devstral-2-2512:free ; Free Fallback
               inclusionai/ling-2.6-1t:free ;; until April 30
               
               ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
-              qwen/qwen-3.5-plus
+              gpt-oss-120b:floor
+              gpt-oss-120b:nitro
+              stepfun/step-3.5-flash:nitro
+
               qwen/qwen3.6-plus:free
-              qwen/qwen3.6-plus-preview
-              stepfun/step-3.5-flash
-              nvidia/nemotron-3-super-120b:free ; Free Fallback
+              tencent/hy3-preview:free
               
               ;; 3. DATA EXTRACTION / TOOL USE
-              ;; minimax/minimax-m2.7
               meta-llama/llama-3.3-70b-instruct:nitro
-              qwen/qwen3.5-flash-02-23
-              qwen/qwen3-next-80b:free ; Free Fallback
               
               ;; THE LAZY FREE OPTION
               openrouter/free
               )
-    :request-params '(:provider (:allow_fallbacks t
-                                 :sort "price"
-                                 :preferredMinThroughput (:p90 50))))
+    ;; :request-params '(:provider (:allow_fallbacks t
+    ;;                              :sort "price"))
+    )
 
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")
@@ -114,12 +112,12 @@
         '(("searxng-isokoliuk" . (:command "podman"
                                            :args ("run" "--rm" "-i"
                                                   "--network" "host"
-                                                  "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                  "--env-file" "~/ai/searxng/.env"
                                                   "isokoliuk/mcp-searxng:latest")))
           ("searxng-icewreck" . (:command "podman"
                                           :args ("run" "--rm" "-i"
                                                  "--network" "host"
-                                                 "-e" "SEARXNG_URL=http://127.0.0.1:32768"
+                                                 "--env-file" "~/ai/searxng/.env"
                                                  "docker.io/icewreck/searxng-mcp-server:latest"))))))
 
 (use-package gptel-integrations
