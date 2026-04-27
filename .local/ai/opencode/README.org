@@ -1,7 +1,9 @@
 #+PROPERTY: header-args :mkdirp yes
+#+PROPERTY: tangle-dir (expand-file-name "~/ansible/system/roles/aiagent_host_setup/files/")
+
 * Containerfile
 :PROPERTIES:
-:header-args:dockerfile: :tangle Containerfile
+:header-args:dockerfile: :tangle (tdir "opencode/Containerfile")
 :END:
 
 #+begin_src dockerfile
@@ -73,8 +75,8 @@ USER node
 WORKDIR /workspace
 
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
-ENV UV_TOOL_BIN_DIR=/home/node/.local/bin
-ENV PATH=/home/node/.local/bin:/home/node/.npm-global/bin:$PATH
+ENV UV_TOOL_BIN_DIR=/home/node/.bin
+ENV PATH=/home/node/.bin:/home/node/.npm-global/bin:$PATH
 
 ENV HOME=/home/node
 
@@ -85,57 +87,22 @@ RUN uv tool install pyright \
 
 RUN mkdir -pv \
     /home/node/.npm-global \
+    /home/node/.bin \
     /home/node/.config/opencode \
-    /home/node/.local/bin \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /workspace
 
-RUN mkdir -pv /home/node/.local/run
+RUN npm install -g "opencode-ai@${OPENCODE_VERSION}"
 
-RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
- && opencode --version \
- && emacs --version | head -n 1 \
- && node --version \
- && npm --version \
- && uv --version
-
-COPY --chown=node:node entrypoint.sh /home/node/entrypoint.sh
-RUN chmod +x /home/node/entrypoint.sh
-
-ENTRYPOINT ["/home/node/entrypoint.sh"]
-CMD ["opencode", "/workspace"]
-#+end_src
-
-** Container entrypoint
-:PROPERTIES:
-:header-args:bash: :tangle entrypoint.sh
-:END:
-
-#+begin_src bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-mkdir -p \
-      /home/node/.config/opencode \
-      /home/node/.local/share/opencode \
-      /home/node/.local/state/opencode \
-      /workspace
-
-cd /workspace
-exec "$@"
+CMD ["sleep", "infinity"]
 #+end_src
 
 * Quadlets
 :PROPERTIES:
-:tangle-dir: (expand-file-name "containers/systemd/" (xdg-config-home))
+:tangle-dir: (expand-file-name "containers/systemd/" "~/ansible/system/roles/aiagent_host_setup/files/")
 :header-args:systemd: :noweb tangle
 :END:
-
-#+NAME: opencode-home
-#+begin_src text
-%h/.local/ai/opencode
-#+end_src
 
 ** opencode.build: containerfile image build
 :PROPERTIES:
@@ -143,12 +110,12 @@ exec "$@"
 :END:
 #+begin_src systemd
 [Unit]
-Description=Build Opencode Custom Image
+Description=Build OpenCode Custom Image
 
 [Build]
 ImageTag=localhost/opencode:latest
-File=<<opencode-home>>/Containerfile
-# Pull=newer checks if the base image (node:22) has updates before building
+File=%h/opencode/Containerfile
+# Pull=newer checks if the base image has updates before building
 Pull=newer
 #+end_src
 
@@ -158,45 +125,61 @@ Pull=newer
 :END:
 #+begin_src systemd
 [Unit]
-Description=Opencode AI Container
+Description=OpenCode Container
 
 [Container]
 Image=opencode.build
 AutoUpdate=local
 ContainerName=opencode
 WorkingDir=/workspace
-UserNS=keep-id
+UserNS=keep-id:uid=1000,gid=1000
 Environment=HOME=/home/node
-Volume=<<opencode-home>>/workspace:/workspace:Z
-Volume=<<opencode-home>>/config:/home/node/.config/opencode:Z
-Volume=<<opencode-home>>/share:/home/node/.local/share/opencode:Z
-Volume=<<opencode-home>>/state:/home/node/.local/state/opencode:Z
-Exec=opencode /workspace
+Volume=/home/work:/workspace:Z
+Volume=%h/opencode/config:/home/node/.config/opencode:Z
+Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
+Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
 
 [Install]
 WantedBy=default.target
 #+end_src
 
-*** 10-podman.conf: add podman support inside container using host socket
-:PROPERTIES:
-:header-args:systemd+: :tangle (tdir "opencode.container.d/10-podman.conf")
-:END:
+** MCP Podman services
 
-Necessary =systemctl --user start podman.socket=
-#+begin_src systemd
-[Container]
-Environment=XDG_RUNTIME_DIR=/home/node/.local/run
-Environment=CONTAINER_HOST=unix:///home/node/.local/run/podman.sock
-Volume=%t/podman/podman.sock:/home/node/.local/run/podman.sock
-SecurityLabelDisable=true
+#+NAME: searxng-port
+#+begin_src emacs-lisp :exports none
+(defun searxng-port ()
+  "Return SEARXNG_PORT value from the .env file as a string."
+  (with-temp-buffer
+    (insert-file-contents "~/ai/searxng/.env")
+    (when (re-search-forward "^SEARXNG_PORT=\\([0-9]+\\)" nil t)
+      (match-string 1))))
+
+(searxng-port)
 #+end_src
 
+*** searxng-mcp
+#+begin_src systemd :tangle (tdir "searxng-mcp.container") :noweb tangle
+[Unit]
+Description=SearXNG MCP Server (rootless, aiagent)
+
+[Container]
+Image=docker.io/icewreck/searxng-mcp-server:latest
+ContainerName=searxng-mcp
+UserNS=keep-id
+Environment=SEARXNG_URL=http://host.containers.internal:<<searxng-port()>>
+Environment=TRANSPORT_PROTOCOL=sse
+PublishPort=18000:8000
+# no podman socket, no privileged mounts
+
+[Install]
+WantedBy=default.target
+#+end_src
 
 * opencode config
 :PROPERTIES:
-:header-args:json-ts: :tangle no
+:header-args:json-ts: :tangle (tdir "opencode/config/opencode.json") :noweb tangle
 :END:
-# :header-args:json-ts: :tangle config/opencode.json :noweb tangle
+# :header-args:json-ts: :tangle no
 # if changing, toggle the comments, to prevent making this call when no need.
 
 #+NAME: tavily-url
@@ -213,21 +196,16 @@ SecurityLabelDisable=true
       "enabled": true
     },
     "searxng": {
-      "type": "local",
+      "type": "remote",
       "enabled": true,
-      "command": [
-        "podman", "run", "--rm", "-i",
-        "--network", "host",
-        "-e", "SEARXNG_URL=http://host.containers.internal:32768",
-        "docker.io/icewreck/searxng-mcp-server:latest"
-      ]
-    },
+      "url": "http://host.containers.internal:18000"
+    }
   }
 }
 #+end_src
 
 
-#+begin_src json-ts :tangle config/opencode.jsonc
+#+begin_src json-ts :tangle (tdir "opencode/config/opencode.jsonc")
 {
   "provider": {
     "openrouter": {
@@ -247,3 +225,50 @@ SecurityLabelDisable=true
   }
 }
 #+end_src
+
+* COMMENT machinectl aiagent opencode.service
+#+begin_src shell
+# interactive shell as aiagent
+# ======================================================================
+sudo machinectl shell aiagent@
+
+# systemd user unit management
+# ======================================================================
+# reload after deploying new/changed Quadlet files
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user daemon-reload
+
+# start / stop / restart / status
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user start    opencode.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user stop     opencode.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  opencode.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user status   opencode.service
+
+# same for searxng-mcp
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  searxng-mcp.service
+
+# Podman as aiagent
+# ======================================================================
+sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman ps
+sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman images
+sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman logs opencode
+sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman system prune -a
+
+# build the opencode image manually (if not using opencode.build Quadlet)
+sudo machinectl shell --uid=aiagent .host -- \
+     /usr/bin/podman build \
+     -t localhost/opencode:latest \
+     /home/aiagent/opencode/
+
+# non-interactive scripting (Ansible handler pattern)
+# ======================================================================
+sudo systemd-run --quiet --pipe --wait \
+     --user --machine=aiagent@.host \
+     /usr/bin/systemctl --user daemon-reload
+#+end_src
+
+
+* COMMENT local vars                                               :noexport:
+
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:
