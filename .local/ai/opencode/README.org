@@ -55,6 +55,9 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     vim-enhanced \
     yq \
     ctags \
+    # haskell
+    # ghcup deps
+    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 
@@ -75,8 +78,11 @@ USER node
 WORKDIR /workspace
 
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
-ENV UV_TOOL_BIN_DIR=/home/node/.bin
-ENV PATH=/home/node/.bin:/home/node/.npm-global/bin:$PATH
+ENV XDG_BIN_HOME=/home/node/.bin
+ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
+ENV PATH=$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+# Haskell
+ENV CABAL_DIR=/home/node/.cabal
 
 ENV HOME=/home/node
 
@@ -95,8 +101,31 @@ RUN mkdir -pv \
 
 RUN npm install -g "opencode-ai@${OPENCODE_VERSION}"
 
+COPY --chown=node:node init.sh /home/node/init.sh
+RUN chmod +x /home/node/init.sh
+ENTRYPOINT ["/home/node/init.sh"]
+
 CMD ["sleep", "infinity"]
 #+end_src
+
+- Entrypoint ::
+#+begin_src shell :tangle (tdir "opencode/init.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+
+INIT_DIR="${HOME}/init.d"
+
+if [[ -d "$INIT_DIR" ]]; then
+  shopt -s nullglob
+  for f in "$INIT_DIR"/*; do
+    [[ -f "$f" && -x "$f" ]] || continue
+    "$f"
+  done
+  shopt -u nullglob
+fi
+
+exec "$@"
+#+end_src
+
 
 * Quadlets
 :PROPERTIES:
@@ -138,10 +167,93 @@ Volume=/home/work:/workspace:Z
 Volume=%h/opencode/config:/home/node/.config/opencode:Z
 Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
 Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
+# Idempotent scripts called by init.sh
+Volume=%h/opencode/init.d:/home/node/init.d:ro,Z
+
+Network=ai.network
 
 [Install]
 WantedBy=default.target
 #+end_src
+
+*** opencode.container.d
+
+**** 50-haskell.conf
+#+begin_src systemd :tangle (tdir "opencode.container.d/haskell.conf")
+[Container]
+# Syntax: <filename>.volume:<container-path>
+Volume=cabal-cache.volume:/home/node/.cabal
+Volume=ghcup-cache.volume:/home/node/.ghcup
+Volume=%h/opencode/bashrc.d/ghcup-env.sh:/home/node/.bashrc.d/ghcup-env.sh:ro,Z
+#+end_src
+
+- Cabal cache named volume ::
+#+begin_src systemd :tangle (tdir "cabal-cache.volume")
+[Unit]
+Description=Cabal cache volume
+
+[Volume]
+# Podman will create this named volume automatically
+#+end_src
+
+- GHCup cache named volume ::
+#+begin_src systemd :tangle (tdir "ghcup-cache.volume")
+[Unit]
+Description=GHCup cache volume
+
+[Volume]
+# Podman will create this named volume automatically
+#+end_src
+
+***** deploy files
+:PROPERTIES:
+:tangle-dir: ~/ansible/system/roles/aiagent_host_setup/files/
+:END:
+
+- GHCUp bootstrap ::
+#+begin_src shell :tangle (tdir "init.d/haskell-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+
+GHCUP_BIN="$HOME/.ghcup/bin/ghcup"
+
+if [[ ! -x "$GHCUP_BIN" ]]; then
+    echo "[init] Bootstrapping Haskell toolchain..."
+
+    # see options https://github.com/haskell/ghcup-hs/blob/master/scripts/bootstrap/bootstrap-haskell
+    export BOOTSTRAP_HASKELL_NONINTERACTIVE=1   # suppress all prompts
+    export BOOTSTRAP_HASKELL_INSTALL_HLS=1      # HLS is opt-in even in noninteractive
+    export BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 # omit Stack
+    export BOOTSTRAP_HASKELL_STACK_SETUP=1      # stack/ghcup integration
+    export BOOTSTRAP_HASKELL_GHC_VERSION=recommended
+    export BOOTSTRAP_HASKELL_CABAL_VERSION=recommended
+    # BOOTSTRAP_HASKELL_ADJUST_BASHRC must be UNSET (not empty) to suppress
+    # .bashrc modification in noninteractive mode — unset is the default
+    unset BOOTSTRAP_HASKELL_ADJUST_BASHRC
+
+    curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+
+    if [[ -f "$HOME/.ghcup/env" ]]; then
+        . "$HOME/.ghcup/env"
+    fi
+
+    cabal update --ignore-project
+    echo "[init] Haskell toolchain ready."
+else
+    if [[ -f "$HOME/.ghcup/env" ]]; then
+        . "$HOME/.ghcup/env"
+    fi
+
+    cabal update --ignore-project
+    echo "[init] Haskell toolchain already present, skipping."
+fi
+#+end_src
+
+- Source GHCUp env ::
+  Deploy to Fedora's =~/.bashrc.d/*=
+#+begin_src shell :tangle (tdir "bashrc.d/ghcup-env.sh")
+[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
+#+end_src
+
 
 ** MCP Podman services
 
@@ -157,29 +269,36 @@ WantedBy=default.target
 (searxng-port)
 #+end_src
 
-*** searxng-mcp
+*** searxng-mcp.container
 #+begin_src systemd :tangle (tdir "searxng-mcp.container") :noweb tangle
-[Unit]
-Description=SearXNG MCP Server (rootless, aiagent)
-
 [Container]
-Image=docker.io/icewreck/searxng-mcp-server:latest
+Image=ghcr.io/sacode/searxng-simple-mcp:latest
 ContainerName=searxng-mcp
-UserNS=keep-id
-Environment=SEARXNG_URL=http://host.containers.internal:<<searxng-port()>>
+Network=ai.network
+PublishPort=8000:8000
+Environment=SEARXNG_MCP_SEARXNG_URL=http://host.containers.internal:<<searxng-port()>>
 Environment=TRANSPORT_PROTOCOL=sse
-PublishPort=18000:8000
-# no podman socket, no privileged mounts
+# prevent loopback
+Environment=FASTMCP_HOST=0.0.0.0
 
 [Install]
 WantedBy=default.target
 #+end_src
 
+** shared network
+#+begin_src systemd :tangle (tdir "ai.network") :noweb tangle
+[Unit]
+Description=AI Containers Bridge Network
+
+[Network]
+# An empty [Network] block tells Podman to create a standard isolated 
+# network with automatic DNS resolution between containers.
+#+end_src
+
 * opencode config
 :PROPERTIES:
-:header-args:json-ts: :tangle (tdir "opencode/config/opencode.json") :noweb tangle
+# :header-args:json-ts: :tangle (tdir "opencode/config/opencode.json") :noweb tangle
 :END:
-# :header-args:json-ts: :tangle no
 # if changing, toggle the comments, to prevent making this call when no need.
 
 #+NAME: tavily-url
@@ -198,7 +317,7 @@ WantedBy=default.target
     "searxng": {
       "type": "remote",
       "enabled": true,
-      "url": "http://host.containers.internal:18000"
+      "url": "http://searxng-mcp:8000/sse"
     }
   }
 }
