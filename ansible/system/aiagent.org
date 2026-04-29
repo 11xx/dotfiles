@@ -345,6 +345,418 @@ Description=AI Containers Bridge Network
 }
 #+end_src
 
+* Ansible host role
+:PROPERTIES:
+:tangle-dir: roles/aiagent_host_setup
+:END:
+
+Role for setting up =aiagent= user, copying container files over to it.
+
+It's run with =sudo machinectl shell=
+
+*** defaults
+:PROPERTIES:
+:tangle-dir: (tdir-base "defaults")
+:END:
+
+**** main
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "main.yaml")
+:END:
+#+begin_src yaml-ts
+---
+aiagent_name: aiagent
+aiagent_shell: /bin/bash
+aiagent_shared_group: aiwork
+aiagent_workspace_root: /home/work
+aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
+aiagent_opencode_dirs:
+  - config
+  - share
+  - state
+aiagent_subuid_count: 65536
+aiagent_host_user: "{{ local_user_name }}"
+#+end_src
+
+*** tasks
+:PROPERTIES:
+:tangle-dir: (tdir-base "tasks")
+:END:
+
+**** main
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "main.yaml")
+:END:
+#+begin_src yaml-ts
+---
+- name: Ensure acl package is present
+  tags: [aiagent_host]
+  community.general.pacman:
+    name: acl
+    state: present
+  become: true
+
+- name: Ensure shared workspace group exists
+  tags: [aiagent_host]
+  ansible.builtin.group:
+    name: "{{ aiagent_shared_group }}"
+    state: present
+  become: true
+
+- name: Create AI agent service user
+  tags: [aiagent_host]
+  ansible.builtin.user:
+    name: "{{ aiagent_name }}"
+    shell: "{{ aiagent_shell }}"
+    create_home: true
+    state: present
+  register: aiagent_user
+  become: true
+
+- name: Add host user to shared group
+  tags: [aiagent_host]
+  ansible.builtin.user:
+    name: "{{ aiagent_host_user }}"
+    groups: "{{ aiagent_shared_group }}"
+    append: true
+  become: true
+
+- name: Add AI agent user to shared group
+  tags: [aiagent_host]
+  ansible.builtin.user:
+    name: "{{ aiagent_name }}"
+    groups: "{{ aiagent_shared_group }}"
+    append: true
+  become: true
+
+# Ensure aiagent_user.uid is always defined for selective tag runs
+# (getent provides passwd info even if the user-creation step is skipped).
+- name: Gather AI agent user info (always)
+  tags: [aiagent_user, aiagent_host]
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ aiagent_name }}"
+  register: aiagent_getent
+
+- name: Set aiagent_user.uid fact
+  tags: [aiagent_host, aiagent_user]
+  ansible.builtin.set_fact:
+    aiagent_user:
+      uid: "{{ aiagent_getent.ansible_facts.getent_passwd[aiagent_name][1] }}"
+  when:
+    - aiagent_getent.ansible_facts.getent_passwd is defined
+    - aiagent_name in aiagent_getent.ansible_facts.getent_passwd
+
+# --- subuid/subgid ---
+# grep rc=0: match found, rc=1: no match, rc=2: file error/absent
+# rc != 0 in both "no mapping" cases → proceed with allocation
+
+- name: Check existing subuid mapping
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: "grep -c ^{{ aiagent_name }}: /etc/subuid"
+  register: subuid_check
+  changed_when: false
+  failed_when: subuid_check.rc > 1
+  become: true
+
+- name: Compute next free subuid block
+  tags: [aiagent_host]
+  ansible.builtin.shell:
+    cmd: >
+      [ -s /etc/subuid ]
+      && awk -F: '{print $2+$3}' /etc/subuid | sort -n | tail -1
+      || echo 100000
+    executable: /bin/bash
+  register: next_subuid
+  changed_when: false
+  when: subuid_check.rc != 0
+  become: true
+
+- name: Assign subuid range to AI agent user
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: >
+      usermod --add-subuids
+      {{ next_subuid.stdout | int }}-{{ next_subuid.stdout | int + aiagent_subuid_count - 1 }}
+      {{ aiagent_name }}
+  when: subuid_check.rc != 0
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Check existing subgid mapping
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: "grep -c ^{{ aiagent_name }}: /etc/subgid"
+  register: subgid_check
+  changed_when: false
+  failed_when: subgid_check.rc > 1
+  become: true
+
+- name: Compute next free subgid block
+  tags: [aiagent_host]
+  ansible.builtin.shell:
+    cmd: >
+      [ -s /etc/subgid ]
+      && awk -F: '{print $2+$3}' /etc/subgid | sort -n | tail -1
+      || echo 100000
+    executable: /bin/bash
+  register: next_subgid
+  changed_when: false
+  when: subgid_check.rc != 0
+  become: true
+
+- name: Assign subgid range to AI agent user
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: >
+      usermod --add-subgids
+      {{ next_subgid.stdout | int }}-{{ next_subgid.stdout | int + aiagent_subuid_count - 1 }}
+      {{ aiagent_name }}
+  when: subgid_check.rc != 0
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- directories ---
+
+- name: Create AI agent application directories
+  tags: [aiagent_host]
+  ansible.builtin.file:
+    path: "{{ aiagent_opencode_root }}/{{ item }}"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  loop: "{{ aiagent_opencode_dirs }}"
+  become: true
+
+- name: Create shared workspace root
+  tags: [aiagent_host]
+  ansible.builtin.file:
+    path: "{{ aiagent_workspace_root }}"
+    state: directory
+    owner: root
+    group: "{{ aiagent_shared_group }}"
+    mode: "2770"
+  become: true
+
+# --- ACLs ---
+
+- name: Apply named user ACLs on shared workspace
+  tags: [aiagent_host]
+  ansible.posix.acl:
+    path: "{{ aiagent_workspace_root }}"
+    entity: "{{ item }}"
+    etype: user
+    permissions: rwx
+    state: present
+  loop:
+    - "{{ aiagent_host_user }}"
+    - "{{ aiagent_name }}"
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Apply named group ACL on shared workspace
+  tags: [aiagent_host]
+  ansible.posix.acl:
+    path: "{{ aiagent_workspace_root }}"
+    entity: "{{ aiagent_shared_group }}"
+    etype: group
+    permissions: rwx
+    state: present
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Apply default user ACLs on shared workspace
+  tags: [aiagent_host]
+  ansible.posix.acl:
+    path: "{{ aiagent_workspace_root }}"
+    entity: "{{ item }}"
+    etype: user
+    permissions: rwx
+    default: true
+    state: present
+  loop:
+    - "{{ aiagent_host_user }}"
+    - "{{ aiagent_name }}"
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Apply default group ACL on shared workspace
+  tags: [aiagent_host]
+  ansible.posix.acl:
+    path: "{{ aiagent_workspace_root }}"
+    entity: "{{ aiagent_shared_group }}"
+    etype: group
+    permissions: rwx
+    default: true
+    state: present
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# --- linger ---
+
+- name: Enable lingering for AI agent user
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ aiagent_name }}"
+    creates: "/var/lib/systemd/linger/{{ aiagent_name }}"
+  become: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Deploy aiagent files and quadlets
+  tags: [aiagent_user]
+  ansible.builtin.import_tasks: copy-files.yaml
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Configure passwordless sudo for aiagent management
+  tags: [aiagent_host]
+  ansible.builtin.import_tasks: sudoers.yaml
+  ignore_errors: "{{ ansible_check_mode }}"
+#+end_src
+
+
+**** Copy files
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "copy-files.yaml")
+:END:
+
+#+begin_src yaml-ts
+---
+# Quadlet directories
+- name: Ensure Quadlet systemd directory exists for aiagent
+  tags: [aiagent_user]
+  ansible.builtin.file:
+    path: "/home/{{ aiagent_name }}/.config/containers/systemd"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  become: true
+
+- name: Ensure opencode source directories exist for aiagent
+  tags: [aiagent_user]
+  ansible.builtin.file:
+    path: "/home/{{ aiagent_name }}/opencode/{{ item }}"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  loop:
+    - ""
+    - config
+  become: true
+
+- name: Deploy Quadlets tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: containers/systemd/
+    dest: "/home/{{ aiagent_name }}/.config/containers/systemd/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+  notify: Reload aiagent quadlets
+
+- name: Deploy Opencode tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: opencode/
+    dest: "/home/{{ aiagent_name }}/opencode/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+
+- name: Deploy bashrc.d tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: bashrc.d/
+    dest: "/home/{{ aiagent_name }}/opencode/bashrc.d/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+
+- name: Deploy init.d tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: init.d/
+    dest: "/home/{{ aiagent_name }}/opencode/init.d/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    # needs to be executable so when the target user bind mounts the files here
+    # to inside a container it can be executed.
+    mode: "0700"
+  become: true
+#+end_src
+
+**** sudoers
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "sudoers.yaml")
+:END:
+#+begin_src yaml-ts
+---
+- name: Template aiagent sudoers drop-in
+  tags: [aiagent_host]
+  ansible.builtin.template:
+    src: aiagent.sudoers.j2
+    # make sure this takes precedence (i.e. is evaluated last) over general
+    # rules for the same user/group like `<user/group> ALL=(ALL) ALL'
+    dest: /etc/sudoers.d/99-aiagent
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -c -f %s
+  become: true
+#+end_src
+
+
+*** Handlers
+:PROPERTIES:
+:tangle-dir: (tdir-base "handlers")
+:END:
+
+**** main
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "main.yaml")
+:END:
+
+#+begin_src yaml-ts
+---
+- name: Reload aiagent quadlets
+  tags: [aiagent_user]
+  ansible.builtin.command:
+    cmd: >
+      systemd-run --quiet --pipe --wait
+      --user --machine=aiagent@.host
+      /usr/bin/systemctl --user daemon-reload
+  become: true
+  changed_when: true
+#+end_src
+
+
+*** templates
+:PROPERTIES:
+:tangle-dir: (tdir-base "templates")
+:END:
+
+**** host passwordless sudoers
+:PROPERTIES:
+:header-args:etc-sudoers: :tangle (tdir "aiagent.sudoers.j2")
+:END:
+#+begin_src etc-sudoers
+# Managed by Ansible — do not edit manually
+# Allows {{ local_user_name }} to manage the aiagent rootless Podman context without password
+
+Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl shell --uid=aiagent .host /usr/bin/podman *
+Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl shell aiagent@ /usr/bin/systemctl --user *
+Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl shell aiagent@ /usr/bin/journalctl --user *
+
+{{ local_user_name }} ALL=(root) NOPASSWD: AIAGENT_PODMAN, AIAGENT_SYSTEMD, AIAGENT_JOURNAL
+#+end_src
+
+
 * COMMENT machinectl aiagent opencode.service
 #+begin_src shell
 # interactive shell as aiagent
