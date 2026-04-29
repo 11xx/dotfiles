@@ -1,0 +1,12 @@
+[Container]
+Image=ghcr.io/sacode/searxng-simple-mcp:latest
+ContainerName=searxng-mcp
+Network=ai.network
+PublishPort=8000:8000
+Environment=SEARXNG_MCP_SEARXNG_URL=http://host.containers.internal:20100
+Environment=TRANSPORT_PROTOCOL=sse
+# prevent loopback
+Environment=FASTMCP_HOST=0.0.0.0
+
+[Install]
+WantedBy=default.target

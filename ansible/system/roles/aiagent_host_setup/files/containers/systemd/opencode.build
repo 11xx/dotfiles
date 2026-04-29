@@ -1,0 +1,8 @@
+[Unit]
+Description=Build OpenCode Custom Image
+
+[Build]
+ImageTag=localhost/opencode:latest
+File=%h/opencode/Containerfile
+# Pull=newer checks if the base image has updates before building
+Pull=newer

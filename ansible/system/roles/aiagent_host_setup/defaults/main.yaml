@@ -1,0 +1,12 @@
+---
+aiagent_name: aiagent
+aiagent_shell: /bin/bash
+aiagent_shared_group: aiwork
+aiagent_workspace_root: /home/work
+aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
+aiagent_opencode_dirs:
+  - config
+  - share
+  - state
+aiagent_subuid_count: 65536
+aiagent_host_user: "{{ local_user_name }}"

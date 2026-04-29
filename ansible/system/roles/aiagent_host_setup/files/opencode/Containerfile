@@ -1,0 +1,99 @@
+FROM quay.io/fedora/fedora:43
+
+ARG OPENCODE_VERSION="latest"
+
+RUN dnf -y upgrade --refresh
+
+RUN dnf -y install --setopt=install_weak_deps=False \
+    # === Essentials for OpenCode ===
+    # Required for Node environment, native addon builds, VCS, and core agent tools
+    ca-certificates \
+    curl \
+    findutils \
+    gcc-c++ \
+    git \
+    gzip \
+    jq \
+    make \
+    nodejs \
+    npm \
+    openssh-clients \
+    procps-ng \
+    python3 \
+    ripgrep \
+    shadow-utils \
+    tar \
+    unzip \
+    wget \
+    which \
+    xz \
+    # === Arbitrary Additional Tools ===
+    # Optional editors, linters, and CLI utilities (safe to modify or remove)
+    podman \
+    fd-find \
+    bat \
+    eza \
+    emacs \
+    entr \
+    git-delta \
+    less \
+    nano \
+    shellcheck \
+    sqlite \
+    strace \
+    tree \
+    uv \
+    vim-enhanced \
+    yq \
+    ctags \
+    # haskell
+    # ghcup deps
+    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl \
+ && dnf clean all \
+ && rm -rf /var/cache/dnf
+
+# Global Node-based tools
+RUN npm install -g @ast-grep/cli \
+ && npm cache clean --force
+
+# Hadolint (Haskell binary not in Fedora core)
+RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
+    -o /usr/local/bin/hadolint \
+ && chmod +x /usr/local/bin/hadolint
+
+
+RUN groupadd -g 1000 node \
+ && useradd -m -u 1000 -g 1000 -s /bin/bash node
+
+USER node
+WORKDIR /workspace
+
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV XDG_BIN_HOME=/home/node/.bin
+ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
+ENV PATH=$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+# Haskell
+ENV CABAL_DIR=/home/node/.cabal
+
+ENV HOME=/home/node
+
+# user-scope installs
+# Python LSP
+RUN uv tool install pyright \
+ && uv cache clean
+
+RUN mkdir -pv \
+    /home/node/.npm-global \
+    /home/node/.bin \
+    /home/node/.config/opencode \
+    /home/node/.local/share/opencode \
+    /home/node/.local/state/opencode \
+    /workspace
+
+RUN npm install -g "opencode-ai@${OPENCODE_VERSION}"
+
+COPY --chown=node:node init.sh /home/node/init.sh
+RUN chmod +x /home/node/init.sh
+ENTRYPOINT ["/home/node/init.sh"]
+
+CMD ["sleep", "infinity"]

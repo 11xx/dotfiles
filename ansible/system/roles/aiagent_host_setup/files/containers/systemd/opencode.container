@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenCode Container
+
+[Container]
+Image=opencode.build
+AutoUpdate=local
+ContainerName=opencode
+WorkingDir=/workspace
+UserNS=keep-id:uid=1000,gid=1000
+Environment=HOME=/home/node
+Volume=/home/work:/workspace:Z
+Volume=%h/opencode/config:/home/node/.config/opencode:Z
+Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
+Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
+# Idempotent scripts called by init.sh
+Volume=%h/opencode/init.d:/home/node/init.d:ro,Z
+
+Network=ai.network
+
+[Install]
+WantedBy=default.target

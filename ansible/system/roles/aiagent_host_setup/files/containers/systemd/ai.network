@@ -1,0 +1,6 @@
+[Unit]
+Description=AI Containers Bridge Network
+
+[Network]
+# An empty [Network] block tells Podman to create a standard isolated
+# network with automatic DNS resolution between containers.

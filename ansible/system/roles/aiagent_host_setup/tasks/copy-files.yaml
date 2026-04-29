@@ -1,0 +1,67 @@
+---
+# Quadlet directories
+- name: Ensure Quadlet systemd directory exists for aiagent
+  tags: [aiagent_user]
+  ansible.builtin.file:
+    path: "/home/{{ aiagent_name }}/.config/containers/systemd"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  become: true
+
+- name: Ensure opencode source directories exist for aiagent
+  tags: [aiagent_user]
+  ansible.builtin.file:
+    path: "/home/{{ aiagent_name }}/opencode/{{ item }}"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  loop:
+    - ""
+    - config
+  become: true
+
+- name: Deploy Quadlets tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: containers/systemd/
+    dest: "/home/{{ aiagent_name }}/.config/containers/systemd/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+  notify: Reload aiagent quadlets
+
+- name: Deploy Opencode tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: opencode/
+    dest: "/home/{{ aiagent_name }}/opencode/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+
+- name: Deploy bashrc.d tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: bashrc.d/
+    dest: "/home/{{ aiagent_name }}/opencode/bashrc.d/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+
+- name: Deploy init.d tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: init.d/
+    dest: "/home/{{ aiagent_name }}/opencode/init.d/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    # needs to be executable so when the target user bind mounts the files here
+    # to inside a container it can be executed.
+    mode: "0700"
+  become: true

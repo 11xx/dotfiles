@@ -1,0 +1,10 @@
+---
+- name: Reload aiagent quadlets
+  tags: [aiagent_user]
+  ansible.builtin.command:
+    cmd: >
+      systemd-run --quiet --pipe --wait
+      --user --machine=aiagent@.host
+      /usr/bin/systemctl --user daemon-reload
+  become: true
+  changed_when: true

@@ -1,0 +1,13 @@
+---
+- name: Template aiagent sudoers drop-in
+  tags: [aiagent_host]
+  ansible.builtin.template:
+    src: aiagent.sudoers.j2
+    # make sure this takes precedence (i.e. is evaluated last) over general
+    # rules for the same user/group like `<user/group> ALL=(ALL) ALL'
+    dest: /etc/sudoers.d/99-aiagent
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -c -f %s
+  become: true
