@@ -542,30 +542,30 @@ aiagent_host_user: "{{ local_user_name }}"
 
 # --- ACLs ---
 
-- name: Apply named user ACLs on shared workspace
+- name: Apply named user access ACLs on shared workspace
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
     entity: "{{ item }}"
     etype: user
-    permissions: rwx
+    permissions: rwX
+    recursive: true
     state: present
   loop:
     - "{{ aiagent_host_user }}"
     - "{{ aiagent_name }}"
   become: true
-  ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Apply named group ACL on shared workspace
+- name: Apply named group access ACL on shared workspace
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
     entity: "{{ aiagent_shared_group }}"
     etype: group
-    permissions: rwx
+    permissions: rwX
+    recursive: true
     state: present
   become: true
-  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Apply default user ACLs on shared workspace
   tags: [aiagent_host]
@@ -575,12 +575,12 @@ aiagent_host_user: "{{ local_user_name }}"
     etype: user
     permissions: rwx
     default: true
+    recursive: true
     state: present
   loop:
     - "{{ aiagent_host_user }}"
     - "{{ aiagent_name }}"
   become: true
-  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: Apply default group ACL on shared workspace
   tags: [aiagent_host]
@@ -590,9 +590,9 @@ aiagent_host_user: "{{ local_user_name }}"
     etype: group
     permissions: rwx
     default: true
+    recursive: true
     state: present
   become: true
-  ignore_errors: "{{ ansible_check_mode }}"
 
 # --- linger ---
 
