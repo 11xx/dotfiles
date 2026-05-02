@@ -9,7 +9,7 @@ Systemd-managed environment variables at:
 
 * User Services
 ** xremap
-#+INCLUDE: "../xremap/README.org::#orgid-iztysr" :only-contents t
+#+INCLUDE: "../xremap/README.org::#systemd-user-service" :only-contents t
 
 ** test services
 

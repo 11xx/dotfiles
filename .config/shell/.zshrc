@@ -87,64 +87,40 @@ fi
 bindkey '^H'   backward-kill-word
 bindkey '^F'   forward-char
 
-current_clip() {
-    selfSessionType=$( loginctl show-session self -p Type | awk -F'=' '{print $2}' )
-    if [ "${selfSessionType}" = wayland ]; then
-        ## Wayland
-        export clipCopy=wl-copy
-        export clipPaste=wl-paste
-    else
-        ## Xorg
-        export clipCopy=(xclip -r -i -t UTF8_STRING -selection clip)
-        export clipPaste=(xclip -o -selection clip \</dev/null)
-    fi
-}
+if [[ -n ${WAYLAND_DISPLAY-} ]] && (( $+commands[wl-copy] && $+commands[wl-paste] )); then
+    xw-copy-region-as-kill() {
+        zle copy-region-as-kill
+        print -rn -- "$CUTBUFFER" | wl-copy --type text/plain;charset=utf-8
+    }
+    zle -N xw-copy-region-as-kill
 
-xw-clip-kill-region () {
-    zle copy-region-as-kill
-    printf '%s' "$CUTBUFFER" | ${clipCopy}
-}
-zle -N xw-clip-kill-region
+    xw-kill-region() {
+        zle kill-region
+        print -rn -- "$CUTBUFFER" | wl-copy --type text/plain;charset=utf-8
+    }
+    zle -N xw-kill-region
 
-xw-clip-kill-region () {
-    zle kill-region
-    printf '%s' "$CUTBUFFER" | ${clipCopy}
-}
-zle -N xw-clip-kill-region
+    xw-kill-line() {
+        zle kill-line
+        print -rn -- "$CUTBUFFER" | wl-copy --type text/plain;charset=utf-8
+    }
+    zle -N xw-kill-line
 
-xw-clip-kill-line () {
-    zle kill-line
-    printf '%s' "$CUTBUFFER" | ${clipCopy}
-}
-zle -N xw-clip-kill-line
+    xw-yank() {
+        CUTBUFFER=$(wl-paste --no-newline 2>/dev/null) || return
+        zle yank
+    }
+    zle -N xw-yank
 
-xw-clip-yank () {
-    CUTBUFFER=$( ${clipPaste} )
-    zle yank
-}
-zle -N xw-clip-yank
-
-x-wayland-bindkeys() {
-    bindkey -e '^[w' xw-clip-kill-region
-    bindkey -e '^W' xw-clip-kill-region
-    bindkey -e '^Y' xw-clip-yank
-    bindkey -e '^K' xw-clip-kill-line
-}
-
-tty-clipboard-binkeys-emacs() {
-    bindkey -e '^[w' copy-region-as-kill
-    bindkey -e '^W' kill-region
-    bindkey -e '^Y' yank
-    bindkey -e '^K' kill-line
-}
-current_clip
-
-if [[ -n $WAYLAND_DISPLAY ]]; then
-    x-wayland-bindkeys
-elif [[ -n $DISPLAY ]] && [[ -z $WAYLAND_DISPLAY ]]; then
-    x-wayland-bindkeys
+    bindkey -e '^[w' xw-copy-region-as-kill
+    bindkey -e '^W'  xw-kill-region
+    bindkey -e '^Y'  xw-yank
+    bindkey -e '^K'  xw-kill-line
 else
-    tty-clipboard-binkeys-emacs
+    bindkey -e '^[w' copy-region-as-kill
+    bindkey -e '^W'  kill-region
+    bindkey -e '^Y'  yank
+    bindkey -e '^K'  kill-line
 fi
 
 bindkey -r '^[x' # execute-named-cmd

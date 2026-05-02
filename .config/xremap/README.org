@@ -106,9 +106,10 @@ keymap:
               c: C-M-SHIFT-c
               s: C-M-SHIFT-s
 #+end_src
-** Systemd user service
+
+* Systemd user service
 :PROPERTIES:
-:CUSTOM_ID: orgid-iztysr
+:CUSTOM_ID: systemd-user-service
 :tangle-dir: (expand-file-name "systemd/user" (xdg-config-home))
 :END:
 

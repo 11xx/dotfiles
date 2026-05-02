@@ -77,6 +77,7 @@ exec-once = sleep 10 && hypr-eww-restart-on-monitor-change
 exec-once = xsettingsd # GTK2-3 theme live changes
 # exec-once = gammastep -P
 exec-once = hypridle
+exec-once = hyprpm reload -n
 #+end_src
 Fix file association in dolphin.
 - [[https://bbs.archlinux.org/viewtopic.php?pid=2167673#p2167673][[SOLVED] Weird XDG MIME Behavior with KDE Dolphin on Hyprland / Applications & Desktop Environments / Arch Linux Forums]]
@@ -111,6 +112,15 @@ env = QT_AUTO_SCREEN_SCALE_FACTOR,1
 env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
 env = SDL_VIDEODRIVER,wayland,x11
 env = CLUTTER_BACKEND,wayland
+#+end_src
+
+*** Import session environment into D-Bus and systemd
+#+begin_src hyprlang-ts
+exec-once = dbus-update-activation-environment --systemd --all
+exec-once = systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE
+exec-once = systemctl --user import-environment GDK_BACKEND QT_QPA_PLATFORM QT_AUTO_SCREEN_SCALE_FACTOR QT_WAYLAND_DISABLE_WINDOWDECORATION SDL_VIDEODRIVER CLUTTER_BACKEND
+exec-once = systemctl --user import-environment EGL_PLATFORM MOZ_ENABLE_WAYLAND
+exec-once = systemctl --user import-environment XDG_MENU_PREFIX
 #+end_src
 
 
@@ -268,8 +278,12 @@ windowrule = match:class steam_app_2622380, match:title ELDEN RING NIGHTREIGN, r
 # File Managers
 windowrule = match:class org.kde.ark, match:title ^(File Already Exists).*Ark$, float on
 windowrule = match:class org.kde.dolphin, match:title ^(Choose Application).*Dolphin$, float on
-windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on, size 1500 900
-windowrule = match:class pcmanfm-qt, match:title Removable medium is inserted, float on
+
+$filePickerSize = size 1500 900
+windowrule = match:class org.freedesktop.impl.portal.desktop.kde, float on, $filePickerSize
+windowrule = match:class ^xdg-desktop-portal-gtk$, match:title ^File Upload.*$, float on, $filePickerSize
+windowrule = match:class ^xdg-desktop-portal-gtk$, match:title ^Open Folder$, float on, $filePickerSize
+windowrule = match:class pcmanfm-qt, match:title Removable medium is inserted, float on, $filePickerSize
 
 # Firefox
 # Empty title notifications (popups with no text)
@@ -534,9 +548,7 @@ bind = SUPER CTRL ALT, N, changegroupactive
 bind = , print, exec, mkdir -p "$(xdg-user-dir PICTURES)/screenshots/" && grim -l 0 -t png "$(xdg-user-dir PICTURES)/screenshots/$(date +'%Y%m%d-%H%M%S-screenshot.png')" && notify-send -a Screenshot 'Fullscreen Screenshot taken'
 # color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 
-# Hang when using default exit:
-# FIX wizard https://github.com/hyprwm/Hyprland/issues/3558#issuecomment-1848768654
-bind = SUPER CTRL ALT, pause, exec, hyprctl dispatch exit 0; sleep 2; pgrep -x Hyprland >/dev/null && killall -9 Hyprland
+bind = SUPER CTRL ALT, pause, exec, uwsm stop
 
 bind = SUPER, O, focusmonitor, +1
 bind = SUPER SHIFT, O, movewindow, mon:+1

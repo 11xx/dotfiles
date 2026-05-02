@@ -2,5 +2,7 @@
 [ ! -d "${GNUPGHOME}" ] &&
     mkdir -p -m 700 "${GNUPGHOME}"
 
-GPG_TTY=$(tty)
-export GPG_TTY
+if [[ -o interactive ]] && [[ -t 0 ]]; then
+    export GPG_TTY=$(tty)
+    gpg-connect-agent updatestartuptty /bye >/dev/null
+fi
