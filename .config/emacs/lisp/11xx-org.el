@@ -8,6 +8,7 @@
   (require 'org-eldoc))
 
 (use-package org
+  :ensure nil
   :bind (:map org-mode-map
               ("C-c C-;" . org-babel-repeat-previous-src-block)
               ("C-M-p" . org-previous-visible-heading)
@@ -79,7 +80,7 @@
         org-hide-emphasis-markers t))
 (use-package org-modern
   :init
-  (setq org-modern-block-fringe nil)
+  (setopt org-modern-block-fringe nil)
   :config
   (global-org-modern-mode))
 (use-package org-transclusion

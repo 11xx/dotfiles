@@ -65,6 +65,24 @@
     ;;                              :sort "price"))
     )
 
+  (gptel-make-openai "Groq"
+    :host "api.groq.com"
+    :endpoint "/openai/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.groq.co")
+    :models '(openai/gpt-oss-120b
+              llama-3.3-70b-versatile
+              qwen/qwen3-32b
+              llama-3.1-8b-instant
+              openai/gpt-oss-safeguard-20b
+              whisper-large-v3-turbo
+              canopylabs/orpheus-v1-english
+              canopylabs/orpheus-arabic-saudi))
+
+  (gptel-make-deepseek "DeepSeek"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.deepseek.com"))
+
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")
     (add-to-list 'org-use-property-inheritance "GPTEL_BACKEND")
@@ -109,16 +127,17 @@
 (use-package mcp
   :init
   (setq mcp-hub-servers
-        '(("searxng-isokoliuk" . (:command "podman"
+        `(("searxng-isokoliuk" . (:command "podman"
                                            :args ("run" "--rm" "-i"
                                                   "--network" "host"
-                                                  "--env-file" "~/ai/searxng/.env"
-                                                  "isokoliuk/mcp-searxng:latest")))
+                                                  "--env-file" ,(expand-file-name "~/ai/searxng/.env")
+                                                  "isokoliuk/mcp-searxng:latest"))) ; ts
           ("searxng-icewreck" . (:command "podman"
                                           :args ("run" "--rm" "-i"
                                                  "--network" "host"
-                                                 "--env-file" "~/ai/searxng/.env"
-                                                 "docker.io/icewreck/searxng-mcp-server:latest"))))))
+                                                 "--env-file" ,(expand-file-name "~/ai/searxng/.env")
+                                                 "docker.io/icewreck/searxng-mcp-server:latest"))))) ; python
+  )
 
 (use-package gptel-integrations
   :ensure nil

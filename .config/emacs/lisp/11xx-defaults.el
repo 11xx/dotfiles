@@ -152,7 +152,6 @@ for unnamed (--daemon), nil for interactive sessions.")
   (desktop-save-mode))
 
 (use-package eros
-  :after org-mode
   :hook (org-mode . eros-mode)
   :init
   (setq eros-eval-result-duration 'command

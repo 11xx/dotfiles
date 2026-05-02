@@ -133,6 +133,7 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
   :hook (corfu-mode . corfu-prescient-mode))
 ;; Add extensions
 (use-package cape
+  :bind ("M-<tab>" . cape-prefix-map)
   :config
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...

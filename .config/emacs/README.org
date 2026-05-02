@@ -582,7 +582,6 @@ for unnamed (--daemon), nil for interactive sessions.")
 ** eros: Overlay eval result (better C-x C-e)
 #+begin_src emacs-lisp
 (use-package eros
-  :after org-mode
   :hook (org-mode . eros-mode)
   :init
   (setq eros-eval-result-duration 'command
@@ -1538,6 +1537,7 @@ Examples:
   (require 'org-eldoc))
 
 (use-package org
+  :ensure nil
   :bind (:map org-mode-map
               ("C-c C-;" . org-babel-repeat-previous-src-block)
               ("C-M-p" . org-previous-visible-heading)
@@ -1634,7 +1634,7 @@ appear when hovered.
 #+begin_src emacs-lisp
 (use-package org-modern
   :init
-  (setq org-modern-block-fringe nil)
+  (setopt org-modern-block-fringe nil)
   :config
   (global-org-modern-mode))
 #+end_src
@@ -2938,6 +2938,7 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
 #+begin_src emacs-lisp
 ;; Add extensions
 (use-package cape
+  :bind ("M-<tab>" . cape-prefix-map)
   :config
   ;; Bind dedicated completion commands
   ;; Alternative prefix keys: C-c p, M-p, M-+, ...
@@ -3283,7 +3284,9 @@ Load theme based on Dark or Light system theme:
   (setq auto-dark-themes '((neron-dark)
                            (neron-light)))
   :config
-  (auto-dark-mode)
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions #'auto-dark-mode)
+    (auto-dark-mode))
   (setq minor-mode-alist
         (delq (assq 'auto-dark-mode minor-mode-alist) minor-mode-alist)))
 #+end_src
@@ -3367,19 +3370,19 @@ Fira Code Symbol externally.
 (use-package fira-code-mode
   :config
   ;; most of this boiler plate is to handle loading order when in daemon mode
-  (defun fira-code-init ()
-    (fira-code-mode-set-font))
-
+  ;; cool thing I learnt here, defun returns the function name so it can be
+  ;; used as symbol too, then that symbol can be called from inside itself
+  ;; because of lexical order.
   (if (daemonp)
       (add-hook 'after-make-frame-functions
                 (defun fira-code-daemon-init (frame)
                   (when (display-graphic-p frame)
                     (with-selected-frame frame
-                      (fira-code-init))
+                      (fira-code-mode-set-font))
                     ;; fontset is global, only needs to run once
                     (remove-hook 'after-make-frame-functions
                                  #'fira-code-daemon-init))))
-    (fira-code-init))
+    (fira-code-mode-set-font))
 
   :hook ((prog-mode text-mode) . (lambda ()
                                    (when (display-graphic-p)
@@ -3600,6 +3603,24 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
     ;;                              :sort "price"))
     )
 
+  (gptel-make-openai "Groq"
+    :host "api.groq.com"
+    :endpoint "/openai/v1/chat/completions"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.groq.co")
+    :models '(openai/gpt-oss-120b
+              llama-3.3-70b-versatile
+              qwen/qwen3-32b
+              llama-3.1-8b-instant
+              openai/gpt-oss-safeguard-20b
+              whisper-large-v3-turbo
+              canopylabs/orpheus-v1-english
+              canopylabs/orpheus-arabic-saudi))
+
+  (gptel-make-deepseek "DeepSeek"
+    :stream t
+    :key (gptel-api-key-from-auth-source "api.deepseek.com"))
+
   (with-eval-after-load 'org
     (add-to-list 'org-use-property-inheritance "GPTEL_MODEL")
     (add-to-list 'org-use-property-inheritance "GPTEL_BACKEND")
@@ -3647,16 +3668,17 @@ mcp
 (use-package mcp
   :init
   (setq mcp-hub-servers
-        '(("searxng-isokoliuk" . (:command "podman"
+        `(("searxng-isokoliuk" . (:command "podman"
                                            :args ("run" "--rm" "-i"
                                                   "--network" "host"
-                                                  "--env-file" "~/ai/searxng/.env"
-                                                  "isokoliuk/mcp-searxng:latest")))
+                                                  "--env-file" ,(expand-file-name "~/ai/searxng/.env")
+                                                  "isokoliuk/mcp-searxng:latest"))) ; ts
           ("searxng-icewreck" . (:command "podman"
                                           :args ("run" "--rm" "-i"
                                                  "--network" "host"
-                                                 "--env-file" "~/ai/searxng/.env"
-                                                 "docker.io/icewreck/searxng-mcp-server:latest"))))))
+                                                 "--env-file" ,(expand-file-name "~/ai/searxng/.env")
+                                                 "docker.io/icewreck/searxng-mcp-server:latest"))))) ; python
+  )
 
 (use-package gptel-integrations
   :ensure nil
