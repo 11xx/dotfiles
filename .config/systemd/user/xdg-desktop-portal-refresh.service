@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart portal after session settles
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sh -c 'sleep 2; systemctl --user restart xdg-desktop-portal.service'
+
+[Install]
+WantedBy=graphical-session.target

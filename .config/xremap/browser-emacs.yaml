@@ -50,7 +50,7 @@ keymap:
       C-x:
         remap:
           h: [C-home, C-a, { set_mark: true }] # C-x h (select all)
-          C-f: C-t # New Tab
+          C-f: C-M-SHIFT-f5
           C-w: C-M-SHIFT-insert # Save Page As...
           k: C-f4
           C-c: C-M-SHIFT-q

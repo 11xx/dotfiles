@@ -43,6 +43,28 @@ org.freedesktop.impl.portal.FileChooser=kde
 
 # #+INCLUDE: "~/.config/darkman/README.org::#orgid-ohmzyr" :minlevel 1
 
+* XDG portal restart workaround
+
+Restarts =xdg-desktop-portal.service= once after session startup so portal
+backend selection is re-evaluated with the final Hyprland session state.
+
+#+begin_src conf :tangle ../systemd/user/xdg-desktop-portal-refresh.service
+[Unit]
+Description=Restart portal after session settles
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/sh -c 'sleep 2; systemctl --user restart xdg-desktop-portal.service'
+
+[Install]
+WantedBy=graphical-session.target
+#+end_src
+
+: systemctl --user daemon-reload
+: systemctl --user enable --now xdg-desktop-portal-refresh
+
 * Notes
 
 ** See [[file:~/.config/darkman/README.org::#orgid-sqomyz][Application-specific settings to use XDG Desktop Portal]]
