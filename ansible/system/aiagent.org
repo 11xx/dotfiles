@@ -594,6 +594,17 @@ aiagent_host_user: "{{ local_user_name }}"
     state: present
   become: true
 
+- name: Fix legacy POSIX permissions on shared workspace
+  tags: [aiagent_host]
+  ansible.builtin.file:
+    path: "{{ aiagent_workspace_root }}"
+    state: directory
+    recurse: true
+    # ug+rwX: Give user & group Read, Write, and Execute (if directory/script)
+    # o-rwx:  Remove all permissions from others
+    mode: "ug+rwX,o-rwx"
+  become: true
+
 # --- linger ---
 
 - name: Enable lingering for AI agent user
