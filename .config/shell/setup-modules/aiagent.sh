@@ -14,12 +14,12 @@ _aiagent_log() {
 
 # interactive shell inside the harness container
 aiagent-shell() {
-    _aiagent exec -it opencode /bin/bash
+    _aiagent exec -it aiagent /bin/bash
 }
 
 # terminal harnesses
 opencode() {
-    _aiagent exec -it opencode opencode "${@:-/workspace}"
+    _aiagent exec -it aiagent opencode "${@:-/work}"
 }
 
 opencode-shell() {
@@ -27,27 +27,27 @@ opencode-shell() {
 }
 
 codex() {
-    _aiagent exec -it opencode codex-auto "$@"
+    _aiagent exec -it aiagent codex-auto "$@"
 }
 
 codex-login() {
-    _aiagent exec -it opencode env BROWSER=none codex login --device-auth "$@"
+    _aiagent exec -it aiagent env BROWSER=none codex login --device-auth "$@"
 }
 
 codex-raw() {
-    _aiagent exec -it opencode codex "$@"
+    _aiagent exec -it aiagent codex "$@"
 }
 
 pi() {
-    _aiagent exec -it opencode pi "$@"
+    _aiagent exec -it aiagent pi "$@"
 }
 
 pi-readonly() {
-    _aiagent exec -it opencode pi-readonly "$@"
+    _aiagent exec -it aiagent pi-readonly "$@"
 }
 
 t3-web() {
-    _aiagent exec -it opencode t3-web "$@"
+    _aiagent exec -it aiagent t3-web "$@"
 }
 
 t3-web-start() {
@@ -91,8 +91,8 @@ aiagent-reload()  { _aiagent_ctl daemon-reload; }
 
 # logs
 aiagent-log()         { _aiagent_log -u "${1:?service name required}" -f; }
-aiagent-log-build()   { _aiagent_log -u opencode-build   -f; }
-aiagent-log-opencode(){ _aiagent_log -u opencode         -f; }
+aiagent-log-build()   { _aiagent_log -u aiagent-build    -f; }
+aiagent-log-opencode(){ _aiagent_log -u aiagent          -f; }
 aiagent-log-searxng() { _aiagent_log -u searxng-mcp      -f; }
 aiagent-log-t3()      { _aiagent_log -u t3-web.service   -f; }
 
@@ -103,12 +103,12 @@ aiagent-prune()  { _aiagent system prune -f; }
 
 # build
 aiagent-build() {
-    _aiagent_ctl start opencode-build.service
-    _aiagent_log -u opencode-build -f
+    _aiagent_ctl start aiagent-build.service
+    _aiagent_log -u aiagent-build -f
 }
 
 # full restart after redeploy
 aiagent-redeploy() {
     _aiagent_ctl daemon-reload
-    _aiagent_ctl restart opencode.service searxng-mcp.service
+    _aiagent_ctl restart aiagent.service searxng-mcp.service
 }

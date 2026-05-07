@@ -5,6 +5,7 @@ aiagent_shared_group: aiwork
 aiagent_workspace_root: /home/work
 aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
 aiagent_opencode_dirs:
+  - agents
   - config
   - share
   - state

@@ -5,7 +5,7 @@ export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
 export T3CODE_PORT="${T3CODE_PORT:-3773}"
 export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3/userdata}"
 export T3CODE_NO_BROWSER="${T3CODE_NO_BROWSER:-true}"
-export T3CODE_CWD="${T3CODE_CWD:-/workspace}"
+export T3CODE_CWD="${T3CODE_CWD:-/work}"
 export BROWSER="${BROWSER:-none}"
 
 args=("$@")

@@ -10,7 +10,7 @@ directories.
 
 - =opencode= is a terminal coding agent with its own config/state.
 - =codex= is OpenAI's terminal coding agent. In this container it edits and runs
-  commands against the mounted =/workspace= tree, not the host filesystem in
+  commands against the mounted =/work= tree, not the host filesystem in
   general. Codex still has its own sandbox/approval layer; the wrapper
   =codex-auto= starts it in workspace-write/on-request mode.
 - Codex-compatible skills such as Impeccable should persist under
@@ -26,7 +26,10 @@ directories.
 - T3 should run inside the existing harness container, not as a separate
   sidecar container. It wraps =codex app-server=, so running it in the same
   container gives it the same Codex binary, OAuth state under =~/.codex=, and
-  mounted =/workspace= view as terminal Codex.
+  mounted =/work= view as terminal Codex.
+- Use =/work= as the canonical in-container workspace root. Keep
+  =/workspace -> /work= as a compatibility symlink for older Codex/OpenCode
+  session state that still records absolute =/workspace/...= paths.
 - A small user =t3-web.service= is the clean background-start option for T3.
   Quadlet is still the right layer for the long-lived container itself, but a
   regular systemd service is a better fit for a foreground process started with
@@ -111,10 +114,13 @@ RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hado
 
 
 RUN groupadd -g 1000 node \
- && useradd -m -u 1000 -g 1000 -s /bin/bash node
+ && useradd -m -u 1000 -g 1000 -s /bin/bash node \
+ && mkdir -pv /work \
+ && ln -sfn /work /workspace \
+ && chown node:node /work
 
 USER node
-WORKDIR /workspace
+WORKDIR /work
 
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV XDG_BIN_HOME=/home/node/.bin
@@ -140,7 +146,7 @@ RUN mkdir -pv \
     /home/node/.codex \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
-    /workspace
+    /work
 
 RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \
@@ -196,7 +202,7 @@ export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
 export T3CODE_PORT="${T3CODE_PORT:-3773}"
 export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3/userdata}"
 export T3CODE_NO_BROWSER="${T3CODE_NO_BROWSER:-true}"
-export T3CODE_CWD="${T3CODE_CWD:-/workspace}"
+export T3CODE_CWD="${T3CODE_CWD:-/work}"
 export BROWSER="${BROWSER:-none}"
 
 args=("$@")
@@ -231,34 +237,34 @@ exec pi --tools read,grep,find,ls "$@"
 :header-args:systemd: :noweb tangle
 :END:
 
-** opencode.build: containerfile image build
+** aiagent.build: containerfile image build
 :PROPERTIES:
-:header-args:systemd+: :tangle (tdir "opencode.build")
+:header-args:systemd+: :tangle (tdir "aiagent.build")
 :END:
 #+begin_src systemd
 [Unit]
 Description=Build AI Agent Harness Image
 
 [Build]
-ImageTag=localhost/opencode:latest
+ImageTag=localhost/aiagent:latest
 File=%h/opencode/Containerfile
 # Pull=newer checks if the base image has updates before building
 Pull=newer
 #+end_src
 
-** opencode.container
+** aiagent.container
 :PROPERTIES:
-:header-args:systemd+: :tangle (tdir "opencode.container")
+:header-args:systemd+: :tangle (tdir "aiagent.container")
 :END:
 #+begin_src systemd
 [Unit]
 Description=AI Agent Harness Container
 
 [Container]
-Image=opencode.build
+Image=aiagent.build
 AutoUpdate=local
-ContainerName=opencode
-WorkingDir=/workspace
+ContainerName=aiagent
+WorkingDir=/work
 UserNS=keep-id:uid=1000,gid=1000
 Environment=HOME=/home/node
 # T3 Code is a web UI around Codex; expose only on host loopback.
@@ -267,7 +273,7 @@ Environment=T3CODE_HOST=0.0.0.0
 Environment=T3CODE_PORT=3773
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
-Volume=/home/work:/workspace:Z
+Volume=/home/work:/work:Z
 Volume=%h/opencode/config:/home/node/.config/opencode:Z
 Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
 Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
@@ -284,10 +290,10 @@ Network=ai.network
 WantedBy=default.target
 #+end_src
 
-*** opencode.container.d
+*** aiagent.container.d
 
 **** 50-haskell.conf
-#+begin_src systemd :tangle (tdir "opencode.container.d/haskell.conf")
+#+begin_src systemd :tangle (tdir "aiagent.container.d/haskell.conf")
 [Container]
 # Syntax: <filename>.volume:<container-path>
 Volume=cabal-cache.volume:/home/node/.cabal
@@ -864,12 +870,12 @@ aiagent_host_user: "{{ local_user_name }}"
 #+begin_src systemd :tangle (tdir "t3-web.service")
 [Unit]
 Description=T3 Code web UI inside the AI agent harness container
-Requires=opencode.service
-After=opencode.service
+Requires=aiagent.service
+After=aiagent.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/podman exec --workdir /workspace opencode /home/node/.bin/t3-web
+ExecStart=/usr/bin/podman exec --workdir /work aiagent /home/node/.bin/t3-web
 Restart=no
 
 [Install]
@@ -942,12 +948,12 @@ _aiagent_log() {
 
 # interactive shell inside the harness container
 aiagent-shell() {
-    _aiagent exec -it opencode /bin/bash
+    _aiagent exec -it aiagent /bin/bash
 }
 
 # terminal harnesses
 opencode() {
-    _aiagent exec -it opencode opencode "${@:-/workspace}"
+    _aiagent exec -it aiagent opencode "${@:-/work}"
 }
 
 opencode-shell() {
@@ -955,27 +961,27 @@ opencode-shell() {
 }
 
 codex() {
-    _aiagent exec -it opencode codex-auto "$@"
+    _aiagent exec -it aiagent codex-auto "$@"
 }
 
 codex-login() {
-    _aiagent exec -it opencode env BROWSER=none codex login --device-auth "$@"
+    _aiagent exec -it aiagent env BROWSER=none codex login --device-auth "$@"
 }
 
 codex-raw() {
-    _aiagent exec -it opencode codex "$@"
+    _aiagent exec -it aiagent codex "$@"
 }
 
 pi() {
-    _aiagent exec -it opencode pi "$@"
+    _aiagent exec -it aiagent pi "$@"
 }
 
 pi-readonly() {
-    _aiagent exec -it opencode pi-readonly "$@"
+    _aiagent exec -it aiagent pi-readonly "$@"
 }
 
 t3-web() {
-    _aiagent exec -it opencode t3-web "$@"
+    _aiagent exec -it aiagent t3-web "$@"
 }
 
 t3-web-start() {
@@ -1019,8 +1025,8 @@ aiagent-reload()  { _aiagent_ctl daemon-reload; }
 
 # logs
 aiagent-log()         { _aiagent_log -u "${1:?service name required}" -f; }
-aiagent-log-build()   { _aiagent_log -u opencode-build   -f; }
-aiagent-log-opencode(){ _aiagent_log -u opencode         -f; }
+aiagent-log-build()   { _aiagent_log -u aiagent-build    -f; }
+aiagent-log-opencode(){ _aiagent_log -u aiagent          -f; }
 aiagent-log-searxng() { _aiagent_log -u searxng-mcp      -f; }
 aiagent-log-t3()      { _aiagent_log -u t3-web.service   -f; }
 
@@ -1031,19 +1037,19 @@ aiagent-prune()  { _aiagent system prune -f; }
 
 # build
 aiagent-build() {
-    _aiagent_ctl start opencode-build.service
-    _aiagent_log -u opencode-build -f
+    _aiagent_ctl start aiagent-build.service
+    _aiagent_log -u aiagent-build -f
 }
 
 # full restart after redeploy
 aiagent-redeploy() {
     _aiagent_ctl daemon-reload
-    _aiagent_ctl restart opencode.service searxng-mcp.service
+    _aiagent_ctl restart aiagent.service searxng-mcp.service
 }
 #+end_src
 
 
-* COMMENT machinectl aiagent opencode.service
+* COMMENT machinectl aiagent aiagent.service
 #+begin_src shell
 # interactive shell as aiagent
 # ======================================================================
@@ -1052,25 +1058,25 @@ sudo machinectl shell aiagent@
 # interactive shell inside the harness container
 # ======================================================================
 sudo machinectl shell --uid=aiagent .host -- \
-     /usr/bin/podman exec -it opencode bash
+     /usr/bin/podman exec -it aiagent bash
 
 # harnesses inside the container
 # ======================================================================
 # OpenCode terminal UI
 sudo machinectl shell --uid=aiagent .host -- \
-     /usr/bin/podman exec -it opencode opencode
+     /usr/bin/podman exec -it aiagent opencode /work
 
 # Codex terminal UI; first run may require `codex login --device-auth` inside the container
 sudo machinectl shell --uid=aiagent .host -- \
-     /usr/bin/podman exec -it opencode codex-auto
+     /usr/bin/podman exec -it aiagent codex-auto
 
 # Pi terminal UI; first run may require `/login` or provider API env vars
 sudo machinectl shell --uid=aiagent .host -- \
-     /usr/bin/podman exec -it opencode pi
+     /usr/bin/podman exec -it aiagent pi
 
 # T3 Code web UI around Codex. Open http://127.0.0.1:3773 on the host.
 sudo machinectl shell --uid=aiagent .host -- \
-     /usr/bin/podman exec -it opencode t3-web
+     /usr/bin/podman exec -it aiagent t3-web
 
 # systemd user unit management
 # ======================================================================
@@ -1078,10 +1084,10 @@ sudo machinectl shell --uid=aiagent .host -- \
 sudo machinectl shell aiagent@ /usr/bin/systemctl --user daemon-reload
 
 # start / stop / restart / status
-sudo machinectl shell aiagent@ /usr/bin/systemctl --user start    opencode.service
-sudo machinectl shell aiagent@ /usr/bin/systemctl --user stop     opencode.service
-sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  opencode.service
-sudo machinectl shell aiagent@ /usr/bin/systemctl --user status   opencode.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user start    aiagent.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user stop     aiagent.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  aiagent.service
+sudo machinectl shell aiagent@ /usr/bin/systemctl --user status   aiagent.service
 
 # same for searxng-mcp
 sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  searxng-mcp.service
@@ -1090,13 +1096,13 @@ sudo machinectl shell aiagent@ /usr/bin/systemctl --user restart  searxng-mcp.se
 # ======================================================================
 sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman ps
 sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman images
-sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman logs opencode
+sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman logs aiagent
 sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman system prune -a
 
-# build the opencode image manually (if not using opencode.build Quadlet)
+# build the aiagent image manually (if not using aiagent.build Quadlet)
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman build \
-     -t localhost/opencode:latest \
+     -t localhost/aiagent:latest \
      /home/aiagent/opencode/
 
 # non-interactive scripting (Ansible handler pattern)

@@ -68,10 +68,13 @@ RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hado
 
 
 RUN groupadd -g 1000 node \
- && useradd -m -u 1000 -g 1000 -s /bin/bash node
+ && useradd -m -u 1000 -g 1000 -s /bin/bash node \
+ && mkdir -pv /work \
+ && ln -sfn /work /workspace \
+ && chown node:node /work
 
 USER node
-WORKDIR /workspace
+WORKDIR /work
 
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV XDG_BIN_HOME=/home/node/.bin
@@ -90,13 +93,14 @@ RUN uv tool install pyright \
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.bin \
+    /home/node/.agents/skills \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /home/node/.codex \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
-    /workspace
+    /work
 
 RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \

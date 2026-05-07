@@ -1,11 +1,11 @@
 [Unit]
 Description=T3 Code web UI inside the AI agent harness container
-Requires=opencode.service
-After=opencode.service
+Requires=aiagent.service
+After=aiagent.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/podman exec --workdir /workspace opencode /home/node/.bin/t3-web
+ExecStart=/usr/bin/podman exec --workdir /work aiagent /home/node/.bin/t3-web
 Restart=no
 
 [Install]

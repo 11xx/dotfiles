@@ -2,10 +2,10 @@
 Description=AI Agent Harness Container
 
 [Container]
-Image=opencode.build
+Image=aiagent.build
 AutoUpdate=local
-ContainerName=opencode
-WorkingDir=/workspace
+ContainerName=aiagent
+WorkingDir=/work
 UserNS=keep-id:uid=1000,gid=1000
 Environment=HOME=/home/node
 # T3 Code is a web UI around Codex; expose only on host loopback.
@@ -14,10 +14,11 @@ Environment=T3CODE_HOST=0.0.0.0
 Environment=T3CODE_PORT=3773
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
-Volume=/home/work:/workspace:Z
+Volume=/home/work:/work:Z
 Volume=%h/opencode/config:/home/node/.config/opencode:Z
 Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
 Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
+Volume=%h/opencode/agents:/home/node/.agents:Z
 Volume=%h/opencode/codex:/home/node/.codex:Z
 Volume=%h/opencode/t3:/home/node/.t3:Z
 Volume=%h/opencode/pi:/home/node/.pi:Z
