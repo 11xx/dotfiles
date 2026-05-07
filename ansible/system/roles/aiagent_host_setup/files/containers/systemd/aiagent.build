@@ -3,6 +3,6 @@ Description=Build AI Agent Harness Image
 
 [Build]
 ImageTag=localhost/aiagent:latest
-File=%h/opencode/Containerfile
+File=%h/aiagent_container/Containerfile
 # Pull=newer checks if the base image has updates before building
 Pull=newer

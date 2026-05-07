@@ -132,12 +132,12 @@
 - name: Create AI agent application directories
   tags: [aiagent_host]
   ansible.builtin.file:
-    path: "{{ aiagent_opencode_root }}/{{ item }}"
+    path: "{{ aiagent_container_root }}/{{ item }}"
     state: directory
     owner: "{{ aiagent_name }}"
     group: "{{ aiagent_name }}"
     mode: "0750"
-  loop: "{{ aiagent_opencode_dirs }}"
+  loop: "{{ aiagent_container_dirs }}"
   become: true
 
 - name: Create shared workspace root

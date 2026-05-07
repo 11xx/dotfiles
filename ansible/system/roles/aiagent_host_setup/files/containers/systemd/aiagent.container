@@ -15,15 +15,15 @@ Environment=T3CODE_PORT=3773
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
 Volume=/home/work:/work:Z
-Volume=%h/opencode/config:/home/node/.config/opencode:Z
-Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
-Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
-Volume=%h/opencode/agents:/home/node/.agents:Z
-Volume=%h/opencode/codex:/home/node/.codex:Z
-Volume=%h/opencode/t3:/home/node/.t3:Z
-Volume=%h/opencode/pi:/home/node/.pi:Z
+Volume=%h/aiagent_container/opencode_config:/home/node/.config/opencode:Z
+Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
+Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
+Volume=%h/aiagent_container/agents:/home/node/.agents:Z
+Volume=%h/aiagent_container/codex:/home/node/.codex:Z
+Volume=%h/aiagent_container/t3:/home/node/.t3:Z
+Volume=%h/aiagent_container/pi:/home/node/.pi:Z
 # Idempotent scripts called by init.sh
-Volume=%h/opencode/init.d:/home/node/init.d:ro,Z
+Volume=%h/aiagent_container/init.d:/home/node/init.d:ro,Z
 
 Network=ai.network
 

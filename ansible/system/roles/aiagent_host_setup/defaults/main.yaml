@@ -3,12 +3,12 @@ aiagent_name: aiagent
 aiagent_shell: /bin/bash
 aiagent_shared_group: aiwork
 aiagent_workspace_root: /home/work
-aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
-aiagent_opencode_dirs:
+aiagent_container_root: "/home/{{ aiagent_name }}/aiagent_container"
+aiagent_container_dirs:
   - agents
-  - config
-  - share
-  - state
+  - opencode_config
+  - opencode_share
+  - opencode_state
   - codex
   - t3
   - pi

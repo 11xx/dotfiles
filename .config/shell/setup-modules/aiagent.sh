@@ -92,7 +92,6 @@ aiagent-reload()  { _aiagent_ctl daemon-reload; }
 # logs
 aiagent-log()         { _aiagent_log -u "${1:?service name required}" -f; }
 aiagent-log-build()   { _aiagent_log -u aiagent-build    -f; }
-aiagent-log-opencode(){ _aiagent_log -u aiagent          -f; }
 aiagent-log-searxng() { _aiagent_log -u searxng-mcp      -f; }
 aiagent-log-t3()      { _aiagent_log -u t3-web.service   -f; }
 

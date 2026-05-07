@@ -40,7 +40,7 @@ directories.
 
 * Containerfile
 :PROPERTIES:
-:header-args:dockerfile: :tangle (tdir "opencode/Containerfile")
+:header-args:dockerfile: :tangle (tdir "aiagent_container/Containerfile")
 :END:
 
 #+begin_src dockerfile
@@ -166,7 +166,7 @@ CMD ["sleep", "infinity"]
 #+end_src
 
 - Entrypoint ::
-#+begin_src shell :tangle (tdir "opencode/init.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle (tdir "aiagent_container/init.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 INIT_DIR="${HOME}/init.d"
@@ -190,12 +190,12 @@ exec "$@"
   environment; individual harnesses are normally launched with =podman exec=
   or from an interactive shell inside the container.
 
-#+begin_src shell :tangle (tdir "opencode/bin/codex-auto") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle (tdir "aiagent_container/bin/codex-auto") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
 #+end_src
 
-#+begin_src shell :tangle (tdir "opencode/bin/t3-web") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle (tdir "aiagent_container/bin/t3-web") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
@@ -225,7 +225,7 @@ exec t3 serve \
   "${args[@]}"
 #+end_src
 
-#+begin_src shell :tangle (tdir "opencode/bin/pi-readonly") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle (tdir "aiagent_container/bin/pi-readonly") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 exec pi --tools read,grep,find,ls "$@"
 #+end_src
@@ -247,7 +247,7 @@ Description=Build AI Agent Harness Image
 
 [Build]
 ImageTag=localhost/aiagent:latest
-File=%h/opencode/Containerfile
+File=%h/aiagent_container/Containerfile
 # Pull=newer checks if the base image has updates before building
 Pull=newer
 #+end_src
@@ -274,15 +274,15 @@ Environment=T3CODE_PORT=3773
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
 Volume=/home/work:/work:Z
-Volume=%h/opencode/config:/home/node/.config/opencode:Z
-Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
-Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
-Volume=%h/opencode/agents:/home/node/.agents:Z
-Volume=%h/opencode/codex:/home/node/.codex:Z
-Volume=%h/opencode/t3:/home/node/.t3:Z
-Volume=%h/opencode/pi:/home/node/.pi:Z
+Volume=%h/aiagent_container/opencode_config:/home/node/.config/opencode:Z
+Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
+Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
+Volume=%h/aiagent_container/agents:/home/node/.agents:Z
+Volume=%h/aiagent_container/codex:/home/node/.codex:Z
+Volume=%h/aiagent_container/t3:/home/node/.t3:Z
+Volume=%h/aiagent_container/pi:/home/node/.pi:Z
 # Idempotent scripts called by init.sh
-Volume=%h/opencode/init.d:/home/node/init.d:ro,Z
+Volume=%h/aiagent_container/init.d:/home/node/init.d:ro,Z
 
 Network=ai.network
 
@@ -298,7 +298,7 @@ WantedBy=default.target
 # Syntax: <filename>.volume:<container-path>
 Volume=cabal-cache.volume:/home/node/.cabal
 Volume=ghcup-cache.volume:/home/node/.ghcup
-Volume=%h/opencode/bashrc.d/ghcup-env.sh:/home/node/.bashrc.d/ghcup-env.sh:ro,Z
+Volume=%h/aiagent_container/bashrc.d/ghcup-env.sh:/home/node/.bashrc.d/ghcup-env.sh:ro,Z
 #+end_src
 
 - Cabal cache named volume ::
@@ -411,7 +411,7 @@ Description=AI Containers Bridge Network
 
 * opencode config
 :PROPERTIES:
-# :header-args:json-ts: :tangle (tdir "opencode/config/opencode.json") :noweb tangle
+# :header-args:json-ts: :tangle (tdir "aiagent_container/opencode_config/opencode.json") :noweb tangle
 :END:
 # if changing, toggle the comments, to prevent making this call when no need.
 
@@ -438,7 +438,7 @@ Description=AI Containers Bridge Network
 #+end_src
 
 
-#+begin_src json-ts :tangle (tdir "opencode/config/opencode.jsonc")
+#+begin_src json-ts :tangle (tdir "aiagent_container/opencode_config/opencode.jsonc")
 {
   "provider": {
     "openrouter": {
@@ -483,12 +483,12 @@ aiagent_name: aiagent
 aiagent_shell: /bin/bash
 aiagent_shared_group: aiwork
 aiagent_workspace_root: /home/work
-aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
-aiagent_opencode_dirs:
+aiagent_container_root: "/home/{{ aiagent_name }}/aiagent_container"
+aiagent_container_dirs:
   - agents
-  - config
-  - share
-  - state
+  - opencode_config
+  - opencode_share
+  - opencode_state
   - codex
   - t3
   - pi
@@ -640,12 +640,12 @@ aiagent_host_user: "{{ local_user_name }}"
 - name: Create AI agent application directories
   tags: [aiagent_host]
   ansible.builtin.file:
-    path: "{{ aiagent_opencode_root }}/{{ item }}"
+    path: "{{ aiagent_container_root }}/{{ item }}"
     state: directory
     owner: "{{ aiagent_name }}"
     group: "{{ aiagent_name }}"
     mode: "0750"
-  loop: "{{ aiagent_opencode_dirs }}"
+  loop: "{{ aiagent_container_dirs }}"
   become: true
 
 - name: Create shared workspace root
@@ -763,17 +763,25 @@ aiagent_host_user: "{{ local_user_name }}"
     mode: "0750"
   become: true
 
-- name: Ensure opencode source directories exist for aiagent
+- name: Deploy aiagent_container tree
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: aiagent_container/
+    dest: "/home/{{ aiagent_name }}/aiagent_container/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+
+- name: Ensure aiagent_container source directories exist for aiagent
   tags: [aiagent_user]
   ansible.builtin.file:
-    path: "/home/{{ aiagent_name }}/opencode/{{ item }}"
+    path: "/home/{{ aiagent_name }}/aiagent_container/{{ item }}"
     state: directory
     owner: "{{ aiagent_name }}"
     group: "{{ aiagent_name }}"
     mode: "0750"
-  loop:
-    - ""
-    - config
+  loop: "{{ aiagent_container_dirs }}"
   become: true
 
 - name: Deploy Quadlets tree
@@ -808,21 +816,11 @@ aiagent_host_user: "{{ local_user_name }}"
   become: true
   notify: Reload aiagent quadlets
 
-- name: Deploy Opencode tree
-  tags: [aiagent_user]
-  ansible.builtin.copy:
-    src: opencode/
-    dest: "/home/{{ aiagent_name }}/opencode/"
-    owner: "{{ aiagent_name }}"
-    group: "{{ aiagent_name }}"
-    mode: "0640"
-  become: true
-
 - name: Deploy bashrc.d tree
   tags: [aiagent_user]
   ansible.builtin.copy:
     src: bashrc.d/
-    dest: "/home/{{ aiagent_name }}/opencode/bashrc.d/"
+    dest: "/home/{{ aiagent_name }}/aiagent_container/bashrc.d/"
     owner: "{{ aiagent_name }}"
     group: "{{ aiagent_name }}"
     mode: "0640"
@@ -832,7 +830,7 @@ aiagent_host_user: "{{ local_user_name }}"
   tags: [aiagent_user]
   ansible.builtin.copy:
     src: init.d/
-    dest: "/home/{{ aiagent_name }}/opencode/init.d/"
+    dest: "/home/{{ aiagent_name }}/aiagent_container/init.d/"
     owner: "{{ aiagent_name }}"
     group: "{{ aiagent_name }}"
     # needs to be executable so when the target user bind mounts the files here
@@ -1026,7 +1024,6 @@ aiagent-reload()  { _aiagent_ctl daemon-reload; }
 # logs
 aiagent-log()         { _aiagent_log -u "${1:?service name required}" -f; }
 aiagent-log-build()   { _aiagent_log -u aiagent-build    -f; }
-aiagent-log-opencode(){ _aiagent_log -u aiagent          -f; }
 aiagent-log-searxng() { _aiagent_log -u searxng-mcp      -f; }
 aiagent-log-t3()      { _aiagent_log -u t3-web.service   -f; }
 
@@ -1103,7 +1100,7 @@ sudo machinectl shell --uid=aiagent .host -- /usr/bin/podman system prune -a
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman build \
      -t localhost/aiagent:latest \
-     /home/aiagent/opencode/
+     /home/aiagent/aiagent_container/
 
 # non-interactive scripting (Ansible handler pattern)
 # ======================================================================
