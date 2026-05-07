@@ -1,5 +1,5 @@
 [Unit]
-Description=Build OpenCode Custom Image
+Description=Build AI Agent Harness Image
 
 [Build]
 ImageTag=localhost/opencode:latest

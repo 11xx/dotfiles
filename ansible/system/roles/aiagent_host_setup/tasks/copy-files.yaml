@@ -34,6 +34,27 @@
   become: true
   notify: Reload aiagent quadlets
 
+- name: Ensure systemd user unit directory exists for aiagent
+  tags: [aiagent_user]
+  ansible.builtin.file:
+    path: "/home/{{ aiagent_name }}/.config/systemd/user"
+    state: directory
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0750"
+  become: true
+
+- name: Deploy aiagent systemd user units
+  tags: [aiagent_user]
+  ansible.builtin.copy:
+    src: systemd/user/
+    dest: "/home/{{ aiagent_name }}/.config/systemd/user/"
+    owner: "{{ aiagent_name }}"
+    group: "{{ aiagent_name }}"
+    mode: "0640"
+  become: true
+  notify: Reload aiagent quadlets
+
 - name: Deploy Opencode tree
   tags: [aiagent_user]
   ansible.builtin.copy:

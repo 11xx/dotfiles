@@ -8,5 +8,8 @@ aiagent_opencode_dirs:
   - config
   - share
   - state
+  - codex
+  - t3
+  - pi
 aiagent_subuid_count: 65536
 aiagent_host_user: "{{ local_user_name }}"

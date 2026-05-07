@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
+export T3CODE_PORT="${T3CODE_PORT:-3773}"
+export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3/userdata}"
+export T3CODE_NO_BROWSER="${T3CODE_NO_BROWSER:-true}"
+export T3CODE_CWD="${T3CODE_CWD:-/workspace}"
+export BROWSER="${BROWSER:-none}"
+
+args=("$@")
+if [[ ${#args[@]} -eq 0 ]]; then
+  args=("$T3CODE_CWD")
+fi
+
+run_cwd="${args[$((${#args[@]} - 1))]}"
+if [[ -d "$run_cwd" ]]; then
+  cd "$run_cwd"
+fi
+
+exec t3 serve \
+  --mode web \
+  --host "$T3CODE_HOST" \
+  --port "$T3CODE_PORT" \
+  --base-dir "$T3CODE_HOME" \
+  --no-browser \
+  --auto-bootstrap-project-from-cwd \
+  "${args[@]}"

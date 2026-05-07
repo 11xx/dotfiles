@@ -12,4 +12,6 @@ if [[ -d "$INIT_DIR" ]]; then
   shopt -u nullglob
 fi
 
+echo 'END init.sh, running provided CMD'
+
 exec "$@"

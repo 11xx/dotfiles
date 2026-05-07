@@ -12,13 +12,74 @@ _aiagent_log() {
     sudo machinectl shell aiagent@ /usr/bin/journalctl --user "$@"
 }
 
-# opencode
+# interactive shell inside the harness container
+aiagent-shell() {
+    _aiagent exec -it opencode /bin/bash
+}
+
+# terminal harnesses
 opencode() {
     _aiagent exec -it opencode opencode "${@:-/workspace}"
 }
 
 opencode-shell() {
-    _aiagent exec -it opencode /bin/bash
+    aiagent-shell
+}
+
+codex() {
+    _aiagent exec -it opencode codex-auto "$@"
+}
+
+codex-login() {
+    _aiagent exec -it opencode env BROWSER=none codex login --device-auth "$@"
+}
+
+codex-raw() {
+    _aiagent exec -it opencode codex "$@"
+}
+
+pi() {
+    _aiagent exec -it opencode pi "$@"
+}
+
+pi-readonly() {
+    _aiagent exec -it opencode pi-readonly "$@"
+}
+
+t3-web() {
+    _aiagent exec -it opencode t3-web "$@"
+}
+
+t3-web-start() {
+    _aiagent_ctl start t3-web.service
+}
+
+t3-web-stop() {
+    _aiagent_ctl stop t3-web.service
+}
+
+t3-web-restart() {
+    _aiagent_ctl restart t3-web.service
+}
+
+t3-web-status() {
+    _aiagent_ctl status t3-web.service
+}
+
+t3-web-enable() {
+    _aiagent_ctl enable t3-web.service
+}
+
+t3-web-disable() {
+    _aiagent_ctl disable t3-web.service
+}
+
+t3-web-log() {
+    _aiagent_log -u t3-web.service -f
+}
+
+t3-open() {
+    xdg-open http://127.0.0.1:3773/
 }
 
 # container lifecycle
@@ -33,6 +94,7 @@ aiagent-log()         { _aiagent_log -u "${1:?service name required}" -f; }
 aiagent-log-build()   { _aiagent_log -u opencode-build   -f; }
 aiagent-log-opencode(){ _aiagent_log -u opencode         -f; }
 aiagent-log-searxng() { _aiagent_log -u searxng-mcp      -f; }
+aiagent-log-t3()      { _aiagent_log -u t3-web.service   -f; }
 
 # podman inspection
 aiagent-ps()     { _aiagent ps; }
