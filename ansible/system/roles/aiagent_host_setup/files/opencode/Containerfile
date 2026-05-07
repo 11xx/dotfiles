@@ -53,7 +53,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     ctags \
     # haskell
     # ghcup deps
-    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl \
+    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl zlib-devel \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 

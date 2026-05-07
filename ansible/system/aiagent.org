@@ -13,6 +13,9 @@ directories.
   commands against the mounted =/workspace= tree, not the host filesystem in
   general. Codex still has its own sandbox/approval layer; the wrapper
   =codex-auto= starts it in workspace-write/on-request mode.
+- Codex-compatible skills such as Impeccable should persist under
+  =~/.agents/skills=. Mount the whole =~/.agents= tree rather than only the
+  =skills= subdir so future agent config and metadata survive rebuilds too.
 - =pi= is the minimal terminal harness. Its own philosophy is closer to "bring
   your own workflow" than OpenCode's batteries-included approach, so the
   container is the main safety boundary. The =pi-readonly= wrapper is useful
@@ -93,7 +96,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     ctags \
     # haskell
     # ghcup deps
-    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl \
+    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl zlib-devel \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 
@@ -130,6 +133,7 @@ RUN uv tool install pyright \
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.bin \
+    /home/node/.agents/skills \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
@@ -267,6 +271,7 @@ Volume=/home/work:/workspace:Z
 Volume=%h/opencode/config:/home/node/.config/opencode:Z
 Volume=%h/opencode/share:/home/node/.local/share/opencode:Z
 Volume=%h/opencode/state:/home/node/.local/state/opencode:Z
+Volume=%h/opencode/agents:/home/node/.agents:Z
 Volume=%h/opencode/codex:/home/node/.codex:Z
 Volume=%h/opencode/t3:/home/node/.t3:Z
 Volume=%h/opencode/pi:/home/node/.pi:Z
@@ -474,6 +479,7 @@ aiagent_shared_group: aiwork
 aiagent_workspace_root: /home/work
 aiagent_opencode_root: "/home/{{ aiagent_name }}/opencode"
 aiagent_opencode_dirs:
+  - agents
   - config
   - share
   - state
