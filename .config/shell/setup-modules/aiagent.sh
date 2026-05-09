@@ -18,67 +18,106 @@ aiagent-shell() {
 }
 
 # terminal harnesses
-opencode() {
+aiagent-opencode() {
     _aiagent exec -it aiagent opencode "${@:-/work}"
 }
 
-opencode-shell() {
+aiagent-opencode-shell() {
     aiagent-shell
 }
 
-codex() {
+aiagent-codex() {
     _aiagent exec -it aiagent codex-auto "$@"
 }
 
-codex-login() {
+aiagent-codex-login() {
     _aiagent exec -it aiagent env BROWSER=none codex login --device-auth "$@"
 }
 
-codex-raw() {
+aiagent-codex-raw() {
     _aiagent exec -it aiagent codex "$@"
 }
 
-pi() {
-    _aiagent exec -it aiagent pi "$@"
+_aiagent_provider_env_args() {
+    local name value
+    for name in \
+        ANTHROPIC_API_KEY \
+        GEMINI_API_KEY \
+        GOOGLE_API_KEY \
+        GROQ_API_KEY \
+        MISTRAL_API_KEY \
+        OPENAI_API_KEY \
+        OPENROUTER_API_KEY \
+        XAI_API_KEY
+    do
+        eval "value=\${$name-}"
+        if [[ -n "$value" ]]; then
+            printf '%s\n' "${name}=${value}"
+        fi
+    done
 }
 
-pi-readonly() {
-    _aiagent exec -it aiagent pi-readonly "$@"
+aiagent-pi() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE pi "$@"
 }
 
-t3-web() {
+aiagent-pi-prompt() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE \
+        pi --provider google -p --no-session --tools read,grep,find,ls "$@"
+}
+
+aiagent-pi-readonly() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE pi-readonly "$@"
+}
+
+aiagent-t3-web() {
     _aiagent exec -it aiagent t3-web "$@"
 }
 
-t3-web-start() {
+aiagent-t3-web-start() {
     _aiagent_ctl start t3-web.service
 }
 
-t3-web-stop() {
+aiagent-t3-web-stop() {
     _aiagent_ctl stop t3-web.service
 }
 
-t3-web-restart() {
+aiagent-t3-web-restart() {
     _aiagent_ctl restart t3-web.service
 }
 
-t3-web-status() {
+aiagent-t3-web-status() {
     _aiagent_ctl status t3-web.service
 }
 
-t3-web-enable() {
+aiagent-t3-web-enable() {
     _aiagent_ctl enable t3-web.service
 }
 
-t3-web-disable() {
+aiagent-t3-web-disable() {
     _aiagent_ctl disable t3-web.service
 }
 
-t3-web-log() {
+aiagent-t3-web-log() {
     _aiagent_log -u t3-web.service -f
 }
 
-t3-open() {
+aiagent-t3-open() {
     xdg-open http://127.0.0.1:3773/
 }
 

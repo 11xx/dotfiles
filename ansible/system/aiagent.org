@@ -4,7 +4,7 @@
 * Harness notes
 
 This role builds one persistent rootless Podman container for terminal-first AI
-coding harnesses. The isolation boundary is the container plus Codex/OpenCode/Pi
+coding harnesses. The isolation boundary is the container plus agent
 permissions; the host only shares =/home/work= and the explicitly mounted state
 directories.
 
@@ -16,13 +16,13 @@ directories.
 - Codex-compatible skills such as Impeccable should persist under
   =~/.agents/skills=. Mount the whole =~/.agents= tree rather than only the
   =skills= subdir so future agent config and metadata survive rebuilds too.
-- =pi= is the minimal terminal harness. Its own philosophy is closer to "bring
-  your own workflow" than OpenCode's batteries-included approach, so the
-  container is the main safety boundary. The =pi-readonly= wrapper is useful
-  for audits.
+- =pi= remains installed but dormant. Print mode works, but the interactive TUI
+  currently segfaults in this Fedora 44 container stack, so use host =pi= for
+  Pi TUI work and keep container Pi only for explicit print-mode testing.
 - =codex-auto=, =t3-web=, and =pi-readonly= are container-internal wrappers
   installed into =/home/node/.bin=. They are not host commands by themselves.
-  Host shell functions below call them through =machinectl= and =podman exec=.
+  Host shell functions below are prefixed with =aiagent-= and call them through
+  =machinectl= and =podman exec=.
 - T3 should run inside the existing harness container, not as a separate
   sidecar container. It wraps =codex app-server=, so running it in the same
   container gives it the same Codex binary, OAuth state under =~/.codex=, and
@@ -950,67 +950,107 @@ aiagent-shell() {
 }
 
 # terminal harnesses
-opencode() {
+aiagent-opencode() {
     _aiagent exec -it aiagent opencode "${@:-/work}"
 }
 
-opencode-shell() {
+aiagent-opencode-shell() {
     aiagent-shell
 }
 
-codex() {
+aiagent-codex() {
     _aiagent exec -it aiagent codex-auto "$@"
 }
 
-codex-login() {
+aiagent-codex-login() {
     _aiagent exec -it aiagent env BROWSER=none codex login --device-auth "$@"
 }
 
-codex-raw() {
+aiagent-codex-raw() {
     _aiagent exec -it aiagent codex "$@"
 }
 
-pi() {
-    _aiagent exec -it aiagent pi "$@"
+_aiagent_provider_env_args() {
+    local name value
+    for name in \
+        ANTHROPIC_API_KEY \
+        GEMINI_API_KEY \
+        GOOGLE_API_KEY \
+        GROQ_API_KEY \
+        MISTRAL_API_KEY \
+        OPENAI_API_KEY \
+        OPENROUTER_API_KEY \
+        XAI_API_KEY
+    do
+        eval "value=\${$name-}"
+        if [[ -n "$value" ]]; then
+            printf '%s\n' "-e"
+            printf '%s\n' "${name}=${value}"
+        fi
+    done
 }
 
-pi-readonly() {
-    _aiagent exec -it aiagent pi-readonly "$@"
+aiagent-pi() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE pi "$@"
 }
 
-t3-web() {
+aiagent-pi-prompt() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE \
+        pi --provider google -p --no-session --tools read,grep,find,ls "$@"
+}
+
+aiagent-pi-readonly() {
+    local env_args=()
+    while IFS= read -r arg; do
+        env_args+=("$arg")
+    done < <(_aiagent_provider_env_args)
+    _aiagent exec -it "${env_args[@]}" aiagent \
+        env -u DISPLAY -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE pi-readonly "$@"
+}
+
+aiagent-t3-web() {
     _aiagent exec -it aiagent t3-web "$@"
 }
 
-t3-web-start() {
+aiagent-t3-web-start() {
     _aiagent_ctl start t3-web.service
 }
 
-t3-web-stop() {
+aiagent-t3-web-stop() {
     _aiagent_ctl stop t3-web.service
 }
 
-t3-web-restart() {
+aiagent-t3-web-restart() {
     _aiagent_ctl restart t3-web.service
 }
 
-t3-web-status() {
+aiagent-t3-web-status() {
     _aiagent_ctl status t3-web.service
 }
 
-t3-web-enable() {
+aiagent-t3-web-enable() {
     _aiagent_ctl enable t3-web.service
 }
 
-t3-web-disable() {
+aiagent-t3-web-disable() {
     _aiagent_ctl disable t3-web.service
 }
 
-t3-web-log() {
+aiagent-t3-web-log() {
     _aiagent_log -u t3-web.service -f
 }
 
-t3-open() {
+aiagent-t3-open() {
     xdg-open http://127.0.0.1:3773/
 }
 
@@ -1067,7 +1107,7 @@ sudo machinectl shell --uid=aiagent .host -- \
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman exec -it aiagent codex-auto
 
-# Pi terminal UI; first run may require `/login` or provider API env vars
+# Dormant Pi install; print mode works, but the interactive TUI currently segfaults
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman exec -it aiagent pi
 
