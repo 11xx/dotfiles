@@ -1,0 +1,563 @@
+#+TITLE: AI Work Exchange Workflow
+
+* Purpose
+
+This project-local helper set makes =/home/work= a low-friction exchange layer
+for isolated AI-agent sessions.
+
+The host side is canonical for orchestration because it knows the original Git
+repo, bare dotfiles repo, Magit workflow, and source paths. The container side is
+only the execution environment. Host =/home/work/ai= is visible inside the
+container as =/work/ai=.
+
+The default flow is:
+
+1. Copy a focused set of files into a session workspace.
+2. Start an agent against that isolated workspace.
+3. Generate a patch into an outbox.
+4. Review/apply the patch manually, with Magit, or with =ai-apply=.
+
+* Files
+
+Scripts live under:
+
+#+begin_src text
+bin/ai-work
+bin/ai-edit
+bin/ai-dot-edit
+bin/aiq
+bin/ai-ask
+bin/ai-add
+bin/ai-done
+bin/ai-diff
+bin/ai-apply
+bin/ai-copy-back
+bin/ai-abort
+bin/ai-open
+bin/ai-shell
+bin/ai-list
+bin/ai-pick
+bin/ai-clean
+bin/ai-status
+#+end_src
+
+Only =bin/ai-work= contains implementation logic. The other files are small
+entrypoint wrappers.
+
+* Workspace Layout
+
+By default the scripts use =/home/work/ai= on the host. When running inside the
+harness container, where =/home/work= is not present and =/work= is the mounted
+workspace, the scripts use =/work/ai=.
+
+#+begin_src text
+/home/work/ai/
+  sessions/
+    SESSION-ID/
+      manifest.json
+      paths.txt
+      source.sha256
+      ai-work.state.json
+      baseline/
+      worktree/
+      done
+      aborted
+  outbox/
+    REPO-SLUG/
+      SESSION-ID.patch
+      SESSION-ID.manifest.json
+      SESSION-ID.source.sha256
+      SESSION-ID.copyback.json
+  tmp/
+#+end_src
+
+Override this with:
+
+#+begin_src bash
+export AI_WORK_ROOT=/some/other/root
+#+end_src
+
+Inside the container, the matching path is expected to be:
+
+#+begin_src bash
+/work/ai
+#+end_src
+
+Override this with:
+
+#+begin_src bash
+export AI_CONTAINER_WORK_ROOT=/work/ai
+#+end_src
+
+* Main Commands
+
+** =ai-edit=
+
+Create a focused session and launch an agent.
+
+#+begin_src bash
+bin/ai-edit [--agent t3|codex|opencode] [--history|--clone] [--dot] [--name NAME] [PATH...]
+#+end_src
+
+Examples:
+
+#+begin_src bash
+bin/ai-edit aiagent.org
+bin/ai-edit --agent codex aiagent.org
+bin/ai-edit aiagent.org ai-workflow.org
+bin/ai-edit --clone
+bin/ai-edit --name shell-helpers .config/shell/README.org
+#+end_src
+
+If no paths are provided, the current directory is copied.
+
+Directory copies from =$HOME= have guardrails. Copying =$HOME= itself or a
+direct child directory such as =~/.config= is refused unless explicitly allowed:
+
+#+begin_src bash
+bin/ai-edit --force-copy-top-level-dir ~/.config
+#+end_src
+
+Large selections are also refused by default:
+
+#+begin_src bash
+AI_WORK_MAX_COPY_FILES=2000
+AI_WORK_MAX_COPY_BYTES=52428800
+#+end_src
+
+Override for a deliberate large copy:
+
+#+begin_src bash
+bin/ai-edit --force-large-copy path/to/large-dir
+#+end_src
+
+The default agent is =t3=. The helper expects the long-running T3 harness to
+already be started. It fails before copying files if T3 is not reachable at
+=AI_T3_URL=.
+
+For a T3 session, the helper adds the session worktree as a project in the
+existing T3 state with:
+
+#+begin_src bash
+t3 project add --base-dir "$AI_T3_BASE_DIR" --title SESSION-ID SESSION-WORKTREE
+#+end_src
+
+It does not spawn a second T3 server.
+
+Plain =http://127.0.0.1:3773/= may show the pairing screen if the browser does
+not have the T3 auth cookie. Use the already-authorized T3 URL/tab from your
+initial pairing flow if needed.
+
+Use =--no-launch= for staging or testing a session without starting an agent:
+
+#+begin_src bash
+bin/ai-edit --no-launch aiagent.org
+#+end_src
+
+** =ai-dot-edit=
+
+Create a session from a bare dotfiles repo.
+
+#+begin_src bash
+bin/ai-dot-edit .config/shell/README.org
+bin/ai-dot-edit --dirty .config/shell .config/emacs
+bin/ai-dot-edit --staged
+#+end_src
+
+Defaults:
+
+#+begin_src bash
+AI_DOT_GIT_DIR="$HOME/.local/dotfiles.git"
+AI_DOT_WORK_TREE="$HOME"
+#+end_src
+
+This matches the common alias:
+
+#+begin_src bash
+alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
+#+end_src
+
+** =aiq=
+
+Quick one-shot entrypoint. It creates a session and writes the prompt to
+=PROMPT.md=.
+
+#+begin_src bash
+bin/aiq path/to/file -- "Make this function stricter and explain the patch."
+#+end_src
+
+For now =aiq= starts the same session machinery as =ai-edit=. Terminal-agent
+prompt injection is intentionally not assumed; the prompt is placed in
+=PROMPT.md= so every agent can see it reliably.
+
+** =ai-ask=
+
+Read-oriented quick query.
+
+#+begin_src bash
+bin/ai-ask path/to/file -- "What are the risky assumptions here?"
+#+end_src
+
+This creates a read-only-intended session and uses Codex in read-only mode by
+default:
+
+#+begin_src bash
+codex exec --sandbox read-only --ask-for-approval never --cd SESSION-WORKTREE "question"
+#+end_src
+
+T3 can also be selected explicitly, but the local =t3 --help= output does not
+show a launch-time read-only mode, so T3 is not the default for =ai-ask=.
+
+** =ai-done=
+
+Generate an outbox patch from a session.
+
+#+begin_src bash
+bin/ai-done [SESSION-ID]
+#+end_src
+
+If no session ID is supplied, the helper opens a pending-session picker. It uses
+=fzf= when available and falls back to a numbered shell menu.
+
+Outputs:
+
+#+begin_src text
+/home/work/ai/outbox/REPO-SLUG/SESSION-ID.patch
+/home/work/ai/outbox/REPO-SLUG/SESSION-ID.manifest.json
+/home/work/ai/outbox/REPO-SLUG/SESSION-ID.source.sha256
+/home/work/ai/outbox/REPO-SLUG/SESSION-ID.copyback.json
+#+end_src
+
+The patch is not applied automatically.
+
+** =ai-diff=
+
+Show the current session diff.
+
+#+begin_src bash
+bin/ai-diff [SESSION-ID]
+#+end_src
+
+Context-only files under =.ai-work/context/= are excluded from diffs.
+
+** =ai-add=
+
+Add files to an existing session.
+
+#+begin_src bash
+bin/ai-add [SESSION-ID] path/to/file path/to/dir
+bin/ai-add [SESSION-ID] --context notes.html extra-log.txt
+#+end_src
+
+Normal =ai-add= paths must be inside the original source root. The helper copies
+them into the session worktree, records them in =paths.txt=, refreshes source
+hashes, and commits only those newly added paths as a new baseline. Existing
+agent edits remain as uncommitted session changes.
+
+=--context= copies files under =.ai-work/context/= and excludes that directory
+from session patches. Use this for reference material that should not be copied
+or patched back unless an agent deliberately creates a normal output file from
+it.
+
+** =ai-apply=
+
+Apply an outbox patch back to the original source.
+
+#+begin_src bash
+bin/ai-apply SESSION-ID
+bin/ai-apply /home/work/ai/outbox/dotfiles/SESSION-ID.patch
+#+end_src
+
+For normal repos, this runs:
+
+#+begin_src bash
+git -C "$source_root" apply "$patch"
+#+end_src
+
+For bare dotfiles, this runs:
+
+#+begin_src bash
+git --git-dir="$git_dir" --work-tree="$source_root" apply "$patch"
+#+end_src
+
+Before applying, =ai-apply= checks the recorded source hashes. If the original
+files changed since the session was created, it refuses unless =--force= is
+passed.
+
+** =ai-copy-back=
+
+Copy plain-tree session changes back without using =git apply=.
+
+#+begin_src bash
+bin/ai-copy-back [SESSION-ID]
+bin/ai-copy-back SESSION-ID --force
+bin/ai-copy-back SESSION-ID --delete
+#+end_src
+
+This is only for =plain= sessions. Git and bare-dotfiles sessions should use
+=ai-apply= so Git remains the return path. =ai-copy-back= reads the
+=SESSION-ID.copyback.json= manifest produced by =ai-done=, checks source hashes
+unless =--force= is passed, copies modified/new files to their original paths,
+and skips deletes unless =--delete= is explicit.
+
+** =ai-open= and =ai-shell=
+
+Reopen an existing session in T3:
+
+#+begin_src bash
+bin/ai-open [SESSION-ID]
+#+end_src
+
+Open a shell inside the =aiagent= container at the session worktree:
+
+#+begin_src bash
+bin/ai-shell [SESSION-ID]
+#+end_src
+
+** =ai-list=, =ai-pick=, =ai-abort=, =ai-clean=, =ai-status=
+
+List sessions and outbox patches:
+
+#+begin_src bash
+bin/ai-list
+bin/ai-list --pending
+bin/ai-list --done
+#+end_src
+
+Print or interactively pick a session ID:
+
+#+begin_src bash
+bin/ai-pick
+bin/ai-pick --all
+#+end_src
+
+Mark a session abandoned:
+
+#+begin_src bash
+bin/ai-abort [SESSION-ID]
+#+end_src
+
+Remove completed or aborted sessions older than a number of days:
+
+#+begin_src bash
+bin/ai-clean --older-than 14
+bin/ai-clean --older-than 7 --status aborted
+bin/ai-clean --older-than 30 --status all --remove-t3-projects
+#+end_src
+
+=--remove-t3-projects= calls =t3 project remove= for sessions that recorded a T3
+workspace before deleting the session directory. Without that flag, project
+deletion stays manual in the T3 UI.
+
+Show basic environment status:
+
+#+begin_src bash
+bin/ai-status
+#+end_src
+
+* Snapshot Mode
+
+Snapshot mode is the default.
+
+It copies selected files into a new session worktree, initializes a Git repo
+there, and commits the copied files as the baseline. Agent edits then appear as
+a normal =git diff= inside the isolated session.
+
+Selection rules:
+
+- Passing files copies those files.
+- Passing multiple files copies all of them while preserving relative paths.
+- Passing directories copies their contents while preserving relative paths.
+- Passing no paths copies the current directory.
+- =--tracked= selects tracked files under the optional path.
+- =--staged= selects staged files under the optional path.
+- =--dirty= selects modified and staged files under the optional path.
+
+Selectors accept multiple scopes:
+
+#+begin_src bash
+bin/ai-edit --dirty src tests
+bin/ai-dot-edit --staged .config/shell .config/emacs
+#+end_src
+
+* History Mode
+
+History mode is explicit:
+
+#+begin_src bash
+bin/ai-edit --history path/to/file
+bin/ai-dot-edit --history .config/shell/README.org
+#+end_src
+
+It requires =git-filter-repo= on the host.
+
+The helper clones the source repo into =/home/work/ai/tmp=, runs
+=git-filter-repo= only inside that fresh local clone, and then moves the
+filtered clone into the session worktree.
+
+It never runs =git-filter-repo= against the source repo or bare dotfiles repo.
+
+Full-clone mode is explicit too:
+
+#+begin_src bash
+bin/ai-edit --clone
+bin/ai-edit --clone .
+bin/ai-dot-edit --clone
+#+end_src
+
+=--clone= performs a normal full-repo clone into the session worktree and keeps
+the whole history. It is only for cloning the entire repo, so it rejects partial
+paths and does not combine with =--tracked=, =--staged=, or =--dirty=. Like
+=--history=, it records one local current-source baseline commit on top so the
+session still returns changes through the same patch flow.
+
+Use the modes like this:
+
+- default: snapshot copy of selected files or directories
+- =--history=: filtered history for selected paths
+- =--clone=: full repo history
+
+* Container Assumptions
+
+The scripts assume:
+
+#+begin_src bash
+AI_CONTAINER=aiagent
+AI_T3_URL=http://127.0.0.1:3773/
+AI_T3_BASE_DIR=/home/node/.t3/userdata
+AI_CONTAINER_WORK_ROOT=/work/ai
+#+end_src
+
+When run on the host, they call the container through:
+
+#+begin_src bash
+sudo machinectl shell --uid=aiagent .host /usr/bin/podman exec ...
+#+end_src
+
+So the host sudoers/machinectl setup from =aiagent.org= must already be active.
+
+When run inside the harness container, they call local commands directly.
+
+* Shared Workspace Permissions
+
+Session directories are normalized after creation and after =ai-add=:
+
+- directories get =ug+rwx,o-rwx= and setgid;
+- files get =ug+rw,o-rwx=;
+- when possible, the tree is moved to group =aiwork=;
+- when =setfacl= is available, access/default ACLs are refreshed for the host
+  user, =aiagent=, group =aiwork=, and an =rwX= ACL mask.
+
+The scripts do not =chown -R aiagent= by default. Ownership can remain with the
+host user while the shared group and ACLs make the files writable from the
+container user.
+
+* Dormant Pi Notes
+
+Pi remains installed in the container, but the project-local =ai-work= scripts no
+longer offer Pi as an agent backend. The interactive TUI currently crashes in
+this Fedora 44 container stack, so the practical default is Codex for read-only
+quick asks and T3/Codex/OpenCode for interactive work.
+
+Keep host-installed Pi available as plain =pi=. Container Pi helpers are
+prefixed so they do not shadow host tools:
+
+#+begin_src bash
+aiagent-pi
+aiagent-pi-prompt "Say ok"
+aiagent-pi-readonly
+#+end_src
+
+Known facts from the Pi investigation:
+
+- Container Pi version was =0.73.1=.
+- Print mode works when provider env is forwarded:
+
+  #+begin_src bash
+  _aiagent exec -it -e GEMINI_API_KEY="$GEMINI_API_KEY" aiagent \
+    pi --provider google -p --no-session --tools read,grep,find,ls "Say ok"
+  #+end_src
+
+- Interactive TUI returns =139=, which is =SIGSEGV=.
+- TTY plumbing is valid: stdin/stdout/stderr are TTYs, and terminal size/TERM
+  are present.
+- A minimal =@mariozechner/pi-tui= =ProcessTerminal= raw-mode test works.
+- =PI_STARTUP_BENCHMARK=1= exits =0=, so =interactiveMode.init()= succeeds.
+- =PI_OFFLINE=1= and =PI_SKIP_VERSION_CHECK=1= still segfault.
+- Running outside the project worktree and with a throwaway =HOME= still
+  segfaults.
+- No =PI_TUI_WRITE_LOG= file is produced in the failing normal run, so the crash
+  happens before normal TUI writer render logging.
+- Host-installed Pi =0.73.1= launches the interactive TUI on Arch. It reaches the
+  normal startup screen, warns only that no models are configured, and reports
+  =0.74.0= available via =pi update=.
+
+Conclusion: this is not currently an =aiagent.org= setup bug. Project repo/git
+watching, persisted =~/.pi= state, display env, network checks, basic terminal
+raw-mode setup, and the =machinectl=/Podman TTY path were ruled out. Most
+likely this is a Pi/Node/native runtime crash in the normal interactive
+render/input path. Leave container Pi dormant for print mode or future upstream
+fixes.
+
+* Safety Model
+
+- Source trees are not modified by =ai-edit=, =ai-dot-edit=, =aiq=, or
+  =ai-done=.
+- Returning changes defaults to patch review.
+- =ai-apply= checks for source drift before applying.
+- =ai-copy-back= is explicit and plain-session-only.
+- Dotfiles patches apply with the bare repo command, not by guessing from cwd.
+- History filtering happens only in fresh local clones.
+- Outbox patches remain after apply so Magit/manual review workflows can use
+  them independently.
+- Each session keeps local state in =ai-work.state.json=. There is no central
+  session index.
+
+* Suggested Installation
+
+For project-local testing:
+
+#+begin_src bash
+export PATH="/work/ocont/bin:$PATH"
+#+end_src
+
+For host-wide use later, copy or tangle the =bin/*= scripts into a host-side
+directory on =PATH=, such as =~/.local/bin=.
+
+* Verification Performed
+
+The current scripts were checked with:
+
+#+begin_src bash
+bash -n bin/ai-work
+shellcheck bin/ai-work bin/ai-* bin/aiq
+#+end_src
+
+Smoke tests covered:
+
+- Snapshot session from a normal Git repo.
+- Multiple explicit path selection.
+- Multiple selector scopes for =--dirty=.
+- Patch generation with =ai-done=.
+- Patch application with =ai-apply=.
+- Context-only files staying out of diffs.
+- Incremental =ai-add= baselining only the newly added paths.
+- Plain-session =ai-copy-back=.
+- Bare dotfiles snapshot using a temporary bare repo and work tree.
+- Top-level home directory refusal and explicit override.
+- Large copy refusal and explicit override.
+- =ai-ask= manifest defaulting to Codex read-only.
+- Source-drift refusal before applying.
+- Missing =git-filter-repo= failure path for =--history=.
+
+* Current Limitations
+
+- =aiq= writes prompts to =PROMPT.md= instead of injecting prompts into every
+  agent's native interface.
+- =ai-clean= removes session directories only; it does not delete outbox
+  patches.
+- History mode requires =git-filter-repo= to be installed on the host.
+- Pi print mode works with explicit provider credentials, but Pi's interactive
+  TUI currently segfaults in this container path.
+- The scripts are installed under =~/.local/bin/ai= from =aiagent.org=; source
+  a fresh user environment or add that directory to =PATH= before first use.

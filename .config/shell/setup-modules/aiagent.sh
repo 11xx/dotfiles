@@ -52,6 +52,7 @@ _aiagent_provider_env_args() {
     do
         eval "value=\${$name-}"
         if [[ -n "$value" ]]; then
+            printf '%s\n' "-e"
             printf '%s\n' "${name}=${value}"
         fi
     done
