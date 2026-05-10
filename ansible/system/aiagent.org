@@ -1122,6 +1122,8 @@ AI_T3_URL="${AI_T3_URL:-http://127.0.0.1:3773/}"
 AI_T3_BASE_DIR="${AI_T3_BASE_DIR:-/home/node/.t3/userdata}"
 AI_DOT_GIT_DIR="${AI_DOT_GIT_DIR:-$HOME/.local/dotfiles.git}"
 AI_DOT_WORK_TREE="${AI_DOT_WORK_TREE:-$HOME}"
+AI_EDIT_DOT_CONFIG="${AI_EDIT_DOT_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/ai-edit-dot.conf}"
+AI_SHARED_WORK_ROOT="${AI_SHARED_WORK_ROOT:-}"
 AI_WORK_MAX_COPY_FILES="${AI_WORK_MAX_COPY_FILES:-2000}"
 AI_WORK_MAX_COPY_BYTES="${AI_WORK_MAX_COPY_BYTES:-52428800}"
 AI_SHARED_GROUP="${AI_SHARED_GROUP:-aiwork}"
@@ -1140,10 +1142,12 @@ need() {
 usage() {
     cat <<'EOF'
 Usage:
-  ai-edit [--agent t3|codex|opencode] [--history|--clone] [--dot] [--name NAME] [PATH...]
-  ai-dot-edit [--history|--clone] [--agent t3|codex|opencode] [PATH...]
+  ai-edit [--agent t3|codex|opencode] [--history|--clone] [--name NAME] [PATH...]
+  ai-edit-dot [--agent t3|codex|opencode] [--name NAME] PATH...
+  ai-edit-bare [--agent t3|codex|opencode] [--name NAME] [PATH...]
   aiq [--agent t3|codex|opencode] [--history|--clone] [PATH...] -- "prompt"
   ai-ask [--agent codex|t3|opencode] [--history|--clone] [PATH...] -- "question"
+  ai-copy SOURCE... WORK-DIR
   ai-add [SESSION] [--context] PATH...
   ai-done [SESSION]
   ai-diff [SESSION]
@@ -1273,7 +1277,7 @@ pick_session() {
         die "no $filter sessions found"
     fi
 
-    if command -v fzf >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    if command -v fzf >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
         choice="$(while IFS= read -r line; do session_line "$line"; done <"$sessions_file" |
       fzf --prompt='ai session> ' --with-nth=1,2,3,4 | cut -f1)"
         rm -f "$sessions_file"
@@ -1282,7 +1286,7 @@ pick_session() {
         return
     fi
 
-    if [[ ! -t 0 || ! -t 1 ]]; then
+    if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
         rm -f "$sessions_file"
         die "missing session id and no interactive picker is available; run ai-list --$filter"
     fi
@@ -1290,13 +1294,13 @@ pick_session() {
     local i=1 ids=()
     while IFS= read -r line; do
         ids+=("$(basename "$line")")
-        printf '%3d  ' "$i" >&2
-        session_line "$line" | tr '\t' ' ' >&2
+        printf '%3d  ' "$i" >/dev/tty
+        session_line "$line" | tr '\t' ' ' >/dev/tty
         i=$((i + 1))
     done <"$sessions_file"
     rm -f "$sessions_file"
-    printf 'Select session: ' >&2
-    read -r choice
+    printf 'Select session: ' >/dev/tty
+    read -r choice </dev/tty
     [[ "$choice" =~ ^[0-9]+$ ]] || die "invalid selection: $choice"
     [[ "$choice" -ge 1 && "$choice" -le "${#ids[@]}" ]] || die "selection out of range: $choice"
     printf '%s\n' "${ids[$((choice - 1))]}"
@@ -1337,6 +1341,22 @@ load_manifest_value() {
     local manifest="$1"
     local expr="$2"
     jq -r "$expr" "$manifest"
+}
+
+expand_config_path() {
+    local value="$1"
+    eval "printf '%s\n' \"$value\""
+}
+
+load_dot_git_dir() {
+    local configured
+    if [[ -f "$AI_EDIT_DOT_CONFIG" ]]; then
+        configured="$(sed -n '/[^[:space:]]/ { s/^[[:space:]]*//; s/[[:space:]]*$//; p; q; }' "$AI_EDIT_DOT_CONFIG")"
+        [[ -n "$configured" ]] || die "empty ai-edit-dot config: $AI_EDIT_DOT_CONFIG"
+        expand_config_path "$configured"
+    else
+        printf '%s\n' "$AI_DOT_GIT_DIR"
+    fi
 }
 
 container_exec() {
@@ -1460,11 +1480,47 @@ normalize_session_permissions() {
     fi
 }
 
+shared_work_root() {
+    if [[ -n "$AI_SHARED_WORK_ROOT" ]]; then
+        printf '%s\n' "$AI_SHARED_WORK_ROOT"
+    elif [[ -d /home/work ]]; then
+        printf '%s\n' /home/work
+    elif [[ -d /work ]]; then
+        printf '%s\n' /work
+    else
+        die "shared work root not found; set AI_SHARED_WORK_ROOT"
+    fi
+}
+
+resolve_under_shared_work() {
+    local dest="$1" root="$2" parent resolved
+    root="$(realpath -m "$root")"
+    if [[ "$dest" = /* ]]; then
+        if [[ -e "$dest" ]]; then
+            resolved="$(realpath -m "$dest")"
+        else
+            parent="$(dirname "$dest")"
+            [[ -d "$parent" ]] || die "destination parent does not exist: $parent"
+            resolved="$(realpath -m "$parent")/$(basename "$dest")"
+        fi
+    else
+        [[ "$dest" != *..* ]] || die "relative destination must not contain '..': $dest"
+        resolved="$(realpath -m "$root/$dest")"
+    fi
+
+    case "$resolved" in
+        "$root"|"$root"/*) printf '%s\n' "$resolved" ;;
+        ,*) die "destination must resolve under $root: $dest" ;;
+    esac
+}
+
 default_source() {
-    local use_dot="$1"
-    if [[ "$use_dot" == "1" ]]; then
-        [[ -d "$AI_DOT_GIT_DIR" ]] || die "dotfiles git dir not found: $AI_DOT_GIT_DIR"
-        printf 'bare-git\n%s\n%s\n%s\n' "$AI_DOT_WORK_TREE" "$AI_DOT_GIT_DIR" dotfiles
+    local source_mode="$1"
+    if [[ "$source_mode" == "dot" || "$source_mode" == "bare" ]]; then
+        local dot_git_dir
+        dot_git_dir="$(load_dot_git_dir)"
+        [[ -d "$dot_git_dir" ]] || die "dotfiles git dir not found: $dot_git_dir"
+        printf 'bare-git\n%s\n%s\n%s\n' "$AI_DOT_WORK_TREE" "$dot_git_dir" dotfiles
         return
     fi
 
@@ -1812,12 +1868,11 @@ history_clone() {
         need git-filter-repo
     fi
 
-    local tmp
-    tmp="$(mktemp -d "$AI_WORK_ROOT/tmp/history.XXXXXX")"
+    mkdir -p "$(dirname "$worktree")"
     if [[ "$source_kind" == "bare-git" ]]; then
-        git clone "$git_dir" "$tmp/clone" >/dev/null
+        git clone --no-local "$git_dir" "$worktree" >/dev/null || die "git clone failed: $git_dir"
     else
-        git clone "$source_root" "$tmp/clone" >/dev/null
+        git clone --no-local "$source_root" "$worktree" >/dev/null || die "git clone failed: $source_root"
     fi
 
     if [[ "$mode" == "history" ]] && ! grep -qxF . "$paths_file"; then
@@ -1826,12 +1881,8 @@ history_clone() {
             [[ -n "$rel" ]] || continue
             args+=(--path "$rel")
         done <"$paths_file"
-        (cd "$tmp/clone" && git filter-repo "${args[@]}" >/dev/null)
+        (cd "$worktree" && git filter-repo "${args[@]}" >/dev/null) || die "git filter-repo failed"
     fi
-
-    mkdir -p "$(dirname "$worktree")"
-    mv "$tmp/clone" "$worktree"
-    rmdir "$tmp"
     if [[ "$mode" == "history" ]]; then
         copy_selected_paths "$source_root" "$worktree" "$paths_file"
     fi
@@ -1859,7 +1910,7 @@ prepare_clone_paths() {
 }
 
 make_session() {
-    local agent="t3" mode="snapshot" use_dot=0 name="" selector="" read_only=0 prompt="" no_launch=0 force_top=0 force_large=0 max_files="$AI_WORK_MAX_COPY_FILES" max_bytes="$AI_WORK_MAX_COPY_BYTES"
+    local agent="t3" mode="snapshot" source_mode="normal" name="" selector="" read_only=0 prompt="" no_launch=0 force_top=0 force_large=0 max_files="$AI_WORK_MAX_COPY_FILES" max_bytes="$AI_WORK_MAX_COPY_BYTES"
     local paths=()
 
     while [[ $# -gt 0 ]]; do
@@ -1867,7 +1918,8 @@ make_session() {
             --agent) agent="${2:?missing --agent value}"; shift 2 ;;
             --history) mode="history"; shift ;;
             --clone) mode="clone"; shift ;;
-            --dot) use_dot=1; shift ;;
+            --source-mode-dot) source_mode="dot"; mode="history"; shift ;;
+            --source-mode-bare) source_mode="bare"; mode="clone"; shift ;;
             --name) name="${2:?missing --name value}"; shift 2 ;;
             --tracked|--staged|--dirty) selector="${1#--}"; shift ;;
             --readonly) read_only=1; shift ;;
@@ -1892,7 +1944,7 @@ make_session() {
     need sha256sum
     mkdir -p "$AI_WORK_ROOT/sessions" "$AI_WORK_ROOT/outbox" "$AI_WORK_ROOT/tmp"
 
-    mapfile -t source_info < <(default_source "$use_dot")
+    mapfile -t source_info < <(default_source "$source_mode")
     local source_kind="${source_info[0]}" source_root="${source_info[1]}" git_dir="${source_info[2]}" repo_slug
     repo_slug="$(slugify "${source_info[3]}")"
     [[ -n "$repo_slug" ]] || repo_slug="plain"
@@ -1900,6 +1952,9 @@ make_session() {
     if [[ "$mode" == "clone" ]]; then
         [[ -n "$git_dir" ]] || die "--clone requires a git or bare-git source"
         [[ -z "$selector" ]] || die "--clone cannot be combined with --tracked, --staged, or --dirty"
+    fi
+    if [[ "$mode" == "history" ]]; then
+        need git-filter-repo
     fi
 
     local paths_file
@@ -1933,7 +1988,10 @@ make_session() {
     mkdir -p "$dir"
 
     if [[ "$mode" == "history" || "$mode" == "clone" ]]; then
-        history_clone "$mode" "$source_kind" "$source_root" "$git_dir" "$paths_file" "$worktree"
+        if ! history_clone "$mode" "$source_kind" "$source_root" "$git_dir" "$paths_file" "$worktree"; then
+            rm -rf "$dir"
+            exit 1
+        fi
         write_agents_md "$worktree" "$id" "$source_root" "$paths_file" "$prompt"
         [[ -n "$prompt" ]] && printf '%s\n' "$prompt" >"$worktree/PROMPT.md"
         commit_session_baseline "$worktree" 'ai-work current source baseline'
@@ -1956,6 +2014,60 @@ make_session() {
     normalize_session_permissions "$dir"
 
     printf '%s\n' "$id"
+}
+
+cmd_edit_dot() {
+    local original=("$@") has_path=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --clone|--dot) die "ai-edit-dot always uses filtered history for explicit paths" ;;
+            --agent|--name|--max-copy-files|--max-copy-bytes|--prompt)
+                [[ $# -ge 2 ]] || die "missing $1 value"
+                shift 2
+                ;;
+            --history|--tracked|--staged|--dirty|--readonly|--no-launch|--force-copy-top-level-dir|--force-large-copy)
+                shift
+                ;;
+            --)
+                shift
+                [[ $# -gt 0 ]] && has_path=1
+                break
+                ;;
+            -*)
+                die "unknown ai-edit-dot option: $1"
+                ;;
+            ,*)
+                has_path=1
+                shift
+                ;;
+        esac
+    done
+    [[ "$has_path" == "1" ]] || die "ai-edit-dot requires at least one path"
+    cmd_edit --history --source-mode-dot "${original[@]}"
+}
+
+cmd_edit_bare() {
+    cmd_edit --clone --source-mode-bare "$@"
+}
+
+cmd_copy() {
+    [[ $# -ge 2 ]] || die "Usage: ai-copy SOURCE... WORK-DIR"
+    local dest_arg="${!#}"
+    local sources=("${@:1:$(($# - 1))}")
+
+    local root dest source dest_dir
+    root="$(shared_work_root)"
+    dest="$(resolve_under_shared_work "$dest_arg" "$root")"
+    mkdir -p "$dest"
+    [[ -d "$dest" ]] || die "destination is not a directory: $dest"
+
+    for source in "${sources[@]}"; do
+        [[ -e "$source" ]] || die "source does not exist: $source"
+        cp -a "$source" "$dest/"
+    done
+    dest_dir="$dest"
+    normalize_session_permissions "$dest_dir"
+    printf 'Copied to: %s\n' "$dest_dir"
 }
 
 launch_agent() {
@@ -1997,7 +2109,9 @@ launch_agent() {
 
 cmd_edit() {
     local id
-    id="$(make_session "$@")"
+    if ! id="$(make_session "$@")"; then
+        exit 1
+    fi
     printf 'Session: %s\n' "$id"
     printf 'Workspace: %s\n' "$(session_dir "$id")/worktree"
     [[ -f "$(session_dir "$id")/no-launch" ]] && return 0
@@ -2310,15 +2424,17 @@ main() {
     cmd="$(basename "$0")"
     case "$cmd" in
         ai-work) cmd="${1:-}"; [[ $# -gt 0 ]] && shift || true ;;
-        ai-edit|ai-dot-edit|aiq|ai-ask|ai-add|ai-done|ai-diff|ai-apply|ai-copy-back|ai-abort|ai-open|ai-shell|ai-list|ai-pick|ai-clean|ai-status) ;;
+        ai-edit|ai-edit-dot|ai-edit-bare|aiq|ai-ask|ai-copy|ai-add|ai-done|ai-diff|ai-apply|ai-copy-back|ai-abort|ai-open|ai-shell|ai-list|ai-pick|ai-clean|ai-status) ;;
         ,*) cmd="${1:-}"; [[ $# -gt 0 ]] && shift || true ;;
     esac
 
     case "$cmd" in
         ai-edit|edit) cmd_edit "$@" ;;
-        ai-dot-edit|dot-edit) cmd_edit --dot "$@" ;;
+        ai-edit-dot|edit-dot) cmd_edit_dot "$@" ;;
+        ai-edit-bare|edit-bare) cmd_edit_bare "$@" ;;
         aiq|q) cmd_edit "$@" ;;
         ai-ask|ask) cmd_edit --readonly --agent codex "$@" ;;
+        ai-copy|copy) cmd_copy "$@" ;;
         ai-add|add) cmd_add "$@" ;;
         ai-done|done) cmd_done "$@" ;;
         ai-diff|diff) cmd_diff "$@" ;;
@@ -2411,13 +2527,13 @@ exec "$(dirname "$0")/ai-work" ai-diff "$@"
 exec "$(dirname "$0")/ai-work" ai-done "$@"
 #+end_src
 
-*** ai-dot-edit
+*** ai-copy
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "ai-dot-edit")
+:header-args:shell+: :tangle (tdir "ai-copy")
 :END:
 
 #+begin_src shell
-exec "$(dirname "$0")/ai-work" ai-dot-edit "$@"
+exec "$(dirname "$0")/ai-work" ai-copy "$@"
 #+end_src
 
 *** ai-edit
@@ -2427,6 +2543,24 @@ exec "$(dirname "$0")/ai-work" ai-dot-edit "$@"
 
 #+begin_src shell
 exec "$(dirname "$0")/ai-work" ai-edit "$@"
+#+end_src
+
+*** ai-edit-bare
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "ai-edit-bare")
+:END:
+
+#+begin_src shell
+exec "$(dirname "$0")/ai-work" ai-edit-bare "$@"
+#+end_src
+
+*** ai-edit-dot
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "ai-edit-dot")
+:END:
+
+#+begin_src shell
+exec "$(dirname "$0")/ai-work" ai-edit-dot "$@"
 #+end_src
 
 *** ai-list

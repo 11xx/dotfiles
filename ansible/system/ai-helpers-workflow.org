@@ -24,9 +24,11 @@ Scripts live under:
 #+begin_src text
 bin/ai-work
 bin/ai-edit
-bin/ai-dot-edit
+bin/ai-edit-dot
+bin/ai-edit-bare
 bin/aiq
 bin/ai-ask
+bin/ai-copy
 bin/ai-add
 bin/ai-done
 bin/ai-diff
@@ -96,7 +98,7 @@ export AI_CONTAINER_WORK_ROOT=/work/ai
 Create a focused session and launch an agent.
 
 #+begin_src bash
-bin/ai-edit [--agent t3|codex|opencode] [--history|--clone] [--dot] [--name NAME] [PATH...]
+bin/ai-edit [--agent t3|codex|opencode] [--history|--clone] [--name NAME] [PATH...]
 #+end_src
 
 Examples:
@@ -104,7 +106,7 @@ Examples:
 #+begin_src bash
 bin/ai-edit aiagent.org
 bin/ai-edit --agent codex aiagent.org
-bin/ai-edit aiagent.org ai-workflow.org
+bin/ai-edit aiagent.org ai-helpers-workflow.org
 bin/ai-edit --clone
 bin/ai-edit --name shell-helpers .config/shell/README.org
 #+end_src
@@ -154,14 +156,13 @@ Use =--no-launch= for staging or testing a session without starting an agent:
 bin/ai-edit --no-launch aiagent.org
 #+end_src
 
-** =ai-dot-edit=
+** =ai-edit-dot=
 
-Create a session from a bare dotfiles repo.
+Create a filtered-history session from a bare dotfiles repo.
 
 #+begin_src bash
-bin/ai-dot-edit .config/shell/README.org
-bin/ai-dot-edit --dirty .config/shell .config/emacs
-bin/ai-dot-edit --staged
+bin/ai-edit-dot .config/shell/README.org
+bin/ai-edit-dot ansible/system/aiagent.org
 #+end_src
 
 Defaults:
@@ -176,6 +177,47 @@ This matches the common alias:
 #+begin_src bash
 alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
 #+end_src
+
+=ai-edit-dot= always requires at least one explicit path and always uses
+filtered history. It does not copy the whole dotfiles worktree.
+
+Override the bare repo path with a plain path in:
+
+#+begin_src bash
+${XDG_CONFIG_HOME:-$HOME/.config}/ai-edit-dot.conf
+#+end_src
+
+The file contains only the path, no key:
+
+#+begin_src text
+$HOME/.local/dotfiles.git
+#+end_src
+
+Basic shell variable expansion is supported for this config value.
+
+** =ai-edit-bare=
+
+Create a full clone session from the configured bare dotfiles repo.
+
+#+begin_src bash
+bin/ai-edit-bare
+bin/ai-edit-bare --name dotfiles-full
+#+end_src
+
+Use this when you deliberately want the whole bare repo history in the session.
+
+** =ai-copy=
+
+Copy files into the shared work tree and normalize shared permissions.
+
+#+begin_src bash
+bin/ai-copy source/file1 proj1
+bin/ai-copy source/file1 source/file2 /home/work/proj1
+#+end_src
+
+Relative destinations resolve under the shared work root, normally
+=/home/work=. Absolute destinations are allowed only when they resolve under
+that same shared root. Symlinks are followed for the safety check.
 
 ** =aiq=
 
@@ -377,7 +419,7 @@ Selectors accept multiple scopes:
 
 #+begin_src bash
 bin/ai-edit --dirty src tests
-bin/ai-dot-edit --staged .config/shell .config/emacs
+bin/ai-edit --dirty src tests
 #+end_src
 
 * History Mode
@@ -386,14 +428,16 @@ History mode is explicit:
 
 #+begin_src bash
 bin/ai-edit --history path/to/file
-bin/ai-dot-edit --history .config/shell/README.org
+bin/ai-edit-dot .config/shell/README.org
 #+end_src
 
 It requires =git-filter-repo= on the host.
 
-The helper clones the source repo into =/home/work/ai/tmp=, runs
-=git-filter-repo= only inside that fresh local clone, and then moves the
-filtered clone into the session worktree.
+The helper clones the source repo directly into the final session worktree with
+=git clone --no-local=, then runs =git-filter-repo= in that fresh clone.
+After filtering succeeds, it overlays only the selected paths from the current
+source worktree so uncommitted local edits are represented without bringing
+back unrelated files.
 
 It never runs =git-filter-repo= against the source repo or bare dotfiles repo.
 
@@ -402,7 +446,7 @@ Full-clone mode is explicit too:
 #+begin_src bash
 bin/ai-edit --clone
 bin/ai-edit --clone .
-bin/ai-dot-edit --clone
+bin/ai-edit-bare
 #+end_src
 
 =--clone= performs a normal full-repo clone into the session worktree and keeps
@@ -501,13 +545,13 @@ fixes.
 
 * Safety Model
 
-- Source trees are not modified by =ai-edit=, =ai-dot-edit=, =aiq=, or
+- Source trees are not modified by =ai-edit=, =ai-edit-dot=, =aiq=, or
   =ai-done=.
 - Returning changes defaults to patch review.
 - =ai-apply= checks for source drift before applying.
 - =ai-copy-back= is explicit and plain-session-only.
 - Dotfiles patches apply with the bare repo command, not by guessing from cwd.
-- History filtering happens only in fresh local clones.
+- History filtering happens only in fresh =--no-local= clones.
 - Outbox patches remain after apply so Magit/manual review workflows can use
   them independently.
 - Each session keeps local state in =ai-work.state.json=. There is no central
@@ -549,6 +593,8 @@ Smoke tests covered:
 - =ai-ask= manifest defaulting to Codex read-only.
 - Source-drift refusal before applying.
 - Missing =git-filter-repo= failure path for =--history=.
+- Bare dotfiles history filtering for explicit paths.
+- =ai-copy= shared-root safety checks and permission normalization.
 
 * Current Limitations
 
