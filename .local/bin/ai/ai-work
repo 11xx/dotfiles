@@ -724,7 +724,9 @@ history_clone() {
     mkdir -p "$(dirname "$worktree")"
     mv "$tmp/clone" "$worktree"
     rmdir "$tmp"
-    copy_selected_paths "$source_root" "$worktree" "$paths_file"
+    if [[ "$mode" == "history" ]]; then
+        copy_selected_paths "$source_root" "$worktree" "$paths_file"
+    fi
 }
 
 prepare_clone_paths() {
@@ -800,14 +802,16 @@ make_session() {
         collect_paths "$source_kind" "$source_root" "$git_dir" "$selector" "${paths[@]}" | sed '/^$/d' | sort -u >"$paths_file"
     fi
     [[ -s "$paths_file" ]] || die "no paths selected"
-    validate_selected_paths "$source_root" "$paths_file" "$force_top"
 
-    local estimate_file selected_files selected_bytes
-    estimate_file="$(mktemp "$AI_WORK_ROOT/tmp/estimate.XXXXXX")"
-    estimate_selected_paths "$source_root" "$paths_file" "$estimate_file"
-    enforce_copy_limits "$estimate_file" "$force_large" "$max_files" "$max_bytes"
-    IFS=$'\t' read -r selected_files selected_bytes <"$estimate_file"
-    rm -f "$estimate_file"
+    local estimate_file selected_files=0 selected_bytes=0
+    if [[ "$mode" != "clone" ]]; then
+        validate_selected_paths "$source_root" "$paths_file" "$force_top"
+        estimate_file="$(mktemp "$AI_WORK_ROOT/tmp/estimate.XXXXXX")"
+        estimate_selected_paths "$source_root" "$paths_file" "$estimate_file"
+        enforce_copy_limits "$estimate_file" "$force_large" "$max_files" "$max_bytes"
+        IFS=$'\t' read -r selected_files selected_bytes <"$estimate_file"
+        rm -f "$estimate_file"
+    fi
 
     local stamp id dir worktree baseline container_worktree suffix first_path
     stamp="$(date -u +%Y%m%d-%H%M%S)"
