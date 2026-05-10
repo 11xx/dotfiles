@@ -10,7 +10,7 @@ if [[ -z "${AI_WORK_ROOT:-}" ]]; then
 fi
 AI_CONTAINER="${AI_CONTAINER:-aiagent}"
 AI_CONTAINER_WORK_ROOT="${AI_CONTAINER_WORK_ROOT:-/work/ai}"
-AI_T3_URL="${AI_T3_URL:-http://127.0.0.1:3773/}"
+AI_T3_URL="${AI_T3_URL:-http://localhost:3773/}"
 AI_T3_BASE_DIR="${AI_T3_BASE_DIR:-/home/node/.t3/userdata}"
 AI_DOT_GIT_DIR="${AI_DOT_GIT_DIR:-$HOME/.local/dotfiles.git}"
 AI_DOT_WORK_TREE="${AI_DOT_WORK_TREE:-$HOME}"
@@ -330,6 +330,29 @@ t3_project_add() {
         return
     fi
     run_in_harness t3 project add --base-dir "$AI_T3_BASE_DIR" --title "$id" "$workspace" >/dev/null
+}
+
+t3_project_id_for_workspace() {
+    local workspace="$1" escaped
+    escaped="${workspace//\'/\'\'}"
+    sqlite3 "$AI_T3_BASE_DIR/state.sqlite" \
+            "select project_id from projection_projects where workspace_root = '$escaped' and deleted_at is null order by created_at desc limit 1;" 2>/dev/null
+}
+
+t3_latest_thread_id_for_project() {
+    local project_id="$1" escaped
+    escaped="${project_id//\'/\'\'}"
+    sqlite3 "$AI_T3_BASE_DIR/state.sqlite" \
+            "select thread_id from projection_threads where project_id = '$escaped' and deleted_at is null order by created_at desc limit 1;" 2>/dev/null
+}
+
+t3_browser_url() {
+    local project_id="$1" thread_id="${2:-}"
+    if [[ -n "$thread_id" ]]; then
+        printf '%s%s/%s\n' "${AI_T3_URL%/}/" "$project_id" "$thread_id"
+    else
+        printf '%s%s\n' "${AI_T3_URL%/}/" "$project_id"
+    fi
 }
 
 write_session_state() {
@@ -964,7 +987,7 @@ cmd_copy() {
 
 launch_agent() {
     local id="$1"
-    local dir manifest agent container_worktree read_only prompt
+    local dir manifest agent container_worktree read_only prompt project_id thread_id browser_url
     dir="$(find_session "$id")"
     manifest="$dir/manifest.json"
     agent="$(load_manifest_value "$manifest" '.agent')"
@@ -976,10 +999,24 @@ launch_agent() {
         t3)
             ensure_t3_ready
             t3_project_add "$id" "$container_worktree"
+            project_id="$(t3_project_id_for_workspace "$container_worktree")"
+            thread_id="$(t3_latest_thread_id_for_project "$project_id")"
+            browser_url="$(t3_browser_url "$project_id" "$thread_id")"
             write_session_state "$dir" t3_project_workspace "$container_worktree"
-            command -v xdg-open >/dev/null 2>&1 && xdg-open "$AI_T3_URL" >/dev/null 2>&1 || true
+            write_session_state "$dir" t3_project_id "$project_id"
+            write_session_state "$dir" t3_thread_id "$thread_id"
+            write_session_state "$dir" t3_browser_url "$browser_url"
+            if [[ -n "$thread_id" ]]; then
+                command -v xdg-open >/dev/null 2>&1 && xdg-open "$browser_url" >/dev/null 2>&1 || true
+            fi
             printf 'T3 project registered: %s\n' "$container_worktree"
-            printf 'T3 URL: %s\n' "$AI_T3_URL"
+            printf 'T3 project: %s\n' "$project_id"
+            if [[ -n "$thread_id" ]]; then
+                printf 'T3 thread: %s\n' "$thread_id"
+                printf 'T3 URL: %s\n' "$browser_url"
+            else
+                printf 'T3 project URL: %s\n' "$browser_url"
+            fi
             printf 'When done: ai-done %s\n' "$id"
             ;;
         codex)
@@ -1212,15 +1249,29 @@ cmd_copy_back() {
 cmd_open() {
     local id
     id="$(resolve_session_arg "${1:-}")"
-    local dir container_worktree
+    local dir container_worktree project_id thread_id browser_url
     dir="$(find_session "$id")"
     container_worktree="$(load_manifest_value "$dir/manifest.json" '.container_worktree')"
     ensure_t3_ready
     t3_project_add "$id" "$container_worktree"
+    project_id="$(t3_project_id_for_workspace "$container_worktree")"
+    thread_id="$(t3_latest_thread_id_for_project "$project_id")"
+    browser_url="$(t3_browser_url "$project_id" "$thread_id")"
     write_session_state "$dir" t3_project_workspace "$container_worktree"
-    command -v xdg-open >/dev/null 2>&1 && xdg-open "$AI_T3_URL" >/dev/null 2>&1 || true
+    write_session_state "$dir" t3_project_id "$project_id"
+    write_session_state "$dir" t3_thread_id "$thread_id"
+    write_session_state "$dir" t3_browser_url "$browser_url"
+    if [[ -n "$thread_id" ]]; then
+        command -v xdg-open >/dev/null 2>&1 && xdg-open "$browser_url" >/dev/null 2>&1 || true
+    fi
     printf 'T3 project registered: %s\n' "$container_worktree"
-    printf 'T3 URL: %s\n' "$AI_T3_URL"
+    printf 'T3 project: %s\n' "$project_id"
+    if [[ -n "$thread_id" ]]; then
+        printf 'T3 thread: %s\n' "$thread_id"
+        printf 'T3 URL: %s\n' "$browser_url"
+    else
+        printf 'T3 project URL: %s\n' "$browser_url"
+    fi
 }
 
 cmd_shell() {

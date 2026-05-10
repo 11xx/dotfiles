@@ -146,9 +146,10 @@ t3 project add --base-dir "$AI_T3_BASE_DIR" --title SESSION-ID SESSION-WORKTREE
 
 It does not spawn a second T3 server.
 
-Plain =http://127.0.0.1:3773/= may show the pairing screen if the browser does
-not have the T3 auth cookie. Use the already-authorized T3 URL/tab from your
-initial pairing flow if needed.
+Plain =http://localhost:3773/= is the safe browser target. The base server URL
+may still show a pairing screen if it is opened without the auth cookie, so the
+helper now only auto-opens a concrete project/thread URL when it has one. If it
+does not, open the project/thread manually.
 
 Use =--no-launch= for staging or testing a session without starting an agent:
 
@@ -467,7 +468,7 @@ The scripts assume:
 
 #+begin_src bash
 AI_CONTAINER=aiagent
-AI_T3_URL=http://127.0.0.1:3773/
+AI_T3_URL=http://localhost:3773/
 AI_T3_BASE_DIR=/home/node/.t3/userdata
 AI_CONTAINER_WORK_ROOT=/work/ai
 #+end_src
