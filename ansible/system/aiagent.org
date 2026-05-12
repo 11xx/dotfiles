@@ -51,11 +51,19 @@ ARG CODEX_VERSION="latest"
 ARG T3_CODE_VERSION="latest"
 ARG PI_CODE_VERSION="latest"
 
+ARG HADOLINT_VERSION="latest"
+ARG WATCHEXEC_VERSION="latest"
+ARG TYPOS_VERSION="latest"
+ARG ACTIONLINT_VERSION="latest"
+ARG DUCKDB_VERSION="latest"
+
 RUN dnf -y upgrade --refresh
 
+# Fedora-packaged tools.
 RUN dnf -y install --setopt=install_weak_deps=False \
-    # === Essentials for OpenCode ===
-    # Required for Node environment, native addon builds, VCS, and core agent tools
+    # === Essentials for OpenCode / Codex / T3 ===
+    # Required for Node runtimes, native addon builds, VCS, shells, process tools,
+    # archive handling, agent search, and upstream binary installs.
     ca-certificates \
     curl \
     findutils \
@@ -76,8 +84,14 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     wget \
     which \
     xz \
+    # === Agent-managed deferred toolchains ===
+    # Present for agents to use only when needed; no cargo installs happen at build time.
+    cargo \
+    openssl-devel \
+    pkgconf-pkg-config \
+    rust \
     # === Arbitrary Additional Tools ===
-    # Optional editors, linters, and CLI utilities (safe to modify or remove)
+    # Optional editors, linters, and CLI utilities (safe to modify or remove).
     podman \
     fd-find \
     bat \
@@ -97,21 +111,120 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     vim-enhanced \
     yq \
     ctags \
-    # haskell
-    # ghcup deps
-    gcc gcc-c++ gmp gmp-devel make ncurses ncurses-compat-libs xz perl zlib-devel \
+    # === Haskell ===
+    # ghcup deps; intentionally repeated with essentials so this block can be
+    # added or removed without changing the harness/runtime dependency block.
+    gcc \
+    gcc-c++ \
+    gmp \
+    gmp-devel \
+    make \
+    ncurses \
+    ncurses-compat-libs \
+    xz \
+    perl \
+    zlib-devel \
+    # === Fedora-packaged extras ===
+    shfmt \
+    just \
+    gh \
+    tokei \
+    hyperfine \
+    du-dust \
+    git-filter-repo \
+    gitleaks \
+    miller \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 
-# Global Node-based tools
+# Upstream binary tools not available in Fedora repos.
+RUN set -eux; \
+    tmp="$(mktemp -d)"; \
+    trap 'rm -rf "$tmp"' EXIT; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+        x86_64|amd64) \
+            watchexec_target="x86_64-unknown-linux-gnu"; \
+            typos_target="x86_64-unknown-linux-musl"; \
+            taplo_arch="x86_64"; \
+            actionlint_arch="amd64"; \
+            duckdb_dist="linux-amd64"; \
+            hadolint_arch="x86_64"; \
+            ;; \
+        aarch64|arm64) \
+            watchexec_target="aarch64-unknown-linux-gnu"; \
+            typos_target="aarch64-unknown-linux-musl"; \
+            taplo_arch="aarch64"; \
+            actionlint_arch="arm64"; \
+            duckdb_dist="linux-arm64"; \
+            hadolint_arch="arm64"; \
+            ;; \
+        ,*) \
+            echo "Unsupported architecture: $arch" >&2; \
+            exit 1; \
+            ;; \
+    esac; \
+    \
+    if [[ "$HADOLINT_VERSION" == "latest" ]]; then \
+        hadolint_url="https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${hadolint_arch}"; \
+    else \
+        hadolint_version="${HADOLINT_VERSION#v}"; \
+        hadolint_url="https://github.com/hadolint/hadolint/releases/download/v${hadolint_version}/hadolint-Linux-${hadolint_arch}"; \
+    fi; \
+    curl -fsSLo /usr/local/bin/hadolint "$hadolint_url"; \
+    chmod 0755 /usr/local/bin/hadolint; \
+    \
+    watchexec_version="${WATCHEXEC_VERSION#v}"; \
+    if [[ "$WATCHEXEC_VERSION" == "latest" ]]; then \
+        watchexec_version="$(curl -fsSL https://api.github.com/repos/watchexec/watchexec/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
+    fi; \
+    curl -fsSLo "$tmp/watchexec.tar.xz" \
+        "https://github.com/watchexec/watchexec/releases/download/v${watchexec_version}/watchexec-${watchexec_version}-${watchexec_target}.tar.xz"; \
+    tar -xJf "$tmp/watchexec.tar.xz" -C "$tmp"; \
+    install -m 0755 "$tmp/watchexec-${watchexec_version}-${watchexec_target}/watchexec" /usr/local/bin/watchexec; \
+    \
+    typos_version="${TYPOS_VERSION#v}"; \
+    if [[ "$TYPOS_VERSION" == "latest" ]]; then \
+        typos_version="$(curl -fsSL https://api.github.com/repos/crate-ci/typos/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
+    fi; \
+    mkdir -p "$tmp/typos"; \
+    curl -fsSLo "$tmp/typos.tar.gz" \
+        "https://github.com/crate-ci/typos/releases/download/v${typos_version}/typos-v${typos_version}-${typos_target}.tar.gz"; \
+    tar -xzf "$tmp/typos.tar.gz" -C "$tmp/typos"; \
+    install -m 0755 "$tmp/typos/typos" /usr/local/bin/typos; \
+    \
+    curl -fsSL "https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-${taplo_arch}.gz" \
+        | gzip -d > /usr/local/bin/taplo; \
+    chmod 0755 /usr/local/bin/taplo; \
+    \
+    actionlint_version="${ACTIONLINT_VERSION#v}"; \
+    if [[ "$ACTIONLINT_VERSION" == "latest" ]]; then \
+        actionlint_version="$(curl -fsSL https://api.github.com/repos/rhysd/actionlint/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
+    fi; \
+    mkdir -p "$tmp/actionlint"; \
+    curl -fsSLo "$tmp/actionlint.tar.gz" \
+        "https://github.com/rhysd/actionlint/releases/download/v${actionlint_version}/actionlint_${actionlint_version}_linux_${actionlint_arch}.tar.gz"; \
+    tar -xzf "$tmp/actionlint.tar.gz" -C "$tmp/actionlint"; \
+    install -m 0755 "$tmp/actionlint/actionlint" /usr/local/bin/actionlint; \
+    \
+    duckdb_version="${DUCKDB_VERSION#v}"; \
+    if [[ "$DUCKDB_VERSION" == "latest" ]]; then \
+        duckdb_version="$(curl -fsSL https://duckdb.org/data/latest_stable_version.txt)"; \
+    fi; \
+    curl -fsSL "https://install.duckdb.org/v${duckdb_version}/duckdb_cli-${duckdb_dist}.gz" \
+        | gzip -d > /usr/local/bin/duckdb; \
+    chmod 0755 /usr/local/bin/duckdb; \
+    \
+    hadolint --version; \
+    watchexec --version; \
+    typos --version; \
+    taplo --version; \
+    actionlint -version; \
+    test "$(duckdb -noheader -init /dev/null -csv -batch -s 'SELECT 2*3*7')" = "42"
+
+# Global Node-based tools.
 RUN npm install -g @ast-grep/cli \
  && npm cache clean --force
-
-# Hadolint (Haskell binary not in Fedora core)
-RUN curl -sSL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
-    -o /usr/local/bin/hadolint \
- && chmod +x /usr/local/bin/hadolint
-
 
 RUN groupadd -g 1000 node \
  && useradd -m -u 1000 -g 1000 -s /bin/bash node \
@@ -122,23 +235,18 @@ RUN groupadd -g 1000 node \
 USER node
 WORKDIR /work
 
+ENV HOME=/home/node
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
-ENV PATH=$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
-# Haskell
+ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-
-ENV HOME=/home/node
-
-# user-scope installs
-# Python LSP
-RUN uv tool install pyright \
- && uv cache clean
+ENV PATH=$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
 
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.bin \
+    /home/node/.cargo/bin \
     /home/node/.agents/skills \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
@@ -147,6 +255,10 @@ RUN mkdir -pv \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
     /work
+
+# User-scope installs.
+RUN uv tool install pyright \
+ && uv cache clean
 
 RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \
@@ -160,6 +272,7 @@ RUN find /home/node/.bin -type f -exec chmod +x {} +
 
 COPY --chown=node:node init.sh /home/node/init.sh
 RUN chmod +x /home/node/init.sh
+
 ENTRYPOINT ["/home/node/init.sh"]
 
 CMD ["sleep", "infinity"]
