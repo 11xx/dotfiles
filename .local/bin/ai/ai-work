@@ -695,7 +695,7 @@ init_session_repo() {
 commit_session_baseline() {
     local worktree="$1" message="$2"
     git -C "$worktree" add -A
-    git -C "$worktree" -c user.name=ai-work -c user.email=ai-work@example.invalid commit -q -m "$message" --allow-empty
+    git -C "$worktree" commit -q -m "$message" --allow-empty
 }
 
 commit_paths_baseline() {
@@ -704,7 +704,7 @@ commit_paths_baseline() {
         [[ -n "$rel" ]] || continue
         git -C "$worktree" add -- "$rel"
     done <"$paths_file"
-    git -C "$worktree" -c user.name=ai-work -c user.email=ai-work@example.invalid commit -q -m "$message" --allow-empty
+    git -C "$worktree" commit -q -m "$message" --allow-empty
 }
 
 write_manifest() {
