@@ -88,6 +88,11 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     git-filter-repo \
     gitleaks \
     miller \
+    # === Java / Kotlin / Android ===
+    # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
+    # the image supplies the JDK and CLI utilities needed to bootstrap the Android SDK.
+    java-latest-openjdk-devel \
+    zip \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 
@@ -195,12 +200,18 @@ ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
 ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-ENV PATH=$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+ENV JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
+ENV ANDROID_HOME=/home/node/Android/Sdk
+ENV ANDROID_SDK_ROOT=$ANDROID_HOME
+ENV GRADLE_USER_HOME=/home/node/.gradle
+ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
 
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.bin \
     /home/node/.cargo/bin \
+    /home/node/.gradle \
+    /home/node/Android/Sdk \
     /home/node/.agents/skills \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \

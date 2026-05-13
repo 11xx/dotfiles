@@ -137,7 +137,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     # === Java / Kotlin / Android ===
     # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
     # the image supplies the JDK and CLI utilities needed to bootstrap the Android SDK.
-    java-21-openjdk-devel \
+    java-latest-openjdk-devel \
     zip \
  && dnf clean all \
  && rm -rf /var/cache/dnf
@@ -246,7 +246,7 @@ ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
 ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
 ENV ANDROID_HOME=/home/node/Android/Sdk
 ENV ANDROID_SDK_ROOT=$ANDROID_HOME
 ENV GRADLE_USER_HOME=/home/node/.gradle
@@ -361,7 +361,7 @@ exec pi --tools read,grep,find,ls "$@"
 :header-args:systemd: :noweb tangle
 :END:
 
-** aiagent.build: containerfile image build
+** aiagent.build: Containerfile image build
 :PROPERTIES:
 :header-args:systemd+: :tangle (tdir "aiagent.build")
 :END:
@@ -446,7 +446,7 @@ Description=GHCup cache volume
 **** 60-android.conf
 #+begin_src systemd :tangle (tdir "aiagent.container.d/android.conf")
 [Container]
-Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+Environment=JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
 Environment=ANDROID_HOME=/home/node/Android/Sdk
 Environment=ANDROID_SDK_ROOT=/home/node/Android/Sdk
 Environment=GRADLE_USER_HOME=/home/node/.gradle
@@ -535,7 +535,7 @@ fi
 #+begin_src shell :tangle (tdir "init.d/android-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk}"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-latest-openjdk}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
@@ -570,11 +570,8 @@ yes | sdkmanager --licenses >/dev/null || true
 
 sdk_packages=(
     "platform-tools"
+    "platforms;android-36.1"
     "build-tools;36.1.0"
-    "build-tools;37.0.0"
-    "platforms;android-36"
-    "platforms;android-37"
-    "sources;android-36"
 )
 
 echo "[init] Ensuring Android SDK packages are installed..."
@@ -585,7 +582,7 @@ echo "[init] Android SDK packages ready."
 - Source Android env ::
   Deploy to Fedora's =~/.bashrc.d/*=
 #+begin_src shell :tangle (tdir "bashrc.d/android-env.sh")
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk}"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-latest-openjdk}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
