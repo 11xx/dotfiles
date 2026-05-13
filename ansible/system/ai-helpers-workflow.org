@@ -98,7 +98,7 @@ export AI_CONTAINER_WORK_ROOT=/work/ai
 Create a focused session and launch an agent.
 
 #+begin_src bash
-bin/ai-edit [--agent t3|codex|opencode] [--history|--clone] [--name NAME] [PATH...]
+bin/ai-edit [--agent t3|codex|opencode] [--history|--clone] [--copy-to WORK-DIR] [--name NAME] [PATH...]
 #+end_src
 
 Examples:
@@ -108,6 +108,7 @@ bin/ai-edit aiagent.org
 bin/ai-edit --agent codex aiagent.org
 bin/ai-edit aiagent.org ai-helpers-workflow.org
 bin/ai-edit --clone
+bin/ai-edit --history --copy-to context-clones src/lib
 bin/ai-edit --name shell-helpers .config/shell/README.org
 #+end_src
 
@@ -157,6 +158,21 @@ Use =--no-launch= for staging or testing a session without starting an agent:
 bin/ai-edit --no-launch aiagent.org
 #+end_src
 
+Use =--copy-to= with =--history= or =--clone= to create a filtered/full clone
+under the shared work tree without making a session, manifest, outbox entry, or
+agent launch. This is for preparing extra context that can be added to an
+existing agent thread manually:
+
+#+begin_src bash
+bin/ai-edit --history --copy-to context-clones src lib
+bin/ai-edit --clone --copy-to context-clones --name whole-project
+#+end_src
+
+Relative destinations resolve under =/home/work= on the host and =/work= inside
+the container, using the same destination rules as =ai-copy=. The generated
+clone is copied as a child directory named from =--name= when provided, otherwise
+from the repo and first selected path.
+
 ** =ai-edit-dot=
 
 Create a filtered-history session from a bare dotfiles repo.
@@ -196,6 +212,13 @@ $HOME/.local/dotfiles.git
 
 Basic shell variable expansion is supported for this config value.
 
+=ai-edit-dot= also accepts =--copy-to=, still using its implicit filtered-history
+mode and still requiring at least one explicit path:
+
+#+begin_src bash
+bin/ai-edit-dot --copy-to dotfiles-context ansible/system/aiagent.org
+#+end_src
+
 ** =ai-edit-bare=
 
 Create a full clone session from the configured bare dotfiles repo.
@@ -206,6 +229,16 @@ bin/ai-edit-bare --name dotfiles-full
 #+end_src
 
 Use this when you deliberately want the whole bare repo history in the session.
+
+Use =--copy-to= when you want a full bare-dotfiles clone copied into shared work
+without session bookkeeping:
+
+#+begin_src bash
+bin/ai-edit-bare --copy-to dotfiles-context --name dotfiles-full
+#+end_src
+
+You can pass =--history= to =ai-edit-bare= when you want a filtered bare-dotfiles
+clone copied or sessioned from explicit paths instead of the full repo.
 
 ** =ai-copy=
 

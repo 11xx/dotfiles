@@ -1370,9 +1370,9 @@ need() {
 usage() {
     cat <<'EOF'
 Usage:
-  ai-edit [--agent t3|codex|opencode] [--history|--clone] [--name NAME] [PATH...]
-  ai-edit-dot [--agent t3|codex|opencode] [--name NAME] PATH...
-  ai-edit-bare [--agent t3|codex|opencode] [--name NAME] [PATH...]
+  ai-edit [--agent t3|codex|opencode] [--history|--clone] [--copy-to WORK-DIR] [--name NAME] [PATH...]
+  ai-edit-dot [--agent t3|codex|opencode] [--copy-to WORK-DIR] [--name NAME] PATH...
+  ai-edit-bare [--agent t3|codex|opencode] [--history] [--copy-to WORK-DIR] [--name NAME] [PATH...]
   aiq [--agent t3|codex|opencode] [--history|--clone] [PATH...] -- "prompt"
   ai-ask [--agent codex|t3|opencode] [--history|--clone] [PATH...] -- "question"
   ai-copy SOURCE... WORK-DIR
@@ -1394,6 +1394,9 @@ Safety flags:
   --force-large-copy           allow selections over AI_WORK_MAX_COPY_FILES/BYTES
   --max-copy-files N           default: 2000
   --max-copy-bytes N           default: 52428800
+
+Clone/export flags:
+  --copy-to WORK-DIR           copy a history/full clone under shared work without making a session
 EOF
 }
 
@@ -2096,14 +2099,29 @@ write_manifest() {
     }' >"$manifest"
 }
 
+ensure_session_local_excludes() {
+    local worktree="$1"
+    local exclude="$worktree/.git/info/exclude"
+    local pattern
+    [[ -d "$worktree/.git" ]] || return 0
+    mkdir -p "$(dirname "$exclude")"
+    touch "$exclude"
+    for pattern in AGENTS.md PROMPT.md; do
+        grep -qxF "$pattern" "$exclude" || printf '%s\n' "$pattern" >>"$exclude"
+    done
+}
+
 write_agents_md() {
-    local worktree="$1" id="$2" source_root="$3" paths_file="$4" prompt="$5"
+    local worktree="$1" id="$2" source_root="$3" paths_file="$4" prompt="$5" mode="${6:-snapshot}"
     {
         printf '# AI Work Session\n\n'
         printf '%s\n' "- Session: \`$id\`"
         printf '%s\n' "- Source: \`$source_root\`"
-        printf '%s\n' "- Return path: generate patches with \`ai-done $id\`; do not write to the source tree directly."
+        printf '%s\n' "- Return path: tell the user to run host command \`ai-done $id\`; do not run \`ai-done\` from inside the container and do not write to the source tree directly."
         printf '%s\n\n' "- Container path: use \`/work\`; \`/workspace\` exists only for compatibility."
+        if [[ "$mode" == "history" || "$mode" == "clone" ]]; then
+            printf '%s\n\n' "- History: this workspace is a Git clone; inspect the visible commit log/history and follow existing project patterns before editing."
+        fi
         printf '## Selected Paths\n\n'
         sed 's/^/- `/' "$paths_file" | sed 's/$/`/'
         if [[ -n "$prompt" ]]; then
@@ -2160,8 +2178,48 @@ prepare_clone_paths() {
     printf '.\n'
 }
 
+copy_history_or_clone_to_shared_work() {
+    local mode="$1" source_kind="$2" source_root="$3" git_dir="$4" repo_slug="$5" paths_file="$6" copy_to="$7" name="$8"
+    local root dest tmp first_path out_name worktree final_path container_path
+
+    [[ "$mode" == "history" || "$mode" == "clone" ]] || die "--copy-to requires --history or --clone"
+    if [[ "$mode" == "history" ]]; then
+        need git-filter-repo
+    fi
+
+    root="$(shared_work_root)"
+    dest="$(resolve_under_shared_work "$copy_to" "$root")"
+    mkdir -p "$dest"
+    [[ -d "$dest" ]] || die "copy destination is not a directory: $dest"
+
+    first_path="$(head -n1 "$paths_file")"
+    out_name="$(session_suffix "$repo_slug" "$first_path" "$name")"
+    [[ -n "$out_name" ]] || out_name="clone"
+    final_path="$dest/$out_name"
+    [[ ! -e "$final_path" ]] || die "destination already exists: $final_path"
+
+    tmp="$(mktemp -d "$AI_WORK_ROOT/tmp/copy-to.XXXXXX")"
+    worktree="$tmp/$out_name"
+    if ! history_clone "$mode" "$source_kind" "$source_root" "$git_dir" "$paths_file" "$worktree"; then
+        rm -rf "$tmp"
+        exit 1
+    fi
+
+    cp -a "$worktree" "$dest/"
+    rm -rf "$tmp"
+    normalize_session_permissions "$final_path"
+
+    container_path="$final_path"
+    case "$container_path" in
+        /home/work|/home/work/*) container_path="/work${container_path#/home/work}" ;;
+    esac
+
+    printf 'Copied to: %s\n' "$final_path"
+    printf 'Container path: %s\n' "$container_path"
+}
+
 make_session() {
-    local agent="t3" mode="snapshot" source_mode="normal" name="" selector="" read_only=0 prompt="" no_launch=0 force_top=0 force_large=0 max_files="$AI_WORK_MAX_COPY_FILES" max_bytes="$AI_WORK_MAX_COPY_BYTES"
+    local agent="t3" mode="snapshot" source_mode="normal" name="" selector="" read_only=0 prompt="" no_launch=0 copy_to="" force_top=0 force_large=0 max_files="$AI_WORK_MAX_COPY_FILES" max_bytes="$AI_WORK_MAX_COPY_BYTES"
     local paths=()
 
     while [[ $# -gt 0 ]]; do
@@ -2172,6 +2230,7 @@ make_session() {
             --source-mode-dot) source_mode="dot"; mode="history"; shift ;;
             --source-mode-bare) source_mode="bare"; mode="clone"; shift ;;
             --name) name="${2:?missing --name value}"; shift 2 ;;
+            --copy-to) copy_to="${2:?missing --copy-to value}"; no_launch=1; shift 2 ;;
             --tracked|--staged|--dirty) selector="${1#--}"; shift ;;
             --readonly) read_only=1; shift ;;
             --no-launch) no_launch=1; shift ;;
@@ -2187,6 +2246,9 @@ make_session() {
     done
 
     [[ "$agent" =~ ^(t3|codex|opencode)$ ]] || die "unknown agent: $agent"
+    if [[ -n "$copy_to" && "$mode" == "snapshot" ]]; then
+        die "--copy-to requires --history or --clone"
+    fi
     if [[ "$agent" == "t3" && "$no_launch" != "1" ]]; then
         ensure_t3_ready
     fi
@@ -2203,6 +2265,9 @@ make_session() {
     if [[ "$mode" == "clone" ]]; then
         [[ -n "$git_dir" ]] || die "--clone requires a git or bare-git source"
         [[ -z "$selector" ]] || die "--clone cannot be combined with --tracked, --staged, or --dirty"
+    fi
+    if [[ -n "$copy_to" && -n "$selector" ]]; then
+        die "--copy-to cannot be combined with --tracked, --staged, or --dirty"
     fi
     if [[ "$mode" == "history" ]]; then
         need git-filter-repo
@@ -2227,6 +2292,12 @@ make_session() {
         rm -f "$estimate_file"
     fi
 
+    if [[ -n "$copy_to" ]]; then
+        copy_history_or_clone_to_shared_work "$mode" "$source_kind" "$source_root" "$git_dir" "$repo_slug" "$paths_file" "$copy_to" "$name"
+        rm -f "$paths_file"
+        return 0
+    fi
+
     local stamp id dir worktree baseline container_worktree suffix first_path
     stamp="$(date -u +%Y%m%d-%H%M%S)"
     first_path="$(head -n1 "$paths_file")"
@@ -2243,15 +2314,18 @@ make_session() {
             rm -rf "$dir"
             exit 1
         fi
-        write_agents_md "$worktree" "$id" "$source_root" "$paths_file" "$prompt"
+        ensure_session_local_excludes "$worktree"
+        write_agents_md "$worktree" "$id" "$source_root" "$paths_file" "$prompt" "$mode"
         [[ -n "$prompt" ]] && printf '%s\n' "$prompt" >"$worktree/PROMPT.md"
         commit_session_baseline "$worktree" 'ai-work current source baseline'
     else
         mkdir -p "$worktree"
         copy_selected_paths "$source_root" "$worktree" "$paths_file"
-        write_agents_md "$worktree" "$id" "$source_root" "$paths_file" "$prompt"
+        git -C "$worktree" init -q
+        ensure_session_local_excludes "$worktree"
+        write_agents_md "$worktree" "$id" "$source_root" "$paths_file" "$prompt" "$mode"
         [[ -n "$prompt" ]] && printf '%s\n' "$prompt" >"$worktree/PROMPT.md"
-        init_session_repo "$worktree"
+        commit_session_baseline "$worktree" 'ai-work baseline'
     fi
 
     cp -a "$worktree" "$baseline"
@@ -2272,7 +2346,7 @@ cmd_edit_dot() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --clone|--dot) die "ai-edit-dot always uses filtered history for explicit paths" ;;
-            --agent|--name|--max-copy-files|--max-copy-bytes|--prompt)
+            --agent|--name|--copy-to|--max-copy-files|--max-copy-bytes|--prompt)
                 [[ $# -ge 2 ]] || die "missing $1 value"
                 shift 2
                 ;;
@@ -2373,7 +2447,18 @@ launch_agent() {
 }
 
 cmd_edit() {
-    local id
+    local id is_copy_to=0 arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--copy-to" ]]; then
+            is_copy_to=1
+            break
+        fi
+    done
+    if [[ "$is_copy_to" == "1" ]]; then
+        make_session "$@"
+        return
+    fi
+
     if ! id="$(make_session "$@")"; then
         exit 1
     fi
