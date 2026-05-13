@@ -150,4 +150,5 @@ aiagent-build() {
 aiagent-redeploy() {
     _aiagent_ctl daemon-reload
     _aiagent_ctl restart aiagent.service searxng-mcp.service
+    _aiagent_ctl try-restart t3-web.service
 }
