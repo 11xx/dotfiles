@@ -134,6 +134,11 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     git-filter-repo \
     gitleaks \
     miller \
+    # === Java / Kotlin / Android ===
+    # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
+    # the image supplies the JDK and CLI utilities needed to bootstrap the Android SDK.
+    java-21-openjdk-devel \
+    zip \
  && dnf clean all \
  && rm -rf /var/cache/dnf
 
@@ -241,12 +246,18 @@ ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
 ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-ENV PATH=$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+ENV ANDROID_HOME=/home/node/Android/Sdk
+ENV ANDROID_SDK_ROOT=$ANDROID_HOME
+ENV GRADLE_USER_HOME=/home/node/.gradle
+ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
 
 RUN mkdir -pv \
     /home/node/.npm-global \
     /home/node/.bin \
     /home/node/.cargo/bin \
+    /home/node/.gradle \
+    /home/node/Android/Sdk \
     /home/node/.agents/skills \
     /home/node/.config/opencode \
     /home/node/.local/share/opencode \
@@ -432,6 +443,37 @@ Description=GHCup cache volume
 # Podman will create this named volume automatically
 #+end_src
 
+**** 60-android.conf
+#+begin_src systemd :tangle (tdir "aiagent.container.d/android.conf")
+[Container]
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+Environment=ANDROID_HOME=/home/node/Android/Sdk
+Environment=ANDROID_SDK_ROOT=/home/node/Android/Sdk
+Environment=GRADLE_USER_HOME=/home/node/.gradle
+Environment=PATH=/home/node/Android/Sdk/cmdline-tools/latest/bin:/home/node/Android/Sdk/platform-tools:/home/node/.cargo/bin:/home/node/.bin:/home/node/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Volume=android-sdk.volume:/home/node/Android/Sdk
+Volume=gradle-cache.volume:/home/node/.gradle
+Volume=%h/aiagent_container/bashrc.d/android-env.sh:/home/node/.bashrc.d/android-env.sh:ro,Z
+#+end_src
+
+- Android SDK cache named volume ::
+#+begin_src systemd :tangle (tdir "android-sdk.volume")
+[Unit]
+Description=Android SDK cache volume
+
+[Volume]
+# Podman will create this named volume automatically
+#+end_src
+
+- Gradle cache named volume ::
+#+begin_src systemd :tangle (tdir "gradle-cache.volume")
+[Unit]
+Description=Gradle cache volume
+
+[Volume]
+# Podman will create this named volume automatically
+#+end_src
+
 ***** deploy files
 :PROPERTIES:
 :tangle-dir: ~/ansible/system/roles/aiagent_host_setup/files/
@@ -487,6 +529,70 @@ fi
   Deploy to Fedora's =~/.bashrc.d/*=
 #+begin_src shell :tangle (tdir "bashrc.d/ghcup-env.sh")
 [ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
+#+end_src
+
+- Android SDK bootstrap ::
+#+begin_src shell :tangle (tdir "init.d/android-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-14742923}"
+cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-48833c34b761c10cb20bcd16582129395d121b27}"
+cmdline_tools_url="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-${cmdline_tools_version}_latest.zip}"
+
+mkdir -p "$ANDROID_HOME/cmdline-tools" "$GRADLE_USER_HOME"
+
+if [[ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
+    echo "[init] Bootstrapping Android SDK command-line tools..."
+
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+
+    curl -fsSLo "$tmp/commandlinetools.zip" "$cmdline_tools_url"
+    printf '%s  %s\n' "$cmdline_tools_sha1" "$tmp/commandlinetools.zip" | sha1sum -c -
+
+    unzip -q "$tmp/commandlinetools.zip" -d "$tmp"
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+    mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+    cp -a "$tmp/cmdline-tools/." "$ANDROID_HOME/cmdline-tools/latest/"
+
+    echo "[init] Android SDK command-line tools ready."
+else
+    echo "[init] Android SDK command-line tools already present, skipping."
+fi
+
+yes | sdkmanager --licenses >/dev/null || true
+
+sdk_packages=(
+    "platform-tools"
+    "build-tools;36.1.0"
+    "build-tools;37.0.0"
+    "platforms;android-36"
+    "platforms;android-37"
+    "sources;android-36"
+)
+
+echo "[init] Ensuring Android SDK packages are installed..."
+sdkmanager --install "${sdk_packages[@]}"
+echo "[init] Android SDK packages ready."
+#+end_src
+
+- Source Android env ::
+  Deploy to Fedora's =~/.bashrc.d/*=
+#+begin_src shell :tangle (tdir "bashrc.d/android-env.sh")
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk}"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+case ":$PATH:" in
+    *":$ANDROID_HOME/cmdline-tools/latest/bin:"*) ;;
+    *) export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" ;;
+esac
 #+end_src
 
 
