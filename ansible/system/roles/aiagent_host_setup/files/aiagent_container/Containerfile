@@ -11,7 +11,9 @@ ARG TYPOS_VERSION="latest"
 ARG ACTIONLINT_VERSION="latest"
 ARG DUCKDB_VERSION="latest"
 
-RUN dnf -y upgrade --refresh
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+    --mount=type=cache,target=/var/cache/dnf \
+    dnf -y --setopt=keepcache=True upgrade --refresh
 
 # Eclipse Temurin JDKs.
 # Fedora 44 retired java-21-openjdk, while Gradle/Android builds should not
@@ -26,7 +28,9 @@ RUN printf '%s\n' \
     > /etc/yum.repos.d/adoptium.repo
 
 # Fedora-packaged tools.
-RUN dnf -y install --setopt=install_weak_deps=False \
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+    --mount=type=cache,target=/var/cache/dnf \
+    dnf -y --setopt=install_weak_deps=False --setopt=keepcache=True install \
     # === Essentials for OpenCode / Codex / T3 ===
     # Required for Node runtimes, native addon builds, VCS, shells, process tools,
     # archive handling, agent search, and upstream binary installs.
@@ -105,9 +109,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     # the image supplies a stable JDK 21 and CLI utilities needed to bootstrap
     # the Android SDK.
     temurin-21-jdk \
-    zip \
- && dnf clean all \
- && rm -rf /var/cache/dnf
+    zip
 
 # Upstream binary tools not available in Fedora repos.
 RUN set -eux; \

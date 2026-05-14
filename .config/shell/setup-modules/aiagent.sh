@@ -140,6 +140,69 @@ aiagent-ps()     { _aiagent ps; }
 aiagent-images() { _aiagent images; }
 aiagent-prune()  { _aiagent system prune -f; }
 
+aiagent-backup() {
+    local include_work=0 dest stamp out dest_display
+    dest="/home/work/ai/backups"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --include-work)
+                include_work=1
+                shift
+                ;;
+            -h|--help)
+                cat <<'EOF'
+Usage:
+  aiagent-backup [--include-work] [DEST_DIR]
+
+Archives aiagent persistent state to DEST_DIR. By default this includes the
+agent config/state bind mounts and named toolchain/cache volumes, but excludes
+/home/work because project workspaces can be large.
+EOF
+                return 0
+                ;;
+            -*)
+                printf 'aiagent-backup: unknown option: %s\n' "$1" >&2
+                return 2
+                ;;
+            *)
+                dest="$1"
+                shift
+                ;;
+        esac
+    done
+
+    mkdir -p "$dest" || return
+    dest="$(cd "$dest" && pwd -P)" || return
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    out="aiagent-backup-${stamp}.tar.gz"
+
+    local podman_args=(
+        run
+        --rm
+        --pull=never
+        --security-opt label=disable
+        -v /home/aiagent/aiagent_container:/backup/aiagent_container:ro
+        -v android-sdk.volume:/backup/volumes/android-sdk:ro
+        -v gradle-cache.volume:/backup/volumes/gradle-cache:ro
+        -v cabal-cache.volume:/backup/volumes/cabal-cache:ro
+        -v ghcup-cache.volume:/backup/volumes/ghcup-cache:ro
+        -v "$dest:/out:Z"
+    )
+    local tar_paths=(aiagent_container volumes)
+
+    if [[ "$include_work" -eq 1 ]]; then
+        podman_args+=(-v /home/work:/backup/work:ro)
+        tar_paths+=(work)
+    fi
+
+    _aiagent "${podman_args[@]}" localhost/aiagent:latest \
+        tar -C /backup -czf "/out/$out" "${tar_paths[@]}"
+
+    dest_display="$dest/$out"
+    printf 'aiagent backup written: %s\n' "$dest_display"
+}
+
 # build
 aiagent-build() {
     _aiagent_ctl start aiagent-build.service
