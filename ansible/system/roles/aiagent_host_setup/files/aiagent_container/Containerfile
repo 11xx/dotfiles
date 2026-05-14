@@ -13,6 +13,18 @@ ARG DUCKDB_VERSION="latest"
 
 RUN dnf -y upgrade --refresh
 
+# Eclipse Temurin JDKs.
+# Fedora 44 retired java-21-openjdk, while Gradle/Android builds should not
+# run against Fedora's floating java-latest package.
+RUN printf '%s\n' \
+    '[Adoptium]' \
+    'name=Adoptium' \
+    'baseurl=https://packages.adoptium.net/artifactory/rpm/fedora/$releasever/$basearch' \
+    'enabled=1' \
+    'gpgcheck=1' \
+    'gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public' \
+    > /etc/yum.repos.d/adoptium.repo
+
 # Fedora-packaged tools.
 RUN dnf -y install --setopt=install_weak_deps=False \
     # === Essentials for OpenCode / Codex / T3 ===
@@ -90,8 +102,9 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     miller \
     # === Java / Kotlin / Android ===
     # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
-    # the image supplies the JDK and CLI utilities needed to bootstrap the Android SDK.
-    java-latest-openjdk-devel \
+    # the image supplies a stable JDK 21 and CLI utilities needed to bootstrap
+    # the Android SDK.
+    temurin-21-jdk \
     zip \
  && dnf clean all \
  && rm -rf /var/cache/dnf
@@ -200,11 +213,11 @@ ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
 ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-ENV JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
 ENV ANDROID_HOME=/home/node/Android/Sdk
 ENV ANDROID_SDK_ROOT=$ANDROID_HOME
 ENV GRADLE_USER_HOME=/home/node/.gradle
-ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+ENV PATH=$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
 
 RUN mkdir -pv \
     /home/node/.npm-global \
@@ -220,6 +233,10 @@ RUN mkdir -pv \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
     /work
+
+RUN java -version \
+ && javac -version \
+ && test -x "$JAVA_HOME/bin/java"
 
 # User-scope installs.
 RUN uv tool install pyright \

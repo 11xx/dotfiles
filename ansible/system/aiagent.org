@@ -59,6 +59,18 @@ ARG DUCKDB_VERSION="latest"
 
 RUN dnf -y upgrade --refresh
 
+# Eclipse Temurin JDKs.
+# Fedora 44 retired java-21-openjdk, while Gradle/Android builds should not
+# run against Fedora's floating java-latest package.
+RUN printf '%s\n' \
+    '[Adoptium]' \
+    'name=Adoptium' \
+    'baseurl=https://packages.adoptium.net/artifactory/rpm/fedora/$releasever/$basearch' \
+    'enabled=1' \
+    'gpgcheck=1' \
+    'gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public' \
+    > /etc/yum.repos.d/adoptium.repo
+
 # Fedora-packaged tools.
 RUN dnf -y install --setopt=install_weak_deps=False \
     # === Essentials for OpenCode / Codex / T3 ===
@@ -136,8 +148,9 @@ RUN dnf -y install --setopt=install_weak_deps=False \
     miller \
     # === Java / Kotlin / Android ===
     # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
-    # the image supplies the JDK and CLI utilities needed to bootstrap the Android SDK.
-    java-latest-openjdk-devel \
+    # the image supplies a stable JDK 21 and CLI utilities needed to bootstrap
+    # the Android SDK.
+    temurin-21-jdk \
     zip \
  && dnf clean all \
  && rm -rf /var/cache/dnf
@@ -246,11 +259,11 @@ ENV XDG_BIN_HOME=/home/node/.bin
 ENV UV_TOOL_BIN_DIR=$XDG_BIN_HOME
 ENV CARGO_HOME=/home/node/.cargo
 ENV CABAL_DIR=/home/node/.cabal
-ENV JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
 ENV ANDROID_HOME=/home/node/Android/Sdk
 ENV ANDROID_SDK_ROOT=$ANDROID_HOME
 ENV GRADLE_USER_HOME=/home/node/.gradle
-ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
+ENV PATH=$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$CARGO_HOME/bin:$XDG_BIN_HOME:/home/node/.npm-global/bin:$PATH
 
 RUN mkdir -pv \
     /home/node/.npm-global \
@@ -266,6 +279,10 @@ RUN mkdir -pv \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
     /work
+
+RUN java -version \
+ && javac -version \
+ && test -x "$JAVA_HOME/bin/java"
 
 # User-scope installs.
 RUN uv tool install pyright \
@@ -446,11 +463,11 @@ Description=GHCup cache volume
 **** 60-android.conf
 #+begin_src systemd :tangle (tdir "aiagent.container.d/android.conf")
 [Container]
-Environment=JAVA_HOME=/usr/lib/jvm/java-latest-openjdk
+Environment=JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
 Environment=ANDROID_HOME=/home/node/Android/Sdk
 Environment=ANDROID_SDK_ROOT=/home/node/Android/Sdk
 Environment=GRADLE_USER_HOME=/home/node/.gradle
-Environment=PATH=/home/node/Android/Sdk/cmdline-tools/latest/bin:/home/node/Android/Sdk/platform-tools:/home/node/.cargo/bin:/home/node/.bin:/home/node/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=/usr/lib/jvm/temurin-21-jdk/bin:/home/node/Android/Sdk/cmdline-tools/latest/bin:/home/node/Android/Sdk/platform-tools:/home/node/Android/Sdk/emulator:/home/node/.cargo/bin:/home/node/.bin:/home/node/.npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Volume=android-sdk.volume:/home/node/Android/Sdk
 Volume=gradle-cache.volume:/home/node/.gradle
 Volume=%h/aiagent_container/bashrc.d/android-env.sh:/home/node/.bashrc.d/android-env.sh:ro,Z
@@ -535,11 +552,11 @@ fi
 #+begin_src shell :tangle (tdir "init.d/android-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-latest-openjdk}"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/temurin-21-jdk}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
-export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-14742923}"
 cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-48833c34b761c10cb20bcd16582129395d121b27}"
@@ -582,13 +599,19 @@ echo "[init] Android SDK packages ready."
 - Source Android env ::
   Deploy to Fedora's =~/.bashrc.d/*=
 #+begin_src shell :tangle (tdir "bashrc.d/android-env.sh")
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-latest-openjdk}"
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/temurin-21-jdk}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
+
+case ":$PATH:" in
+    *":$JAVA_HOME/bin:"*) ;;
+    *) export PATH="$JAVA_HOME/bin:$PATH" ;;
+esac
+
 case ":$PATH:" in
     *":$ANDROID_HOME/cmdline-tools/latest/bin:"*) ;;
-    *) export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" ;;
+    *) export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH" ;;
 esac
 #+end_src
 
