@@ -46,16 +46,20 @@ directories.
 #+begin_src dockerfile
 FROM quay.io/fedora/fedora:44
 
+# Agent runtimes intentionally float so rebuilds pick up current upstream CLIs.
 ARG OPENCODE_VERSION="latest"
 ARG CODEX_VERSION="latest"
 ARG T3_CODE_VERSION="latest"
 ARG PI_CODE_VERSION="latest"
 
-ARG HADOLINT_VERSION="latest"
-ARG WATCHEXEC_VERSION="latest"
-ARG TYPOS_VERSION="latest"
-ARG ACTIONLINT_VERSION="latest"
-ARG DUCKDB_VERSION="latest"
+# Standalone binary tools are pinned for reproducible builds and to avoid
+# GitHub API release lookups during image construction.
+ARG HADOLINT_VERSION="2.14.0"
+ARG WATCHEXEC_VERSION="2.5.1"
+ARG TYPOS_VERSION="1.46.0"
+ARG TAPLO_VERSION="0.10.0"
+ARG ACTIONLINT_VERSION="1.7.12"
+ARG DUCKDB_VERSION="1.5.2"
 
 RUN --mount=type=cache,target=/var/cache/libdnf5 \
     --mount=type=cache,target=/var/cache/dnf \
@@ -159,6 +163,15 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
 
 # Upstream binary tools not available in Fedora repos.
 RUN set -eux; \
+    curl_retry() { \
+        curl -fL \
+            --retry 5 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --connect-timeout 20 \
+            --max-time 300 \
+            "$@"; \
+    }; \
     tmp="$(mktemp -d)"; \
     trap 'rm -rf "$tmp"' EXIT; \
     arch="$(uname -m)"; \
@@ -185,53 +198,45 @@ RUN set -eux; \
             ;; \
     esac; \
     \
-    if [[ "$HADOLINT_VERSION" == "latest" ]]; then \
-        hadolint_url="https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${hadolint_arch}"; \
-    else \
-        hadolint_version="${HADOLINT_VERSION#v}"; \
-        hadolint_url="https://github.com/hadolint/hadolint/releases/download/v${hadolint_version}/hadolint-Linux-${hadolint_arch}"; \
-    fi; \
-    curl -fsSLo /usr/local/bin/hadolint "$hadolint_url"; \
+    hadolint_version="${HADOLINT_VERSION#v}"; \
+    watchexec_version="${WATCHEXEC_VERSION#v}"; \
+    typos_version="${TYPOS_VERSION#v}"; \
+    taplo_version="${TAPLO_VERSION#v}"; \
+    actionlint_version="${ACTIONLINT_VERSION#v}"; \
+    duckdb_version="${DUCKDB_VERSION#v}"; \
+    \
+    echo "Installing hadolint ${hadolint_version}..." >&2; \
+    curl_retry -o /usr/local/bin/hadolint \
+        "https://github.com/hadolint/hadolint/releases/download/v${hadolint_version}/hadolint-Linux-${hadolint_arch}"; \
     chmod 0755 /usr/local/bin/hadolint; \
     \
-    watchexec_version="${WATCHEXEC_VERSION#v}"; \
-    if [[ "$WATCHEXEC_VERSION" == "latest" ]]; then \
-        watchexec_version="$(curl -fsSL https://api.github.com/repos/watchexec/watchexec/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
-    fi; \
-    curl -fsSLo "$tmp/watchexec.tar.xz" \
+    echo "Installing watchexec ${watchexec_version}..." >&2; \
+    curl_retry -o "$tmp/watchexec.tar.xz" \
         "https://github.com/watchexec/watchexec/releases/download/v${watchexec_version}/watchexec-${watchexec_version}-${watchexec_target}.tar.xz"; \
     tar -xJf "$tmp/watchexec.tar.xz" -C "$tmp"; \
     install -m 0755 "$tmp/watchexec-${watchexec_version}-${watchexec_target}/watchexec" /usr/local/bin/watchexec; \
     \
-    typos_version="${TYPOS_VERSION#v}"; \
-    if [[ "$TYPOS_VERSION" == "latest" ]]; then \
-        typos_version="$(curl -fsSL https://api.github.com/repos/crate-ci/typos/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
-    fi; \
+    echo "Installing typos ${typos_version}..." >&2; \
     mkdir -p "$tmp/typos"; \
-    curl -fsSLo "$tmp/typos.tar.gz" \
+    curl_retry -o "$tmp/typos.tar.gz" \
         "https://github.com/crate-ci/typos/releases/download/v${typos_version}/typos-v${typos_version}-${typos_target}.tar.gz"; \
     tar -xzf "$tmp/typos.tar.gz" -C "$tmp/typos"; \
     install -m 0755 "$tmp/typos/typos" /usr/local/bin/typos; \
     \
-    curl -fsSL "https://github.com/tamasfe/taplo/releases/latest/download/taplo-linux-${taplo_arch}.gz" \
+    echo "Installing taplo ${taplo_version}..." >&2; \
+    curl_retry "https://github.com/tamasfe/taplo/releases/download/${taplo_version}/taplo-linux-${taplo_arch}.gz" \
         | gzip -d > /usr/local/bin/taplo; \
     chmod 0755 /usr/local/bin/taplo; \
     \
-    actionlint_version="${ACTIONLINT_VERSION#v}"; \
-    if [[ "$ACTIONLINT_VERSION" == "latest" ]]; then \
-        actionlint_version="$(curl -fsSL https://api.github.com/repos/rhysd/actionlint/releases/latest | jq -r '.tag_name' | sed 's/^v//')"; \
-    fi; \
+    echo "Installing actionlint ${actionlint_version}..." >&2; \
     mkdir -p "$tmp/actionlint"; \
-    curl -fsSLo "$tmp/actionlint.tar.gz" \
+    curl_retry -o "$tmp/actionlint.tar.gz" \
         "https://github.com/rhysd/actionlint/releases/download/v${actionlint_version}/actionlint_${actionlint_version}_linux_${actionlint_arch}.tar.gz"; \
     tar -xzf "$tmp/actionlint.tar.gz" -C "$tmp/actionlint"; \
     install -m 0755 "$tmp/actionlint/actionlint" /usr/local/bin/actionlint; \
     \
-    duckdb_version="${DUCKDB_VERSION#v}"; \
-    if [[ "$DUCKDB_VERSION" == "latest" ]]; then \
-        duckdb_version="$(curl -fsSL https://duckdb.org/data/latest_stable_version.txt)"; \
-    fi; \
-    curl -fsSL "https://install.duckdb.org/v${duckdb_version}/duckdb_cli-${duckdb_dist}.gz" \
+    echo "Installing duckdb ${duckdb_version}..." >&2; \
+    curl_retry "https://install.duckdb.org/v${duckdb_version}/duckdb_cli-${duckdb_dist}.gz" \
         | gzip -d > /usr/local/bin/duckdb; \
     chmod 0755 /usr/local/bin/duckdb; \
     \
