@@ -152,6 +152,17 @@ PATH=${XDG_BIN_HOME}/wrappers:${PATH}
 PATH=${PATH}:${HOME}/code/linux-scripts
 #+end_src
 
+* Android dev
+:PROPERTIES:
+:header-args:conf: :tangle android-dev.conf
+:END:
+
+#+begin_src conf
+ANDROID_HOME=${HOME}/Android/Sdk
+PATH=${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator:${ANDROID_HOME}/cmdline-tools/latest/bin:${PATH}
+#+end_src
+
+
 * COMMENT Local Variables
 
 # Local Variables:
