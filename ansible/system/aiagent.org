@@ -299,7 +299,7 @@ RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}" \
     "t3@${T3_CODE_VERSION}" \
-    "@mariozechner/pi-coding-agent@${PI_CODE_VERSION}" \
+    "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
  && npm cache clean --force
 
 COPY --chown=node:node bin/ /home/node/.bin/

@@ -559,7 +559,7 @@ Known facts from the Pi investigation:
 - Interactive TUI returns =139=, which is =SIGSEGV=.
 - TTY plumbing is valid: stdin/stdout/stderr are TTYs, and terminal size/TERM
   are present.
-- A minimal =@mariozechner/pi-tui= =ProcessTerminal= raw-mode test works.
+- A minimal =@earendil-works/pi-tui= =ProcessTerminal= raw-mode test works.
 - =PI_STARTUP_BENCHMARK=1= exits =0=, so =interactiveMode.init()= succeeds.
 - =PI_OFFLINE=1= and =PI_SKIP_VERSION_CHECK=1= still segfault.
 - Running outside the project worktree and with a throwaway =HOME= still
