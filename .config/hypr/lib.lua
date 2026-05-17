@@ -40,7 +40,7 @@ local function dispatch_action(dispatcher)
 end
 
 local function bind_raw(keys, callback, flags)
-    hl.bind(keys, callback, flags or {})
+    return hl.bind(keys, callback, flags or {})
 end
 
 local function full_reset()
@@ -193,20 +193,28 @@ local function in_submap(node, callback)
     end
 end
 
-local function ensure_reset_binds(node)
-    if node.submap == nil or node.has_reset_binds then
+local function disable_binds(binds)
+    for _, bind in ipairs(binds or {}) do
+        bind:set_enabled(false)
+    end
+end
+
+local function refresh_reset_binds(node)
+    if node.submap == nil then
         return
     end
 
+    disable_binds(node.reset_binds)
+    node.reset_binds = {}
+
     hl.define_submap(node.submap, function()
-        bind_raw("escape", function()
+        table.insert(node.reset_binds, bind_raw("escape", function()
             full_reset()
-        end)
-        bind_raw("catchall", function()
+        end))
+        table.insert(node.reset_binds, bind_raw("catchall", function()
             full_reset()
-        end)
+        end))
     end)
-    node.has_reset_binds = true
 end
 
 local function ensure_prefix(parent, chord)
@@ -221,13 +229,19 @@ local function ensure_prefix(parent, chord)
     end
     table.insert(path, chord)
 
-    child = { children = {}, path = path, submap = submap_name(path), has_reset_binds = false }
+    child = {
+        children = {},
+        path = path,
+        submap = submap_name(path),
+        has_reset_binds = false,
+        reset_binds = {},
+    }
     parent.children[chord] = child
 
     in_submap(parent, function()
         bind_submap(chord, child.submap)
     end)
-    ensure_reset_binds(child)
+    refresh_reset_binds(parent)
 
     return child
 end
@@ -261,7 +275,13 @@ function keymap_set(sequence, dispatcher, flags)
             end
             table.insert(path, chord)
 
-            local leaf = existing or { children = {}, path = path, submap = nil, has_reset_binds = false }
+            local leaf = existing or {
+                children = {},
+                path = path,
+                submap = nil,
+                has_reset_binds = false,
+                reset_binds = {},
+            }
             leaf.path = path
             leaf.action = dispatcher
             node.children[chord] = leaf
@@ -269,6 +289,7 @@ function keymap_set(sequence, dispatcher, flags)
             in_submap(node, function()
                 bind(chord, dispatcher, flags)
             end)
+            refresh_reset_binds(node)
         end
     end
 end
@@ -284,9 +305,7 @@ function keymap_exec(sequence, cmd, flags)
             end
         end
     end
-    keymap_set(sequence, function()
-        return hl.exec_cmd(cmd, rules)
-    end, bind_flags)
+    keymap_set(sequence, hl.dsp.exec_cmd(cmd, rules), bind_flags)
 end
 
 function bind_exec(keys, cmd, flags)
