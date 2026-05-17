@@ -15,8 +15,7 @@ function reset_submap()
     return hl.dispatch(hl.dsp.submap("reset"))
 end
 
-local suppressed_prefix_releases = {}
-local root_prefix_release_ids = {}
+local suppressed_leaf_presses = {}
 local keymap_root = { children = {}, path = {}, submap = nil, has_reset_binds = false }
 local keymap_config = { submap_timeout_ms = nil }
 local keymap_submap_generation = 0
@@ -52,8 +51,9 @@ end
 function bind(keys, dispatcher, flags)
     local id = key_id(keys)
     bind_raw(keys, function()
-        if root_prefix_release_ids[id] then
-            suppressed_prefix_releases[id] = true
+        if suppressed_leaf_presses[id] then
+            suppressed_leaf_presses[id] = nil
+            return
         end
         full_reset()
         local result = dispatch_action(dispatcher)
@@ -68,15 +68,10 @@ end
 
 function bind_submap(keys, name, flags)
     local bind_flags = copy_flags(flags)
-    bind_flags.release = true
 
     bind_raw(keys, function()
         local id = key_id(keys)
-        if suppressed_prefix_releases[id] then
-            suppressed_prefix_releases[id] = nil
-            full_reset()
-            return
-        end
+        suppressed_leaf_presses[id] = true
 
         reset_submap()
         keymap_submap_generation = keymap_submap_generation + 1
@@ -228,9 +223,6 @@ local function ensure_prefix(parent, chord)
 
     child = { children = {}, path = path, submap = submap_name(path), has_reset_binds = false }
     parent.children[chord] = child
-    if parent == keymap_root then
-        root_prefix_release_ids[key_id(chord)] = true
-    end
 
     in_submap(parent, function()
         bind_submap(chord, child.submap)
@@ -292,7 +284,9 @@ function keymap_exec(sequence, cmd, flags)
             end
         end
     end
-    keymap_set(sequence, hl.dsp.exec_cmd(cmd, rules), bind_flags)
+    keymap_set(sequence, function()
+        return hl.exec_cmd(cmd, rules)
+    end, bind_flags)
 end
 
 function bind_exec(keys, cmd, flags)
