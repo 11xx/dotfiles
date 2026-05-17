@@ -154,6 +154,7 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     git-filter-repo \
     gitleaks \
     miller \
+    lua lua-devel \
     # === Java / Kotlin / Android ===
     # Gradle wrappers and Android Gradle Plugin provide Gradle/Kotlin bits per project;
     # the image supplies a stable JDK 21 and CLI utilities needed to bootstrap
