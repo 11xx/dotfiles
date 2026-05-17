@@ -1,4 +1,5 @@
 require("lib")
+require("hyprmacs-keymap")
 require("displays-workspaces")
 require("startup")
 require("environment")
