@@ -7,6 +7,8 @@ local browser = "firefox"
 bind("SUPER + G", hl.dsp.submap("reset"), { submap_universal = true })
 
 bind("SUPER + T", hl.dsp.window.float({ action = "toggle" }))
+
+-- hl.dsp.layout(...) wraps Hyprland's native layoutmsg dispatcher.
 bind("SUPER + R", hl.dsp.layout("rotatesplit 90"))
 bind("SUPER + SHIFT + R", hl.dsp.layout("rotatesplit 270"))
 bind("SUPER + S", hl.dsp.layout("swapsplit"))
@@ -114,8 +116,8 @@ bind("SUPER + O", hl.dsp.focus({ monitor = "+1" }))
 bind("SUPER + SHIFT + O", hl.dsp.window.move({ monitor = "+1" }))
 -- exec, hyprctl dispatch movewindow mon:"$(hyprctl monitors -j | jq -r '.[] | select(.focused == false).id')"
 
--- Notification contols
-bind_exec("SUPER + CTRL + ALT + N", "swaync-client --open-panel")
+-- Notification controls
+bind_exec("SUPER + CTRL + ALT + S", "swaync-client --open-panel")
 
 -- Switch keyboard layouts, find names with `hyprctl devices'
 -- bind_exec("control_r", "hyprctl switchxkblayout \"$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')\" next")
@@ -133,7 +135,7 @@ bind_exec("SUPER + CTRL + ALT + D", "aria2-dragdrop")
 bind_exec("SUPER + ALT + SPACE", "gpu-screen-recorder-replay-save")
 
 -- Pause/resume replay buffer
-bind_exec("SUPER + ALT + pause", "gpu-screen-recorder-replay-toggle")
+bind_exec("SUPER + ALT + home", "gpu-screen-recorder-replay-toggle")
 
 -- Stop replay buffer entirely
 bind_exec("SUPER + ALT + end", "gpu-screen-recorder-replay-stop")
@@ -155,8 +157,7 @@ bind_exec("XF86AudioPlay", "playerctl play-pause")
 bind_exec("SUPER + XF86AudioNext", "playerctl --player=mpd next")
 bind_exec("SUPER + XF86AudioPrev", "playerctl --player=mpd previous")
 bind_exec("SUPER + XF86AudioPlay", "playerctl --player=mpd play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=mpd stop")
-bind_exec("SUPER + XF86AudioStop", "wptoggle")
+bind_exec("SUPER + XF86AudioStop", "playerctl --player=mpd stop; wptoggle")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")

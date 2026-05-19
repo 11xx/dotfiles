@@ -42,9 +42,6 @@ window_rule({ class = "^(steam_app_[0-9]+)$" }, { monitor = "0 silent", workspac
 -- Elden Ring: prevent FPS drops when unfocused
 window_rule({ class = "steam_app_2622380", title = "ELDEN RING NIGHTREIGN" }, { render_unfocused = true })
 
--- Render unfocused at lower FPS (add to config misc section)
--- hl.config({ misc = { render_unfocused_fps = 30 } })
-
 -- File Managers
 window_rule({ class = "org.kde.ark", title = "^(File Already Exists).*Ark$" }, { float = true })
 window_rule({ class = "org.kde.dolphin", title = "^(Choose Application).*Dolphin$" }, { float = true })

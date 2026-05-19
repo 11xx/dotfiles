@@ -30,7 +30,6 @@ hl.config({
 
         resize_on_border = false,
         extend_border_grab_area = 0,
-        -- no_cursor_warps = true -- don't move the cursor with keybinds
         resize_corner = 0, -- bottom right
     },
 })
@@ -67,6 +66,7 @@ hl.config({
 
         mouse_move_enables_dpms = false,
         key_press_enables_dpms = true,
+        -- render_unfocused_fps = 30,
     },
     debug = {
         -- vfr = false,

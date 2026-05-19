@@ -258,7 +258,6 @@ hl.config({
 
         resize_on_border = false,
         extend_border_grab_area = 0,
-        -- no_cursor_warps = true -- don't move the cursor with keybinds
         resize_corner = 0, -- bottom right
     },
 })
@@ -305,6 +304,7 @@ hl.config({
 
         mouse_move_enables_dpms = false,
         key_press_enables_dpms = true,
+        -- render_unfocused_fps = 30,
     },
     debug = {
         -- vfr = false,
@@ -374,9 +374,6 @@ window_rule({ class = "^(steam_app_[0-9]+)$" }, { monitor = "0 silent", workspac
 
 -- Elden Ring: prevent FPS drops when unfocused
 window_rule({ class = "steam_app_2622380", title = "ELDEN RING NIGHTREIGN" }, { render_unfocused = true })
-
--- Render unfocused at lower FPS (add to config misc section)
--- hl.config({ misc = { render_unfocused_fps = 30 } })
 
 -- File Managers
 window_rule({ class = "org.kde.ark", title = "^(File Already Exists).*Ark$" }, { float = true })
@@ -470,6 +467,8 @@ local browser = "firefox"
 bind("SUPER + G", hl.dsp.submap("reset"), { submap_universal = true })
 
 bind("SUPER + T", hl.dsp.window.float({ action = "toggle" }))
+
+-- hl.dsp.layout(...) wraps Hyprland's native layoutmsg dispatcher.
 bind("SUPER + R", hl.dsp.layout("rotatesplit 90"))
 bind("SUPER + SHIFT + R", hl.dsp.layout("rotatesplit 270"))
 bind("SUPER + S", hl.dsp.layout("swapsplit"))
@@ -577,8 +576,8 @@ bind("SUPER + O", hl.dsp.focus({ monitor = "+1" }))
 bind("SUPER + SHIFT + O", hl.dsp.window.move({ monitor = "+1" }))
 -- exec, hyprctl dispatch movewindow mon:"$(hyprctl monitors -j | jq -r '.[] | select(.focused == false).id')"
 
--- Notification contols
-bind_exec("SUPER + CTRL + ALT + N", "swaync-client --open-panel")
+-- Notification controls
+bind_exec("SUPER + CTRL + ALT + S", "swaync-client --open-panel")
 
 -- Switch keyboard layouts, find names with `hyprctl devices'
 -- bind_exec("control_r", "hyprctl switchxkblayout \"$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')\" next")
@@ -609,7 +608,7 @@ Using =gpu-screen-recorder=
 bind_exec("SUPER + ALT + SPACE", "gpu-screen-recorder-replay-save")
 
 -- Pause/resume replay buffer
-bind_exec("SUPER + ALT + pause", "gpu-screen-recorder-replay-toggle")
+bind_exec("SUPER + ALT + home", "gpu-screen-recorder-replay-toggle")
 
 -- Stop replay buffer entirely
 bind_exec("SUPER + ALT + end", "gpu-screen-recorder-replay-stop")
@@ -634,8 +633,7 @@ bind_exec("XF86AudioPlay", "playerctl play-pause")
 bind_exec("SUPER + XF86AudioNext", "playerctl --player=mpd next")
 bind_exec("SUPER + XF86AudioPrev", "playerctl --player=mpd previous")
 bind_exec("SUPER + XF86AudioPlay", "playerctl --player=mpd play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=mpd stop")
-bind_exec("SUPER + XF86AudioStop", "wptoggle")
+bind_exec("SUPER + XF86AudioStop", "playerctl --player=mpd stop; wptoggle")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")
