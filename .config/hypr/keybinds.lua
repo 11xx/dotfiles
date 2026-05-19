@@ -7,7 +7,8 @@ local browser = "firefox"
 bind("SUPER + G", hl.dsp.submap("reset"), { submap_universal = true })
 
 bind("SUPER + T", hl.dsp.window.float({ action = "toggle" }))
-bind("SUPER + R", hl.dsp.layout("togglesplit"))
+bind("SUPER + R", hl.dsp.layout("rotatesplit 90"))
+bind("SUPER + SHIFT + R", hl.dsp.layout("rotatesplit 270"))
 bind("SUPER + S", hl.dsp.layout("swapsplit"))
 
 -- [[https://github.com/hyprwm/Hyprland/issues/102][Submap of key bindings · Issue #102 · hyprwm/Hyprland]]
@@ -35,11 +36,15 @@ bind("SUPER + L", hl.dsp.focus({ direction = "r" }))
 bind("SUPER + P", hl.dsp.window.cycle_next({ prev = true }))
 bind("SUPER + N", hl.dsp.window.cycle_next({ next = true }))
 
--- vim
-bind("SUPER + SHIFT + H", hl.dsp.window.move({ direction = "l" }))
-bind("SUPER + SHIFT + J", hl.dsp.window.move({ direction = "d" }))
-bind("SUPER + SHIFT + K", hl.dsp.window.move({ direction = "u" }))
-bind("SUPER + SHIFT + L", hl.dsp.window.move({ direction = "r" }))
+function bubblemv(direction)
+    return function()
+        return hl.plugin.bubblemv.move(direction)
+    end
+end
+bind("SUPER + SHIFT + H", bubblemv("left"))
+bind("SUPER + SHIFT + J", bubblemv("down"))
+bind("SUPER + SHIFT + K", bubblemv("up"))
+bind("SUPER + SHIFT + L", bubblemv("right"))
 
 bind("SUPER + ALT + B", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
 bind("SUPER + ALT + N", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
