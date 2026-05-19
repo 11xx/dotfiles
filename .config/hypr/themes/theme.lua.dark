@@ -1,0 +1,22 @@
+dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "") .. "colors.lua")
+
+return {
+    name = "dark",
+    colorBg = colorNeronBg,
+    colorFg = colorNeronFg,
+    colorBgSecondary = "rgb(27282c)",
+    hyprbarsColorClose = colorNeronPink,
+    hyprbarsColorMaximize = colorNeronGreen,
+    hyprbarsColorFloat = colorNeronCyan,
+    config = {
+        general = {
+            gaps_in = 4,
+            gaps_out = 8,
+            border_size = 3,
+            col = {
+                active_border = colorNeronOrange,
+                inactive_border = colorTransparent,
+            },
+        },
+    },
+}

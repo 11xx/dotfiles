@@ -1,0 +1,25 @@
+dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "") .. "colors.lua")
+
+return {
+    name = "light",
+    colorBg = colorMonowhiteBg,
+    colorFg = colorMonowhiteFg,
+    colorBgSecondary = "rgb(f6f6f6)",
+    hyprbarsColorClose = colorMonowhitePink,
+    hyprbarsColorMaximize = colorMonowhiteGreen,
+    hyprbarsColorFloat = colorMonowhiteCyan,
+    config = {
+        decoration = {
+            rounding = 4,
+        },
+        general = {
+            gaps_in = 4,
+            gaps_out = 8,
+            border_size = 3,
+            col = {
+                active_border = { colors = { colorMonowhitePink }, angle = 45 },
+                inactive_border = colorTransparent,
+            },
+        },
+    },
+}

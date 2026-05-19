@@ -139,7 +139,7 @@ Replacement for =no_gaps_when_only=, see
 [[https://github.com/hyprwm/Hyprland/pull/8072][hyprwm/Hyprland/Pull Request #8072/layouts: Nuke no_gaps_when_only by vaxerski]].
 #+begin_src lua
 for _, selector in ipairs({ "w[t1]", "w[tg1]", "f[1]" }) do
-    hl.workspace_rule({ workspace = selector, gaps_in = 0, gaps_out = 0, border_size = 1 })
+    hl.workspace_rule({ workspace = selector, gaps_in = 0, gaps_out = 0 })
 end
 #+end_src
 
@@ -658,10 +658,6 @@ Settings that use IPC like =gsettings= or =hyprctl= could and probably
 should also be set from darkman.
 
 *** Mouse: Settings for hyprcursor and the xcursor fallback
-:PROPERTIES:
-:header-args:lua: :tangle theme.lua
-:END:
-
 - See
   + [[https://wiki.hyprland.org/FAQ/#how-do-i-change-me-mouse-cursor][FAQ#How do I change me mouse cursor? – Hyprland Wiki]]
   + [[https://github.com/hyprwm/Hyprland/issues/6320][Inconsistent cursor size · Issue #6320 · hyprwm/Hyprland · GitHub]]
@@ -709,47 +705,77 @@ hl.config({
 :END:
 
 The .light|.dark suffix is to distinguish a theme file so it can be symlinked
-to the "current theme" file =theme.conf=, e.g.:
-: ln -sf theme.conf.light theme.conf
+to the "current theme" file =theme.lua=, e.g.:
+: ln -sf theme.lua.light theme.lua
 
 - This is an artefact of a darkman setup, for dynamic auto dark/light theme
   change.
 
   See [[file:~/.config/darkman/README.org::#hyprland][darkman#Hyprland]]
 
-The old hyprlang =theme.conf= symlink was sourced from the main config. With
-Hyprland's Lua config this section defines the active theme directly; darkman
-automation should switch this via =hyprctl eval= or by tangling a Lua variant.
+The old hyprlang =theme.conf= symlink was sourced from the main config. In the
+Lua config, =themes/theme.lua= points to a Lua theme profile file that returns a
+table. During config evaluation, the theme loader loads the symlink target and
+applies the returned theme table.
 
-Shared 'library' of color definitions
-#+begin_src lua
--- basic
-local colorWhite = "rgb(ffffff)"
-local colorGrayBg = "rgb(cccccc)"
+#+begin_src shell :tangle no
+hyprland_link_theme light
+hyprctl reload
 
--- light theme
-local colorMonowhiteBg = colorWhite
-local colorMonowhiteFg = "rgb(545e62)"
-local colorMonowhiteRed = "rgb(ba0d0d)"
-local colorMonowhiteCyan = "rgb(006861)"
-local colorMonowhitePink = "rgb(b30071)"
-local colorMonowhiteGreen = "rgb(1c6b00)"
-
--- dark theme (neron)
-local colorNeronBg = "rgb(222222)"
-local colorNeronGreen = "rgb(61bd09)"
-local colorNeronCyan = "rgb(16b0cf)"
-local colorNeronFg = "rgb(a6a8a9)"
-local colorNeronCurrent = "rgb(2f2f2f)"
-local colorNeronOrange = "rgb(fd892c)"
-
--- misc
-local colorCurrentIcon = "rgb(666666)"
+hyprland_link_theme dark
+hyprctl reload
 #+end_src
 
+For live application without a full config reload, the same theme function can
+be called directly:
 
-#+begin_src lua
-local lightTheme = {
+#+begin_src shell :tangle no
+hyprland_link_theme light
+hyprctl eval 'apply_theme()'
+
+hyprland_link_theme dark
+hyprctl eval 'apply_theme()'
+#+end_src
+
+The symlink update stores the selected theme for future reloads. A reload or eval
+call is still required after changing only the symlink, because
+=themes/theme.lua= is loaded by the theme loader and is not itself the required
+module watched as the main Hyprland config entrypoint.
+
+Shared 'library' of color definitions
+#+begin_src lua :tangle themes/colors.lua :mkdirp yes
+-- basic
+colorBlack = "rgb(000000)"
+colorTransparent = "rgba(ff000000)"
+colorWhite = "rgb(ffffff)"
+colorGrayBg = "rgb(cccccc)"
+
+-- light theme
+colorMonowhiteBg = colorWhite
+colorMonowhiteFg = "rgb(545e62)"
+colorMonowhiteRed = "rgb(ba0d0d)"
+colorMonowhiteCyan = "rgb(006861)"
+colorMonowhitePink = "rgb(b30071)"
+colorMonowhiteGreen = "rgb(1c6b00)"
+
+-- dark theme (neron)
+colorNeronBg = "rgb(222222)"
+colorNeronPink = "rgb(ff77cf)"
+colorNeronGreen = "rgb(61bd09)"
+colorNeronCyan = "rgb(16b0cf)"
+colorNeronFg = "rgb(a6a8a9)"
+colorNeronCurrent = "rgb(2f2f2f)"
+colorNeronOrange = "rgb(fd892c)"
+
+-- misc
+colorCurrentIcon = "rgb(666666)"
+#+end_src
+
+#+begin_src lua :tangle themes/theme.lua.light :mkdirp yes
+dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "") .. "colors.lua")
+
+return {
+    name = "light",
     colorBg = colorMonowhiteBg,
     colorFg = colorMonowhiteFg,
     colorBgSecondary = "rgb(f6f6f6)",
@@ -773,8 +799,11 @@ local lightTheme = {
 }
 #+end_src
 
-#+begin_src lua
-local darkTheme = {
+#+begin_src lua :tangle themes/theme.lua.dark :mkdirp yes
+dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "") .. "colors.lua")
+
+return {
+    name = "dark",
     colorBg = colorNeronBg,
     colorFg = colorNeronFg,
     colorBgSecondary = "rgb(27282c)",
@@ -785,17 +814,78 @@ local darkTheme = {
         general = {
             gaps_in = 4,
             gaps_out = 8,
-            border_size = 1, -- dark border is easier to see in dark theme
+            border_size = 3,
             col = {
-                active_border = colorYtOrange,
+                active_border = colorNeronOrange,
                 inactive_border = colorTransparent,
             },
         },
     },
 }
+#+end_src
 
-local activeTheme = darkTheme
-hl.config(activeTheme.config)
+#+begin_src lua
+local function theme_conf_file()
+    local config_home = os.getenv("XDG_CONFIG_HOME")
+    if config_home == nil or config_home == "" then
+        config_home = (os.getenv("HOME") or "") .. "/.config"
+    end
+    return config_home .. "/hypr/themes/active-theme.lua"
+end
+
+local function theme_file_for_name(name)
+    if name == "light" or name == "dark" then
+        return theme_conf_file() .. "." .. name
+    end
+    return name
+end
+
+local function notify_theme_error(message)
+    if hl.notification ~= nil then
+        hl.notification.create({
+            text = message,
+            duration = 5000,
+            icon = "warning",
+            color = colorYtOrange,
+        })
+    end
+end
+
+local function load_theme(name)
+    local path = theme_conf_file()
+    if name ~= nil then
+        path = theme_file_for_name(name)
+    end
+
+    local ok, theme = pcall(dofile, path)
+    if not ok then
+        notify_theme_error("Unable to load Hyprland theme: " .. tostring(path))
+        return nil
+    end
+    if type(theme) ~= "table" then
+        notify_theme_error("Hyprland theme did not return a table: " .. tostring(path))
+        return nil
+    end
+    return theme
+end
+
+function apply_theme(name)
+    local theme = load_theme(name)
+    if theme == nil then
+        return
+    end
+
+    colorBg = theme.colorBg
+    colorFg = theme.colorFg
+    colorBgSecondary = theme.colorBgSecondary
+    hyprbarsColorClose = theme.hyprbarsColorClose
+    hyprbarsColorMaximize = theme.hyprbarsColorMaximize
+    hyprbarsColorFloat = theme.hyprbarsColorFloat
+
+    hl.config(theme.config)
+end
+
+apply_theme()
 #+end_src
 
 *** Blur

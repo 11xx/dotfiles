@@ -26,5 +26,5 @@ hl.workspace_rule({ workspace = "9", persistent = true, gaps_in = 0, gaps_out = 
 hl.workspace_rule({ workspace = "10", persistent = true })
 
 for _, selector in ipairs({ "w[t1]", "w[tg1]", "f[1]" }) do
-    hl.workspace_rule({ workspace = selector, gaps_in = 0, gaps_out = 0, border_size = 1 })
+    hl.workspace_rule({ workspace = selector, gaps_in = 0, gaps_out = 0 })
 end

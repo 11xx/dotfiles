@@ -24,74 +24,67 @@ hl.config({
     },
 })
 
--- basic
-local colorWhite = "rgb(ffffff)"
-local colorGrayBg = "rgb(cccccc)"
+local function theme_conf_file()
+    local config_home = os.getenv("XDG_CONFIG_HOME")
+    if config_home == nil or config_home == "" then
+        config_home = (os.getenv("HOME") or "") .. "/.config"
+    end
+    return config_home .. "/hypr/themes/active-theme.lua"
+end
 
--- light theme
-local colorMonowhiteBg = colorWhite
-local colorMonowhiteFg = "rgb(545e62)"
-local colorMonowhiteRed = "rgb(ba0d0d)"
-local colorMonowhiteCyan = "rgb(006861)"
-local colorMonowhitePink = "rgb(b30071)"
-local colorMonowhiteGreen = "rgb(1c6b00)"
+local function theme_file_for_name(name)
+    if name == "light" or name == "dark" then
+        return theme_conf_file() .. "." .. name
+    end
+    return name
+end
 
--- dark theme (neron)
-local colorNeronBg = "rgb(222222)"
-local colorNeronGreen = "rgb(61bd09)"
-local colorNeronCyan = "rgb(16b0cf)"
-local colorNeronFg = "rgb(a6a8a9)"
-local colorNeronCurrent = "rgb(2f2f2f)"
-local colorNeronOrange = "rgb(fd892c)"
+local function notify_theme_error(message)
+    if hl.notification ~= nil then
+        hl.notification.create({
+            text = message,
+            duration = 5000,
+            icon = "warning",
+            color = colorYtOrange,
+        })
+    end
+end
 
--- misc
-local colorCurrentIcon = "rgb(666666)"
+local function load_theme(name)
+    local path = theme_conf_file()
+    if name ~= nil then
+        path = theme_file_for_name(name)
+    end
 
-local lightTheme = {
-    colorBg = colorMonowhiteBg,
-    colorFg = colorMonowhiteFg,
-    colorBgSecondary = "rgb(f6f6f6)",
-    hyprbarsColorClose = colorMonowhitePink,
-    hyprbarsColorMaximize = colorMonowhiteGreen,
-    hyprbarsColorFloat = colorMonowhiteCyan,
-    config = {
-        decoration = {
-            rounding = 4,
-        },
-        general = {
-            gaps_in = 4,
-            gaps_out = 8,
-            border_size = 3,
-            col = {
-                active_border = { colors = { colorMonowhitePink }, angle = 45 },
-                inactive_border = colorTransparent,
-            },
-        },
-    },
-}
+    local ok, theme = pcall(dofile, path)
+    if not ok then
+        notify_theme_error("Unable to load Hyprland theme: " .. tostring(path))
+        return nil
+    end
+    if type(theme) ~= "table" then
+        notify_theme_error("Hyprland theme did not return a table: " .. tostring(path))
+        return nil
+    end
+    return theme
+end
 
-local darkTheme = {
-    colorBg = colorNeronBg,
-    colorFg = colorNeronFg,
-    colorBgSecondary = "rgb(27282c)",
-    hyprbarsColorClose = colorNeronPink,
-    hyprbarsColorMaximize = colorNeronGreen,
-    hyprbarsColorFloat = colorNeronCyan,
-    config = {
-        general = {
-            gaps_in = 4,
-            gaps_out = 8,
-            border_size = 1, -- dark border is easier to see in dark theme
-            col = {
-                active_border = colorYtOrange,
-                inactive_border = colorTransparent,
-            },
-        },
-    },
-}
+function apply_theme(name)
+    local theme = load_theme(name)
+    if theme == nil then
+        return
+    end
 
-local activeTheme = darkTheme
-hl.config(activeTheme.config)
+    colorBg = theme.colorBg
+    colorFg = theme.colorFg
+    colorBgSecondary = theme.colorBgSecondary
+    hyprbarsColorClose = theme.hyprbarsColorClose
+    hyprbarsColorMaximize = theme.hyprbarsColorMaximize
+    hyprbarsColorFloat = theme.hyprbarsColorFloat
+
+    hl.config(theme.config)
+end
+
+apply_theme()
 
 hl.config({
     decoration = {
