@@ -82,6 +82,9 @@ function apply_theme(name)
     hyprbarsColorFloat = theme.hyprbarsColorFloat
 
     hl.config(theme.config)
+    if apply_hyprbars_theme ~= nil then
+        apply_hyprbars_theme()
+    end
 end
 
 apply_theme()

@@ -6,7 +6,7 @@ exec_once("sleep 2 && hypr-eww-open")
 exec_once("sleep 10 && hypr-eww-restart-on-monitor-change")
 exec_once("xsettingsd") -- GTK2-3 theme live changes
 -- exec_once("gammastep -P")
-exec_once("hypridle")
+exec_once("hypridle -c \"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hypridle.conf\"")
 exec_once("hyprpm reload -n")
 
 hl.env("XDG_MENU_PREFIX", "arch-")

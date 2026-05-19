@@ -31,7 +31,7 @@ require("keybinds")
 require("theme")
 require("nvidia")
 require("vrr")
--- require("plugins.hyprbars")
+require("plugins.hyprbars")
 require("enable-tearing")
 require("misc-snippets")
 require("idleinhibit")
@@ -160,7 +160,7 @@ exec_once("sleep 2 && hypr-eww-open")
 exec_once("sleep 10 && hypr-eww-restart-on-monitor-change")
 exec_once("xsettingsd") -- GTK2-3 theme live changes
 -- exec_once("gammastep -P")
-exec_once("hypridle")
+exec_once("hypridle -c \"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hypridle.conf\"")
 exec_once("hyprpm reload -n")
 #+end_src
 Fix file association in dolphin.
@@ -883,6 +883,9 @@ function apply_theme(name)
     hyprbarsColorFloat = theme.hyprbarsColorFloat
 
     hl.config(theme.config)
+    if apply_hyprbars_theme ~= nil then
+        apply_hyprbars_theme()
+    end
 end
 
 apply_theme()
@@ -1009,40 +1012,117 @@ hl.config({
 
 *** Hyprbars
 :PROPERTIES:
-:header-args:hyprlang-ts: :tangle plugins/hyprbars.conf :mkdirp yes
+:header-args:lua: :tangle plugins/hyprbars.lua :mkdirp yes
 :END:
 - [[https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars][hyprland-plugins/hyprbars at main · hyprwm/hyprland-plugins]]
   # [2024-06-09 Sun 19:46:25 -03] @ak
-#+begin_src hyprlang-ts
-plugin {
-  hyprbars {
-    bar_height = 20
-    bar_color = $colorBgSecondary
-    col.text = $colorFg
-    bar_text_size = 9
-    bar_text_font = Noto Sans
-    bar_button_padding = 10
-    bar_padding = 5
-    bar_precedence_over_border = true
-    hyprbars-button = $hyprbarsColorClose, 16, , hyprctl dispatch killactive
-    hyprbars-button = $hyprbarsColorMaximize, 16, , hyprctl dispatch fullscreen 2
-    hyprbars-button = $hyprbarsColorFloat, 16, , hyprctl dispatch togglefloating
-  }
-}
+
+Hyprbars is enabled by =hyprpm=, for example =hyprpm enable hyprbars=. The
+plugin's settings are still Hyprland config, not a separate plugin module.
+
+Hyprbars buttons are configured through the plugin Lua API. The plugin clears
+buttons during full config reloads; theme-only evals should update normal
+=hl.config= values without re-adding buttons.
+
+#+begin_src lua
+local hyprbars_buttons_registered = false
+
+local function hyprbars_loaded()
+    return hl.plugin ~= nil and hl.plugin.hyprbars ~= nil
+end
+
+local function notify_hyprbars_missing()
+    if hl.notification ~= nil then
+        hl.notification.create({
+            text = "Hyprbars plugin is not loaded; run hyprpm enable hyprbars && hyprpm reload",
+            duration = 5000,
+            icon = "warning",
+            color = colorYtOrange,
+        })
+    end
+end
+
+function apply_hyprbars_theme()
+    if not hyprbars_loaded() then
+        return
+    end
+
+    hl.config({
+        plugin = {
+            hyprbars = {
+                bar_height = 20,
+                bar_color = colorBgSecondary,
+                col = {
+                    text = colorFg,
+                },
+                bar_text_size = 9,
+                bar_text_font = "Noto Sans",
+                bar_button_padding = 10,
+                bar_padding = 5,
+                bar_precedence_over_border = true,
+            },
+        },
+    })
+end
+
+local function add_hyprbars_buttons()
+    if not hyprbars_loaded() or hyprbars_buttons_registered then
+        return
+    end
+
+    hl.plugin.hyprbars.add_button({
+        bg_color = hyprbarsColorClose,
+        fg_color = colorFg,
+        size = 16,
+        icon = "",
+        action = "hyprctl dispatch killactive",
+    })
+    hl.plugin.hyprbars.add_button({
+        bg_color = hyprbarsColorMaximize,
+        fg_color = colorFg,
+        size = 16,
+        icon = "",
+        action = "hyprctl dispatch fullscreen 2",
+    })
+    hl.plugin.hyprbars.add_button({
+        bg_color = hyprbarsColorFloat,
+        fg_color = colorFg,
+        size = 16,
+        icon = "",
+        action = "hyprctl dispatch togglefloating",
+    })
+
+    hyprbars_buttons_registered = true
+end
+
+local function setup_hyprbars(notify_missing)
+    if not hyprbars_loaded() then
+        if notify_missing then
+            notify_hyprbars_missing()
+        end
+        return
+    end
+
+    apply_hyprbars_theme()
+    add_hyprbars_buttons()
+end
+
+setup_hyprbars(false)
+hl.on("hyprland.start", function()
+    hl.timer(function()
+        setup_hyprbars(true)
+    end, { timeout = 2000, type = "oneshot" })
+end)
 #+end_src
 
-Disable title bars for tiles (non-floating) windows
+Disable title bars for tiled windows
 - See
   + [[https://github.com/hyprwm/hyprland-plugins/tree/main/hyprbars#window-rules][hyprland-plugins/hyprbars#Window rules at main · hyprwm/hyprland-plugins]]
   + [[https://www.reddit.com/r/hyprland/comments/1cyaz4u/comment/l5brgnw/][I like hyprbars. That's all. : r/hyprland]]
-#+begin_src hyprlang-ts
-windowrule = hyprbars:no_bar true, match:float false
-#+end_src
-
-Source in main config
-#+begin_src lua :tangle no
--- Hyprbars plugin config remains hyprlang because plugin config still uses that
--- syntax. It is intentionally not required from hyprland.lua while disabled.
+#+begin_src lua
+if hyprbars_loaded() then
+    window_rule({ float = false }, { ["hyprbars:no_bar"] = true })
+end
 #+end_src
 
 ** Enable tearing
@@ -1100,6 +1180,10 @@ stuff for development
 :header-args:hyprlang-ts: :tangle hypridle.conf :comments org
 :END:
 - [[https://wiki.hyprland.org/Hypr-Ecosystem/hypridle/][hypridle – Hyprland Wiki]]
+
+Hypridle still uses hyprlang. It is not part of Hyprland's Lua config migration,
+so it should continue to tangle to =hypridle.conf= and be launched by
+=exec_once("hypridle")=.
 
 - Monitor DPMS and brightness for hypridle ::
 #+begin_src hyprlang-ts :noweb tangle
