@@ -835,6 +835,14 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
     :if (treesit-available-p)))
 #+end_src
 
+*** etc
+randoms
+#+begin_src emacs-lisp
+(use-package etc-sudoers-mode :defer t)
+(use-package dockerfile-mode :defer t)
+#+end_src
+
+
 *** provide footer
 #+begin_src emacs-lisp
 (provide '11xx-modes-edit)
@@ -1623,6 +1631,7 @@ Make syntax markers like ~=word=~ or =~word~= be hidden normally and only
 appear when hovered.
 #+begin_src emacs-lisp
 (use-package org-appear
+  :disabled
   :after org
   :hook (org-mode . org-appear-mode)
   :init
@@ -2046,12 +2055,7 @@ Return the path to the generated output file."
 SLUG is derived from the heading title and confirmed in the minibuffer."
       (interactive)
       (let* ((title (substring-no-properties (org-entry-get nil "ITEM")))
-             (slug  (thread-last title
-                                 (downcase)
-                                 (replace-regexp-in-string "[[:space:]]+" "-")
-                                 (replace-regexp-in-string "[^a-z0-9_-]" "")
-                                 (replace-regexp-in-string "-+" "-")
-                                 (string-trim "-")))
+             (slug  (org-stable-ids--slugify title))
              (slug  (read-string "Slug for tdir-base: " slug))
              (value (format "(tdir-base \"%s\")" slug)))
         (org-set-property "tangle-dir" value)
@@ -3588,7 +3592,9 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
               ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
               gpt-oss-120b:floor
               gpt-oss-120b:nitro
+              gpt-oss-120b:google-vertex
               stepfun/step-3.5-flash:nitro
+              google/gemini-3.1-flash-lite-preview
 
               qwen/qwen3.6-plus:free
               tencent/hy3-preview:free
@@ -3660,7 +3666,17 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 
 (use-package gptel-titler
   :after gptel
-  :load-path "~/code/emacs/gptel-titler/")
+  :load-path "~/code/emacs/gptel-titler/"
+  :init
+  (setopt gptel-titler-model 'openai/gpt-oss-safeguard-20b)
+  :config
+  ;; example add new model name to existing backend
+  ;; (let ((backend (gptel-get-backend "OpenRouter")))
+  ;;   (when backend
+  ;;     (cl-pushnew 'openai/gpt-oss-safeguard-20b
+  ;;                 (gptel-backend-models backend)
+  ;;                 :key (lambda (x) (if (listp x) (car x) x)))))
+  )
 #+end_src
 
 mcp

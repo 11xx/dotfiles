@@ -101,7 +101,9 @@ number."
   (setq auto-dark-themes '((neron-dark)
                            (neron-light)))
   :config
-  (auto-dark-mode)
+  (if (daemonp)
+      (add-hook 'after-make-frame-functions #'auto-dark-mode)
+    (auto-dark-mode))
   (setq minor-mode-alist
         (delq (assq 'auto-dark-mode minor-mode-alist) minor-mode-alist)))
 (use-package ibuffer
@@ -135,19 +137,19 @@ number."
 (use-package fira-code-mode
   :config
   ;; most of this boiler plate is to handle loading order when in daemon mode
-  (defun fira-code-init ()
-    (fira-code-mode-set-font))
-
+  ;; cool thing I learnt here, defun returns the function name so it can be
+  ;; used as symbol too, then that symbol can be called from inside itself
+  ;; because of lexical order.
   (if (daemonp)
       (add-hook 'after-make-frame-functions
                 (defun fira-code-daemon-init (frame)
                   (when (display-graphic-p frame)
                     (with-selected-frame frame
-                      (fira-code-init))
+                      (fira-code-mode-set-font))
                     ;; fontset is global, only needs to run once
                     (remove-hook 'after-make-frame-functions
                                  #'fira-code-daemon-init))))
-    (fira-code-init))
+    (fira-code-mode-set-font))
 
   :hook ((prog-mode text-mode) . (lambda ()
                                    (when (display-graphic-p)

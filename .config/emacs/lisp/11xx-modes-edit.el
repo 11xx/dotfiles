@@ -70,5 +70,8 @@
     :after picard-mode
     :if (treesit-available-p)))
 
+(use-package etc-sudoers-mode :defer t)
+(use-package dockerfile-mode :defer t)
+
 (provide '11xx-modes-edit)
 ;;; 11xx-modes-edit.el ends here

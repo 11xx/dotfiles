@@ -73,6 +73,7 @@
 (advice-add 'org-export--dispatch-action
             :before #'org-export-dispatch-disable-whitespace)
 (use-package org-appear
+  :disabled
   :after org
   :hook (org-mode . org-appear-mode)
   :init
@@ -183,12 +184,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 SLUG is derived from the heading title and confirmed in the minibuffer."
       (interactive)
       (let* ((title (substring-no-properties (org-entry-get nil "ITEM")))
-             (slug  (thread-last title
-                                 (downcase)
-                                 (replace-regexp-in-string "[[:space:]]+" "-")
-                                 (replace-regexp-in-string "[^a-z0-9_-]" "")
-                                 (replace-regexp-in-string "-+" "-")
-                                 (string-trim "-")))
+             (slug  (org-stable-ids--slugify title))
              (slug  (read-string "Slug for tdir-base: " slug))
              (value (format "(tdir-base \"%s\")" slug)))
         (org-set-property "tangle-dir" value)

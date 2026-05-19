@@ -50,7 +50,9 @@
               ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
               gpt-oss-120b:floor
               gpt-oss-120b:nitro
+              gpt-oss-120b:google-vertex
               stepfun/step-3.5-flash:nitro
+              google/gemini-3.1-flash-lite-preview
 
               qwen/qwen3.6-plus:free
               tencent/hy3-preview:free
@@ -122,7 +124,17 @@
 
 (use-package gptel-titler
   :after gptel
-  :load-path "~/code/emacs/gptel-titler/")
+  :load-path "~/code/emacs/gptel-titler/"
+  :init
+  (setopt gptel-titler-model 'openai/gpt-oss-safeguard-20b)
+  :config
+  ;; example add new model name to existing backend
+  ;; (let ((backend (gptel-get-backend "OpenRouter")))
+  ;;   (when backend
+  ;;     (cl-pushnew 'openai/gpt-oss-safeguard-20b
+  ;;                 (gptel-backend-models backend)
+  ;;                 :key (lambda (x) (if (listp x) (car x) x)))))
+  )
 
 (use-package mcp
   :init
