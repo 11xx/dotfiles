@@ -2,7 +2,11 @@
 aiagent_name: aiagent
 aiagent_shell: /bin/bash
 aiagent_shared_group: aiwork
-aiagent_workspace_root: /home/work
+aiagent_workspace_root: /work
+aiagent_exposed_port_prefix: "4522"
+aiagent_t3_container_port: 3773
+aiagent_t3_public_bind: "0.0.0.0"
+aiagent_t3_public_port: 45223
 aiagent_container_root: "/home/{{ aiagent_name }}/aiagent_container"
 aiagent_container_dirs:
   - agents

@@ -1,11 +1,72 @@
 #+PROPERTY: header-args :mkdirp yes
 #+PROPERTY: tangle-dir (expand-file-name "~/ansible/system/roles/aiagent_host_setup/files/")
 
+* Setup constants
+
+Edit these values here first. Tangled Quadlets, Ansible defaults, and shell
+helpers should reference these constants instead of repeating path or port
+literals.
+
+#+NAME: aiagent-host-work-root
+#+begin_src emacs-lisp :exports none
+"/work"
+#+end_src
+
+#+NAME: aiagent-container-work-root
+#+begin_src emacs-lisp :exports none
+"/work"
+#+end_src
+
+#+NAME: aiagent-ai-work-subdir
+#+begin_src emacs-lisp :exports none
+"ai"
+#+end_src
+
+#+NAME: aiagent-exposed-port-prefix
+#+begin_src emacs-lisp :exports none
+"4522"
+#+end_src
+
+#+NAME: aiagent-t3-exposed-port-suffix
+#+begin_src emacs-lisp :exports none
+"3"
+#+end_src
+
+#+NAME: aiagent-t3-public-port
+#+begin_src emacs-lisp :exports none :var prefix=aiagent-exposed-port-prefix() suffix=aiagent-t3-exposed-port-suffix()
+(concat prefix suffix)
+#+end_src
+
+#+NAME: aiagent-t3-public-bind
+#+begin_src emacs-lisp :exports none
+"0.0.0.0"
+#+end_src
+
+#+NAME: aiagent-t3-container-port
+#+begin_src emacs-lisp :exports none
+"3773"
+#+end_src
+
+#+NAME: aiagent-t3-host-url
+#+begin_src emacs-lisp :exports none :var public_port=aiagent-t3-public-port()
+(concat "http://127.0.0.1:" public_port "/")
+#+end_src
+
+#+NAME: aiagent-container-ai-root
+#+begin_src emacs-lisp :exports none :var root=aiagent-container-work-root() subdir=aiagent-ai-work-subdir()
+(concat root "/" subdir)
+#+end_src
+
+#+NAME: aiagent-host-ai-root
+#+begin_src emacs-lisp :exports none :var root=aiagent-host-work-root() subdir=aiagent-ai-work-subdir()
+(concat root "/" subdir)
+#+end_src
+
 * Harness notes
 
 This role builds one persistent rootless Podman container for terminal-first AI
 coding harnesses. The isolation boundary is the container plus agent
-permissions; the host only shares =/home/work= and the explicitly mounted state
+permissions; the host only shares =/work= and the explicitly mounted state
 directories.
 
 - =opencode= is a terminal coding agent with its own config/state.
@@ -27,9 +88,15 @@ directories.
   sidecar container. It wraps =codex app-server=, so running it in the same
   container gives it the same Codex binary, OAuth state under =~/.codex=, and
   mounted =/work= view as terminal Codex.
-- Use =/work= as the canonical in-container workspace root. Keep
-  =/workspace -> /work= as a compatibility symlink for older Codex/OpenCode
-  session state that still records absolute =/workspace/...= paths.
+- Use =/work= as the canonical host and in-container workspace root. These are
+  separate filesystems connected only through the explicit bind mount.
+- Externally reachable AI services should prefer the manually chosen host port
+  prefix defined in [[*Setup constants][Setup constants]]. T3 Web uses the T3
+  public port constant; internal-only ports such as MCP =8000= should stay
+  unpublished unless deliberately promoted.
+- The throwaway/no-auth lane is intentionally skipped for now. One-shot and
+  no-auth work should use host-installed tools directly unless that becomes
+  too painful or risky.
 - A small user =t3-web.service= is the clean background-start option for T3.
   Quadlet is still the right layer for the long-lived container itself, but a
   regular systemd service is a better fit for a foreground process started with
@@ -40,7 +107,7 @@ directories.
 
 * Containerfile
 :PROPERTIES:
-:header-args:dockerfile: :tangle (tdir "aiagent_container/Containerfile")
+:header-args:dockerfile: :tangle (tdir "aiagent_container/Containerfile") :noweb tangle
 :END:
 
 #+begin_src dockerfile
@@ -254,12 +321,11 @@ RUN npm install -g @ast-grep/cli \
 
 RUN groupadd -g 1000 node \
  && useradd -m -u 1000 -g 1000 -s /bin/bash node \
- && mkdir -pv /work \
- && ln -sfn /work /workspace \
- && chown node:node /work
+ && mkdir -pv <<aiagent-container-work-root()>> \
+ && chown node:node <<aiagent-container-work-root()>>
 
 USER node
-WORKDIR /work
+WORKDIR <<aiagent-container-work-root()>>
 
 ENV HOME=/home/node
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
@@ -286,7 +352,7 @@ RUN mkdir -pv \
     /home/node/.codex \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
-    /work
+    <<aiagent-container-work-root()>>
 
 RUN java -version \
  && javac -version \
@@ -344,14 +410,14 @@ set -euo pipefail
 exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
 #+end_src
 
-#+begin_src shell :tangle (tdir "aiagent_container/bin/t3-web") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle (tdir "aiagent_container/bin/t3-web") :shebang #!/usr/bin/env bash :tangle-mode o750 :noweb tangle
 set -euo pipefail
 
 export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
-export T3CODE_PORT="${T3CODE_PORT:-3773}"
+export T3CODE_PORT="${T3CODE_PORT:-<<aiagent-t3-container-port()>>}"
 export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3/userdata}"
 export T3CODE_NO_BROWSER="${T3CODE_NO_BROWSER:-true}"
-export T3CODE_CWD="${T3CODE_CWD:-/work}"
+export T3CODE_CWD="${T3CODE_CWD:-<<aiagent-container-work-root()>>}"
 export BROWSER="${BROWSER:-none}"
 
 args=("$@")
@@ -413,16 +479,17 @@ Description=AI Agent Harness Container
 Image=aiagent.build
 AutoUpdate=local
 ContainerName=aiagent
-WorkingDir=/work
+WorkingDir=<<aiagent-container-work-root()>>
 UserNS=keep-id:uid=1000,gid=1000
 Environment=HOME=/home/node
-# T3 Code is a web UI around Codex; expose only on host loopback.
-PublishPort=127.0.0.1:3773:3773
+# T3 Code is the only LAN-exposed harness service. Related exposed ports should
+# prefer the manually chosen <<aiagent-exposed-port-prefix()>>* prefix.
+PublishPort=<<aiagent-t3-public-bind()>>:<<aiagent-t3-public-port()>>:<<aiagent-t3-container-port()>>
 Environment=T3CODE_HOST=0.0.0.0
-Environment=T3CODE_PORT=3773
+Environment=T3CODE_PORT=<<aiagent-t3-container-port()>>
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
-Volume=/home/work:/work:Z
+Volume=<<aiagent-host-work-root()>>:<<aiagent-container-work-root()>>:Z
 Volume=%h/aiagent_container/opencode_config:/home/node/.config/opencode:Z
 Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
 Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
@@ -644,7 +711,6 @@ esac
 Image=ghcr.io/sacode/searxng-simple-mcp:latest
 ContainerName=searxng-mcp
 Network=ai.network
-PublishPort=8000:8000
 Environment=SEARXNG_MCP_SEARXNG_URL=http://host.containers.internal:<<searxng-port()>>
 Environment=TRANSPORT_PROTOCOL=sse
 # prevent loopback
@@ -732,12 +798,16 @@ It's run with =sudo machinectl shell=
 :PROPERTIES:
 :header-args:yaml-ts: :tangle (tdir "main.yaml")
 :END:
-#+begin_src yaml-ts
+#+begin_src yaml-ts :noweb tangle
 ---
 aiagent_name: aiagent
 aiagent_shell: /bin/bash
 aiagent_shared_group: aiwork
-aiagent_workspace_root: /home/work
+aiagent_workspace_root: <<aiagent-host-work-root()>>
+aiagent_exposed_port_prefix: "<<aiagent-exposed-port-prefix()>>"
+aiagent_t3_container_port: <<aiagent-t3-container-port()>>
+aiagent_t3_public_bind: "<<aiagent-t3-public-bind()>>"
+aiagent_t3_public_port: <<aiagent-t3-public-port()>>
 aiagent_container_root: "/home/{{ aiagent_name }}/aiagent_container"
 aiagent_container_dirs:
   - agents
@@ -892,6 +962,22 @@ aiagent_host_user: "{{ local_user_name }}"
 
 # --- directories ---
 
+- name: Check shared workspace root path
+  tags: [aiagent_host]
+  ansible.builtin.stat:
+    path: "{{ aiagent_workspace_root }}"
+  register: aiagent_workspace_stat
+  become: true
+
+- name: Refuse symlink shared workspace root
+  tags: [aiagent_host]
+  ansible.builtin.fail:
+    msg: "{{ aiagent_workspace_root }} must be a real directory, not a symlink"
+  when:
+    - aiagent_workspace_stat.stat.exists
+    - aiagent_workspace_stat.stat.islnk
+  become: true
+
 - name: Create AI agent application directories
   tags: [aiagent_host]
   ansible.builtin.file:
@@ -977,6 +1063,13 @@ aiagent_host_user: "{{ local_user_name }}"
     # o-rwx:  Remove all permissions from others
     mode: "ug+rwX,o-rwx"
   become: true
+
+- name: Preserve setgid on shared workspace directories
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: "find {{ aiagent_workspace_root | quote }} -type d -exec chmod g+s {} +"
+  become: true
+  changed_when: false
 
 # --- linger ---
 
@@ -1120,7 +1213,7 @@ aiagent_host_user: "{{ local_user_name }}"
 :END:
 
 **** t3-web.service
-#+begin_src systemd :tangle (tdir "t3-web.service")
+#+begin_src systemd :tangle (tdir "t3-web.service") :noweb tangle
 [Unit]
 Description=T3 Code web UI inside the AI agent harness container
 Requires=aiagent.service
@@ -1128,7 +1221,7 @@ After=aiagent.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/podman exec --workdir /work aiagent /home/node/.bin/t3-web
+ExecStart=/usr/bin/podman exec --workdir <<aiagent-container-work-root()>> aiagent /home/node/.bin/t3-web
 Restart=no
 
 [Install]
@@ -1182,10 +1275,13 @@ Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl shell aiagent@ /usr/bin/journal
 
 * aiagent's container user machinectl helpers for host
 :PROPERTIES:
-:header-args:shell: :tangle (expand-file-name "shell/setup-modules/aiagent.sh" (xdg-config-home)) :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.'
+:header-args:shell: :tangle (expand-file-name "shell/setup-modules/aiagent.sh" (xdg-config-home)) :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.' :noweb tangle
 :END:
 
 #+begin_src shell
+AIAGENT_WORK_ROOT="${AIAGENT_WORK_ROOT:-<<aiagent-host-work-root()>>}"
+AIAGENT_T3_PUBLIC_URL="${AIAGENT_T3_PUBLIC_URL:-<<aiagent-t3-host-url()>>}"
+
 # aiagent: base primitive
 _aiagent() {
     sudo machinectl shell --uid=aiagent .host /usr/bin/podman "$@"
@@ -1206,7 +1302,7 @@ aiagent-shell() {
 
 # terminal harnesses
 aiagent-opencode() {
-    _aiagent exec -it aiagent opencode "${@:-/work}"
+    _aiagent exec -it aiagent opencode "${@:-<<aiagent-container-work-root()>>}"
 }
 
 aiagent-opencode-shell() {
@@ -1306,7 +1402,7 @@ aiagent-t3-web-log() {
 }
 
 aiagent-t3-open() {
-    xdg-open http://127.0.0.1:3773/
+    xdg-open "$AIAGENT_T3_PUBLIC_URL"
 }
 
 # container lifecycle
@@ -1329,7 +1425,7 @@ aiagent-prune()  { _aiagent system prune -f; }
 
 aiagent-backup() {
     local include_work=0 dest stamp out dest_display
-    dest="/home/work/ai/backups"
+    dest="$AIAGENT_WORK_ROOT/ai/backups"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -1344,7 +1440,7 @@ Usage:
 
 Archives aiagent persistent state to DEST_DIR. By default this includes the
 agent config/state bind mounts and named toolchain/cache volumes, but excludes
-/home/work because project workspaces can be large.
+<<aiagent-host-work-root()>> because project workspaces can be large.
 EOF
                 return 0
                 ;;
@@ -1379,7 +1475,7 @@ EOF
     local tar_paths=(aiagent_container volumes)
 
     if [[ "$include_work" -eq 1 ]]; then
-        podman_args+=(-v /home/work:/backup/work:ro)
+        podman_args+=(-v "$AIAGENT_WORK_ROOT:/backup/work:ro")
         tar_paths+=(work)
     fi
 
@@ -1425,19 +1521,21 @@ PATH=${PATH}:${XDG_BIN_HOME}/ai
 
 Shared logic for the other callers
 
-#+begin_src shell
+#+begin_src shell :noweb tangle
 set -euo pipefail
 
 if [[ -z "${AI_WORK_ROOT:-}" ]]; then
-    if [[ -d /work && ! -e /home/work ]]; then
-        AI_WORK_ROOT=/work/ai
-    else
-        AI_WORK_ROOT=/home/work/ai
-    fi
+    AI_WORK_ROOT=<<aiagent-host-ai-root()>>
 fi
 AI_CONTAINER="${AI_CONTAINER:-aiagent}"
-AI_CONTAINER_WORK_ROOT="${AI_CONTAINER_WORK_ROOT:-/work/ai}"
-AI_T3_URL="${AI_T3_URL:-http://localhost:3773/}"
+AI_CONTAINER_WORK_ROOT="${AI_CONTAINER_WORK_ROOT:-<<aiagent-container-ai-root()>>}"
+if [[ -z "${AI_T3_URL:-}" ]]; then
+    if [[ -d /home/node && -d <<aiagent-container-work-root()>> ]]; then
+        AI_T3_URL="http://127.0.0.1:${T3CODE_PORT:-<<aiagent-t3-container-port()>>}/"
+    else
+        AI_T3_URL="<<aiagent-t3-host-url()>>"
+    fi
+fi
 AI_T3_BASE_DIR="${AI_T3_BASE_DIR:-/home/node/.t3/userdata}"
 AI_DOT_GIT_DIR="${AI_DOT_GIT_DIR:-$HOME/.local/dotfiles.git}"
 AI_DOT_WORK_TREE="${AI_DOT_WORK_TREE:-$HOME}"
@@ -1567,7 +1665,7 @@ session_status() {
 
 list_session_dirs() {
     local filter="${1:-pending}" root session status
-    for root in "$AI_WORK_ROOT" /work/ai /home/work/ai; do
+    for root in "$AI_WORK_ROOT" <<aiagent-container-ai-root()>>; do
         [[ -d "$root/sessions" ]] || continue
         find "$root/sessions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null
     done | sort -u |
@@ -1647,7 +1745,7 @@ find_session() {
     fi
 
     local root candidate
-    for root in "$AI_WORK_ROOT" /work/ai /home/work/ai; do
+    for root in "$AI_WORK_ROOT" <<aiagent-container-ai-root()>>; do
         [[ -d "$root/sessions" ]] || continue
         candidate="$root/sessions/$id"
         if [[ -f "$candidate/manifest.json" ]]; then
@@ -1694,7 +1792,7 @@ container_systemctl() {
 }
 
 run_in_harness() {
-    if [[ -d /home/node && -d /work && -x /home/node/.npm-global/bin/t3 ]]; then
+    if [[ -d /home/node && -d <<aiagent-container-work-root()>> && -x /home/node/.npm-global/bin/t3 ]]; then
         "$@"
     else
         container_exec "$AI_CONTAINER" "$@"
@@ -1702,7 +1800,7 @@ run_in_harness() {
 }
 
 run_in_harness_interactive() {
-    if [[ -d /home/node && -d /work ]]; then
+    if [[ -d /home/node && -d <<aiagent-container-work-root()>> ]]; then
         "$@"
     else
         container_exec_interactive "$AI_CONTAINER" "$@"
@@ -1712,7 +1810,7 @@ run_in_harness_interactive() {
 run_in_harness_at() {
     local cwd="$1"
     shift
-    if [[ -d /home/node && -d /work ]]; then
+    if [[ -d /home/node && -d <<aiagent-container-work-root()>> ]]; then
         (cd "$cwd" && "$@")
     else
         container_exec --workdir "$cwd" "$AI_CONTAINER" "$@"
@@ -1722,7 +1820,7 @@ run_in_harness_at() {
 run_in_harness_interactive_at() {
     local cwd="$1"
     shift
-    if [[ -d /home/node && -d /work ]]; then
+    if [[ -d /home/node && -d <<aiagent-container-work-root()>> ]]; then
         (cd "$cwd" && "$@")
     else
         container_exec_interactive --workdir "$cwd" "$AI_CONTAINER" "$@"
@@ -1828,10 +1926,8 @@ normalize_session_permissions() {
 shared_work_root() {
     if [[ -n "$AI_SHARED_WORK_ROOT" ]]; then
         printf '%s\n' "$AI_SHARED_WORK_ROOT"
-    elif [[ -d /home/work ]]; then
-        printf '%s\n' /home/work
-    elif [[ -d /work ]]; then
-        printf '%s\n' /work
+    elif [[ -d <<aiagent-host-work-root()>> ]]; then
+        printf '%s\n' <<aiagent-host-work-root()>>
     else
         die "shared work root not found; set AI_SHARED_WORK_ROOT"
     fi
@@ -2209,7 +2305,7 @@ write_agents_md() {
         printf '%s\n' "- Session: \`$id\`"
         printf '%s\n' "- Source: \`$source_root\`"
         printf '%s\n' "- Return path: tell the user to run host command \`ai-done $id\`; do not run \`ai-done\` from inside the container and do not write to the source tree directly."
-        printf '%s\n\n' "- Container path: use \`/work\`; \`/workspace\` exists only for compatibility."
+        printf '%s\n\n' "- Container path: use \`<<aiagent-container-work-root()>>\`."
         if [[ "$mode" == "history" || "$mode" == "clone" ]]; then
             printf '%s\n\n' "- History: this workspace is a Git clone; inspect the visible commit log/history and follow existing project patterns before editing."
         fi
@@ -2302,7 +2398,7 @@ copy_history_or_clone_to_shared_work() {
 
     container_path="$final_path"
     case "$container_path" in
-        /home/work|/home/work/*) container_path="/work${container_path#/home/work}" ;;
+        <<aiagent-host-work-root()>>|<<aiagent-host-work-root()>>/*) container_path="<<aiagent-container-work-root()>>${container_path#<<aiagent-host-work-root()>>}" ;;
     esac
 
     printf 'Copied to: %s\n' "$final_path"
@@ -3099,7 +3195,7 @@ sudo machinectl shell --uid=aiagent .host -- \
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman exec -it aiagent pi
 
-# T3 Code web UI around Codex. Open http://127.0.0.1:3773 on the host.
+# T3 Code web UI around Codex. Open <<aiagent-t3-host-url()>> on the host.
 sudo machinectl shell --uid=aiagent .host -- \
      /usr/bin/podman exec -it aiagent t3-web
 

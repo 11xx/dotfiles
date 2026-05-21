@@ -129,6 +129,22 @@
 
 # --- directories ---
 
+- name: Check shared workspace root path
+  tags: [aiagent_host]
+  ansible.builtin.stat:
+    path: "{{ aiagent_workspace_root }}"
+  register: aiagent_workspace_stat
+  become: true
+
+- name: Refuse symlink shared workspace root
+  tags: [aiagent_host]
+  ansible.builtin.fail:
+    msg: "{{ aiagent_workspace_root }} must be a real directory, not a symlink"
+  when:
+    - aiagent_workspace_stat.stat.exists
+    - aiagent_workspace_stat.stat.islnk
+  become: true
+
 - name: Create AI agent application directories
   tags: [aiagent_host]
   ansible.builtin.file:
@@ -214,6 +230,13 @@
     # o-rwx:  Remove all permissions from others
     mode: "ug+rwX,o-rwx"
   become: true
+
+- name: Preserve setgid on shared workspace directories
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    cmd: "find {{ aiagent_workspace_root | quote }} -type d -exec chmod g+s {} +"
+  become: true
+  changed_when: false
 
 # --- linger ---
 

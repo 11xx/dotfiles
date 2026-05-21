@@ -2,12 +2,12 @@
 
 * Purpose
 
-This project-local helper set makes =/home/work= a low-friction exchange layer
+This project-local helper set makes =/work= a low-friction exchange layer
 for isolated AI-agent sessions.
 
 The host side is canonical for orchestration because it knows the original Git
 repo, bare dotfiles repo, Magit workflow, and source paths. The container side is
-only the execution environment. Host =/home/work/ai= is visible inside the
+only the execution environment. Host =/work/ai= is visible inside the
 container as =/work/ai=.
 
 The default flow is:
@@ -48,12 +48,12 @@ entrypoint wrappers.
 
 * Workspace Layout
 
-By default the scripts use =/home/work/ai= on the host. When running inside the
-harness container, where =/home/work= is not present and =/work= is the mounted
-workspace, the scripts use =/work/ai=.
+By default the scripts use =/work/ai=. On the host this is the shared exchange
+directory; inside the harness container it is the same tree mounted at the same
+path.
 
 #+begin_src text
-/home/work/ai/
+/work/ai/
   sessions/
     SESSION-ID/
       manifest.json
@@ -147,7 +147,7 @@ t3 project add --base-dir "$AI_T3_BASE_DIR" --title SESSION-ID SESSION-WORKTREE
 
 It does not spawn a second T3 server.
 
-Plain =http://localhost:3773/= is the safe browser target. The base server URL
+Plain =http://127.0.0.1:45223/= is the safe browser target. The base server URL
 may still show a pairing screen if it is opened without the auth cookie, so the
 helper now only auto-opens a concrete project/thread URL when it has one. If it
 does not, open the project/thread manually.
@@ -168,7 +168,7 @@ bin/ai-edit --history --copy-to context-clones src lib
 bin/ai-edit --clone --copy-to context-clones --name whole-project
 #+end_src
 
-Relative destinations resolve under =/home/work= on the host and =/work= inside
+Relative destinations resolve under =/work= on the host and =/work= inside
 the container, using the same destination rules as =ai-copy=. The generated
 clone is copied as a child directory named from =--name= when provided, otherwise
 from the repo and first selected path.
@@ -246,11 +246,11 @@ Copy files into the shared work tree and normalize shared permissions.
 
 #+begin_src bash
 bin/ai-copy source/file1 proj1
-bin/ai-copy source/file1 source/file2 /home/work/proj1
+bin/ai-copy source/file1 source/file2 /work/proj1
 #+end_src
 
 Relative destinations resolve under the shared work root, normally
-=/home/work=. Absolute destinations are allowed only when they resolve under
+=/work=. Absolute destinations are allowed only when they resolve under
 that same shared root. Symlinks are followed for the safety check.
 
 ** =aiq=
@@ -298,10 +298,10 @@ If no session ID is supplied, the helper opens a pending-session picker. It uses
 Outputs:
 
 #+begin_src text
-/home/work/ai/outbox/REPO-SLUG/SESSION-ID.patch
-/home/work/ai/outbox/REPO-SLUG/SESSION-ID.manifest.json
-/home/work/ai/outbox/REPO-SLUG/SESSION-ID.source.sha256
-/home/work/ai/outbox/REPO-SLUG/SESSION-ID.copyback.json
+/work/ai/outbox/REPO-SLUG/SESSION-ID.patch
+/work/ai/outbox/REPO-SLUG/SESSION-ID.manifest.json
+/work/ai/outbox/REPO-SLUG/SESSION-ID.source.sha256
+/work/ai/outbox/REPO-SLUG/SESSION-ID.copyback.json
 #+end_src
 
 The patch is not applied automatically.
@@ -341,7 +341,7 @@ Apply an outbox patch back to the original source.
 
 #+begin_src bash
 bin/ai-apply SESSION-ID
-bin/ai-apply /home/work/ai/outbox/dotfiles/SESSION-ID.patch
+bin/ai-apply /work/ai/outbox/dotfiles/SESSION-ID.patch
 #+end_src
 
 For normal repos, this runs:
@@ -501,7 +501,7 @@ The scripts assume:
 
 #+begin_src bash
 AI_CONTAINER=aiagent
-AI_T3_URL=http://localhost:3773/
+AI_T3_URL=http://127.0.0.1:45223/
 AI_T3_BASE_DIR=/home/node/.t3/userdata
 AI_CONTAINER_WORK_ROOT=/work/ai
 #+end_src

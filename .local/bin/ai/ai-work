@@ -2,15 +2,17 @@
 set -euo pipefail
 
 if [[ -z "${AI_WORK_ROOT:-}" ]]; then
-    if [[ -d /work && ! -e /home/work ]]; then
-        AI_WORK_ROOT=/work/ai
-    else
-        AI_WORK_ROOT=/home/work/ai
-    fi
+    AI_WORK_ROOT=/work/ai
 fi
 AI_CONTAINER="${AI_CONTAINER:-aiagent}"
 AI_CONTAINER_WORK_ROOT="${AI_CONTAINER_WORK_ROOT:-/work/ai}"
-AI_T3_URL="${AI_T3_URL:-http://localhost:3773/}"
+if [[ -z "${AI_T3_URL:-}" ]]; then
+    if [[ -d /home/node && -d /work ]]; then
+        AI_T3_URL="http://127.0.0.1:${T3CODE_PORT:-3773}/"
+    else
+        AI_T3_URL="http://127.0.0.1:45223/"
+    fi
+fi
 AI_T3_BASE_DIR="${AI_T3_BASE_DIR:-/home/node/.t3/userdata}"
 AI_DOT_GIT_DIR="${AI_DOT_GIT_DIR:-$HOME/.local/dotfiles.git}"
 AI_DOT_WORK_TREE="${AI_DOT_WORK_TREE:-$HOME}"
@@ -140,7 +142,7 @@ session_status() {
 
 list_session_dirs() {
     local filter="${1:-pending}" root session status
-    for root in "$AI_WORK_ROOT" /work/ai /home/work/ai; do
+    for root in "$AI_WORK_ROOT" /work/ai; do
         [[ -d "$root/sessions" ]] || continue
         find "$root/sessions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null
     done | sort -u |
@@ -220,7 +222,7 @@ find_session() {
     fi
 
     local root candidate
-    for root in "$AI_WORK_ROOT" /work/ai /home/work/ai; do
+    for root in "$AI_WORK_ROOT" /work/ai; do
         [[ -d "$root/sessions" ]] || continue
         candidate="$root/sessions/$id"
         if [[ -f "$candidate/manifest.json" ]]; then
@@ -401,8 +403,6 @@ normalize_session_permissions() {
 shared_work_root() {
     if [[ -n "$AI_SHARED_WORK_ROOT" ]]; then
         printf '%s\n' "$AI_SHARED_WORK_ROOT"
-    elif [[ -d /home/work ]]; then
-        printf '%s\n' /home/work
     elif [[ -d /work ]]; then
         printf '%s\n' /work
     else
@@ -782,7 +782,7 @@ write_agents_md() {
         printf '%s\n' "- Session: \`$id\`"
         printf '%s\n' "- Source: \`$source_root\`"
         printf '%s\n' "- Return path: tell the user to run host command \`ai-done $id\`; do not run \`ai-done\` from inside the container and do not write to the source tree directly."
-        printf '%s\n\n' "- Container path: use \`/work\`; \`/workspace\` exists only for compatibility."
+        printf '%s\n\n' "- Container path: use \`/work\`."
         if [[ "$mode" == "history" || "$mode" == "clone" ]]; then
             printf '%s\n\n' "- History: this workspace is a Git clone; inspect the visible commit log/history and follow existing project patterns before editing."
         fi
@@ -875,7 +875,7 @@ copy_history_or_clone_to_shared_work() {
 
     container_path="$final_path"
     case "$container_path" in
-        /home/work|/home/work/*) container_path="/work${container_path#/home/work}" ;;
+        /work|/work/*) container_path="/work${container_path#/work}" ;;
     esac
 
     printf 'Copied to: %s\n' "$final_path"

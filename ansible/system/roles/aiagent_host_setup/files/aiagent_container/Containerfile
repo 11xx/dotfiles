@@ -209,7 +209,6 @@ RUN npm install -g @ast-grep/cli \
 RUN groupadd -g 1000 node \
  && useradd -m -u 1000 -g 1000 -s /bin/bash node \
  && mkdir -pv /work \
- && ln -sfn /work /workspace \
  && chown node:node /work
 
 USER node

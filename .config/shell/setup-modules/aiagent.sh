@@ -1,4 +1,7 @@
 #!/usr/bin/echo 'This is a source only file.'
+AIAGENT_WORK_ROOT="${AIAGENT_WORK_ROOT:-/work}"
+AIAGENT_T3_PUBLIC_URL="${AIAGENT_T3_PUBLIC_URL:-http://127.0.0.1:45223/}"
+
 # aiagent: base primitive
 _aiagent() {
     sudo machinectl shell --uid=aiagent .host /usr/bin/podman "$@"
@@ -119,7 +122,7 @@ aiagent-t3-web-log() {
 }
 
 aiagent-t3-open() {
-    xdg-open http://127.0.0.1:3773/
+    xdg-open "$AIAGENT_T3_PUBLIC_URL"
 }
 
 # container lifecycle
@@ -142,7 +145,7 @@ aiagent-prune()  { _aiagent system prune -f; }
 
 aiagent-backup() {
     local include_work=0 dest stamp out dest_display
-    dest="/home/work/ai/backups"
+    dest="$AIAGENT_WORK_ROOT/ai/backups"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -157,7 +160,7 @@ Usage:
 
 Archives aiagent persistent state to DEST_DIR. By default this includes the
 agent config/state bind mounts and named toolchain/cache volumes, but excludes
-/home/work because project workspaces can be large.
+/work because project workspaces can be large.
 EOF
                 return 0
                 ;;
@@ -192,7 +195,7 @@ EOF
     local tar_paths=(aiagent_container volumes)
 
     if [[ "$include_work" -eq 1 ]]; then
-        podman_args+=(-v /home/work:/backup/work:ro)
+        podman_args+=(-v "$AIAGENT_WORK_ROOT:/backup/work:ro")
         tar_paths+=(work)
     fi
 

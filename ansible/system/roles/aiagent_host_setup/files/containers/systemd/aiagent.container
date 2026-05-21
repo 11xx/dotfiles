@@ -8,13 +8,14 @@ ContainerName=aiagent
 WorkingDir=/work
 UserNS=keep-id:uid=1000,gid=1000
 Environment=HOME=/home/node
-# T3 Code is a web UI around Codex; expose only on host loopback.
-PublishPort=127.0.0.1:3773:3773
+# T3 Code is the only LAN-exposed harness service. Related exposed ports should
+# prefer the manually chosen 4522* prefix.
+PublishPort=0.0.0.0:45223:3773
 Environment=T3CODE_HOST=0.0.0.0
 Environment=T3CODE_PORT=3773
 Environment=T3CODE_HOME=/home/node/.t3/userdata
 Environment=T3CODE_NO_BROWSER=true
-Volume=/home/work:/work:Z
+Volume=/work:/work:Z
 Volume=%h/aiagent_container/opencode_config:/home/node/.config/opencode:Z
 Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
 Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
