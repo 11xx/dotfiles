@@ -1,0 +1,55 @@
+---
+- name: Configure Raspberry Pi systems for rootless Podman
+  hosts: pak
+  vars:
+    _user_env:
+      XDG_RUNTIME_DIR: "{{ xdg_runtime_dir }}"
+      XDG_CONFIG_HOME: "{{ xdg_config_home }}"
+      XDG_DATA_HOME: "{{ xdg_data_home }}"
+      HOME: "{{ ansible_facts['user_dir'] }}"
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      become: true
+
+    - name: Install become dependency (acl)
+      ansible.builtin.apt:
+        name: acl
+        state: present
+      become: true
+
+    - name: Get target user UID
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ ansible_user }}"
+      register: _user_entry
+
+    - name: Set target user UID fact
+      ansible.builtin.set_fact:
+        target_user_uid: "{{ _user_entry.ansible_facts.getent_passwd[ansible_user][1] }}"
+
+  roles:
+    - { role: "user-setup_pak", tags: ["user-setup"] }
+    - { role: "containers_pak", tags: ["containers"] }
+    - { role: "packages_pak", tags: ["packages"] }
+    - { role: firewall, tags: ["firewall"] }
+    - { role: shell_pak, tags: ["shell"] }
+
+  post_tasks:
+    - name: Final verification - check Podman status
+      ansible.builtin.command: podman info
+      register: podman_info
+      changed_when: false
+      become: yes
+      become_user: "{{ ansible_user }}"
+      ignore_errors: yes
+
+    - name: Display setup completion message
+      ansible.builtin.debug:
+        msg: |
+          ================================
+          Rootless Podman Setup Complete!
+          ================================

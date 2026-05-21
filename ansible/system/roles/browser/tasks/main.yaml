@@ -1,0 +1,12 @@
+- name: Install Vivaldi
+  ansible.builtin.package:
+    name:
+      - vivaldi
+      - vivaldi-ffmpeg-codecs
+    state: present
+
+- name: Install Firefox
+  ansible.builtin.package:
+    name:
+      - firefox
+    state: present

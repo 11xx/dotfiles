@@ -1,0 +1,33 @@
+- name: Enable Nvidia DRM
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/modprobe.d/00-nvidia.conf
+    line: 'options nvidia-drm modeset=1 fbdev=1'
+    create: true
+
+- name: Enable Nvidia DRM
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/mkinitcpio.conf.d/50-nvidia.conf
+    line: 'MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)'
+    create: true
+
+- name: 'pacman mkinitcpio rebuild hook for when driver or kernel updates'
+  ansible.builtin.copy:
+    dest: /etc/pacman.d/hooks/nvidia.hook
+    content: |
+      [Trigger]
+      Operation=Install
+      Operation=Upgrade
+      Operation=Remove
+      Type=Package
+      Target=nvidia-dkms
+      Target=linux-zen
+      Target=linux
+
+      [Action]
+      Description=Updating NVIDIA module in initcpio
+      Depends=mkinitcpio
+      When=PostTransaction
+      NeedsTargets
+      Exec=/bin/sh -c 'while read -r trg; do case $trg in linux*) exit 0; esac; done; /usr/bin/mkinitcpio -P'

@@ -1,0 +1,33 @@
+- name: Install QEMU/KVM and libvirt packages
+  community.general.pacman:
+    name:
+      - qemu-desktop
+      - qemu-hw-usb-host
+      - edk2-ovmf
+      - libvirt
+      - virt-manager
+      - dnsmasq
+    state: present
+  become: true
+
+- name: Enable and start libvirtd
+  ansible.builtin.systemd:
+    name: libvirtd
+    enabled: true
+    state: started
+  become: true
+
+- name: Add host user to kvm group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: kvm
+    append: true
+  become: true
+
+- name: Add host user to libvirt group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: libvirt
+    append: true
+  become: true
+  when: not ansible_check_mode

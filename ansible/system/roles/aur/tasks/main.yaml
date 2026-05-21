@@ -1,0 +1,31 @@
+- name: Create the `aurbuilder` user
+  become: true
+  ansible.builtin.user:
+    name: aurbuilder
+    create_home: true
+    home: /var/cache/aurbuilder
+    # group: wheel
+    uid: 5899
+
+- name: Allow the `aurbuilder` user to run `sudo pacman` without a password
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/11-install-aurbuilder
+    line: 'aurbuilder ALL=(ALL) NOPASSWD: /usr/bin/pacman'
+    create: true
+    # mode: "0644"
+    validate: 'visudo -cf %s'
+
+- name: Install paru from the AUR
+  aur:
+      name: paru
+      use: makepkg
+      state: present
+  become: true
+  become_user: aurbuilder
+
+- name: 'paru.conf: Change paru to handle only AUR packages'
+  ansible.builtin.lineinfile:
+    path: /etc/paru.conf
+    regexp: '^(#|)AurOnly$'
+    line: AurOnly

@@ -1,0 +1,8 @@
+ufw_rules:
+  - { port: "22",  proto: tcp, rule: allow,  src: "{{ lan_subnet }}", comment: "SSH from LAN" }
+  - { port: "22",  proto: tcp, rule: limit,  src: "{{ lan_subnet }}", comment: "SSH rate limit" }
+  - { port: "53",  proto: tcp, rule: allow,  src: "{{ lan_subnet }}", comment: "DNS TCP" }
+  - { port: "53",  proto: udp, rule: allow,  src: "{{ lan_subnet }}", comment: "DNS UDP" }
+  - { port: "80",  proto: tcp, rule: allow,  src: "{{ lan_subnet }}", comment: "HTTP / Caddy" }
+  - { port: "443", proto: tcp, rule: allow,  src: "{{ lan_subnet }}", comment: "HTTPS / Caddy" }
+  - { port: "5300", proto: tcp, rule: allow,  src: "{{ lan_subnet }}", comment: "Pi-Hole web dashboard" }

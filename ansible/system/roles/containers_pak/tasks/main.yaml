@@ -1,0 +1,219 @@
+---
+- name: Install rootless Podman dependencies
+  ansible.builtin.apt:
+    name:
+      - podman
+      - uidmap
+      - passt
+      - slirp4netns
+      - fuse-overlayfs
+      - crun
+      - ca-certificates
+      - acl
+    state: present
+    update_cache: true
+  become: true
+
+- name: Install Podman
+  ansible.builtin.apt:
+    name:
+      - podman
+    state: present
+  become: yes
+
+- name: Install podman-compose (to run compose.yml files)
+  ansible.builtin.apt:
+    name: podman-compose
+    state: present
+  become: yes
+
+- name: Setup rootless containers for user
+  block:
+    - ansible.builtin.import_role:
+        name: containers
+        tasks_from: uidmap
+
+    - name: Enable lingering for the user (allows user services without login)
+      ansible.builtin.command: loginctl enable-linger {{ ansible_user }}
+      changed_when: false
+      become: yes
+
+# specially for pi-hole
+- name: Configure system-level settings for rootless containers
+  block:
+    - name: Allow unprivileged users to bind to ports below 1024
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_unprivileged_port_start
+        value: "53"
+        sysctl_file: /etc/sysctl.d/unprivileged-port.conf
+        reload: yes
+      become: yes
+
+    - name: Optimize network buffer sizes for container networking
+      ansible.posix.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        sysctl_file: /etc/sysctl.d/increase-mem.conf
+        reload: yes
+      loop:
+        - { name: "net.core.wmem_max", value: "25165824" }
+        - { name: "net.core.rmem_max", value: "25165824" }
+        - { name: "net.ipv4.tcp_rmem", value: "20480 174760 25165824" }
+        - { name: "net.ipv4.tcp_wmem", value: "20480 174760 25165824" }
+        - { name: "net.ipv4.tcp_window_scaling", value: "1" }
+        - { name: "net.ipv4.tcp_timestamps", value: "1" }
+        - { name: "net.ipv4.tcp_sack", value: "1" }
+        - { name: "net.ipv4.tcp_no_metrics_save", value: "1" }
+        - { name: "net.core.netdev_max_backlog", value: "10000" }
+      become: yes
+
+    # Check and handle systemd-resolved
+    - name: Check if systemd-resolved is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Check if /etc/systemd/resolved.conf exists
+      ansible.builtin.stat:
+        path: /etc/systemd/resolved.conf
+      register: resolved_conf_stat
+
+    - name: Disable systemd-resolved DNS stub listener to free port 53
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^#?DNSStubListener='
+        line: 'DNSStubListener=no'
+        backup: true
+        create: true  # Create the file if it doesn't exist
+        mode: '0644'
+        owner: root
+        group: root
+      become: yes
+      when:
+        - "'systemd-resolved' in ansible_facts.packages"
+      notify: Restart systemd-resolved
+
+    - name: Ensure systemd-resolved is restarted if modified
+      ansible.builtin.service:
+        name: systemd-resolved
+        state: restarted
+      become: yes
+      when: "'systemd-resolved' in ansible_facts.packages"
+
+- name: Configure Podman for the user
+  block:
+    - name: Create containers config directory structure
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ xdg_config_home }}/containers"
+        - "{{ xdg_config_home }}/containers/registries.conf.d"
+        - "{{ xdg_config_home }}/containers/containers.conf.d"
+
+    - name: Configure unqualified registry searches
+      ansible.builtin.copy:
+        content: |
+          unqualified-search-registries = [
+            'docker.io',
+            'registry.fedoraproject.org',
+            'registry.access.redhat.com',
+            'registry.centos.org'
+          ]
+        dest: "{{ xdg_config_home }}/containers/registries.conf"
+        mode: '0644'
+
+
+    - name: Configure container image policy (insecure for convenience)
+      ansible.builtin.copy:
+        content: |
+          {"default": [{"type": "insecureAcceptAnything"}]}
+        dest: "{{ xdg_config_home }}/containers/policy.json"
+        mode: '0644'
+
+    - name: Configure storage driver (overlay only)
+      ansible.builtin.copy:
+        content: |
+          [storage]
+          driver = "overlay"
+        dest: "{{ xdg_config_home }}/containers/storage.conf"
+        mode: '0644'
+
+    - name: Configure container DNS to avoid port conflicts (drop-in file)
+      ansible.builtin.copy:
+        content: |
+          [network]
+          dns_bind_port = 20053
+        dest: "{{ xdg_config_home }}/containers/containers.conf.d/dns-bind-port-not-53.conf"
+        mode: '0644'
+
+    - name: Configure container limits and networking (drop-in file)
+      ansible.builtin.copy:
+        content: |
+          [containers]
+          pids_limit = 0
+          default_ulimits = [
+            "nofile=65536:65536"
+          ]
+
+          [network]
+          network_backend = "netavark"
+        dest: "{{ xdg_config_home }}/containers/containers.conf.d/performance-tuning.conf"
+        mode: '0644'
+
+  become: yes
+  become_user: "{{ ansible_user }}"
+  environment: "{{ _user_env }}"
+
+- name: Enable and start Podman socket for docker-compose compatibility
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    enabled: yes
+    state: started
+    scope: user
+  become: yes
+  become_user: "{{ ansible_user }}"
+  environment: "{{ _user_env }}"
+  when: not ansible_check_mode
+
+- name: Configure firewall for container services
+  block:
+    - name: Configure firewall with ufw (if available)
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { port: "80", proto: "tcp" }
+        - { port: "443", proto: "tcp" }
+        - { port: "443", proto: "udp" }
+        - { port: "53", proto: "tcp" }
+        - { port: "53", proto: "udp" }
+      when: ansible_facts['os_family'] == "Debian"
+      become: yes
+      ignore_errors: yes
+
+- name: Verify Podman installation
+  ansible.builtin.command: podman --version
+  register: podman_version
+  changed_when: false
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Display Podman version
+  ansible.builtin.debug:
+    msg: "Podman version: {{ podman_version.stdout }}"
+
+- name: Test rootless container functionality
+  ansible.builtin.command: podman run --rm hello-world
+  register: podman_test
+  changed_when: false
+  become: yes
+  become_user: "{{ ansible_user }}"
+  environment: "{{ _user_env }}"
+  when: not ansible_check_mode  # Skip in check mode
+  ignore_errors: yes
+
+- name: Display test results
+  ansible.builtin.debug:
+    msg: "Podman test result: {{ 'SKIPPED (check mode)' if ansible_check_mode else ('SUCCESS' if podman_test.rc == 0 else 'FAILED') }}"

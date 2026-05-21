@@ -1,0 +1,6 @@
+- name: 'mkinitcpio compression setting'
+  ansible.builtin.copy:
+    dest: /etc/mkinitcpio.conf.d/90-compression.conf
+    content: |
+      COMPRESSION=zstd
+      COMPRESSION_OPTIONS=(-T0 --long --ultra -21)

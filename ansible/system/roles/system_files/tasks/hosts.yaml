@@ -1,0 +1,8 @@
+- name: Add custom hosts shortcuts
+  become: true
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    state: present
+    block: |
+      {{ gak_address }} {{ gak_fqdn }} gak
+      {{ pak_address }} {{ pak_fqdn }} pak

@@ -1,0 +1,16 @@
+---
+# Handlers for containers role
+- name: Restart systemd-resolved
+  ansible.builtin.service:
+    name: systemd-resolved
+    state: restarted
+  become: yes
+  listen: Restart systemd-resolved
+
+- name: reload systemd user
+  ansible.builtin.systemd_service:
+    daemon_reload: yes
+    scope: user
+  become: yes
+  become_user: "{{ ansible_user }}"
+  environment: "{{ _user_env }}"

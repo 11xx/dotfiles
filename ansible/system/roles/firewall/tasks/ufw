@@ -1,0 +1,45 @@
+- name: Install UFW
+  ansible.builtin.package:
+    name: ufw
+    state: present
+  become: true
+
+- name: Reset UFW to defaults before applying rules
+  community.general.ufw:
+    state: reset
+  become: true
+  when: not ansible_check_mode
+
+- name: Set default policies
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: incoming, policy: deny }
+    - { direction: outgoing, policy: allow }
+  become: true
+
+- name: Allow loopback interface
+  community.general.ufw:
+    rule: allow
+    interface: lo
+    direction: in
+  become: true
+
+- name: Apply host-specific UFW rules
+  community.general.ufw:
+    rule: "{{ item.rule | default('allow') }}"
+    port: "{{ item.port | default(omit) }}"
+    proto: "{{ item.proto | default(omit) }}"
+    src: "{{ item.src | default(omit) }}"
+    interface: "{{ item.interface | default(omit) }}"
+    direction: "{{ item.direction | default('in') }}"
+    comment: "{{ item.comment | default(omit) }}"
+  loop: "{{ ufw_rules }}"
+  become: true
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    logging: on
+  become: true

@@ -1,0 +1,8 @@
+- name: Setup rootless subuid and subgid
+  ansible.builtin.lineinfile:
+    path: /etc/{{ item }}
+    line: "{{ ansible_user }}:100000:65536"
+  loop:
+    - subuid
+    - subgid
+  become: true

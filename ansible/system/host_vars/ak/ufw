@@ -1,0 +1,8 @@
+ufw_rules:
+  # SSH — TCP only, both allow and rate-limit
+  - { port: "{{ ssh_port }}", proto: tcp, rule: allow, comment: "SSH" }
+  - { port: "{{ ssh_port }}", proto: tcp, rule: limit, comment: "SSH rate limit" }
+
+  # KDE Connect
+  - { port: "1714:1764", proto: tcp, rule: allow, comment: "KDE Connect" }
+  - { port: "1714:1764", proto: udp, rule: allow, comment: "KDE Connect" }

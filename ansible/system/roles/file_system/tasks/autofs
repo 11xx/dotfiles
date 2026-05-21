@@ -1,0 +1,86 @@
+- name: 'aur: Install autofs'
+  aur:
+    name: autofs
+    use: paru
+    state: present
+  become_user: aurbuilder
+
+- name: 'fs: Create gak NFS base mount point'
+  ansible.builtin.file:
+    path: /gak
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: 'autofs: Register /gak in auto.master.d'
+  ansible.builtin.copy:
+    dest: /etc/autofs/auto.master.d/gak.autofs
+    content: "/gak /etc/autofs/auto.gak --timeout=3600 --ghost"
+
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload autofs
+
+- name: 'autofs: Configure gak NFS mounts'
+  ansible.builtin.copy:
+    dest: /etc/autofs/auto.gak
+    # soft     : return EIO after retrans failures instead of hanging forever
+    # timeo=5  : 0.5s initial RPC timeout before retry (tenths of a second)
+    # retrans=2: give up after 2 retries (~1.5s total before soft error)
+    # retry=0  : do not retry the mount attempt if server is unreachable
+    content: |
+      music -fstype=nfs4,ro,soft,timeo=5,retrans=2,retry=0  gak:/turak/music
+      turak -fstype=nfs4,rw,soft,timeo=5,retrans=2,retry=0  gak:/turak
+      marak -fstype=nfs4,rw,soft,timeo=5,retrans=2,retry=0  gak:/marak
+      media -fstype=nfs4,rw,soft,timeo=5,retrans=2,retry=0  gak:/media
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload autofs
+
+- name: 'autofs: Register local drives in auto.master.d'
+  ansible.builtin.copy:
+    dest: /etc/autofs/auto.master.d/local-drives.autofs
+    content: "/- /etc/autofs/auto.local-drives --timeout=1800"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload autofs
+
+- name: 'autofs: Configure local mounts'
+  ansible.builtin.copy:
+    dest: /etc/autofs/auto.local-drives
+    content: |
+      /games -fstype=auto,rw,noatime,compress=zstd:1,ssd,space_cache=v2,discard=async,commit=120 :LABEL=GAMES
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload autofs
+
+- name: 'systemd: Ensure autofs drop-in directory exists'
+  ansible.builtin.file:
+    path: /etc/systemd/system/autofs.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: 'systemd: Enable and start autofs.service'
+  ansible.builtin.systemd_service:
+    name: autofs.service
+    enabled: true
+    state: started
+
+# https://serverfault.com/a/722206
+- name: 'systemd: Fix autofs.service dependency race after boot'
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/autofs.service.d/dependency-race-fix.conf
+    content: |
+      [Unit]
+      Requires=network.target rpc-statd.service rpcbind.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd daemon

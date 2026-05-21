@@ -1,0 +1,10 @@
+- name: Allow the `wheel' group sudo commands
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/11-wheel
+    content: |
+      %wheel ALL=(ALL) ALL
+    owner: root
+    group: root
+    mode: "0440"
+    validate: 'visudo -cf %s'

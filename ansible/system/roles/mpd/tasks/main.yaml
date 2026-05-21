@@ -1,0 +1,74 @@
+---
+- name: 'Install MPD and clients'
+  community.general.pacman:
+    name:
+      - mpd
+      - mpc
+      - ncmpcpp
+      - rmpc
+    state: present
+
+- name: 'Install MPD setup dependencies from the AUR'
+  aur:
+    name:
+      - mpdris2
+      - mpdscribble
+      - listenbrainz-mpd
+      - mergerfs
+      - ashuffle
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+- name: 'Install MPD setup dependencies from pacman'
+  community.general.pacman:
+    name:
+      - swaync
+      - playerctl
+    state: present
+
+- name: 'Make sure user_allow_other is enabled in /etc/fuse.conf'
+  ansible.builtin.lineinfile:
+    path: /etc/fuse.conf
+    regexp: '^user_allow_other'
+    line: user_allow_other
+
+- name: 'Create "$XDG_DATA_HOME/mpd" directory'
+  ansible.builtin.file:
+    path: "{{ xdg_data_home }}/mpd"
+    state: directory
+    recurse: true
+    owner: "{{ local_user_name }}"
+    group: "{{ local_user_group }}"
+
+- name: 'Check if database file exists'
+  ansible.builtin.stat:
+    path: "{{ xdg_data_home }}/mpd/database"
+  register: mpd_database
+
+- name: 'Create "$XDG_STATE_HOME/mpd" directory'
+  ansible.builtin.file:
+    path: "{{ xdg_state_home }}/mpd"
+    state: directory
+    recurse: true
+    owner: "{{ local_user_name }}"
+    group: "{{ local_user_group }}"
+
+- name: 'Copy asound.conf to enable "bit-perfect" playback'
+  ansible.builtin.copy:
+    dest: /etc/asound.conf
+    content: |
+      pcm.FiioK5PRO {
+         type hw
+         card "FiiO K5 Pro"
+      }
+
+      pcm.!default {
+         type plug
+         slave {
+            pcm "FiioK5PRO"
+            rate "unchanged"
+            format "unchanged"
+         }
+      }

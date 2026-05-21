@@ -1,0 +1,17 @@
+- name: Verify target shell binary exists
+  ansible.builtin.stat:
+    path: "{{ shell_path }}"
+  register: shell_stat
+
+- name: Fail fast if shell does not exist
+  ansible.builtin.assert:
+    that:
+      - shell_stat.stat.exists
+      - shell_stat.stat.executable
+    fail_msg: "Shell {{ shell_path }} does not exist or is not executable on this host. Install it first."
+
+- name: Set login shell
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    shell: "{{ shell_path }}"
+  become: true

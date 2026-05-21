@@ -1,0 +1,68 @@
+- name: Install zsh and config dependencies
+  community.general.pacman:
+    name:
+      - zsh
+      - run-parts
+      - bash-completion
+      - ttf-liberation-mono-nerd
+      - noto-fonts-cjk
+      - noto-fonts-emoji
+      - noto-fonts
+      - zsh-completions
+      - xclip
+      - wl-clipboard
+      - atuin # history
+      - zoxide # cd alternative
+      - fzf # for zoxide & atuin
+      - perl-rename # rename utility with regex, called just 'rename' in most distros.
+      - grc # https://github.com/garabik/grc "generic colouriser"
+    state: present
+
+- name: Install zsh dependencies from the AUR
+  aur:
+    name:
+      - zsh-theme-powerlevel10k-git
+      - zsh-fast-syntax-highlighting
+      - zsh-autopair-git
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+- name: Install interactive shell dependencies from the AUR
+  aur:
+    name:
+      - advcpmv
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+# for redundancy sake
+- name: Install TUI and command-line programs
+  community.general.pacman:
+    name:
+      - bat
+      - fd
+      - eza
+      - ripgrep
+      - duf
+      - btop
+      - nvtop
+      - fzf
+      - ncdu
+      - nnn
+      - pulsemixer
+      - rsync
+    state: present
+
+- name: Install extra/optional dependencies for TUI programs
+  aur:
+    name:
+      - dragon-drop # for nnn `dragdrop' plugin
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+- ansible.builtin.import_tasks: zsh-antidote

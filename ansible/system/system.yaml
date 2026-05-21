@@ -1,0 +1,30 @@
+---
+- name: Arch Linux setup
+  hosts: ak
+  roles:
+    - { role: file_system, tags: ["file_system"] }
+    - { role: firewall, tags: ["firewall"] }
+    - { role: fonts, tags: ["fonts"] }
+    - { role: aur, tags: ["aur"] }
+    - { role: hyprland, tags: ["hyprland"] }
+    - { role: browser, tags: ["browser"] }
+    - { role: emacs, tags: ["emacs"] }
+    - { role: shell, tags: ["shell"] }
+    - { role: mpd, tags: ["mpd"] }
+    - { role: services, tags: ["services"] }
+    - { role: desktop, tags: ["desktop"] }
+    - { role: system_files, tags: ["system_files"] }
+    - { role: android, tags: ["android"] }
+    - { role: script-deps, tags: ["script-deps"] }
+    - { role: vpn, tags: ["vpn"] }
+    - { role: containers, tags: ["containers"] }
+    - { role: kde-not-in-kde, tags: ["kde-not-in-kde"] }
+    - { role: aiagent_host_setup, tags: ["aiagent", "opencode"] }
+    - { role: qemu-kvm, tags: ["qemu-kvm"] }
+    - { role: controller-vm, tags: ["controller-vm"] }
+
+  tasks:
+    - name: System management tools
+      community.general.pacman:
+        name:
+          - pacman-contrib

@@ -1,0 +1,33 @@
+xbox_vm_dir: "{{ ansible_env.HOME }}/.local/vm/controller-tools"
+xbox_vm_disk: "win10-controller-tools.qcow2"
+xbox_vm_disk_size: "60G"
+xbox_vm_ram: "8G"
+
+# Xbox Wireless Adapter USB IDs - confirm with `lsusb` on the host
+xbox_dongle_vendor: "045e"
+xbox_dongle_product: "02e6"
+
+# Wired controller
+xbox_controller_vendor: "045e"
+xbox_controller_product: "02e3"
+
+# 8BitDo Ultimate 2 Bluetooth / UM 2 Receiver
+#
+# 8BitDo mode change setup based on
+# https://gist.github.com/barraIhsan/783a82bcf32bed896c85d27dbb8018a5
+#
+# Observed:
+# - 2dc8:310b = active receiver/controller mode
+# - 2dc8:3109 = fallback/update/idle receiver mode
+# - 057e:2009 = Switch Pro mode
+bitdo_vendor: "2dc8"
+bitdo_receiver_active_product: "310b"
+bitdo_receiver_idle_product: "3109"
+
+# Optional: when the controller exposes itself as Switch Pro
+nintendo_vendor: "057e"
+nintendo_pro_product: "2009"
+
+# OVMF paths on Arch (edk2-ovmf)
+ovmf_code: "/usr/share/edk2/x64/OVMF_CODE.4m.fd"
+ovmf_vars_src: "/usr/share/edk2/x64/OVMF_VARS.4m.fd"

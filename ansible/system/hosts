@@ -1,0 +1,16 @@
+[all:vars]
+ansible_user="{{ local_user_name }}"
+ansible_become_pass="{{ local_user_pass }}"
+
+[arch]
+ak
+
+[arch:vars]
+ansible_connection=local
+
+[raspberry_pi]
+pak
+
+[raspberry_pi:vars]
+ansible_ssh_pipelining=true
+ansible_python_interpreter=/usr/bin/python3

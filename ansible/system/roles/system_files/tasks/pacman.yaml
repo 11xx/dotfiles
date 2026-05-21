@@ -1,0 +1,48 @@
+- name: 'pacman.conf: Enable colors'
+  ansible.builtin.lineinfile:
+    path: /etc/pacman.conf
+    regexp: '^(#|)Color$'
+    line: Color
+
+- name: 'pacman.conf: Change parallel downloads count'
+  ansible.builtin.lineinfile:
+    path: /etc/pacman.conf
+    regexp: '^(#|)ParallelDownloads'
+    line: ParallelDownloads = 10
+
+- name: 'pacman.conf: Enable multilib'
+  ansible.builtin.blockinfile:
+    path: /etc/pacman.conf
+    insertafter: '(?m)#\[multilib\]\n#Include' # (?m) enables multiline match
+    block: |
+      [multilib]
+      Include = /etc/pacman.d/mirrorlist
+
+- name: 'makepkg.conf: Add support for "/etc/makepkg.conf.d/*.conf" override files'
+  ansible.builtin.blockinfile:
+    path: /etc/makepkg.conf
+    insertafter: 'EOF'
+    block: |
+      if test -d /etc/makepkg.conf.d/; then
+        for __makepkgConf in /etc/makepkg.conf.d/*.conf; do
+            test -r "$__makepkgConf" && . "$__makepkgConf"
+        done
+        unset __makepkgConf
+      fi
+
+- name: Create /etc/makepkg.conf.d directory (for makepkg.conf overrides)
+  ansible.builtin.file:
+    path: /etc/makepkg.conf.d
+    state: directory
+
+- name: Let makepkg to use all but 2 CPU cores
+  ansible.builtin.lineinfile:
+    path: /etc/makepkg.conf.d/10-nprocs.conf
+    line: 'MAKEFLAGS="-j$(nproc --ignore 2)"'
+    create: true
+
+- name: Change zstd compression for using all cores and bigger dictionary
+  ansible.builtin.lineinfile:
+    path: /etc/makepkg.conf.d/50-zstd-compression.conf
+    line: 'COMPRESSZST=(zstd -c -z -q -T0 --long -)'
+    create: true

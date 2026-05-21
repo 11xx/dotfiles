@@ -1,0 +1,11 @@
+- name: File system utilities
+  community.general.pacman:
+    name:
+      # ntfs
+      - dosfstools # mkfs fat/vfat/msdos
+      - ntfs-3g # specifically for ntfsfix
+
+- ansible.builtin.import_role:
+    name: file_system
+    tasks_from: autofs
+  become: true

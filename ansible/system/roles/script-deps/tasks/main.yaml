@@ -1,0 +1,8 @@
+---
+- name: Install script dependencies
+  community.general.pacman:
+    name:
+      - imagemagick # screenshot script
+      - pv # pipe progress "meter"
+    state: present
+    extra_args: --asdeps

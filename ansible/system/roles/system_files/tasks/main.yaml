@@ -1,0 +1,8 @@
+---
+- ansible.builtin.include_tasks: hosts.yaml
+- ansible.builtin.include_tasks: nvidia.yaml
+- ansible.builtin.include_tasks: pacman.yaml
+- ansible.builtin.include_tasks: uinput.yaml
+- ansible.builtin.include_tasks: initcpio.yaml
+- ansible.builtin.include_tasks: sysctl.yaml
+- ansible.builtin.import_tasks: wheel-sudoers.yaml

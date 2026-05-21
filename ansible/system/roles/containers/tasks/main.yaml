@@ -1,0 +1,45 @@
+- name: Install oci-container provider
+  community.general.pacman:
+    name:
+      - crun
+    state: present
+    extra_args: --asdeps
+  become: true
+
+- name: Install podman and dependencies
+  community.general.pacman:
+    name:
+      - podman
+      - podman-compose
+    state: present
+  become: true
+
+- name: Setup subuid/subgid
+  ansible.builtin.include_tasks: "uidmap.yaml"
+
+## some user-local settings
+
+- name: Create $XDG_CONFIG_HOME/containers directories
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+  - '{{ xdg_config_home }}/containers/registries.conf.d'
+  - '{{ xdg_config_home }}/containers'
+
+# https://wiki.archlinux.org/title/Podman#Registries
+# https://www.youtube.com/watch?v=CC7t7foYkko
+- name: Enable unqualified searches
+  ansible.builtin.lineinfile:
+    path: '{{ xdg_config_home }}/containers/registries.conf.d/10-unqualified-search-registries.conf'
+    line: 'unqualified-search-registries = ["docker.io"]'
+    create: true
+
+- name: Enable overlay storage driver
+  ansible.builtin.blockinfile:
+    path: '{{ xdg_config_home }}/containers/storage.conf'
+    block: |
+      [storage]
+      driver = "overlay"
+    create: true
+    state: absent

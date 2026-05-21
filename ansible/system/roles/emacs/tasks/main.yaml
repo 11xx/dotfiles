@@ -1,0 +1,16 @@
+# Emacs dependencies
+- name: Install Emacs config dependencies from pacman
+  community.general.pacman:
+    name:
+      - ttf-liberation-mono-nerd
+      - ispell
+    state: present
+
+- name: Install Emacs config dependencies from the AUR
+  aur:
+    name:
+      - otf-fira-code-symbol
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder

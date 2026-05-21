@@ -1,0 +1,27 @@
+- name: Add user to "input" group (if user exists)
+  block:
+    - name: Get information about user
+      getent:
+        database: passwd
+        key: "{{ local_user_name }}"
+      register: local_user_name_getent
+      ignore_errors: yes
+
+    - name: Add user to input group
+      user:
+        name: "{{ local_user_name }}"
+        groups: input
+        append: yes
+      when: local_user_name_getent is succeeded
+
+- name: Enable using uinput without root permissions
+  ansible.builtin.lineinfile:
+    path: /etc/udev/rules.d/99-input.rules
+    line: KERNEL=="uinput", GROUP="input", TAG+="uaccess"
+    create: true
+
+- name: Add uinput to modules-load
+  ansible.builtin.lineinfile:
+    path: /etc/modules-load.d/uinput.conf
+    line: uinput
+    create: true

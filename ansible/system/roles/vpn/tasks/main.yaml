@@ -1,0 +1,16 @@
+---
+- name: Install networkmanager-openvpn plugin from pacman
+  community.general.pacman:
+    name:
+      - networkmanager-openvpn
+    state: present
+
+# if for some reason networkmanager's nmtui-connect dont install this
+# dependency, install it here:
+# [[https://bbs.archlinux.org/viewtopic.php?id=254687][Openvpn error while loading shared libraries: libnma.so.0: cannot open / Networking, Server, and Protection / Arch Linux Forums]]
+- name: Install networkmanager's dependency for TUI from pacman
+  community.general.pacman:
+    name:
+      - libnma
+    state: present
+    extra_args: --asdeps

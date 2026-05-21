@@ -1,0 +1,10 @@
+- name: Install fonts
+  community.general.pacman:
+    name:
+      - noto-fonts
+      - noto-fonts-cjk
+      - noto-fonts-emoji
+      - noto-fonts-extra
+      - ttf-liberation
+      - ttf-liberation-mono-nerd
+      - ttf-roboto

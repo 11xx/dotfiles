@@ -1,0 +1,17 @@
+---
+# - name: Install Android utilities for PC
+#   community.general.pacman:
+#     name:
+
+#     state: present
+
+- name: Install Android utilities for PC from the AUR
+  aur:
+    name:
+      - android-tools # provides adb
+      - simple-mtpfs # for mounting android file system
+      - gvfs-mtp # for android mounting by file manager
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder

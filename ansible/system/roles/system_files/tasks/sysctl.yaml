@@ -1,0 +1,6 @@
+- name: Enable SysRq Kernel keys
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.d/99-sysrq.conf
+    line: 'kernel.sysrq=1'
+    create: true

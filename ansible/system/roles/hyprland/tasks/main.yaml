@@ -1,0 +1,71 @@
+---
+- name: "Install Hyprland"
+  community.general.pacman:
+    name:
+      - hyprland
+      - uwsm # session manager
+    state: present
+  become: true
+
+- name: "Install Hyprland config dependencies & extra helper programs from the AUR"
+  aur:
+    name:
+      # use default repo instead # [2024-02-21 Wed 22:12:02 -03] @ak - xdg-desktop-portal-hyprland-git       # before this one I had to manually do: $ pacman -S qt6-base qt6-wayland sdbus-cpp hyprlang --asdeps --needed
+      - rose-pine-hyprcursor # also download the xcursor version for GTK programs: https://github.com/rose-pine/cursor
+      # - eww-git
+      - wlr-randr # dep of nwg-displays
+      - nwg-displays
+      - tofi
+      - hyprprop-git
+      # - hypridle-git
+      - gtk-nocsd-git # hide gtk decorations for tiling WMs
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+# pac hyprcursor hypridle hyprwayland-scanner xdg-desktop-portal-hyprland hyprpaper hyprutils hyprlang --asdeps
+- name: Install Hyprland config desktop dependencies from pacman
+  become: true
+  community.general.pacman:
+    name:
+      # hyprland adds
+      - hyprshot # but use custom script instead bc me like it more
+      - hyprpaper
+      - swaybg
+      - hyprpicker
+      - xdg-desktop-portal-hyprland # ps ignore # [2024-10-23 Wed 01:37:28 -03] @ak [installed above from the AUR] - xdg-desktop-portal-hyprland
+      - hypridle # ps ignore # [2024-10-23 Wed 01:38:40 -03] @ak # aur instead
+      - hyprcursor
+      - polkit-kde-agent # GUI authentication helper
+      - libnotify
+      - kdeconnect
+      - wl-clipboard
+      # scripts dependencies
+      - socat
+      - jaq # jq alternative
+      - jq
+      # audio
+      - playerctl # keybinds
+      - pipewire
+      - pipewire-pulse
+      - pipewire-jack
+      - pipewire-alsa
+      # screenshots
+      - grim
+      - slurp
+      - wob # gui overlay for e.g. volume
+    state: present
+  become: true
+
+- name: "Packages for integration with other DEs"
+  become: true
+  community.general.pacman:
+    name:
+      - archlinux-xdg-menu # run `XDG_MENU_PREFIX=arch- kbuildsycoca6`
+                           # to fix dolphin mime-types file
+                           # associations on Hyprland
+                           # See:
+                           # - [[https://www.reddit.com/r/archlinux/comments/1benmij/why_does_the_dolphin_file_manager_do_not/][Why does the dolphin file manager do not detecting any applications? : r/archlinux]]
+                           # - [[https://bbs.archlinux.org/viewtopic.php?pid=2167442#p2167442][[SOLVED] Weird XDG MIME Behavior with KDE Dolphin on Hyprland / Applications & Desktop Environments / Arch Linux Forums]]
+                           # # [2024-07-26 Fri 11:54:15 -03] @ak

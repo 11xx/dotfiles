@@ -1,0 +1,3 @@
+kde_terminal_application: alacritty
+
+kde_terminal_service: Alacritty.desktop

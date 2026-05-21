@@ -1,0 +1,80 @@
+---
+- name: Install default programs dependencies & optional dependencies for desktop
+  community.general.pacman:
+    name:
+      # - tesseract-data # zathura-pdf-mupdf # install tesseract-data-best-* from the AUR
+      - kimageformats5 # qimgv more formats, including jxl
+    state: present
+    extra_args: --asdeps
+
+# - name: Install default programs dependencies & optional dependencies for desktop from the AUR
+#   aur:
+#     name:
+#       - tesseract-data-best # this doesn't install with ansible since its a group
+#     use: paru
+#     state: present
+#   become: true
+#   become_user: aurbuilder
+
+- name: Install default programs for desktop
+  community.general.pacman:
+    name:
+      - mpv
+      - xdg-user-dirs
+      # dark light switch
+      - gammastep
+      - darkman
+      - xsettingsd
+      - gnome-themes-extra # mainly for gtk2 adwaita theme
+      - pcmanfm
+      - pcmanfm-qt
+      - gvfs-mtp # for android mounting by file manager
+      - trash-cli
+      # launch script dep
+      # - zathura
+      - zathura-pdf-mupdf
+    state: present
+
+- name: Install default programs for desktop from the AUR
+  aur:
+    name:
+      - qimgv
+      - bookmarksync-git # GTK/KDE file managers sync
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+
+# This is required for idempotency with programs that require either
+# the 'rust' or 'rustup' packages to build
+- name: Install desktop programs from the AUR that require rustup
+  block:
+    - name: "Make sure `rust` is uninstalled ins favour of rustup as dependency"
+      community.general.pacman:
+        name: rust
+        state: absent
+        # when: rust_check.rc != 0 # #RM_RUST_CHECK
+
+    - name: Install rustup
+      community.general.pacman:
+        name: rustup
+        state: present
+      # when: rust_check.rc != 0 # #RM_RUST_CHECK
+
+    - name: Set default Rust version for aurbuilder
+      become: true
+      become_user: aurbuilder
+      ansible.builtin.command: rustup default stable
+      # when: "'rustup' in ansible_play_hosts_all" # #RM_RUST_CHECK
+      # no-changed-when - Ansible Lint Documentation (https://ansible.readthedocs.io/projects/lint/rules/no-changed-when/#correct-code)
+      # register: my_output # <- Registers the command output.
+      # changed_when: my_output.rc != 0 # <- Uses the return code to define when the task has changed.
+
+    - name: Install default programs for desktop from the AUR
+      aur:
+        name:
+          - brightness # prolly have to be installed manually
+        use: paru
+        state: present
+      become: true
+      become_user: aurbuilder
