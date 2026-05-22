@@ -368,7 +368,6 @@ Personal config modularized into "pseudo-packages"
 (keymap-global-set "C-c d f p" #'delete-file-local-variable-prop-line)
 (keymap-global-set "C-c C-M-t" #'visual-line-mode)
 (keymap-global-set "C-c M-t" #'toggle-truncate-lines)
-(keymap-global-set "C-c i t" #'current-timestamp-insert)
 (keymap-global-set "C-x C-z" #'org-set-property)
 (keymap-global-set "C-z" #'org-set-property)
 (keymap-global-set "C-S-<left>" #'shrink-window-horizontally)
@@ -1209,23 +1208,17 @@ Javascript related packages
 :END:
 
 #+begin_src emacs-lisp
-<<11xx-functions-el>>
-
-(provide '11xx-functions)
+;;; 11xx-functions.el --- Utility functions  -*- lexical-binding: t; -*-
 #+end_src
 
-** Function definitions
-:PROPERTIES:
-:header-args:emacs-lisp: :noweb-ref 11xx-functions-el
-:END:
-*** Electric modes
+** Electric modes
 [[https://www.emacswiki.org/emacs/ElectricPair][EmacsWiki: Electric Pair]]
 [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Auto_002dIndentation.html][24.7 Automatic indentation of code]]
 
 Electric pairs are like when a open parenthesis is inserted and the
 closing one is inserted automatically.
 
-*** Mark whole work
+** Mark whole work
 #wizard src [[https://emacs.stackexchange.com/questions/35069/best-way-to-select-a-word/35072#35072][mark - Best way to select a word - Emacs Stack Exchange]]
 
 =mark-whole-word=, to replace the built-in =mark-word= function.
@@ -1264,7 +1257,7 @@ See `mark-word' for more."
     (mark-word arg allow-extend)))
 #+end_src
 
-*** Use tabs for indentation if needed
+** Use tabs for indentation if needed
 See [[https://www.emacswiki.org/emacs/NoTabs#h5o-1][EmacsWiki: No Tabs]]
 #+begin_src emacs-lisp
 (defun infer-indentation-style ()
@@ -1280,26 +1273,7 @@ and if inconclusive, use current `indent-tabs-mode'."
 (add-hook 'prog-mode-hook #'infer-indentation-style)
 #+end_src
 
-*** Insert current timestamp
-#+begin_src emacs-lisp
-(defun current-timestamp-format ()
-  "Return current timestamp and hostname in a formatted string."
-  (concat "[" (format-time-string "%Y-%m-%d %a %H:%M:%S %Z" (current-time)) "] @" (system-name)))
-
-;;;###autoload
-(defun current-timestamp-insert ()
-  "Insert the current timestamp and hostname in a formatted string as a comment."
-  (interactive)
-  (let ((str (current-timestamp-format))
-        (start-point (point)))
-    (insert str)
-    (set-mark start-point)
-    (comment-region (region-beginning) (region-end))))
-;; [2024-08-28 Wed 03:14:39 -03] @ak
-;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
-#+end_src
-
-*** Kill matching lines
+** Kill matching lines
 [[https://www.emacswiki.org/emacs/KillMatchingLines][EmacsWiki: Kill Matching Lines]]
 # [2022-04-21 Thu 01:08:16]
 Delete lines with matching string and send them to killring
@@ -1331,7 +1305,7 @@ even beep.)"
     (flush-lines regexp rstart rend interactive)))
 #+end_src
 
-*** Check if directory exists and create it if not
+** Check if directory exists and create it if not
 #+begin_src emacs-lisp :results code
 (defun ensure-directory (dir)
   "Ensure DIR exists."
@@ -1339,7 +1313,7 @@ even beep.)"
     (make-directory dir t)))
 #+end_src
 
-*** Return XDG home directories
+** Return XDG home directories
 - =$XDG_BIN_HOME=
   #+begin_src emacs-lisp
 (defun xdg-bin-home ()
@@ -1354,7 +1328,7 @@ even beep.)"
   (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
   #+end_src
 
-*** Return file contents as string
+** Return file contents as string
 #+begin_src emacs-lisp
 (defun read-file-contents (file-path)
   "Read the contents of the file at FILE-PATH and return it as a string."
@@ -1363,7 +1337,7 @@ even beep.)"
     (buffer-string)))
 #+end_src
 
-*** Unfill paragraph
+** Unfill paragraph
 [[https://www.emacswiki.org/emacs/UnfillParagraph][EmacsWiki: Unfill Paragraph]]
 # [2023-06-23 Fri 13:28:42 -03]
 #+begin_src emacs-lisp
@@ -1380,7 +1354,7 @@ even beep.)"
 (define-key global-map "\M-Q" 'unfill-paragraph)
 #+end_src
 
-*** Filter any matching list item from a list
+** Filter any matching list item from a list
 # ;; from chatgpt: function for filtering items from a list using a list
 #+begin_src emacs-lisp
 (defun filter-list-any (source-list filter-list)
@@ -1398,7 +1372,7 @@ even beep.)"
     (nreverse result)))
 #+end_src
 
-*** Filter list items that match any prefix from a list
+** Filter list items that match any prefix from a list
 #+begin_src emacs-lisp
 (defun filter-list-any-string-prefix (source-list filter-list)
   "Filter out items from SOURCE-LIST that match any prefix in FILTER-LIST.
@@ -1420,7 +1394,7 @@ Example:
 #+end_src
 # (filter-list-any-prefix '("--fruit=banana" "orange" "cherry" "--veggie=potato") '("--fruit" "--veggie"))
 
-*** Platform check
+** Platform check
 Define macro for checking if =system-type= is =type=, if so, evaluate
 body.
 - [[https://stackoverflow.com/questions/1817257/how-to-determine-operating-system-in-elisp/26137517#26137517][emacs - How to determine operating system in elisp? - Stack Overflow]].
@@ -1438,7 +1412,7 @@ Usage
   (message "Free as in Freedom!"))
 #+end_example
 
-*** Replace alist item
+** Replace alist item
 like =add-to-list= but replaces item
 #+begin_src emacs-lisp
 (cl-defun add-or-replace-to-alist (list-var element &key append prepend)
@@ -1508,6 +1482,118 @@ Examples:
              (if append "appended/replaced." "prepended/replaced."))
     updated))
 #+end_src
+
+** provide footer
+#+begin_src emacs-lisp
+(require 'insert-timestamp :defer t)
+
+(provide '11xx-functions)
+#+end_src
+
+
+** insert-timestamp.el
+:PROPERTIES:
+:header-args:emacs-lisp+: :tangle lisp/insert-timestamp.el
+:END:
+
+#+begin_src emacs-lisp
+;;; insert-timestamp.el --- Small timestamp insertion helpers -*- lexical-binding: t; -*-
+
+(defun current-timestamp--hostname-suffix ()
+  "Return hostname suffix used by timestamp insertion commands."
+  (concat " @" (system-name)))
+
+(defun current-timestamp-org ()
+  "Return current timestamp in Org-friendly human-readable format."
+  (format-time-string "%Y-%m-%d %a %H:%M:%S %Z"))
+
+(defun current-timestamp-iso-basic ()
+  "Return current UTC timestamp in ISO 8601 basic format.
+
+This is compact and alphanumeric-only, for example:
+
+  20260522T183045Z"
+  (format-time-string "%Y%m%dT%H%M%SZ" nil t))
+
+(defun current-timestamp-iso ()
+  "Return current timestamp in ISO 8601 / RFC 3339-style extended format.
+
+This contains no spaces, for example:
+
+  2026-05-22T15:30:45-03:00"
+  (let ((ts (format-time-string "%Y-%m-%dT%H:%M:%S%z")))
+    (replace-regexp-in-string
+     "\\([+-][0-9][0-9]\\)\\([0-9][0-9]\\)\\'"
+     "\\1:\\2"
+     ts)))
+
+(defun current-timestamp-comment-format ()
+  "Return current timestamp and hostname in comment-marker format.
+
+This is intended for code timestamp marks with readable metadata, for example:
+
+  [2026-05-22 Fri 15:30:45 -03] @hostname"
+  (concat "["
+          (format-time-string "%Y-%m-%d %a %H:%M:%S %Z")
+          "]"
+          (current-timestamp--hostname-suffix)))
+
+;; Backward-compatible alias for the old frequently-used name.
+(defalias 'current-timestamp-format #'current-timestamp-comment-format)
+
+(defun current-timestamp--insert-as-comment (str)
+  "Insert STR and comment it using the current major mode's syntax."
+  (let ((start-point (point)))
+    (insert str)
+    (comment-region start-point (point))))
+
+;;;###autoload
+(defun current-timestamp-insert-comment ()
+  "Insert the current comment-marker timestamp and hostname as a comment."
+  (interactive)
+  (current-timestamp--insert-as-comment
+   (current-timestamp-comment-format)))
+
+;; Backward-compatible alias for the old frequently-used command.
+(defalias 'current-timestamp-insert #'current-timestamp-insert-comment)
+
+;;;###autoload
+(defun current-timestamp-insert-org ()
+  "Insert current Org-friendly timestamp followed by hostname."
+  (interactive)
+  (insert (current-timestamp-org)
+          (current-timestamp--hostname-suffix)))
+
+;;;###autoload
+(defun current-timestamp-insert-iso-basic ()
+  "Insert current ISO 8601 basic UTC timestamp followed by hostname.
+
+The timestamp itself is alphanumeric-only."
+  (interactive)
+  (insert (current-timestamp-iso-basic)
+          (current-timestamp--hostname-suffix)))
+
+;;;###autoload
+(defun current-timestamp-insert-iso ()
+  "Insert current ISO 8601 / RFC 3339-style timestamp followed by hostname.
+
+The timestamp contains no spaces."
+  (interactive)
+  (insert (current-timestamp-iso)
+          (current-timestamp--hostname-suffix)))
+
+(keymap-global-set "C-c i t t" #'current-timestamp-insert-iso-basic)
+(keymap-global-set "C-c i t c" #'current-timestamp-insert-comment)
+(keymap-global-set "C-c i t o" #'current-timestamp-insert-org)
+(keymap-global-set "C-c i t i" #'current-timestamp-insert-iso)
+
+(provide 'insert-timestamp)
+;;; insert-timestamp.el ends here
+#+end_src
+# ;; [2026-05-22 Fri 15:23:46 -03] @ak | refactored
+# ;; [2024-08-28 Wed 03:14:39 -03] @ak
+# ;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
+
 
 
 * 11xx-org.el: Org Mode

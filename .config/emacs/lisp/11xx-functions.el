@@ -1,4 +1,5 @@
-;; -*- lexical-binding: t; -*-
+;;; 11xx-functions.el --- Utility functions  -*- lexical-binding: t; -*-
+
 (defun mark-whole-word (&optional arg allow-extend)
   "Like `mark-word', but select whole words and skips over whitespace.
 If you use a negative prefix ARG then select words backward.
@@ -29,6 +30,7 @@ See `mark-word' for more."
           (left-word)
         (right-word)))
     (mark-word arg allow-extend)))
+
 (defun infer-indentation-style ()
   "Compare number of spaces and tabs and define `indent-tabs-mode' to t or nil.
 
@@ -40,21 +42,7 @@ and if inconclusive, use current `indent-tabs-mode'."
         (tab-count (how-many "^\t" (point-min) (point-max))))
     (setq-local indent-tabs-mode (> tab-count space-count))))
 (add-hook 'prog-mode-hook #'infer-indentation-style)
-(defun current-timestamp-format ()
-  "Return current timestamp and hostname in a formatted string."
-  (concat "[" (format-time-string "%Y-%m-%d %a %H:%M:%S %Z" (current-time)) "] @" (system-name)))
 
-;;;###autoload
-(defun current-timestamp-insert ()
-  "Insert the current timestamp and hostname in a formatted string as a comment."
-  (interactive)
-  (let ((str (current-timestamp-format))
-        (start-point (point)))
-    (insert str)
-    (set-mark start-point)
-    (comment-region (region-beginning) (region-end))))
-;; [2024-08-28 Wed 03:14:39 -03] @ak
-;; # [2023-12-10 Sun 01:33:12 -03:00] @winr58
 (defun kill-matching-lines (regexp &optional rstart rend interactive)
   "Kill lines containing matches for REGEXP.
 
@@ -80,22 +68,27 @@ even beep.)"
   (unless (and buffer-read-only kill-read-only-ok)
     ;; Delete lines or make the "Buffer is read-only" error.
     (flush-lines regexp rstart rend interactive)))
+
 (defun ensure-directory (dir)
   "Ensure DIR exists."
   (unless (file-directory-p dir)
     (make-directory dir t)))
+
 (defun xdg-bin-home ()
   "Return the base directory for user specific executable files."
   (xdg--dir-home "XDG_BIN_HOME" "~/.local/bin"))
+
 (defun xdg-state-home ()
   "Return the base directory for user specific log files."
   (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
+
 (defun read-file-contents (file-path)
   "Read the contents of the file at FILE-PATH and return it as a string."
   (with-temp-buffer
     (insert-file-contents file-path)
     (buffer-string)))
-    ;;; Stefan Monnier <foo at acm.org>. It is the opposite of fill-paragraph
+
+;;; Stefan Monnier <foo at acm.org>. It is the opposite of fill-paragraph
 (defun unfill-paragraph (&optional region)
   "Takes a multi-line paragraph and makes it into a single line of text."
   (interactive (progn (barf-if-buffer-read-only) '(t)))
@@ -106,6 +99,7 @@ even beep.)"
 
 ;; Handy key definition
 (define-key global-map "\M-Q" 'unfill-paragraph)
+
 (defun filter-list-any (source-list filter-list)
   "Filter out items from SOURCE-LIST that are found in FILTER-LIST."
   (let ((hash-table (make-hash-table :test 'equal))
@@ -119,6 +113,7 @@ even beep.)"
         (push item result)))
     ;; The result list is built in reverse order, so reverse it
     (nreverse result)))
+
 (defun filter-list-any-string-prefix (source-list filter-list)
   "Filter out items from SOURCE-LIST that match any prefix in FILTER-LIST.
 
@@ -136,11 +131,13 @@ Example:
                filter-list)
         (push item result)))
     (nreverse result)))
+
 (defmacro with-system (type &rest body)
   "Evaluate BODY if `system-type' equals TYPE."
   (declare (indent defun))
   `(when (eq system-type ',type)
      ,@body))
+
 (cl-defun add-or-replace-to-alist (list-var element &key append prepend)
   "Add or replace ELEMENT or a list of ELEMENTS in the alist stored in LIST-VAR.
 
@@ -207,5 +204,7 @@ Examples:
              (if (> count 1) "ies were" "y was")
              (if append "appended/replaced." "prepended/replaced."))
     updated))
+
+(require 'insert-timestamp :defer t)
 
 (provide '11xx-functions)

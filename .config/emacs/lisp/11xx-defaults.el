@@ -9,7 +9,6 @@
 (keymap-global-set "C-c d f p" #'delete-file-local-variable-prop-line)
 (keymap-global-set "C-c C-M-t" #'visual-line-mode)
 (keymap-global-set "C-c M-t" #'toggle-truncate-lines)
-(keymap-global-set "C-c i t" #'current-timestamp-insert)
 (keymap-global-set "C-x C-z" #'org-set-property)
 (keymap-global-set "C-z" #'org-set-property)
 (keymap-global-set "C-S-<left>" #'shrink-window-horizontally)
