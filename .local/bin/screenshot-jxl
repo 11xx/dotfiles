@@ -1,0 +1,388 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+app_name="Screenshot"
+
+mode="fullscreen"
+include_cursor=0
+
+write_lossless=1
+write_lossy=1
+
+copy_mode="path"
+notify_enabled=1
+
+lossless_effort=7
+lossy_distance="0.3"
+lossy_effort=7
+
+lossy_dir=""
+lossless_dir=""
+lossless_dir_explicit=0
+
+usage() {
+    cat <<'EOF'
+Usage:
+  screenshot-jxl [OPTIONS]
+
+Capture mode:
+  -s, --select                 Capture a selected region with slurp
+  -f, --fullscreen             Capture fullscreen (default)
+  -c, --cursor                 Include cursor in the capture
+
+Output policy:
+      --lossless-only          Save only the archival lossless JXL
+      --lossy-only             Save only the working lossy JXL
+      --lossy-distance N       Set lossy JXL distance (default: 0.3)
+      --lossless-effort N      Set lossless JXL effort 1..9 (default: 7)
+      --lossy-effort N         Set lossy JXL effort 1..9 (default: 7)
+
+Clipboard:
+      --copy path              Copy preferred saved path (default)
+      --copy lossy-path        Copy lossy saved path
+      --copy lossless-path     Copy lossless saved path
+      --copy image             Copy PNG image data
+      --copy none              Do not touch clipboard
+
+Paths:
+      --lossy-dir DIR          Directory for working lossy screenshots
+      --lossless-dir DIR       Directory for archival lossless screenshots
+      --screenshots-dir DIR    Alias for --lossy-dir
+      --archive-dir DIR        Alias for --lossless-dir
+
+Notifications:
+      --no-notify              Disable desktop notifications
+
+Debugging:
+  -v, --verbose                Enable shell tracing
+
+Help:
+  -h, --help                   Show this help text
+
+Defaults:
+  - Saves a lossless JXL archive copy
+  - Saves a lossy JXL working copy
+  - Stores lossy files in ~/Pictures/screenshots/
+  - Stores lossless files in ~/Pictures/screenshots/archive/
+  - Copies the lossy path when both outputs exist
+EOF
+}
+
+notify_error() {
+    [[ "$notify_enabled" -eq 1 ]] || return 0
+    command -v notify-send >/dev/null 2>&1 || return 0
+
+    notify-send --urgency=low --app-name="$app_name" \
+        "Screenshot failed" \
+        "$1"
+}
+
+die() {
+    notify_error "$1" || true
+    printf 'screenshot-jxl: %s\n' "$1" >&2
+    exit 1
+}
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"
+}
+
+check_effort() {
+    case "$2" in
+        [1-9]) ;;
+        *) die "$1 must be an integer from 1 to 9" ;;
+    esac
+}
+
+check_distance() {
+    case "$1" in
+        ''|*[!0123456789.]*|*.*.*)
+            die "--lossy-distance must be a non-negative decimal number"
+            ;;
+    esac
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -s|--select)
+            mode="region"
+            shift
+            ;;
+        -f|--fullscreen)
+            mode="fullscreen"
+            shift
+            ;;
+        -c|--cursor)
+            include_cursor=1
+            shift
+            ;;
+        --lossless-only)
+            write_lossless=1
+            write_lossy=0
+            shift
+            ;;
+        --lossy-only)
+            write_lossless=0
+            write_lossy=1
+            shift
+            ;;
+        --lossy-distance)
+            [[ $# -ge 2 ]] || die "--lossy-distance requires a value"
+            lossy_distance="$2"
+            shift 2
+            ;;
+        --lossless-effort)
+            [[ $# -ge 2 ]] || die "--lossless-effort requires a value"
+            lossless_effort="$2"
+            shift 2
+            ;;
+        --lossy-effort)
+            [[ $# -ge 2 ]] || die "--lossy-effort requires a value"
+            lossy_effort="$2"
+            shift 2
+            ;;
+        --copy)
+            [[ $# -ge 2 ]] || die "--copy requires: path, lossy-path, lossless-path, image, or none"
+            case "$2" in
+                path|lossy-path|lossless-path|image|none)
+                    copy_mode="$2"
+                    ;;
+                *)
+                    die "invalid --copy mode: $2"
+                    ;;
+            esac
+            shift 2
+            ;;
+        --lossy-dir|--screenshots-dir)
+            [[ $# -ge 2 ]] || die "$1 requires a directory"
+            lossy_dir="$2"
+            if [[ "$lossless_dir_explicit" -eq 0 ]]; then
+                lossless_dir="$lossy_dir/archive"
+            fi
+            shift 2
+            ;;
+        --lossless-dir|--archive-dir)
+            [[ $# -ge 2 ]] || die "$1 requires a directory"
+            lossless_dir="$2"
+            lossless_dir_explicit=1
+            shift 2
+            ;;
+        --no-notify)
+            notify_enabled=0
+            shift
+            ;;
+        -v|--verbose)
+            set -x
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            die "unknown option: $1"
+            ;;
+        *)
+            die "unexpected positional argument: $1"
+            ;;
+    esac
+done
+
+[[ "$write_lossless" -eq 1 || "$write_lossy" -eq 1 ]] || \
+    die "nothing to do: both outputs are disabled"
+
+check_effort "--lossless-effort" "$lossless_effort"
+check_effort "--lossy-effort" "$lossy_effort"
+check_distance "$lossy_distance"
+
+need grim
+need cjxl
+need magick
+
+if [[ "$mode" = "region" ]]; then
+    need slurp
+fi
+
+if [[ "$copy_mode" != "none" ]]; then
+    need wl-copy
+fi
+
+if [[ "$notify_enabled" -eq 1 ]]; then
+    need notify-send
+fi
+
+get_pictures_dir() {
+    if command -v xdg-user-dir >/dev/null 2>&1; then
+        xdg-user-dir PICTURES 2>/dev/null || printf '%s/Pictures\n' "$HOME"
+    else
+        printf '%s/Pictures\n' "$HOME"
+    fi
+}
+
+pictures_dir="$(get_pictures_dir)"
+
+if [[ -z "$lossy_dir" ]]; then
+    lossy_dir="$pictures_dir/screenshots"
+fi
+
+if [[ -z "$lossless_dir" ]]; then
+    lossless_dir="$lossy_dir/archive"
+fi
+
+mkdir -p "$lossy_dir"
+mkdir -p "$lossless_dir"
+
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/screenshot-jxl"
+mkdir -p "$cache_dir"
+
+timestamp="$(date +'%Y%m%d-%H%M%S')"
+base_name="${timestamp}-screenshot"
+
+lossless_file="$lossless_dir/${base_name}.jxl"
+lossy_file="$lossy_dir/${base_name}-lossy.jxl"
+thumb_file="$cache_dir/${base_name}-thumb.png"
+
+tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/screenshot-jxl.XXXXXXXX")"
+trap 'rm -rf "$tmpdir"' EXIT
+
+tmp_ppm="$tmpdir/capture.ppm"
+
+grim_args=(-t ppm)
+
+if [[ "$include_cursor" -eq 1 ]]; then
+    grim_args+=(-c)
+fi
+
+if [[ "$mode" = "region" ]]; then
+    geometry="$(slurp || true)"
+    [[ -n "${geometry:-}" ]] || die "selection cancelled"
+    grim_args+=(-g "$geometry")
+fi
+
+grim "${grim_args[@]}" "$tmp_ppm" || die "grim failed"
+
+[[ -s "$tmp_ppm" ]] || die "capture was not created"
+
+encode_lossless() {
+    cjxl "$tmp_ppm" "$lossless_file" \
+        --distance 0 \
+        --effort "$lossless_effort" \
+        >/dev/null || die "lossless cjxl encode failed"
+
+    [[ -s "$lossless_file" ]] || die "lossless output was not created"
+}
+
+encode_lossy() {
+    cjxl "$tmp_ppm" "$lossy_file" \
+        --distance "$lossy_distance" \
+        --effort "$lossy_effort" \
+        >/dev/null || die "lossy cjxl encode failed"
+
+    [[ -s "$lossy_file" ]] || die "lossy output was not created"
+}
+
+if [[ "$write_lossless" -eq 1 ]]; then
+    encode_lossless
+fi
+
+if [[ "$write_lossy" -eq 1 ]]; then
+    encode_lossy
+fi
+
+preferred_path() {
+    if [[ "$write_lossy" -eq 1 ]]; then
+        printf '%s\n' "$lossy_file"
+    elif [[ "$write_lossless" -eq 1 ]]; then
+        printf '%s\n' "$lossless_file"
+    else
+        return 1
+    fi
+}
+
+lossy_path() {
+    [[ "$write_lossy" -eq 1 ]] || die "cannot copy lossy path: lossy output was not written"
+    printf '%s\n' "$lossy_file"
+}
+
+lossless_path() {
+    [[ "$write_lossless" -eq 1 ]] || die "cannot copy lossless path: lossless output was not written"
+    printf '%s\n' "$lossless_file"
+}
+
+case "$copy_mode" in
+    path)
+        preferred_path | tr -d '\n' | wl-copy
+        ;;
+    lossy-path)
+        lossy_path | tr -d '\n' | wl-copy
+        ;;
+    lossless-path)
+        lossless_path | tr -d '\n' | wl-copy
+        ;;
+    image)
+        magick "$tmp_ppm" png:- | wl-copy --type image/png || \
+            die "failed to copy PNG image to clipboard"
+        ;;
+    none)
+        ;;
+esac
+
+if [[ "$notify_enabled" -eq 1 ]]; then
+    magick "$tmp_ppm" -thumbnail '300x300>' "$thumb_file" >/dev/null 2>&1 || true
+fi
+
+notify_success() {
+    [[ "$notify_enabled" -eq 1 ]] || return 0
+
+    local title
+    case "$mode" in
+        region) title="Region screenshot taken" ;;
+        *)      title="Fullscreen screenshot taken" ;;
+    esac
+
+    local body_lines=()
+
+    if [[ "$write_lossless" -eq 1 ]]; then
+        body_lines+=("Lossless: $lossless_file")
+    fi
+
+    if [[ "$write_lossy" -eq 1 ]]; then
+        body_lines+=("Lossy: $lossy_file")
+    fi
+
+    case "$copy_mode" in
+        path)          body_lines+=("Clipboard: copied preferred path") ;;
+        lossy-path)    body_lines+=("Clipboard: copied lossy path") ;;
+        lossless-path) body_lines+=("Clipboard: copied lossless path") ;;
+        image)         body_lines+=("Clipboard: copied PNG image") ;;
+        none)          body_lines+=("Clipboard: unchanged") ;;
+    esac
+
+    local body
+    body="$(printf '%s\n' "${body_lines[@]}")"
+
+    if [[ -f "$thumb_file" ]]; then
+        notify-send --urgency=normal --app-name="$app_name" \
+            --icon="$thumb_file" \
+            "$title" \
+            "$body"
+    else
+        notify-send --urgency=normal --app-name="$app_name" \
+            "$title" \
+            "$body"
+    fi
+}
+
+notify_success
+
+if [[ "$write_lossless" -eq 1 ]]; then
+    printf 'LOSSLESS=%s\n' "$lossless_file"
+fi
+
+if [[ "$write_lossy" -eq 1 ]]; then
+    printf 'LOSSY=%s\n' "$lossy_file"
+fi
