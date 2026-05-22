@@ -1,6 +1,7 @@
 #+TITLE: Arch Linux utility scripts
 #+PROPERTY: header-args :results silent
 #+PROPERTY: header-args:bash :mkdirp yes :comments no
+
 #+options: toc:2 num:nil
 
 * screenshot-jxl
@@ -8,62 +9,67 @@
 :header-args:bash: :tangle screenshot-jxl :shebang "#!/usr/bin/env bash"
 :END:
 
-#+subtitle: Wayland screenshot helper with dual JPEG XL outputs
+#+subtitle: Wayland screenshot helper with immediate notification and lossless JPEG XL output
 
-The helper captures the screen once and writes two JPEG XL files by default:
+This helper is intentionally simpler than the earlier dual-output version. It
+captures one screenshot and writes one final file: a mathematically lossless
+JPEG XL image.
 
-- a lossless archive copy;
-- a lossy working copy.
+The important workflow detail is that the user-facing notification is not tied
+to the slow encoder step. The capture is made first, a small PNG thumbnail is
+created immediately, and the desktop notification is sent before =cjxl= starts
+its heavier lossless compression work.
 
-That layout keeps the exact screenshot available while making the everyday file
-smaller and more disposable. The lossy file is the default clipboard path
-because it is the file normally meant for quick sharing.
-
-The source blocks under this heading are tangled in order into
-=~/.local/bin/screenshot-jxl=. Bash examples that are not part of the script use
-=:tangle no= explicitly.
+The source blocks under this heading tangle, in order, into
+=~/.local/bin/screenshot-jxl=. Example blocks use =:tangle no= so they remain
+part of the document without becoming part of the script.
 
 ** Dependencies
 
-The script is Wayland-native and expects a Hyprland-compatible screenshot stack.
+The script is Wayland-native and is intended for Hyprland or another compositor
+that works with =grim=.
 
 #+begin_src bash :tangle no
 sudo pacman -S grim slurp libjxl wl-clipboard libnotify imagemagick xdg-user-dirs
 #+end_src
 
-The relevant programs are:
+The relevant commands are:
 
-- =grim= for Wayland capture;
+- =grim= for Wayland screenshot capture;
 - =slurp= for region selection;
 - =cjxl= for JPEG XL encoding;
 - =wl-copy= for Wayland clipboard support;
-- =notify-send= for notifications;
-- =magick= for PNG clipboard conversion and notification thumbnails;
-- =xdg-user-dir= for the default Pictures directory.
+- =notify-send= for desktop notifications;
+- =magick= for the fast PNG thumbnail and optional PNG clipboard image;
+- =xdg-user-dir= for the default Pictures directory, when available.
 
-The script can still fall back to =$HOME/Pictures= if =xdg-user-dir= is missing.
+The script can still fall back to =$HOME/Pictures= if =xdg-user-dir= is absent
+or fails.
 
 ** Format policy
 
-The archive file is encoded with =--distance 0=, which means mathematically
-lossless JPEG XL. This is the version to keep.
+Screenshots are archival by default. Flat UI colors, text, terminals, icons,
+subpixel rendering, and theme previews are all hostile to lossy compression when
+exact visual structure matters.
 
-The working file is encoded with a configurable lossy distance. The default is
-conservative:
+The final file is therefore encoded as JPEG XL with distance =0=:
 
 #+begin_src bash :tangle no
---lossy-distance 0.3
+cjxl input.ppm output.jxl --distance 0 --effort 9
 #+end_src
 
-That should usually compress better than PNG while avoiding the obvious
-checker/noise pattern that appears when screenshot-like UI content is encoded
-too aggressively.
+That preserves exact pixels while allowing JPEG XL to compress the image more
+aggressively than a normal PNG workflow often would.
+
+The tradeoff is that high-effort lossless JXL encoding can take noticeably
+longer than simply writing a PNG. To keep the interaction responsive, the script
+sends its screenshot notification immediately after capture and thumbnail
+creation, then performs the final encode afterward.
 
 ** Script prelude
 
-Use Bash rather than POSIX =sh= because the script uses arrays for arguments and
-notification body construction. This keeps the capture command and notification
-logic less fragile than string-building.
+Use Bash rather than POSIX =sh= because arrays make the =grim= argument list and
+notification body construction safer and simpler.
 
 #+begin_src bash
 set -Eeuo pipefail
@@ -73,13 +79,14 @@ set -Eeuo pipefail
 
 The default mode is fullscreen capture.
 
-The default output policy is dual-output:
+The default output is a single lossless JPEG XL file under
+=~/Pictures/screenshots/=. The default encoder effort is =9= because the slow
+part now happens after the immediate notification. Lower it with =--effort= if
+latency or CPU use matters more than file size.
 
-- write the lossless archive;
-- write the lossy working copy.
-
-The clipboard defaults to =path=, which means "copy the preferred saved file
-path". When both outputs exist, the preferred path is the lossy file.
+The default clipboard behavior is =path=: the final output path is copied as
+soon as the path is known. The file may still be encoding for a short period
+after the notification appears.
 
 #+begin_src bash
 app_name="Screenshot"
@@ -87,25 +94,18 @@ app_name="Screenshot"
 mode="fullscreen"
 include_cursor=0
 
-write_lossless=1
-write_lossy=1
-
 copy_mode="path"
 notify_enabled=1
+verbose=0
 
-lossless_effort=7
-lossy_distance="0.3"
-lossy_effort=7
-
-lossy_dir=""
-lossless_dir=""
-lossless_dir_explicit=0
+jxl_effort=9
+output_dir=""
 #+end_src
 
 ** Help text
 
-The script itself only carries operational help. Longer examples and commentary
-belong in this Org document.
+The script carries only reference help. The walkthrough and examples live in
+this Org document.
 
 #+begin_src bash
 usage() {
@@ -114,54 +114,43 @@ Usage:
   screenshot-jxl [OPTIONS]
 
 Capture mode:
-  -s, --select                 Capture a selected region with slurp
-  -f, --fullscreen             Capture fullscreen (default)
-  -c, --cursor                 Include cursor in the capture
+  -s, --select               Capture a selected region with slurp
+  -f, --fullscreen           Capture fullscreen (default)
+  -c, --cursor               Include cursor in the capture
 
-Output policy:
-      --lossless-only          Save only the archival lossless JXL
-      --lossy-only             Save only the working lossy JXL
-      --lossy-distance N       Set lossy JXL distance (default: 0.3)
-      --lossless-effort N      Set lossless JXL effort 1..9 (default: 7)
-      --lossy-effort N         Set lossy JXL effort 1..9 (default: 7)
+Output:
+      --effort N             Set lossless JXL effort 1..9 (default: 9)
+      --output-dir DIR       Directory for screenshots
+      --screenshots-dir DIR  Alias for --output-dir
 
 Clipboard:
-      --copy path              Copy preferred saved path (default)
-      --copy lossy-path        Copy lossy saved path
-      --copy lossless-path     Copy lossless saved path
-      --copy image             Copy PNG image data
-      --copy none              Do not touch clipboard
-
-Paths:
-      --lossy-dir DIR          Directory for working lossy screenshots
-      --lossless-dir DIR       Directory for archival lossless screenshots
-      --screenshots-dir DIR    Alias for --lossy-dir
-      --archive-dir DIR        Alias for --lossless-dir
+      --copy path            Copy final .jxl path to clipboard (default)
+      --copy image           Copy PNG image data to clipboard
+      --copy none            Do not touch clipboard
 
 Notifications:
-      --no-notify              Disable desktop notifications
+      --no-notify            Disable desktop notifications
 
 Debugging:
-  -v, --verbose                Enable shell tracing
+  -v, --verbose              Enable shell tracing
 
 Help:
-  -h, --help                   Show this help text
+  -h, --help                 Show this help text
 
-Defaults:
-  - Saves a lossless JXL archive copy
-  - Saves a lossy JXL working copy
-  - Stores lossy files in ~/Pictures/screenshots/
-  - Stores lossless files in ~/Pictures/screenshots/archive/
-  - Copies the lossy path when both outputs exist
+Behavior:
+  - Captures once using grim
+  - Creates a small PNG notification thumbnail immediately
+  - Sends the screenshot notification before JXL encoding
+  - Saves a mathematically lossless JPEG XL file
 EOF
 }
 #+end_src
 
 ** Diagnostics
 
-=die= prints to stderr and also sends a low-urgency notification when possible.
-It checks for =notify-send= at call time so dependency failures can still be
-reported cleanly.
+Failures should be visible even when the script is called from a Hyprland
+binding. =die= prints to stderr and also uses =notify-send= when notification is
+enabled and the command exists.
 
 #+begin_src bash
 notify_error() {
@@ -180,8 +169,8 @@ die() {
 }
 #+end_src
 
-External commands are checked after options are parsed. That allows
-=--no-notify= or =--copy none= to remove optional runtime requirements.
+Dependency checks are explicit. Optional commands are only required when their
+corresponding feature is active.
 
 #+begin_src bash
 need() {
@@ -189,33 +178,21 @@ need() {
 }
 #+end_src
 
-A small validator catches invalid effort values before =cjxl= is invoked.
+The effort value is deliberately constrained to =1..9= before capture starts.
 
 #+begin_src bash
 check_effort() {
-    case "$2" in
-        [1-9]) ;;
-        *) die "$1 must be an integer from 1 to 9" ;;
-    esac
-}
-#+end_src
-
-A minimal decimal validator is enough for =cjxl --distance= values used here.
-
-#+begin_src bash
-check_distance() {
     case "$1" in
-        ''|*[!0123456789.]*|*.*.*)
-            die "--lossy-distance must be a non-negative decimal number"
-            ;;
+        [1-9]) ;;
+        *) die "--effort must be an integer from 1 to 9" ;;
     esac
 }
 #+end_src
 
 ** Argument parsing
 
-The parser is intentionally direct: each flag mutates one variable and then
-shifts its own arguments.
+Each option mutates one script variable and shifts its own arguments. There are
+no positional arguments because the screenshot source is always the compositor.
 
 #+begin_src bash
 while [[ $# -gt 0 ]]; do
@@ -232,35 +209,20 @@ while [[ $# -gt 0 ]]; do
             include_cursor=1
             shift
             ;;
-        --lossless-only)
-            write_lossless=1
-            write_lossy=0
-            shift
-            ;;
-        --lossy-only)
-            write_lossless=0
-            write_lossy=1
-            shift
-            ;;
-        --lossy-distance)
-            [[ $# -ge 2 ]] || die "--lossy-distance requires a value"
-            lossy_distance="$2"
+        --effort)
+            [[ $# -ge 2 ]] || die "--effort requires a value"
+            jxl_effort="$2"
             shift 2
             ;;
-        --lossless-effort)
-            [[ $# -ge 2 ]] || die "--lossless-effort requires a value"
-            lossless_effort="$2"
-            shift 2
-            ;;
-        --lossy-effort)
-            [[ $# -ge 2 ]] || die "--lossy-effort requires a value"
-            lossy_effort="$2"
+        --output-dir|--screenshots-dir)
+            [[ $# -ge 2 ]] || die "$1 requires a directory"
+            output_dir="$2"
             shift 2
             ;;
         --copy)
-            [[ $# -ge 2 ]] || die "--copy requires: path, lossy-path, lossless-path, image, or none"
+            [[ $# -ge 2 ]] || die "--copy requires: path, image, or none"
             case "$2" in
-                path|lossy-path|lossless-path|image|none)
+                path|image|none)
                     copy_mode="$2"
                     ;;
                 *)
@@ -269,25 +231,12 @@ while [[ $# -gt 0 ]]; do
             esac
             shift 2
             ;;
-        --lossy-dir|--screenshots-dir)
-            [[ $# -ge 2 ]] || die "$1 requires a directory"
-            lossy_dir="$2"
-            if [[ "$lossless_dir_explicit" -eq 0 ]]; then
-                lossless_dir="$lossy_dir/archive"
-            fi
-            shift 2
-            ;;
-        --lossless-dir|--archive-dir)
-            [[ $# -ge 2 ]] || die "$1 requires a directory"
-            lossless_dir="$2"
-            lossless_dir_explicit=1
-            shift 2
-            ;;
         --no-notify)
             notify_enabled=0
             shift
             ;;
         -v|--verbose)
+            verbose=1
             set -x
             shift
             ;;
@@ -299,7 +248,7 @@ while [[ $# -gt 0 ]]; do
             shift
             break
             ;;
-        -*)
+        -* )
             die "unknown option: $1"
             ;;
         *)
@@ -311,25 +260,13 @@ done
 
 ** Validation
 
-At least one final image must be written.
+Validate the encoder setting before doing any screenshot work.
 
 #+begin_src bash
-[[ "$write_lossless" -eq 1 || "$write_lossy" -eq 1 ]] || \
-    die "nothing to do: both outputs are disabled"
+check_effort "$jxl_effort"
 #+end_src
 
-Validate encoder parameters before doing any capture work.
-
-#+begin_src bash
-check_effort "--lossless-effort" "$lossless_effort"
-check_effort "--lossy-effort" "$lossy_effort"
-check_distance "$lossy_distance"
-#+end_src
-
-** Dependency selection
-
-Some dependencies are unconditional because the script cannot do useful work
-without them.
+The capture, encoder, and thumbnail tools are mandatory.
 
 #+begin_src bash
 need grim
@@ -337,7 +274,7 @@ need cjxl
 need magick
 #+end_src
 
-Region capture only requires =slurp= when the region mode is active.
+Region selection requires =slurp= only in region mode.
 
 #+begin_src bash
 if [[ "$mode" = "region" ]]; then
@@ -345,7 +282,8 @@ if [[ "$mode" = "region" ]]; then
 fi
 #+end_src
 
-Clipboard and notification dependencies depend on the selected runtime policy.
+Clipboard and notification commands are checked only when their features are
+enabled.
 
 #+begin_src bash
 if [[ "$copy_mode" != "none" ]]; then
@@ -357,10 +295,10 @@ if [[ "$notify_enabled" -eq 1 ]]; then
 fi
 #+end_src
 
-** Output directories
+** Output directory
 
-The default directory is based on the XDG Pictures directory when available.
-If that command is missing or fails, =$HOME/Pictures= is used.
+Use the XDG Pictures directory when possible. Falling back to =$HOME/Pictures=
+keeps the script usable in smaller shells or stripped-down environments.
 
 #+begin_src bash
 get_pictures_dir() {
@@ -372,27 +310,22 @@ get_pictures_dir() {
 }
 #+end_src
 
-The lossy directory is the ordinary working screenshot directory. The lossless
-directory defaults to an =archive= subdirectory under it.
+If no output directory was provided, screenshots go under
+=Pictures/screenshots=.
 
 #+begin_src bash
 pictures_dir="$(get_pictures_dir)"
 
-if [[ -z "$lossy_dir" ]]; then
-    lossy_dir="$pictures_dir/screenshots"
+if [[ -z "$output_dir" ]]; then
+    output_dir="$pictures_dir/screenshots"
 fi
 
-if [[ -z "$lossless_dir" ]]; then
-    lossless_dir="$lossy_dir/archive"
-fi
-
-mkdir -p "$lossy_dir"
-mkdir -p "$lossless_dir"
+mkdir -p "$output_dir"
 #+end_src
 
-Notification thumbnails are PNG files placed in the cache directory. They are
-not stored under the temporary directory because some notification daemons load
-icons after the script exits.
+Notification thumbnails are placed under the cache directory instead of the
+runtime temporary directory. Some notification daemons load icon files after the
+script has already moved on; a cache path avoids racing against cleanup.
 
 #+begin_src bash
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/screenshot-jxl"
@@ -401,23 +334,22 @@ mkdir -p "$cache_dir"
 
 ** File names
 
-Both output files share the same timestamp and semantic base name. The lossless
-archive keeps the clean basename; the lossy disposable file carries the
-=-lossy= suffix.
+The timestamp is recorded before capture so the name reflects when the shortcut
+was pressed, not when compression finished.
 
 #+begin_src bash
 timestamp="$(date +'%Y%m%d-%H%M%S')"
 base_name="${timestamp}-screenshot"
 
-lossless_file="$lossless_dir/${base_name}.jxl"
-lossy_file="$lossy_dir/${base_name}-lossy.jxl"
+output_file="$output_dir/${base_name}.jxl"
 thumb_file="$cache_dir/${base_name}-thumb.png"
 #+end_src
 
 ** Temporary capture state
 
-The screen is captured once to a PPM file. PPM is intentionally used as a simple
-lossless intermediate for both JPEG XL outputs and for the PNG clipboard path.
+The compositor capture is written to a temporary PPM file. PPM is intentionally
+used as a simple lossless intermediate: it is fast, unambiguous, and accepted by
+both ImageMagick and =cjxl=.
 
 #+begin_src bash
 tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/screenshot-jxl.XXXXXXXX")"
@@ -428,8 +360,8 @@ tmp_ppm="$tmpdir/capture.ppm"
 
 ** Capture arguments
 
-=grim= receives its arguments as a Bash array to avoid unsafe string
-concatenation. Cursor and region flags are added only when requested.
+The =grim= command is built as an array to avoid quoting bugs. Cursor capture is
+added only when requested.
 
 #+begin_src bash
 grim_args=(-t ppm)
@@ -439,8 +371,8 @@ if [[ "$include_cursor" -eq 1 ]]; then
 fi
 #+end_src
 
-In region mode, =slurp= provides the geometry. An empty geometry means the
-selection was cancelled.
+For region screenshots, =slurp= returns the geometry string. An empty result
+means the selection was cancelled.
 
 #+begin_src bash
 if [[ "$mode" = "region" ]]; then
@@ -452,7 +384,8 @@ fi
 
 ** Capture execution
 
-The capture must exist and be non-empty before any encoding work starts.
+The screenshot is captured once. Everything else works from this temporary
+lossless source.
 
 #+begin_src bash
 grim "${grim_args[@]}" "$tmp_ppm" || die "grim failed"
@@ -460,151 +393,53 @@ grim "${grim_args[@]}" "$tmp_ppm" || die "grim failed"
 [[ -s "$tmp_ppm" ]] || die "capture was not created"
 #+end_src
 
-** JPEG XL encoding
+** Immediate thumbnail
 
-The lossless archive is exact. This is the file to keep.
+The thumbnail is generated before any final JPEG XL encoding. It is small and
+uses low PNG compression because the point is responsiveness, not archival
+quality.
 
 #+begin_src bash
-encode_lossless() {
-    cjxl "$tmp_ppm" "$lossless_file" \
-        --distance 0 \
-        --effort "$lossless_effort" \
-        >/dev/null || die "lossless cjxl encode failed"
-
-    [[ -s "$lossless_file" ]] || die "lossless output was not created"
+make_thumbnail() {
+    magick "$tmp_ppm" \
+        -thumbnail '300x300>' \
+        -strip \
+        -define png:compression-level=0 \
+        "$thumb_file" \
+        >/dev/null 2>&1 || true
 }
 #+end_src
 
-The lossy working copy is smaller and disposable. The default distance is low
-on purpose because screenshots punish aggressive lossy compression more than
-photos do.
+Create the thumbnail immediately after capture.
 
 #+begin_src bash
-encode_lossy() {
-    cjxl "$tmp_ppm" "$lossy_file" \
-        --distance "$lossy_distance" \
-        --effort "$lossy_effort" \
-        >/dev/null || die "lossy cjxl encode failed"
-
-    [[ -s "$lossy_file" ]] || die "lossy output was not created"
-}
+make_thumbnail
 #+end_src
 
-Run whichever encoders the selected output policy enabled.
+** Immediate notification
+
+This notification is intentionally sent before =cjxl= runs. It means “the
+screen has been captured successfully and final encoding is now in progress”.
+If encoding later fails, a separate error notification is sent by =die=.
 
 #+begin_src bash
-if [[ "$write_lossless" -eq 1 ]]; then
-    encode_lossless
-fi
-
-if [[ "$write_lossy" -eq 1 ]]; then
-    encode_lossy
-fi
-#+end_src
-
-** Clipboard target selection
-
-The =path= clipboard mode chooses the most useful saved file path. In normal
-dual-output mode that means the lossy working copy. If only one output exists,
-that path is used.
-
-#+begin_src bash
-preferred_path() {
-    if [[ "$write_lossy" -eq 1 ]]; then
-        printf '%s\n' "$lossy_file"
-    elif [[ "$write_lossless" -eq 1 ]]; then
-        printf '%s\n' "$lossless_file"
-    else
-        return 1
-    fi
-}
-#+end_src
-
-The explicit path modes fail if the requested output was not produced.
-
-#+begin_src bash
-lossy_path() {
-    [[ "$write_lossy" -eq 1 ]] || die "cannot copy lossy path: lossy output was not written"
-    printf '%s\n' "$lossy_file"
-}
-
-lossless_path() {
-    [[ "$write_lossless" -eq 1 ]] || die "cannot copy lossless path: lossless output was not written"
-    printf '%s\n' "$lossless_file"
-}
-#+end_src
-
-** Clipboard writing
-
-Clipboard image mode intentionally writes PNG data. This avoids depending on
-receiving applications having JPEG XL paste support.
-
-#+begin_src bash
-case "$copy_mode" in
-    path)
-        preferred_path | tr -d '\n' | wl-copy
-        ;;
-    lossy-path)
-        lossy_path | tr -d '\n' | wl-copy
-        ;;
-    lossless-path)
-        lossless_path | tr -d '\n' | wl-copy
-        ;;
-    image)
-        magick "$tmp_ppm" png:- | wl-copy --type image/png || \
-            die "failed to copy PNG image to clipboard"
-        ;;
-    none)
-        ;;
-esac
-#+end_src
-
-** Notification thumbnail
-
-The notification thumbnail is generated as PNG for compatibility. Failure to
-generate the thumbnail should not make the screenshot fail.
-
-#+begin_src bash
-if [[ "$notify_enabled" -eq 1 ]]; then
-    magick "$tmp_ppm" -thumbnail '300x300>' "$thumb_file" >/dev/null 2>&1 || true
-fi
-#+end_src
-
-** Notification body
-
-The body lists the files that were actually written and the clipboard action
-that was performed.
-
-#+begin_src bash
-notify_success() {
+notify_captured() {
     [[ "$notify_enabled" -eq 1 ]] || return 0
 
     local title
     case "$mode" in
-        region) title="Region screenshot taken" ;;
-        *)      title="Fullscreen screenshot taken" ;;
-    esac
-
-    local body_lines=()
-
-    if [[ "$write_lossless" -eq 1 ]]; then
-        body_lines+=("Lossless: $lossless_file")
-    fi
-
-    if [[ "$write_lossy" -eq 1 ]]; then
-        body_lines+=("Lossy: $lossy_file")
-    fi
-
-    case "$copy_mode" in
-        path)          body_lines+=("Clipboard: copied preferred path") ;;
-        lossy-path)    body_lines+=("Clipboard: copied lossy path") ;;
-        lossless-path) body_lines+=("Clipboard: copied lossless path") ;;
-        image)         body_lines+=("Clipboard: copied PNG image") ;;
-        none)          body_lines+=("Clipboard: unchanged") ;;
+        region) title="Region screenshot captured" ;;
+        *)      title="Fullscreen screenshot captured" ;;
     esac
 
     local body
-    body="$(printf '%s\n' "${body_lines[@]}")"
+    body="Encoding lossless JPEG XL: $output_file"
+
+    case "$copy_mode" in
+        path)  body+=$'\nClipboard: copying output path' ;;
+        image) body+=$'\nClipboard: preparing PNG image data' ;;
+        none)  body+=$'\nClipboard: unchanged' ;;
+    esac
 
     if [[ -f "$thumb_file" ]]; then
         notify-send --urgency=normal --app-name="$app_name" \
@@ -619,93 +454,141 @@ notify_success() {
 }
 #+end_src
 
-Send the final success notification after every output and clipboard operation
-has completed.
+Send the notification before clipboard conversion and before final compression.
 
 #+begin_src bash
-notify_success
+notify_captured
+#+end_src
+
+** Clipboard writing
+
+Path clipboard mode can happen immediately because the output path is already
+known. The file may still be encoding when the path is copied.
+
+PNG image clipboard mode is provided for applications that cannot paste JPEG XL.
+It is performed before the final encode so the screenshot can be pasted without
+waiting for =cjxl=.
+
+#+begin_src bash
+case "$copy_mode" in
+    path)
+        printf '%s' "$output_file" | wl-copy
+        ;;
+    image)
+        magick "$tmp_ppm" png:- | wl-copy --type image/png || \
+            die "failed to copy PNG image to clipboard"
+        ;;
+    none)
+        ;;
+esac
+#+end_src
+
+** Lossless JPEG XL encoding
+
+The final file is encoded after the notification and clipboard work. =--distance
+0= is the important part: it requests mathematically lossless JPEG XL.
+
+#+begin_src bash
+encode_lossless() {
+    cjxl "$tmp_ppm" "$output_file" \
+        --distance 0 \
+        --effort "$jxl_effort" \
+        >/dev/null || die "lossless cjxl encode failed"
+
+    [[ -s "$output_file" ]] || die "lossless output was not created"
+}
+#+end_src
+
+Run the encoder as the final expensive operation.
+
+#+begin_src bash
+encode_lossless
+#+end_src
+
+** Cache cleanup
+
+Old notification thumbnails are disposable. Clean them opportunistically after
+encoding so cleanup never delays the immediate notification.
+
+#+begin_src bash
+find "$cache_dir" -type f -name '*-thumb.png' -mtime +7 -delete \
+    >/dev/null 2>&1 || true
 #+end_src
 
 ** Terminal output
 
-The script prints machine-readable-ish output so it can still be used from the
-terminal or from another wrapper.
+The terminal output stays simple so other scripts can call this helper and parse
+the saved path if needed.
 
 #+begin_src bash
-if [[ "$write_lossless" -eq 1 ]]; then
-    printf 'LOSSLESS=%s\n' "$lossless_file"
-fi
-
-if [[ "$write_lossy" -eq 1 ]]; then
-    printf 'LOSSY=%s\n' "$lossy_file"
-fi
+printf 'OUTPUT=%s\n' "$output_file"
+printf 'EFFORT=%s\n' "$jxl_effort"
 #+end_src
 
 ** Hyprland bindings
 
-For normal use, bind the default invocation to Print.
+Bind the default fullscreen capture to Print.
 
 #+begin_src lua :tangle no
 bind_exec("print", "~/.local/bin/screenshot-jxl")
 #+end_src
 
-Use Shift+Print for region capture.
+Use Shift+Print for region selection.
 
 #+begin_src lua :tangle no
 bind_exec("shift+print", "~/.local/bin/screenshot-jxl --select")
 #+end_src
 
 Use Ctrl+Print when the next action is pasting the screenshot into an
-application that expects image data.
+application. This copies PNG image data while still saving the final lossless
+JPEG XL file.
 
 #+begin_src lua :tangle no
 bind_exec("ctrl+print", "~/.local/bin/screenshot-jxl --select --copy image")
 #+end_src
 
-Use Alt+Print for an exact archive-only capture.
+Include the cursor when useful for UI documentation.
 
 #+begin_src lua :tangle no
-bind_exec("alt+print", "~/.local/bin/screenshot-jxl --lossless-only --copy lossless-path")
+bind_exec("alt+print", "~/.local/bin/screenshot-jxl --cursor")
 #+end_src
 
 ** Manual usage
 
-Default dual-output capture:
+Fullscreen lossless JPEG XL screenshot:
 
 #+begin_src bash :tangle no
 screenshot-jxl
 #+end_src
 
-Region capture:
+Region screenshot:
 
 #+begin_src bash :tangle no
 screenshot-jxl --select
 #+end_src
 
-Copy PNG image data for pasting:
+Copy PNG image data for pasting while saving the lossless JXL file:
 
 #+begin_src bash :tangle no
 screenshot-jxl --select --copy image
 #+end_src
 
-Keep only the lossless archive:
+Use a faster but larger lossless encode:
 
 #+begin_src bash :tangle no
-screenshot-jxl --lossless-only --copy lossless-path
+screenshot-jxl --effort 5
 #+end_src
 
-Create a smaller, more aggressive lossy working copy:
+Use a custom directory:
 
 #+begin_src bash :tangle no
-screenshot-jxl --lossy-distance 0.5 --lossy-effort 8
+screenshot-jxl --output-dir "$HOME/Pictures/screenshots/jxl"
 #+end_src
 
-Use custom directories:
+Disable notifications:
 
 #+begin_src bash :tangle no
-screenshot-jxl \
-  --lossy-dir "$HOME/Pictures/screenshots/disposable" \
-  --lossless-dir "$HOME/Pictures/screenshots/archive"
+screenshot-jxl --no-notify
 #+end_src
 
 ** Tangling
