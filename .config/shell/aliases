@@ -41,7 +41,8 @@ alias f="fzf"
 alias c="bat"
 alias b="bat"
 
-alias l='eza -lag --color=auto --group-directories-first --time-style long-iso'
+alias l='eza -la --no-user --color=auto --group-directories-first --time-style long-iso'
+alias lo='eza -lag --color=auto --group-directories-first --time-style long-iso'
 alias lt='l -T'
 # alias cd-file-manager-actions="cd ~/.local/share/file-manager/actions"
 alias cdc='cd "$XDG_CONFIG_HOME"'
