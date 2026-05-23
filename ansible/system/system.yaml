@@ -22,6 +22,7 @@
     - { role: aiagent_host_setup, tags: ["aiagent", "opencode"] }
     - { role: qemu-kvm, tags: ["qemu-kvm"] }
     - { role: controller-vm, tags: ["controller-vm"] }
+    - { role: misc_packages, tags: ["misc_packages"] }
 
   tasks:
     - name: System management tools

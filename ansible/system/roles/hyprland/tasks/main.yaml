@@ -13,8 +13,6 @@
       # use default repo instead # [2024-02-21 Wed 22:12:02 -03] @ak - xdg-desktop-portal-hyprland-git       # before this one I had to manually do: $ pacman -S qt6-base qt6-wayland sdbus-cpp hyprlang --asdeps --needed
       - rose-pine-hyprcursor # also download the xcursor version for GTK programs: https://github.com/rose-pine/cursor
       # - eww-git
-      - wlr-randr # dep of nwg-displays
-      - nwg-displays
       - tofi
       - hyprprop-git
       # - hypridle-git
@@ -54,6 +52,8 @@
       # screenshots
       - grim
       - slurp
+      - wlr-randr # dep of nwg-displays
+      - nwg-displays
       - wob # gui overlay for e.g. volume
     state: present
 

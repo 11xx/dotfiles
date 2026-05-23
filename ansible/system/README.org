@@ -1,5 +1,6 @@
 #+TITLE: Arch Linux Ansible system packages and services declaration
 #+PROPERTY: header-args :mkdirp yes :cache yes
+#+options: toc:2 num:nil
 
 # replace header arg mode: ^\(#\+begin_src +\|:header-args:\)\(yaml\) then \1ansible
 
@@ -138,6 +139,7 @@ Mainly packages, system services, and system files declaration
     - { role: aiagent_host_setup, tags: ["aiagent", "opencode"] }
     - { role: qemu-kvm, tags: ["qemu-kvm"] }
     - { role: controller-vm, tags: ["controller-vm"] }
+    - { role: misc_packages, tags: ["misc_packages"] }
 
   tasks:
     - name: System management tools
@@ -439,9 +441,9 @@ Download the aur.py module:
     # mode: "0644"
     validate: 'visudo -cf %s'
 
-- name: Install paru from the AUR
+- name: Install paru-git from the AUR
   aur:
-      name: paru
+      name: paru-git
       use: makepkg
       state: present
   become: true
@@ -587,8 +589,6 @@ Download the aur.py module:
       # use default repo instead # [2024-02-21 Wed 22:12:02 -03] @ak - xdg-desktop-portal-hyprland-git       # before this one I had to manually do: $ pacman -S qt6-base qt6-wayland sdbus-cpp hyprlang --asdeps --needed
       - rose-pine-hyprcursor # also download the xcursor version for GTK programs: https://github.com/rose-pine/cursor
       # - eww-git
-      - wlr-randr # dep of nwg-displays
-      - nwg-displays
       - tofi
       - hyprprop-git
       # - hypridle-git
@@ -628,6 +628,8 @@ Download the aur.py module:
       # screenshots
       - grim
       - slurp
+      - wlr-randr # dep of nwg-displays
+      - nwg-displays
       - wob # gui overlay for e.g. volume
     state: present
 
@@ -788,18 +790,19 @@ Default programs and launchers
 
 #+begin_src yaml-ts
 ---
-# - name: Install Android utilities for PC
-#   community.general.pacman:
-#     name:
-
-#     state: present
+- name: Install Android utilities for PC
+  community.general.pacman:
+    name:
+      - android-tools # provides adb
+      - gvfs-mtp # for android mounting by file manager
+      - scrcpy
+    state: present
 
 - name: Install Android utilities for PC from the AUR
   aur:
     name:
-      - android-tools # provides adb
       - simple-mtpfs # for mounting android file system
-      - gvfs-mtp # for android mounting by file manager
+      - android-studio
     use: paru
     state: present
   become: true
@@ -836,8 +839,6 @@ Default programs and launchers
   aur:
     name:
       - mpdris2
-      - mpdscribble
-      - listenbrainz-mpd
       - mergerfs
       - ashuffle
     use: paru
@@ -850,6 +851,8 @@ Default programs and launchers
     name:
       - swaync
       - playerctl
+      - mpdscribble
+      - listenbrainz-mpd
     state: present
 
 - name: 'Make sure user_allow_other is enabled in /etc/fuse.conf'
@@ -1518,6 +1521,413 @@ kde_terminal_service: Alacritty.desktop
 
 ** aiagent
 #+INCLUDE: aiagent.org
+
+** Package placement reference
+
+Packages stay in the role that can independently need them. Duplicate
+declarations are fine because package installation is idempotent.
+
+| Package kind | Preferred Ansible home |
+|--------------+------------------------|
+| Boot, kernels, base system, pacman/admin tools | =misc_packages= unless a system file role configures them |
+| Filesystems, disks, mounts, recovery utilities | =file_system= when configured there, otherwise =misc_packages= |
+| Firewall, SSH, VPN, network services | =firewall=, =services=, =vpn=, or =misc_packages= for unconfigured tools |
+| Fonts and font families | =fonts= or =misc_packages= for kept/experimental families |
+| Shell, terminal, CLI/TUI utilities | =shell= when part of interactive defaults, otherwise =misc_packages= |
+| Hyprland, Wayland, portal, screenshot, cursor helpers | =hyprland= when tied to the WM, otherwise =misc_packages= |
+| Desktop apps, themes, file managers, media viewers | =desktop= or =browser= for browsers |
+| Android tooling | =android= |
+| MPD, music playback, tagging, scrobbling | =mpd= when tied to the music setup, otherwise =misc_packages= |
+| Containers and NVIDIA container integration | =containers= |
+| QEMU/KVM/libvirt/VM tooling | =qemu-kvm= or =controller-vm= when configured there |
+| AI-agent host requirements | =aiagent_host_setup= |
+| Explicit packages without a strong owner | =misc_packages= |
+
+** Misc packages
+:PROPERTIES:
+:tangle-dir: (tdir-base "misc_packages")
+:END:
+
+Explicitly installed packages that are intentionally kept but do not
+yet need their own role. This is deliberately redundant with more
+specific roles when a package can stand alone as a useful tool.
+
+*** tasks
+:PROPERTIES:
+:tangle-dir: (tdir-base "tasks")
+:END:
+
+**** main
+:PROPERTIES:
+:header-args:yaml-ts: :tangle (tdir "main.yaml")
+:END:
+
+#+begin_src yaml-ts
+---
+- name: Install miscellaneous native packages
+  community.general.pacman:
+    name:
+      - 7zip
+      - aichat
+      - alsa-utils
+      - amd-ucode
+      - ansible
+      - arch-hs
+      - aria2
+      - ark
+      - aspell
+      - aspell-en
+      - base
+      - base-devel
+      - bash-language-server
+      - bat-extras
+      - beets
+      - bind
+      - blueman
+      - bluez
+      - bluez-utils
+      - breeze-icons
+      - brightnessctl
+      - btrfs-progs
+      - cabal-install
+      - calc
+      - clamav
+      - cloudflared
+      - copyq
+      - cuda
+      - curtail
+      - d-spy
+      - dash
+      - ddrescue
+      - debuginfod
+      - deno
+      - detox
+      - devtools
+      - direnv
+      - discord
+      - dolphin
+      - easyeffects
+      - efibootmgr
+      - elinks
+      - emacs-wayland
+      - entr
+      - espeak-ng
+      - evtest
+      - exfatprogs
+      - expect
+      - fatresize
+      - feh
+      - firejail
+      - flatpak
+      - gamemode
+      - gamescope
+      - geckodriver
+      - ghostty
+      - gimp
+      - git
+      - git-filter-repo
+      - github-cli
+      - glow
+      - goverlay
+      - gparted
+      - gpu-screen-recorder
+      - gtk3-demos
+      - gtk3-docs
+      - gtk4-demos
+      - haskell-hls-cabal-plugin
+      - hoogle
+      - htmlq
+      - httrack
+      - imv
+      - inkscape
+      - inotify-tools
+      - jdk-openjdk
+      - jdk17-openjdk
+      - jdk21-openjdk
+      - jellyfin-mpv-shim
+      - kdialog
+      - kitty
+      - konsole
+      - krun
+      - kvantum
+      - kvantum-qt5
+      - languagetool
+      - lib32-gamemode
+      - libnvidia-container
+      - libreoffice-still
+      - libva-nvidia-driver
+      - linux
+      - linux-firmware
+      - linux-headers
+      - linux-lts
+      - linux-lts-headers
+      - linux-zen
+      - linux-zen-headers
+      - lsp-plugins
+      - lutris
+      - lxqt-config
+      - ly
+      - man-db
+      - man-pages
+      - mangohud
+      - mediainfo
+      - mktorrent
+      - mkvtoolnix-cli
+      - monolith
+      - namcap
+      - nbd
+      - nethogs
+      - networkmanager
+      - nfs-utils
+      - nodejs
+      - nvidia-container-toolkit
+      - nvidia-open-dkms
+      - nwg-look
+      - nyxt
+      - ollama-cuda
+      - openrgb
+      - opus-tools
+      - os-prober
+      - otf-aurulent-nerd
+      - otf-codenewroman-nerd
+      - otf-comicshanns-nerd
+      - otf-commit-mono-nerd
+      - otf-droid-nerd
+      - otf-firamono-nerd
+      - otf-geist-mono-nerd
+      - otf-hasklig-nerd
+      - otf-hermit-nerd
+      - otf-monaspace-nerd
+      - otf-opendyslexic-nerd
+      - otf-overpass-nerd
+      - pan
+      - pandoc-cli
+      - papirus-icon-theme
+      - par2cmdline
+      - pastel
+      - pavucontrol
+      - pdf2svg
+      - perf
+      - perl-image-exiftool
+      - picard
+      - plasma-workspace
+      - plasma5-integration
+      - pnpm
+      - podlet
+      - python-internetarchive
+      - python-lsp-server
+      - python-orjson
+      - python-pylint
+      - python-rapidfuzz
+      - qt5ct
+      - qt6-examples
+      - qt6ct
+      - quodlibet
+      - qutebrowser
+      - rbw
+      - rdma-core
+      - rebuild-detector
+      - reflector
+      - rpi-imager
+      - samba
+      - scrcpy
+      - shellcheck
+      - simdjson
+      - smartmontools
+      - songrec
+      - sox
+      - sshfs
+      - steam
+      - strace
+      - streamlink
+      - svgcleaner
+      - svgo
+      - tcc
+      - tcpdump
+      - texlive-basic
+      - texlive-bibtexextra
+      - texlive-bin
+      - texlive-binextra
+      - texlive-context
+      - texlive-fontsextra
+      - texlive-fontsrecommended
+      - texlive-fontutils
+      - texlive-formatsextra
+      - texlive-games
+      - texlive-humanities
+      - texlive-latex
+      - texlive-latexextra
+      - texlive-latexrecommended
+      - texlive-luatex
+      - texlive-mathscience
+      - texlive-metapost
+      - texlive-music
+      - texlive-pictures
+      - texlive-plaingeneric
+      - texlive-pstricks
+      - texlive-publishers
+      - texlive-xetex
+      - thunderbird
+      - tldr
+      - torbrowser-launcher
+      - transmission-cli
+      - tree-sitter-cli
+      - ttf-0xproto-nerd
+      - ttf-3270-nerd
+      - ttf-agave-nerd
+      - ttf-anonymouspro-nerd
+      - ttf-arimo-nerd
+      - ttf-bigblueterminal-nerd
+      - ttf-bitstream-vera-mono-nerd
+      - ttf-cascadia-code-nerd
+      - ttf-cascadia-mono-nerd
+      - ttf-cousine-nerd
+      - ttf-d2coding-nerd
+      - ttf-daddytime-mono-nerd
+      - ttf-dejavu-nerd
+      - ttf-envycoder-nerd
+      - ttf-fantasque-nerd
+      - ttf-firacode-nerd
+      - ttf-go-nerd
+      - ttf-gohu-nerd
+      - ttf-hack-nerd
+      - ttf-heavydata-nerd
+      - ttf-iawriter-nerd
+      - ttf-ibmplex-mono-nerd
+      - ttf-inconsolata-go-nerd
+      - ttf-inconsolata-lgc-nerd
+      - ttf-inconsolata-nerd
+      - ttf-intone-nerd
+      - ttf-iosevka-nerd
+      - ttf-iosevkaterm-nerd
+      - ttf-iosevkatermslab-nerd
+      - ttf-jetbrains-mono-nerd
+      - ttf-lekton-nerd
+      - ttf-lilex-nerd
+      - ttf-martian-mono-nerd
+      - ttf-meslo-nerd
+      - ttf-monofur-nerd
+      - ttf-monoid-nerd
+      - ttf-mononoki-nerd
+      - ttf-mplus-nerd
+      - ttf-nerd-fonts-symbols
+      - ttf-nerd-fonts-symbols-mono
+      - ttf-noto-nerd
+      - ttf-profont-nerd
+      - ttf-proggyclean-nerd
+      - ttf-recursive-nerd
+      - ttf-roboto-mono-nerd
+      - ttf-sharetech-mono-nerd
+      - ttf-sourcecodepro-nerd
+      - ttf-space-mono-nerd
+      - ttf-terminus-nerd
+      - ttf-tinos-nerd
+      - ttf-ubuntu-mono-nerd
+      - ttf-ubuntu-nerd
+      - ttf-victor-mono-nerd
+      - ttf-zed-mono-nerd
+      - ueberzugpp
+      - unzip
+      - upmpdcli
+      - upx
+      - uv
+      - viu
+      - vnstat
+      - webfont-kit-generator
+      - websocat
+      - wev
+      - wf-recorder
+      - wget
+      - whois
+      - winetricks
+      - wiremix
+      - wlsunset
+      - words
+      - wrangler
+      - xdg-desktop-portal-gtk
+      - xdg-user-dirs-gtk
+      - xorg-xhost
+      - zed
+      - zip
+    state: present
+
+- name: Install miscellaneous AUR packages
+  aur:
+    name:
+      - adwaita-qt5
+      - adwaita-qt6
+      - alacritty-sixel-git
+      - ani-cli-git
+      - cask
+      - chatterino2-bin
+      - clay
+      - clipse
+      - clyrics
+      - downgrade
+      - dtach-ng
+      - dupeguru
+      - dvdisaster
+      - f2
+      - fawkes-bin
+      - floorp-bin
+      - gamescope-session-steam-git
+      - ghcup-hs-bin
+      - gmrender-resurrect-git
+      - gtk3-debug
+      - haskell-yocto
+      - helium-browser-bin
+      - jellyfin-media-player
+      - losslessaudiochecker
+      - losslesscut-bin
+      - mailpit
+      - mpd-current-json
+      - nomacs
+      - nyuu-bin
+      - parpar-bin
+      - pear-desktop-bin
+      - pms-git
+      - proton-ge-custom-bin
+      - pwvucontrol
+      - python-cloudscraper
+      - python-deezer-py
+      - python-epc
+      - qarma-git
+      - qt5-examples
+      - rmlint
+      - selectdefaultapplication-git
+      - simp1e-amber-hyprcursor
+      - smem
+      - spek
+      - sptlrx-bin
+      - streamrip
+      - t3code-bin
+      - tageditor-cli
+      - tailwindcss-extra-bin
+      - theme.sh
+      - thorium-browser-bin
+      - totp-cli
+      - vdhcoapp
+      - vrrtest-git
+      - watchman-bin
+      - wine-stable
+      - wine-stable-mono
+      - wrk
+      - xcursor-simp1e
+      - xdg-ninja
+      - zen-browser-bin
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+#+end_src
+
+#+begin_note
+Debug split packages currently installed explicitly are not declared as
+direct AUR installs because =paru -Si <name>-debug= does not resolve
+them as standalone AUR package bases: =paru-git-debug=,
+=haskell-yocto-debug=, =mpd-current-json-debug=, and
+=tageditor-cli-debug=.
+#+end_note
 
 ** QEMU/KVM
 :PROPERTIES:

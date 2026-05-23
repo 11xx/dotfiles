@@ -12,8 +12,6 @@
   aur:
     name:
       - mpdris2
-      - mpdscribble
-      - listenbrainz-mpd
       - mergerfs
       - ashuffle
     use: paru
@@ -26,6 +24,8 @@
     name:
       - swaync
       - playerctl
+      - mpdscribble
+      - listenbrainz-mpd
     state: present
 
 - name: 'Make sure user_allow_other is enabled in /etc/fuse.conf'

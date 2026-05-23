@@ -16,9 +16,9 @@
     # mode: "0644"
     validate: 'visudo -cf %s'
 
-- name: Install paru from the AUR
+- name: Install paru-git from the AUR
   aur:
-      name: paru
+      name: paru-git
       use: makepkg
       state: present
   become: true
