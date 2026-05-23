@@ -26,10 +26,6 @@ retry_files_enabled = False
 :END:
 
 #+begin_src conf
-[all:vars]
-ansible_user="{{ local_user_name }}"
-ansible_become_pass="{{ local_user_pass }}"
-
 [arch]
 ak
 
@@ -63,17 +59,6 @@ xdg_state_home:   "{{ ansible_facts['user_dir'] }}/.local/state"
 xdg_bin_home:     "{{ ansible_facts['user_dir'] }}/.local/bin"
 xdg_runtime_dir:  "/run/user/{{ ansible_facts['user_uid'] }}"
 #+end_src
-
-**** local user creds
-- [[https://docs.ansible.com/ansible/latest/tips_tricks/ansible_tips_tricks.html#keep-vaulted-variables-safely-visible][Keep vaulted variables safely visible - General tips — Ansible Documentation]]
-  Use =ansible-vault create vault= to create the encrypted files.
-#+begin_src yaml-ts :tangle (tdir "user")
-local_user_name: "{{ v_user_name }}"
-local_user_group: "{{ v_user_group }}"
-local_user_pass: "{{ v_user_pass }}"
-#+end_src
-In this case, the created vault with =v_= vars shall be placed under
-=host_vars/<host>/vault=.
 
 ** host_vars
 *** ak
@@ -645,7 +630,6 @@ Download the aur.py module:
       - slurp
       - wob # gui overlay for e.g. volume
     state: present
-  become: true
 
 - name: "Packages for integration with other DEs"
   become: true
@@ -879,8 +863,8 @@ Default programs and launchers
     path: "{{ xdg_data_home }}/mpd"
     state: directory
     recurse: true
-    owner: "{{ local_user_name }}"
-    group: "{{ local_user_group }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_group }}"
 
 - name: 'Check if database file exists'
   ansible.builtin.stat:
@@ -892,8 +876,8 @@ Default programs and launchers
     path: "{{ xdg_state_home }}/mpd"
     state: directory
     recurse: true
-    owner: "{{ local_user_name }}"
-    group: "{{ local_user_group }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_group }}"
 
 - name: 'Copy asound.conf to enable "bit-perfect" playback'
   ansible.builtin.copy:
@@ -1220,16 +1204,16 @@ threads.
     - name: Get information about user
       getent:
         database: passwd
-        key: "{{ local_user_name }}"
-      register: local_user_name_getent
+        key: "{{ ansible_user }}"
+      register: ansible_user_getent
       ignore_errors: yes
 
     - name: Add user to input group
       user:
-        name: "{{ local_user_name }}"
+        name: "{{ ansible_user }}"
         groups: input
         append: yes
-      when: local_user_name_getent is succeeded
+      when: ansible_user_getent is succeeded
 
 - name: Enable using uinput without root permissions
   ansible.builtin.lineinfile:

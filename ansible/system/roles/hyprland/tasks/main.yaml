@@ -56,7 +56,6 @@
       - slurp
       - wob # gui overlay for e.g. volume
     state: present
-  become: true
 
 - name: "Packages for integration with other DEs"
   become: true

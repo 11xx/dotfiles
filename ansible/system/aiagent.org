@@ -818,7 +818,7 @@ aiagent_container_dirs:
   - t3
   - pi
 aiagent_subuid_count: 65536
-aiagent_host_user: "{{ local_user_name }}"
+aiagent_host_user: "{{ ansible_user }}"
 #+end_src
 
 *** tasks
@@ -1264,13 +1264,13 @@ WantedBy=default.target
 :END:
 #+begin_src etc-sudoers
 # Managed by Ansible — do not edit manually
-# Allows {{ local_user_name }} to manage the aiagent rootless Podman context without password
+# Allows {{ ansible_user }} to manage the aiagent rootless Podman context without password
 
 Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl shell --uid=aiagent .host /usr/bin/podman *
 Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl shell aiagent@ /usr/bin/systemctl --user *
 Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl shell aiagent@ /usr/bin/journalctl --user *
 
-{{ local_user_name }} ALL=(root) NOPASSWD: AIAGENT_PODMAN, AIAGENT_SYSTEMD, AIAGENT_JOURNAL
+{{ ansible_user }} ALL=(root) NOPASSWD: AIAGENT_PODMAN, AIAGENT_SYSTEMD, AIAGENT_JOURNAL
 #+end_src
 
 * aiagent's container user machinectl helpers for host

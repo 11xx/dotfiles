@@ -39,8 +39,8 @@
     path: "{{ xdg_data_home }}/mpd"
     state: directory
     recurse: true
-    owner: "{{ local_user_name }}"
-    group: "{{ local_user_group }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_group }}"
 
 - name: 'Check if database file exists'
   ansible.builtin.stat:
@@ -52,8 +52,8 @@
     path: "{{ xdg_state_home }}/mpd"
     state: directory
     recurse: true
-    owner: "{{ local_user_name }}"
-    group: "{{ local_user_group }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_group }}"
 
 - name: 'Copy asound.conf to enable "bit-perfect" playback'
   ansible.builtin.copy:

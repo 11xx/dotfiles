@@ -17,4 +17,4 @@ aiagent_container_dirs:
   - t3
   - pi
 aiagent_subuid_count: 65536
-aiagent_host_user: "{{ local_user_name }}"
+aiagent_host_user: "{{ ansible_user }}"

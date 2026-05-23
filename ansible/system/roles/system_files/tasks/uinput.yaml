@@ -3,16 +3,16 @@
     - name: Get information about user
       getent:
         database: passwd
-        key: "{{ local_user_name }}"
-      register: local_user_name_getent
+        key: "{{ ansible_user }}"
+      register: ansible_user_getent
       ignore_errors: yes
 
     - name: Add user to input group
       user:
-        name: "{{ local_user_name }}"
+        name: "{{ ansible_user }}"
         groups: input
         append: yes
-      when: local_user_name_getent is succeeded
+      when: ansible_user_getent is succeeded
 
 - name: Enable using uinput without root permissions
   ansible.builtin.lineinfile:

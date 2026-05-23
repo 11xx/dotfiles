@@ -1,3 +1,0 @@
-local_user_name: "{{ v_user_name }}"
-local_user_group: "{{ v_user_group }}"
-local_user_pass: "{{ v_user_pass }}"
