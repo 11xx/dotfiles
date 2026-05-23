@@ -205,6 +205,6 @@ Examples:
              (if append "appended/replaced." "prepended/replaced."))
     updated))
 
-(require 'insert-timestamp :defer t)
+(use-package insert-timestamp :defer t)
 
 (provide '11xx-functions)

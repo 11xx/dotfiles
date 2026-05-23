@@ -1485,7 +1485,7 @@ Examples:
 
 ** provide footer
 #+begin_src emacs-lisp
-(require 'insert-timestamp :defer t)
+(use-package insert-timestamp :defer t)
 
 (provide '11xx-functions)
 #+end_src
