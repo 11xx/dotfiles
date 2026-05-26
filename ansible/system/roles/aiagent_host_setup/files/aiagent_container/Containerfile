@@ -114,7 +114,40 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     # the image supplies a stable JDK 21 and CLI utilities needed to bootstrap
     # the Android SDK.
     temurin-21-jdk \
-    zip
+    zip \
+    # === C++ / Qt ===
+    # Qt6 GUI development and C++ build toolchain; intentionally self-contained
+    # so this block can be added or removed without changing other groups.
+    gcc-c++ \
+    cmake \
+    ninja-build \
+    pkgconf-pkg-config \
+    qt6-qtbase-devel \
+    qt6-qtmultimedia-devel \
+    sqlite \
+    sqlite-devel \
+    taglib \
+    taglib-devel \
+    # === Media tools ===
+    # Media playback, editing, and metadata analysis utilities;
+    # self-contained block.
+    zstd \
+    unzip \
+    p7zip \
+    p7zip-plugins \
+    file \
+    binutils \
+    ripgrep \
+    jq \
+    xmlstarlet \
+    perl-Image-ExifTool \
+    mediainfo \
+    pipewire-devel \
+    ffmpeg-devel \
+    gstreamer1-devel \
+    gstreamer1-plugins-base-devel \
+    gstreamer1-plugins-good \
+    gstreamer1-plugins-bad-free
 
 # Upstream binary tools not available in Fedora repos.
 RUN set -eux; \
