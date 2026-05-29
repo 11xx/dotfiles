@@ -5,6 +5,7 @@ ARG OPENCODE_VERSION="latest"
 ARG CODEX_VERSION="latest"
 ARG T3_CODE_VERSION="latest"
 ARG PI_CODE_VERSION="latest"
+ARG CLAUDE_CODE_VERSION="latest"
 
 # Standalone binary tools are pinned for reproducible builds and to avoid
 # GitHub API release lookups during image construction.
@@ -271,6 +272,7 @@ RUN mkdir -pv \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /home/node/.codex \
+    /home/node/.claude \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
     /work
@@ -286,6 +288,7 @@ RUN uv tool install pyright \
 RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}" \
+    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "t3@${T3_CODE_VERSION}" \
     "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
  && npm cache clean --force

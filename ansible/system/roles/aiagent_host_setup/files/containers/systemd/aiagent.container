@@ -21,6 +21,7 @@ Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
 Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
 Volume=%h/aiagent_container/agents:/home/node/.agents:Z
 Volume=%h/aiagent_container/codex:/home/node/.codex:Z
+Volume=%h/aiagent_container/claude:/home/node/.claude:Z
 Volume=%h/aiagent_container/t3:/home/node/.t3:Z
 Volume=%h/aiagent_container/pi:/home/node/.pi:Z
 # Idempotent scripts called by init.sh

@@ -118,6 +118,7 @@ ARG OPENCODE_VERSION="latest"
 ARG CODEX_VERSION="latest"
 ARG T3_CODE_VERSION="latest"
 ARG PI_CODE_VERSION="latest"
+ARG CLAUDE_CODE_VERSION="latest"
 
 # Standalone binary tools are pinned for reproducible builds and to avoid
 # GitHub API release lookups during image construction.
@@ -384,6 +385,7 @@ RUN mkdir -pv \
     /home/node/.local/share/opencode \
     /home/node/.local/state/opencode \
     /home/node/.codex \
+    /home/node/.claude \
     /home/node/.t3/userdata \
     /home/node/.pi/agent \
     <<aiagent-container-work-root()>>
@@ -399,6 +401,7 @@ RUN uv tool install pyright \
 RUN npm install -g \
     "opencode-ai@${OPENCODE_VERSION}" \
     "@openai/codex@${CODEX_VERSION}" \
+    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     "t3@${T3_CODE_VERSION}" \
     "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
  && npm cache clean --force
@@ -529,6 +532,7 @@ Volume=%h/aiagent_container/opencode_share:/home/node/.local/share/opencode:Z
 Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
 Volume=%h/aiagent_container/agents:/home/node/.agents:Z
 Volume=%h/aiagent_container/codex:/home/node/.codex:Z
+Volume=%h/aiagent_container/claude:/home/node/.claude:Z
 Volume=%h/aiagent_container/t3:/home/node/.t3:Z
 Volume=%h/aiagent_container/pi:/home/node/.pi:Z
 # Idempotent scripts called by init.sh
@@ -849,6 +853,7 @@ aiagent_container_dirs:
   - opencode_share
   - opencode_state
   - codex
+  - claude
   - t3
   - pi
 aiagent_subuid_count: 65536
@@ -1526,6 +1531,39 @@ aiagent-redeploy() {
     _aiagent_ctl daemon-reload
     _aiagent_ctl restart aiagent.service searxng-mcp.service
     _aiagent_ctl try-restart t3-web.service
+}
+#+end_src
+
+Anthropic Claude
+#+begin_src shell
+aiagent-claude() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude --dangerously-skip-permissions "$@"
+}
+
+aiagent-claude-noskip() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude "$@"
+}
+
+aiagent-claude-login() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN BROWSER=none \
+        claude auth login "$@"
+}
+
+aiagent-claude-status() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude auth status --text
+}
+
+aiagent-claude-doctor() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude doctor
 }
 #+end_src
 

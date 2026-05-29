@@ -218,3 +218,33 @@ aiagent-redeploy() {
     _aiagent_ctl restart aiagent.service searxng-mcp.service
     _aiagent_ctl try-restart t3-web.service
 }
+
+aiagent-claude() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude --dangerously-skip-permissions "$@"
+}
+
+aiagent-claude-noskip() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude "$@"
+}
+
+aiagent-claude-login() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAUDE_CODE_OAUTH_TOKEN BROWSER=none \
+        claude auth login "$@"
+}
+
+aiagent-claude-status() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude auth status --text
+}
+
+aiagent-claude-doctor() {
+    _aiagent exec -it aiagent \
+        env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+        claude doctor
+}
