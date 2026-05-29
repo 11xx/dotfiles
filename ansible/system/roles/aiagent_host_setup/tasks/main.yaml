@@ -129,6 +129,30 @@
 
 # --- directories ---
 
+- name: Resolve shared workspace root
+  tags: [aiagent_host]
+  ansible.builtin.command:
+    argv:
+      - realpath
+      - -m
+      - --
+      - "{{ aiagent_workspace_root }}"
+  register: aiagent_workspace_realpath
+  changed_when: false
+  check_mode: false
+  become: true
+
+- name: Refuse unsafe shared workspace root
+  tags: [aiagent_host]
+  ansible.builtin.assert:
+    that:
+      - aiagent_workspace_root is defined
+      - aiagent_workspace_root is string
+      - aiagent_workspace_root == "/work"
+      - aiagent_workspace_realpath.stdout == "/work"
+    fail_msg: "Refusing to manage unsafe aiagent_workspace_root={{ aiagent_workspace_root }} realpath={{ aiagent_workspace_realpath.stdout }}"
+  become: true
+
 - name: Check shared workspace root path
   tags: [aiagent_host]
   ansible.builtin.stat:
@@ -145,17 +169,6 @@
     - aiagent_workspace_stat.stat.islnk
   become: true
 
-- name: Create AI agent application directories
-  tags: [aiagent_host]
-  ansible.builtin.file:
-    path: "{{ aiagent_container_root }}/{{ item }}"
-    state: directory
-    owner: "{{ aiagent_name }}"
-    group: "{{ aiagent_name }}"
-    mode: "0750"
-  loop: "{{ aiagent_container_dirs }}"
-  become: true
-
 - name: Create shared workspace root
   tags: [aiagent_host]
   ansible.builtin.file:
@@ -166,34 +179,34 @@
     mode: "2770"
   become: true
 
-# --- ACLs ---
+# --- top-level ACLs only ---
 
-- name: Apply named user access ACLs on shared workspace
+- name: Apply named user access ACLs on shared workspace root
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
     entity: "{{ item }}"
     etype: user
-    permissions: rwX
-    recursive: true
+    permissions: rwx
+    follow: false
     state: present
   loop:
     - "{{ aiagent_host_user }}"
     - "{{ aiagent_name }}"
   become: true
 
-- name: Apply named group access ACL on shared workspace
+- name: Apply named group access ACL on shared workspace root
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
     entity: "{{ aiagent_shared_group }}"
     etype: group
-    permissions: rwX
-    recursive: true
+    permissions: rwx
+    follow: false
     state: present
   become: true
 
-- name: Apply default user ACLs on shared workspace
+- name: Apply default user ACLs on shared workspace root
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
@@ -201,14 +214,14 @@
     etype: user
     permissions: rwx
     default: true
-    recursive: true
+    follow: false
     state: present
   loop:
     - "{{ aiagent_host_user }}"
     - "{{ aiagent_name }}"
   become: true
 
-- name: Apply default group ACL on shared workspace
+- name: Apply default group ACL on shared workspace root
   tags: [aiagent_host]
   ansible.posix.acl:
     path: "{{ aiagent_workspace_root }}"
@@ -216,27 +229,9 @@
     etype: group
     permissions: rwx
     default: true
-    recursive: true
+    follow: false
     state: present
   become: true
-
-- name: Fix legacy POSIX permissions on shared workspace
-  tags: [aiagent_host]
-  ansible.builtin.file:
-    path: "{{ aiagent_workspace_root }}"
-    state: directory
-    recurse: true
-    # ug+rwX: Give user & group Read, Write, and Execute (if directory/script)
-    # o-rwx:  Remove all permissions from others
-    mode: "ug+rwX,o-rwx"
-  become: true
-
-- name: Preserve setgid on shared workspace directories
-  tags: [aiagent_host]
-  ansible.builtin.command:
-    cmd: "find {{ aiagent_workspace_root | quote }} -type d -exec chmod g+s {} +"
-  become: true
-  changed_when: false
 
 # --- linger ---
 

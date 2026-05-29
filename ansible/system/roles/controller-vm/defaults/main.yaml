@@ -28,6 +28,11 @@ bitdo_receiver_idle_product: "3109"
 nintendo_vendor: "057e"
 nintendo_pro_product: "2009"
 
+# Flydigi Vader 5 Pro
+# - 37d7:2401 = Flydigi Vader 5 Pro (dongle)
+vader5_vendor: "37d7"
+vader5_product: "2401"
+
 # OVMF paths on Arch (edk2-ovmf)
 ovmf_code: "/usr/share/edk2/x64/OVMF_CODE.4m.fd"
 ovmf_vars_src: "/usr/share/edk2/x64/OVMF_VARS.4m.fd"
