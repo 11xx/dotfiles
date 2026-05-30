@@ -104,6 +104,7 @@ keymap_exec("print", "screenshot-jxl")
 keymap_exec("S-print", "screenshot-jxl --select")
 keymap_exec("C-print", "screenshot-jxl --select --copy image")
 keymap_exec("M-print", "screenshot-jxl --lossless")
+keymap_exec("s-M-print", "shotdrag")
 
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")

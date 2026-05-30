@@ -604,3 +604,31 @@ Then make the tangled file executable if needed:
 #+begin_src bash :tangle no
 chmod +x ~/.local/bin/screenshot-jxl
 #+end_src
+
+* shotdrag
+:PROPERTIES:
+:header-args:bash: :tangle shotdrag :shebang "#!/usr/bin/env bash"
+:END:
+
+#+begin_src bash
+set -euo pipefail
+
+umask 077
+
+script_name="$(basename -- "${BASH_SOURCE[0]}")"
+script_name="${script_name%.*}"
+
+out_dir="${TMPDIR:-/tmp}/${script_name}"
+mkdir -p -- "$out_dir"
+
+geometry="$(slurp)" || exit 0
+[ -n "$geometry" ] || exit 0
+
+timestamp="$(date +'%Y-%m-%d_%H-%M-%S_%N')"
+out_file="${out_dir}/shot-${timestamp}.png"
+
+grim -g "$geometry" -t png "$out_file"
+
+dragon-drop "$out_file"
+#+end_src
+

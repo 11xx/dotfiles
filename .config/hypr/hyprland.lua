@@ -14,3 +14,5 @@ require("plugins.hyprbars")
 require("enable-tearing")
 require("misc-snippets")
 require("idleinhibit")
+
+require("dev")

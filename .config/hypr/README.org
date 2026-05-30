@@ -250,6 +250,15 @@ hl.config({
 })
 #+end_src
 
+Fix F13+ keys being bound to XF86* keysyms
+#+begin_src lua
+hl.config({
+      input = {
+         kb_options = "fkeys:basic_13-24",
+      }
+})
+#+end_src
+
 *** General
 #+begin_src lua
 hl.config({
@@ -564,6 +573,7 @@ keymap_exec("print", "screenshot-jxl")
 keymap_exec("S-print", "screenshot-jxl --select")
 keymap_exec("C-print", "screenshot-jxl --select --copy image")
 keymap_exec("M-print", "screenshot-jxl --lossless")
+keymap_exec("s-M-print", "shotdrag")
 
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
@@ -1169,10 +1179,10 @@ window_rule({ class = "com.github.hluk.copyq" }, { float = true })
 bind_exec("SUPER + grave", "copyq toggle")
 #+end_src
 
-** dev.conf
+** dev.lua
 stuff for development
-#+begin_src lua :tangle no
--- require("dev")
+#+begin_src lua
+require("dev")
 #+end_src
 
 * =hypridle.conf=: Idle management daemon
@@ -1188,9 +1198,9 @@ so it should continue to tangle to =hypridle.conf= and be launched by
 - Monitor DPMS and brightness for hypridle ::
 #+begin_src hyprlang-ts :noweb tangle
 listener {
-  timeout = 300 # 5min
-  on-timeout = hyprctl dispatch dpms off
-  on-resume = hyprctl dispatch dpms on
+  timeout = 330                                                                                  # 5.5min
+  on-timeout = hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'                            # screen off when timeout has passed
+  on-resume = hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })' && brightnessctl -r          # screen on when activity is detected after timeout has fired.
 }
 #+end_src
 

@@ -1,6 +1,22 @@
 #+title: Hyprmacs Keymap
 #+property: header-args:lua :tangle hyprmacs-keymap.lua
 
+* TODO
+- [ ] key release race condition.
+#+begin_example
+keymap_exec("M-print", "screenshot-jxl --lossless")
+keymap_exec("s-M-print", "shotdrag")
+#+end_example
+
+Noted behaviour:
+- Press down =s= and =M= in any order (good).
+  + Press and release =print=
+  + Then here there's two behaviours:
+    * as =s-M= are still being pressed down, which one is released first affects outcome (bad behaviour to fix here):
+      - Release =M= first and "shotdrag" runs
+      - Release =s= first and "screenshot-jxl --lossless" runs
+# [2026-05-29 Fri 17:42:45 -03] @ak
+
 * Purpose
 
 Hyprmacs provides Emacs-like key chords on top of Hyprland's Lua submaps.

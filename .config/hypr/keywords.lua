@@ -25,6 +25,12 @@ hl.config({
 })
 
 hl.config({
+      input = {
+         kb_options = "fkeys:basic_13-24",
+      }
+})
+
+hl.config({
     general = {
         layout = "dwindle",
 
