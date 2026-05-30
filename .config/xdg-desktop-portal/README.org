@@ -22,9 +22,10 @@ portal implementation.
 
 #+begin_src conf :tangle hyprland-portals.conf
 [preferred]
-default=hyprland;kde
+default=hyprland;kde;gtk
 org.freedesktop.impl.portal.Settings=darkman
 org.freedesktop.impl.portal.FileChooser=kde
+org.freedesktop.impl.portal.OpenURI=kde
 #+end_src
 - where
   + =;= semicolons allow specifying order of fallback
