@@ -83,10 +83,5 @@ The timestamp contains no spaces."
   (insert (current-timestamp-iso)
           (current-timestamp--hostname-suffix)))
 
-(keymap-global-set "C-c i t t" #'current-timestamp-insert-iso-basic)
-(keymap-global-set "C-c i t c" #'current-timestamp-insert-comment)
-(keymap-global-set "C-c i t o" #'current-timestamp-insert-org)
-(keymap-global-set "C-c i t i" #'current-timestamp-insert-iso)
-
 (provide 'insert-timestamp)
 ;;; insert-timestamp.el ends here

@@ -205,6 +205,12 @@ Examples:
              (if append "appended/replaced." "prepended/replaced."))
     updated))
 
-(use-package insert-timestamp :defer t)
+(use-package insert-timestamp
+  :ensure nil
+  :bind
+  (("C-c i t t" . current-timestamp-insert-iso-basic)
+   ("C-c i t c" . current-timestamp-insert-comment)
+   ("C-c i t o" . current-timestamp-insert-org)
+   ("C-c i t i" . current-timestamp-insert-iso)))
 
 (provide '11xx-functions)

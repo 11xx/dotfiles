@@ -33,39 +33,75 @@
     :models '(qwen3.5:9b
               ))
 
-  (gptel-make-openai "OpenRouter"
-    :host "openrouter.ai"
-    :endpoint "/api/v1/chat/completions"
-    :stream t
-    :key (gptel-api-key-from-auth-source "openrouter.ai")
-    :models '(
-              ;; 1. CODING & LOGIC
-              deepseek/deepseek-v4-pro
-              deepseek/deepseek-v4-flash
-              moonshotai/kimi-k2.6:nitro
-              xiaomi/mimo-v2.5-pro
-              mistralai/devstral-2-2512:free ; Free Fallback
-              inclusionai/ling-2.6-1t:free ;; until April 30
-              
-              ;; 2. GENERAL PURPOSE (MINI EQUIVALENT)
-              gpt-oss-120b:floor
-              gpt-oss-120b:nitro
-              gpt-oss-120b:google-vertex
-              stepfun/step-3.5-flash:nitro
-              google/gemini-3.1-flash-lite-preview
+  (use-package gptel-openrouter
+    :vc (:url "https://github.com/darcamo/gptel-openrouter")
+    :after gptel
+    :config
+    (require 'seq)
 
-              qwen/qwen3.6-plus:free
-              tencent/hy3-preview:free
-              
-              ;; 3. DATA EXTRACTION / TOOL USE
-              meta-llama/llama-3.3-70b-instruct:nitro
-              
-              ;; THE LAZY FREE OPTION
-              openrouter/free
-              )
-    ;; :request-params '(:provider (:allow_fallbacks t
-    ;;                              :sort "price"))
-    )
+    (defun gptel-openrouter-model-free-p (model)
+      "Return non-nil if MODEL appears to be a free OpenRouter model.
+
+MODEL is one model alist from the cached OpenRouter `/models` response."
+      (let ((id (alist-get 'id model)))
+        (and id
+             (string-match-p "\\(:free\\|^openrouter/free$\\)" id))))
+
+    (defun gptel-openrouter-get-all-models (&optional predicate)
+      "Return all cached OpenRouter model IDs as symbols.
+
+If PREDICATE is non-nil, it is called with each model alist from the
+cached OpenRouter model data. Only models for which PREDICATE returns
+non-nil are kept."
+      ;; Downloads only if the cache is missing or older than one day,
+      ;; according to gptel-openrouter's own logic.
+      (gptel-openrouter-download-model-data)
+
+      ;; Invalidate the in-memory parsed JSON cache so a freshly downloaded
+      ;; models.json is visible during the same Emacs session.
+      (setq gptel-openrouter--json-cache-content nil)
+
+      (let* ((content (gptel-openrouter--get-json-content))
+             (models (alist-get 'data content)))
+        (unless models
+          (user-error
+           "No OpenRouter model data found; run M-x gptel-openrouter-download-model-data"))
+        (mapcar
+         (lambda (model)
+           (intern (alist-get 'id model)))
+         (seq-filter
+          (lambda (model)
+            (and (alist-get 'id model)
+                 (or (null predicate)
+                     (funcall predicate model))))
+          models))))
+
+    (defun gptel-openrouter-get-all-annotated-models (&optional predicate)
+      "Return all cached OpenRouter models annotated for gptel.
+
+If PREDICATE is non-nil, only annotate models for which PREDICATE
+returns non-nil."
+      (gptel-openrouter-get-annotated-models
+       (gptel-openrouter-get-all-models predicate)))
+
+    (gptel-make-openai "OpenRouter"
+      :host "openrouter.ai"
+      :endpoint "/api/v1/chat/completions"
+      :stream t
+      :key (gptel-api-key-from-auth-source "openrouter.ai")
+
+      ;; All current cached OpenRouter models, excluding free models.
+      :models
+      (gptel-openrouter-get-all-annotated-models
+       (lambda (model)
+         (not (gptel-openrouter-model-free-p model))))
+
+      :request-params
+      '(:service_tier "flex"
+                      :provider (:sort "throughput"
+                                       :allow_fallbacks :json-false
+                                       :data_collection "deny"
+                                       :zdr t))))
 
   (gptel-make-openai "Groq"
     :host "api.groq.com"
