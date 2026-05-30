@@ -4,15 +4,15 @@ AIAGENT_T3_PUBLIC_URL="${AIAGENT_T3_PUBLIC_URL:-http://127.0.0.1:45223/}"
 
 # aiagent: base primitive
 _aiagent() {
-    sudo machinectl shell --uid=aiagent .host /usr/bin/podman "$@"
+    sudo machinectl --quiet shell --uid=aiagent .host /usr/bin/podman "$@"
 }
 
 _aiagent_ctl() {
-    sudo machinectl shell aiagent@ /usr/bin/systemctl --user "$@"
+    sudo machinectl --quiet shell aiagent@ /usr/bin/systemctl --user "$@"
 }
 
 _aiagent_log() {
-    sudo machinectl shell aiagent@ /usr/bin/journalctl --user "$@"
+    sudo machinectl --quiet shell aiagent@ /usr/bin/journalctl --user "$@"
 }
 
 # interactive shell inside the harness container

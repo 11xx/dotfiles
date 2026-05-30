@@ -1,8 +1,8 @@
 # Managed by Ansible — do not edit manually
 # Allows {{ ansible_user }} to manage the aiagent rootless Podman context without password
 
-Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl shell --uid=aiagent .host /usr/bin/podman *
-Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl shell aiagent@ /usr/bin/systemctl --user *
-Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl shell aiagent@ /usr/bin/journalctl --user *
+Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl --quiet shell --uid=aiagent .host /usr/bin/podman *
+Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl --quiet shell aiagent@ /usr/bin/systemctl --user *
+Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl --quiet shell aiagent@ /usr/bin/journalctl --user *
 
 {{ ansible_user }} ALL=(root) NOPASSWD: AIAGENT_PODMAN, AIAGENT_SYSTEMD, AIAGENT_JOURNAL

@@ -533,6 +533,7 @@ Volume=%h/aiagent_container/opencode_state:/home/node/.local/state/opencode:Z
 Volume=%h/aiagent_container/agents:/home/node/.agents:Z
 Volume=%h/aiagent_container/codex:/home/node/.codex:Z
 Volume=%h/aiagent_container/claude:/home/node/.claude:Z
+Volume=%h/aiagent_container/claude.json:/home/node/.claude.json:Z
 Volume=%h/aiagent_container/t3:/home/node/.t3:Z
 Volume=%h/aiagent_container/pi:/home/node/.pi:Z
 # Idempotent scripts called by init.sh
@@ -1300,9 +1301,9 @@ WantedBy=default.target
 # Managed by Ansible — do not edit manually
 # Allows {{ ansible_user }} to manage the aiagent rootless Podman context without password
 
-Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl shell --uid=aiagent .host /usr/bin/podman *
-Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl shell aiagent@ /usr/bin/systemctl --user *
-Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl shell aiagent@ /usr/bin/journalctl --user *
+Cmnd_Alias AIAGENT_PODMAN  = /usr/bin/machinectl --quiet shell --uid=aiagent .host /usr/bin/podman *
+Cmnd_Alias AIAGENT_SYSTEMD = /usr/bin/machinectl --quiet shell aiagent@ /usr/bin/systemctl --user *
+Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl --quiet shell aiagent@ /usr/bin/journalctl --user *
 
 {{ ansible_user }} ALL=(root) NOPASSWD: AIAGENT_PODMAN, AIAGENT_SYSTEMD, AIAGENT_JOURNAL
 #+end_src
@@ -1318,15 +1319,15 @@ AIAGENT_T3_PUBLIC_URL="${AIAGENT_T3_PUBLIC_URL:-<<aiagent-t3-host-url()>>}"
 
 # aiagent: base primitive
 _aiagent() {
-    sudo machinectl shell --uid=aiagent .host /usr/bin/podman "$@"
+    sudo machinectl --quiet shell --uid=aiagent .host /usr/bin/podman "$@"
 }
 
 _aiagent_ctl() {
-    sudo machinectl shell aiagent@ /usr/bin/systemctl --user "$@"
+    sudo machinectl --quiet shell aiagent@ /usr/bin/systemctl --user "$@"
 }
 
 _aiagent_log() {
-    sudo machinectl shell aiagent@ /usr/bin/journalctl --user "$@"
+    sudo machinectl --quiet shell aiagent@ /usr/bin/journalctl --user "$@"
 }
 
 # interactive shell inside the harness container
