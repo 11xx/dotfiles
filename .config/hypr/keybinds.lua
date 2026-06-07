@@ -109,7 +109,7 @@ keymap_exec("s-M-print", "shotdrag")
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
 
-bind_exec("SUPER + CTRL + ALT + pause", "uwsm stop")
+bind("SUPER + CTRL + ALT + pause", hl.dsp.exit())
 
 bind("SUPER + O", hl.dsp.focus({ monitor = "+1" }))
 bind("SUPER + SHIFT + O", hl.dsp.window.move({ monitor = "+1" }))

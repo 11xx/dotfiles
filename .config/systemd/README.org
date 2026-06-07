@@ -8,6 +8,19 @@ Systemd-managed environment variables at:
 [[../environment.d/README.org]]
 
 * User Services
+** Hyprland session target
+:PROPERTIES:
+:header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/hyprland-session.target")
+:END:
+
+#+begin_src systemd
+[Unit]
+Description=Hyprland graphical session
+BindsTo=graphical-session.target
+Before=graphical-session.target
+PropagatesStopTo=graphical-session.target
+#+end_src
+
 ** xremap
 #+INCLUDE: "../xremap/README.org::#systemd-user-service" :only-contents t
 
@@ -206,4 +219,3 @@ See user logs and 'systemctl --user status servicename.service' for details.
 #+end_example
 so an empty =ExecStart== before the override e.g. =ExecStart=command= is
 to clear any conflicts since systemd only allows one ExecStart.
-

@@ -11,7 +11,7 @@ export VIDEO=mpv
 export IMAGE=qimgv
 export OPENER=launch
 export PAGER=bat
-export WM=start-hyprland
+export WM=hyprland-session
 export READER=zatura
 
 if is_systemd_system; then

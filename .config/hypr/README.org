@@ -579,7 +579,7 @@ keymap_exec("s-M-print", "shotdrag")
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
 
-bind_exec("SUPER + CTRL + ALT + pause", "uwsm stop")
+bind("SUPER + CTRL + ALT + pause", hl.dsp.exit())
 
 bind("SUPER + O", hl.dsp.focus({ monitor = "+1" }))
 bind("SUPER + SHIFT + O", hl.dsp.window.move({ monitor = "+1" }))
@@ -1253,6 +1253,26 @@ Install =hyprland-nvidia-git= or apply nvidia patch manually
 :PROPERTIES:
 :tangle-dir: (expand-file-name "hyprland" (xdg-bin-home))
 :END:
+
+** =hyprland-session=: shell-managed graphical-session target wrapper
+
+Keep Hyprland owned by the login shell so compositor exit returns to the tty,
+but still make =graphical-session.target= active for user services.
+
+#+begin_src shell :tangle (tdir "hyprland-session") :shebang #!/usr/bin/env sh :mkdirp yes :tangle-mode o755
+set -eu
+
+target=hyprland-session.target
+
+cleanup() {
+    systemctl --user stop "${target}" >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT INT TERM
+
+systemctl --user start "${target}"
+/usr/bin/start-hyprland "$@"
+#+end_src
 
 ** noweb setup helpers
 
