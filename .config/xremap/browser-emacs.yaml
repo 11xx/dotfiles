@@ -10,6 +10,7 @@ keymap:
         - Thorium-browser # X11
         - org.musicbrainz.Picard
         - zen
+        - helium
     exact_match: true # avoid WM conflicts with SUPER+MOD+...
     remap:
       C-b: { with_mark: left }

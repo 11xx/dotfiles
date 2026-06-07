@@ -176,6 +176,7 @@ Mainly packages, system services, and system files declaration
       # ntfs
       - dosfstools # mkfs fat/vfat/msdos
       - ntfs-3g # specifically for ntfsfix
+      - ntfsprogs
 
 - ansible.builtin.import_role:
     name: file_system

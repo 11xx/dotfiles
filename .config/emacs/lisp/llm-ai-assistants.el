@@ -4,8 +4,7 @@
 
 (use-package gptel
   :init
-  (setq gptel-model 'MiniMax-M2.7
-        gptel-default-mode 'org-mode)
+  (setq gptel-default-mode 'org-mode)
   :config
   (gptel-make-gemini "Gemini"
     :stream t
@@ -25,7 +24,10 @@
               MiniMax-M2.1-highspeed
               MiniMax-M2
               MiniMax-M2.7
-              MiniMax-M2.7-highspeed))
+              MiniMax-M2.7-highspeed
+              MiniMax-M3
+              MiniMax-M3-highspeed))
+  (setq gptel-model 'MiniMax-M3-highspeed)
 
   (gptel-make-ollama "Ollama"
     :host "localhost:11434"
@@ -98,10 +100,10 @@ returns non-nil."
 
       :request-params
       '(:service_tier "flex"
-                      :provider (:sort "throughput"
-                                       :allow_fallbacks :json-false
-                                       :data_collection "deny"
-                                       :zdr t))))
+        :provider (:sort "throughput"
+                         :allow_fallbacks :json-false
+                         :data_collection "deny"
+                         :zdr t))))
 
   (gptel-make-openai "Groq"
     :host "api.groq.com"

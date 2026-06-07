@@ -3633,8 +3633,7 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
 #+begin_src emacs-lisp
 (use-package gptel
   :init
-  (setq gptel-model 'MiniMax-M2.7
-        gptel-default-mode 'org-mode)
+  (setq gptel-default-mode 'org-mode)
   :config
   (gptel-make-gemini "Gemini"
     :stream t
@@ -3654,7 +3653,10 @@ Use the package =transpose-frame= (see [[https://www.emacswiki.org/emacs/Transpo
               MiniMax-M2.1-highspeed
               MiniMax-M2
               MiniMax-M2.7
-              MiniMax-M2.7-highspeed))
+              MiniMax-M2.7-highspeed
+              MiniMax-M3
+              MiniMax-M3-highspeed))
+  (setq gptel-model 'MiniMax-M3-highspeed)
 
   (gptel-make-ollama "Ollama"
     :host "localhost:11434"
