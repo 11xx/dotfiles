@@ -650,10 +650,14 @@ exec_once("wob-volume-pw-extras")
 bind_exec("XF86AudioLowerVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3-", { repeating = true })
 bind_exec("XF86AudioRaiseVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3+", { repeating = true })
 
-bind_exec("SUPER + ALT + XF86AudioLowerVolume", "env WOB_PIPE=/tmp/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
-bind_exec("SUPER + ALT + XF86AudioRaiseVolume", "env WOB_PIPE=/tmp/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
-bind_exec("SUPER + XF86AudioLowerVolume", "env WOB_PIPE=/tmp/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
-bind_exec("SUPER + XF86AudioRaiseVolume", "env WOB_PIPE=/tmp/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
+-- bind_exec("SUPER + ALT + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
+-- bind_exec("SUPER + ALT + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
+-- bind_exec("SUPER + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
+-- bind_exec("SUPER + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
+keymap_exec("s-M-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
+keymap_exec("s-M-XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
+keymap_exec("s-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
+keymap_exec("s-XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
 #+end_src
 
 ** Theming

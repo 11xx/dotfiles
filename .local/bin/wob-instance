@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Usage: wob-instance <PIPE_PATH> <CONFIG_FILE>
+
+PIPE="$1"
+CONFIG="$2"
+
+if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
+    echo "Usage: $0 PIPE_PATH CONFIG_FILE" >&2
+    exit 1
+fi
+
+exec 9>"${PIPE}.lock"
+flock -n 9 || exit 0
+
+while :; do
+    [ -p "$PIPE" ] || { rm -f "$PIPE"; mkfifo "$PIPE"; }
+    timeout 30 cat "$PIPE"
+done | wob -c "$CONFIG"

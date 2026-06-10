@@ -75,73 +75,94 @@ background_color = 11111100
 :CUSTOM_ID: orgid-snwuth
 :END:
 
-Monitor =wob='s config file and restart on change with =entr=
+Foreground variant of the default bar that live-reloads while you edit
+=wob.ini=: =entr= watches the config and restarts the reader on every save.
+Prefer [[#orgid-wobvolumepw][=wob-volume-pw=]] for normal use (background,
+self-healing); reach for this one only while tweaking the config. Run one or
+the other, not both — they read the same pipe.
 
-- DEPENDENCIES:
-  + wob
-  + entr
+Dependencies: =wob=, =entr=.
+
+The pipe and config resolve through XDG with =/tmp= / =~/.config= fallbacks,
+and it shares the default bar's pipe so =pw-volume='s output shows up here too.
+A leading =-v= turns on shell tracing. The pre-launch =pkill= is scoped to this
+bar's own reader by its config path, so the per-sink bars are left alone (the
+old =killall wob= used to take them all down).
 
 #+begin_src shell
-wobPipe="${XDG_RUNTIME_DIR:-/tmp}/wobpipe-volume"
+[ "$1" = -v ] && { set -x; shift; }
+
+wobPipe="${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob"
 wobConfig="${XDG_CONFIG_HOME:-$HOME/.config}/wob/wob.ini"
-wobPidFile="/tmp/wob-volume.pid$$"
+
+[ -p "$wobPipe" ] || { rm -f "$wobPipe"; mkfifo "$wobPipe"; }
+pkill -f "wob -c $wobConfig" 2>/dev/null
+
+printf '%s\n' "$wobConfig" |
+    entr -r -- sh -c "tail -f \"$wobPipe\" | wob -c \"$wobConfig\""
 #+end_src
 
 ** =wob-instance=: Instance monitor starter for custom pipes and config
 :PROPERTIES:
 :header-args:shell: :tangle (tdir "wob-instance") :shebang #!/usr/bin/env sh
+:CUSTOM_ID: orgid-wobinstance
 :END:
 
-#+begin_src shell
-wobPipe="$1"
-wobConfig="$2"
-wobPidFile="/tmp/wob-volume.pid$$"
+Starts one =wob= reader for a given =(pipe, config)= pair. Takes the pipe and
+config as arguments so the same script drives the default bar and every
+per-sink bar. Robust against the two ways these bars die in practice:
 
-if [ -z "${wobPipe}" ] || [ -z "${wobConfig}" ]; then
-    echo "Usage: $0 PIPE_PATH CONFIG_FILE"
+- *Single reader.* It grabs an exclusive =flock= on =<pipe>.lock= and exits
+  quietly if another instance already holds it, so a duplicate launch can't
+  steal every other message. It never deletes the pipe on exit — an earlier
+  version did, and any duplicate or crashed instance then silently broke the
+  surviving reader.
+- *Self-healing pipe.* It re-opens the FIFO by path for every message rather
+  than letting =tail -f= pin one inode forever. If the pipe is removed under
+  it (e.g. aged out of =/tmp=, or stale on =$XDG_RUNTIME_DIR= after a crash),
+  the next loop iteration recreates it and writers keep working. The =timeout=
+  unblocks a =cat= stuck on a deleted inode so that recreate actually happens.
+
+With the pipes now under =$XDG_RUNTIME_DIR= (tmpfs, =0700=, not swept by
+=systemd-tmpfiles=) the aging case should no longer arise, but the guard costs
+nothing and keeps the script correct on the =/tmp= fallback.
+
+#+begin_src shell
+# Usage: wob-instance <PIPE_PATH> <CONFIG_FILE>
+
+PIPE="$1"
+CONFIG="$2"
+
+if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
+    echo "Usage: $0 PIPE_PATH CONFIG_FILE" >&2
     exit 1
 fi
 
-# Cleanup on exit
-cleanup() {
-    [ -f "$wobPidFile" ] && kill "$(cat "$wobPidFile")" 2>/dev/null || true
-    rm -f "$wobPidFile" "$wobPipe"
-}
-trap cleanup EXIT
+exec 9>"${PIPE}.lock"
+flock -n 9 || exit 0
 
-# Create FIFO if doesn't exist
-[ -p "$wobPipe" ] || mkfifo "$wobPipe"
-
-start_wob() {
-    tail -f "$wobPipe" | wob -c "$wobConfig" &
-    echo $! > "$wobPidFile"
-}
-
-# Kill previous instance (by PID, not killall)
-[ -f "$wobPidFile" ] && kill "$(cat "$wobPidFile")" 2>/dev/null
-
-# Start fresh
-start_wob
-
-# Watch config file with entr (stdin from heredoc)
-entr -r -- sh -c "
-    [ -f '$wobPidFile' ] && kill \$(cat '$wobPidFile') 2>/dev/null || true
-    tail -f '$wobPipe' | wob -c '$wobConfig' &
-    echo \$! > '$wobPidFile'
-    wait \$(cat '$wobPidFile')
-" <<EOF
-$wobConfig
-EOF
+while :; do
+    [ -p "$PIPE" ] || { rm -f "$PIPE"; mkfifo "$PIPE"; }
+    timeout 30 cat "$PIPE"
+done | wob -c "$CONFIG"
 #+end_src
 
 ** =wob-volume-pw=
 :PROPERTIES:
 :header-args:shell: :tangle (tdir "wob-volume-pw") :shebang #!/usr/bin/env zsh
+:CUSTOM_ID: orgid-wobvolumepw
 :END:
-- =!&= is equivalent to =nohup= + =disown=
+
+The default bar, started once at login (=exec_once= in the Hyprland config).
+Hands the default pipe and config to [[#orgid-wobinstance][=wob-instance=]] and
+backgrounds it; zsh's =&!= is =nohup= + =disown= in one. The pipe path matches
+=pw-volume='s built-in default, so a bare =pw-volume @DEFAULT_AUDIO_SINK@ …=
+(no =WOB_PIPE=) lands here.
+
 #+begin_src shell
-wobPipeVolume=/tmp/pw-volume.wob
-wob-instance "${wobPipeVolume}" ~/.config/wob/wob.ini &!
+wobPipe="${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob"
+wobConfig="${XDG_CONFIG_HOME:-$HOME/.config}/wob/wob.ini"
+wob-instance "$wobPipe" "$wobConfig" &!
 #+end_src
 
 ** =wob-volume-pw-extras=
@@ -149,8 +170,15 @@ wob-instance "${wobPipeVolume}" ~/.config/wob/wob.ini &!
 :header-args:shell: :tangle (tdir "wob-volume-pw-extras") :shebang #!/usr/bin/env zsh
 :END:
 
+The per-sink bars (firefox-sink, game-sink), also started once at login. Each
+gets its own pipe under =$XDG_RUNTIME_DIR= and its own config, matching the
+=WOB_PIPE== paths the volume keybinds export. Add a sink by dropping in a
+=wob-<name>-sink.ini= and one more line here.
+
 #+begin_src shell
-wob-instance /tmp/wob-firefox-sink.pipe ~/.config/wob/wob-firefox-sink.ini &!
-wob-instance /tmp/wob-game-sink.pipe ~/.config/wob/wob-game-sink.ini &!
+wobRuntime="${XDG_RUNTIME_DIR:-/tmp}"
+wobConfigDir="${XDG_CONFIG_HOME:-$HOME/.config}/wob"
+wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini" &!
+wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"    &!
 #+end_src
 

@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+wobPipe="${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob"
+wobConfig="${XDG_CONFIG_HOME:-$HOME/.config}/wob/wob.ini"
+wob-instance "$wobPipe" "$wobConfig" &!

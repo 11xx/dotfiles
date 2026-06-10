@@ -1,0 +1,444 @@
+#!/usr/bin/env zsh
+# ~/.local/bin/pw-volume
+# Control volume for specific PipeWire sinks with wob/swaync support (zsh native)
+# Uses pw-dump for reliable device discovery
+# Usage: pw-volume [OPTIONS] SINK_IDENTIFIER [+/-]AMOUNT
+
+set -e
+
+# ===== Configuration =====
+typeset WOB_PIPE="${WOB_PIPE:-${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob}"
+typeset -r SWAYNC_SEND="swaync-client"
+typeset -r DUNST_MSG_ID="991042"
+
+# Notification backend: wob (default), swaync, or dunst
+typeset NOTIFY_BACKEND="${NOTIFY_BACKEND:-wob}"
+
+# ===== Helper Functions =====
+
+show_usage() {
+    cat << 'EOF'
+Usage: pw-volume [OPTIONS] SINK_IDENTIFIER [+/-]AMOUNT
+
+OPTIONS:
+  -n, --notification BACKEND  Use notification backend: wob (default), swaync, dunst
+  -m, --mute                  Toggle mute for sink
+  -g, --get                   Get current volume
+  -l, --list                  List all available sinks and sources (discovery helper)
+  -s, --source                Control audio source instead of sink (experimental)
+  -h, --help                  Show this help
+
+SINK_IDENTIFIER:
+  Can be any of:
+  - Node ID number (e.g., 42)
+  - Sink name or nick (e.g., 'GameSink', 'firefox-sink', 'FiiO K5 Pro')
+  - Partial name match (case-insensitive)
+  - @DEFAULT_AUDIO_SINK@
+  - @DEFAULT_AUDIO_SOURCE@
+
+AMOUNT:
+  Absolute volume (0-100)
+  Relative: +5 or -5 (percentage points)
+
+EXAMPLES:
+  pw-volume --list                    # Discover sink names and IDs
+  pw-volume GameSink +5               # Increase GameSink by 5%
+  pw-volume -n wob firefox-sink -10   # Decrease firefox-sink by 10% with wob
+  pw-volume --get GameSink            # Get GameSink current volume
+  pw-volume GameSink --mute           # Toggle mute for GameSink
+  pw-volume 'FiiO K5 Pro' +3          # Target by device nick
+EOF
+    exit "${1:-0}"
+}
+
+# Check if command exists
+has_cmd() {
+    command -v "$1" &>/dev/null
+}
+
+# Verify required dependencies
+check_deps() {
+    local missing=()
+
+    for cmd in wpctl pw-dump jq; do
+        has_cmd "$cmd" || missing+=("$cmd")
+    done
+
+    if (( ${#missing[@]} > 0 )); then
+        print "ERROR: Missing required commands: ${missing[*]}" >&2
+        print "Install: pipewire jq" >&2
+        return 1
+    fi
+}
+
+# Get all audio sinks (regular + custom loopback)
+get_all_sinks() {
+    pw-dump | jq -r '
+        .[] | select(.type == "PipeWire:Interface:Node")
+        | select(.info.props["media.class"] == "Audio/Sink")
+        | {
+            id: .id,
+            name: .info.props["node.name"],
+            nick: .info.props["node.nick"],
+            description: .info.props["node.description"],
+            class: .info.props["media.class"]
+          }
+    ' 2>/dev/null || return 1
+}
+
+# Get all audio sources
+get_all_sources() {
+    pw-dump | jq -r '
+        .[] | select(.type == "PipeWire:Interface:Node")
+        | select(.info.props["media.class"] == "Audio/Source")
+        | {
+            id: .id,
+            name: .info.props["node.name"],
+            nick: .info.props["node.nick"],
+            description: .info.props["node.description"]
+          }
+    ' 2>/dev/null || return 1
+}
+
+# List all available sinks and sources for discovery
+list_devices() {
+    print "\n=== PipeWire Audio Devices ===" >&2
+
+    print "\nSinks (Audio Outputs):" >&2
+    get_all_sinks | jq -r '
+        "\(.id): \(.name // "unnamed") - \(.description // "")"
+    ' | sed 's/^/  /' || print "  (none found)" >&2
+
+    print "\nSources (Audio Inputs):" >&2
+    get_all_sources | jq -r '
+        "\(.id): \(.name // "unnamed") - \(.description // "")"
+    ' | sed 's/^/  /' || print "  (none found)" >&2
+
+    print "\nSpecial Identifiers:" >&2
+    print "  @DEFAULT_AUDIO_SINK@      -> Default output device" >&2
+    print "  @DEFAULT_AUDIO_SOURCE@    -> Default input device" >&2
+}
+
+# Resolve sink/source identifier to node ID
+resolve_device() {
+    local identifier="$1"
+
+    # Already a wpctl-compatible identifier
+    [[ "$identifier" =~ ^@ ]] && print "$identifier" && return 0
+
+    # Numeric ID - validate it exists
+    if [[ "$identifier" =~ ^[0-9]+$ ]]; then
+        if wpctl inspect "$identifier" &>/dev/null; then
+            print "$identifier"
+            return 0
+        else
+            print "ERROR: Node ID $identifier does not exist" >&2
+            return 1
+        fi
+    fi
+
+    # Name search - case-insensitive, check name/nick/description
+    local node_id
+    node_id=$(pw-dump | jq -r "
+        .[] | select(.type == \"PipeWire:Interface:Node\")
+        | select(.info.props[\"media.class\"] == \"Audio/Sink\")
+        | select(
+            (.info.props[\"node.name\"] // \"\" | ascii_downcase | contains(\"${identifier:l}\")) or
+            (.info.props[\"node.nick\"] // \"\" | ascii_downcase | contains(\"${identifier:l}\")) or
+            (.info.props[\"node.description\"] // \"\" | ascii_downcase | contains(\"${identifier:l}\"))
+          )
+        | .id
+    " 2>/dev/null | head -1)
+
+    if [[ -z "$node_id" ]]; then
+        print "ERROR: Device \"$identifier\" not found" >&2
+        print "\nUse 'pw-volume --list' to see all available devices" >&2
+        return 1
+    fi
+
+    print "$node_id"
+}
+
+# Get current volume (0-100) - NO external dependencies
+get_volume() {
+    local device="$1"
+    local vol_str
+
+    vol_str=$(wpctl get-volume "$device" 2>/dev/null) || {
+        print "ERROR: Could not get volume for device $device" >&2
+        return 1
+    }
+
+    # Extract decimal from "Volume: 0.85" or "Volume: 0.85 [MUTED]"
+    local vol_decimal
+    vol_decimal=$(print "$vol_str" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+
+    if [[ -z "$vol_decimal" ]]; then
+        print "ERROR: Could not parse volume from: $vol_str" >&2
+        return 1
+    fi
+
+    # Convert decimal to percentage using zsh arithmetic
+    # Split on decimal point: 0.85 -> 85%
+    local integer_part="${vol_decimal%.*}"
+    local decimal_part="${vol_decimal#*.}"
+
+    # Pad decimal part to 2 digits and convert
+    decimal_part="${decimal_part}00"  # Pad with zeros
+    decimal_part="${decimal_part:0:2}"  # Take first 2 digits
+
+    local percent=$(( (integer_part * 100) + decimal_part ))
+
+    print "$percent"
+}
+
+# Set volume with optional relative / absolute change
+# Supported forms (consistent with wpctl[web:24]):
+#   50         -> set to 50%
+#   150        -> set to 100% (clamped)
+#   0.5        -> set to 0.5 (raw wpctl value, clamped 0–1)
+#   50%        -> set to 50%
+#   5%+        -> +5%
+#   5%-        -> -5%
+#   5+         -> +5%
+#   5-         -> -5%
+#   0.5+       -> +0.5%
+#   0.5-       -> -0.5%
+set_volume() {
+    local device="$1"
+    local amount="$2"
+
+    # --- Relative change: VOL[%, decimal][+|-] ---
+    if [[ "$amount" == *[+-] ]]; then
+        local op="${amount[-1]}"          # last char: + or -
+        local num="${amount[1,-2]}"       # everything except last char
+
+        local current_vol
+        current_vol=$(get_volume "$device") || return 1   # 0–100 int
+
+        # Parse delta in percent (integer)
+        local delta
+        if [[ "$num" == *% ]]; then
+            # e.g. "5%" -> 5
+            num="${num%%%}"
+            delta="$num"
+        elif [[ "$num" == *.* ]]; then
+            # decimal, treat as percent fraction: 0.5 -> 0.5%
+            # convert to integer hundredths
+            delta=$(( num * 100.0 ))
+        else
+            # bare int: 5+ -> 5%
+            delta="$num"
+        fi
+        delta="${delta%.*}"  # floor to integer
+
+        local new_vol
+        if [[ "$op" == "+" ]]; then
+            new_vol=$(( current_vol + delta ))
+        else
+            new_vol=$(( current_vol - delta ))
+        fi
+
+        # Clamp to 0–100
+        (( new_vol > 100 )) && new_vol=100
+        (( new_vol < 0 )) && new_vol=0
+
+        # Convert to 0.0–1.0 and apply
+        local decimal=$(( new_vol / 100.0 ))
+        wpctl set-volume "$device" "$decimal"
+        return
+    fi
+
+    # --- Absolute percentage with % suffix: VOL% ---
+    if [[ "$amount" == *% ]]; then
+        local num="${amount%%%}"
+        local vol="$num"
+        (( vol > 100 )) && vol=100
+        (( vol < 0 )) && vol=0
+        local decimal=$(( vol / 100.0 ))
+        wpctl set-volume "$device" "$decimal"
+        return
+    fi
+
+    # --- Absolute: either 0–100 int or 0.0–1.0 float ---
+    if [[ "$amount" == *.* ]]; then
+        # Treat as raw 0.0–1.0 wpctl value
+        local val="$amount"
+        (( val > 1.0 )) && val=1.0
+        (( val < 0.0 )) && val=0.0
+        wpctl set-volume "$device" "$val"
+    else
+        # 0–100 integer percent
+        local vol="$amount"
+        (( vol > 100 )) && vol=100
+        (( vol < 0 )) && vol=0
+        local decimal=$(( vol / 100.0 ))
+        wpctl set-volume "$device" "$decimal"
+    fi
+}
+
+# Send feedback via wob
+feedback_wob() {
+    local volume="$1"
+
+    if [[ ! -p "$WOB_PIPE" ]]; then
+        print "ERROR: $WOB_PIPE is not a wob pipe" >&2
+        return 1
+    fi
+    print "$volume" > "$WOB_PIPE"
+}
+
+# Send feedback via swaync
+feedback_swaync() {
+    local volume="$1"
+    local is_muted="$2"
+
+    if ! has_cmd "$SWAYNC_SEND"; then
+        print "ERROR: swaync-client not found" >&2
+        return 1
+    fi
+
+    if [[ "$is_muted" == "true" ]]; then
+        "$SWAYNC_SEND" -n "Volume muted" --hint "int:value:0" \
+            --app-name "Volume" --urgency low -r "$DUNST_MSG_ID"
+    else
+        "$SWAYNC_SEND" -n "Volume: ${volume}%" --hint "int:value:$volume" \
+            --app-name "Volume" --urgency low -r "$DUNST_MSG_ID"
+    fi
+}
+
+# Send feedback via dunst
+feedback_dunst() {
+    local volume="$1"
+    local is_muted="$2"
+
+    if [[ "$is_muted" == "true" ]]; then
+        dunstify -a "Volume" -u low -r "$DUNST_MSG_ID" "Volume muted"
+    else
+        dunstify -a "Volume" -u low -r "$DUNST_MSG_ID" \
+                 -h "int:value:$volume" "Volume: ${volume}%"
+    fi
+}
+
+# Check if muted
+is_muted() {
+    local device="$1"
+    wpctl get-mute "$device" 2>/dev/null | grep -q "Muted: yes"
+}
+
+# Send notification based on backend
+send_feedback() {
+    local volume="$1"
+    local is_muted="${2:-false}"
+
+    case "$NOTIFY_BACKEND" in
+        wob)
+            feedback_wob "$volume" || return 1
+            ;;
+        swaync)
+            feedback_swaync "$volume" "$is_muted" || return 1
+            ;;
+        dunst)
+            feedback_dunst "$volume" "$is_muted" || return 1
+            ;;
+        *)
+            print "ERROR: Unknown notification backend: $NOTIFY_BACKEND" >&2
+            return 1
+            ;;
+    esac
+}
+
+# ===== Main Script =====
+
+check_deps || exit 1
+
+# Parse options
+local operation="set"  # set, get, mute, or list
+
+while (( $# > 0 )); do
+    case "$1" in
+        -n|--notification)
+            NOTIFY_BACKEND="$2"
+            shift 2
+            ;;
+        -g|--get)
+            operation="get"
+            shift
+            ;;
+        -m|--mute)
+            operation="mute"
+            shift
+            ;;
+        -l|--list)
+            list_devices
+            exit 0
+            ;;
+        -h|--help)
+            show_usage 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        # Check if it looks like a number with +/- (relative volume)
+        # This must come BEFORE the generic -* catch-all
+        -+([0-9]))
+            # This is -5, -10, etc. - NOT a flag, it's relative volume
+            # Stop option parsing and treat as positional args
+            break
+            ;;
+        +([0-9]))
+            # This is 5, 10, etc. - absolute volume
+            break
+            ;;
+        -*)
+            print "ERROR: Unknown option: $1" >&2
+            show_usage 1
+            ;;
+        *)
+            # First non-option argument is the device identifier
+            break
+            ;;
+    esac
+done
+
+# Validate arguments
+if (( $# < 1 )); then
+    print "ERROR: Missing DEVICE_IDENTIFIER" >&2
+    show_usage 1
+fi
+
+local device_id
+device_id=$(resolve_device "$1") || exit 1
+shift
+
+case "$operation" in
+    get)
+        local vol
+        vol=$(get_volume "$device_id") || exit 1
+        print "Volume: ${vol}%"
+        ;;
+
+    mute)
+        wpctl set-mute "$device_id" toggle
+        if is_muted "$device_id"; then
+            send_feedback 0 "true"
+        else
+            local vol
+            vol=$(get_volume "$device_id") || exit 1
+            send_feedback "$vol" "false"
+        fi
+        ;;
+
+    set)
+        if (( $# < 1 )); then
+            print "ERROR: Missing AMOUNT for set operation" >&2
+            show_usage 1
+        fi
+
+        set_volume "$device_id" "$1" || exit 1
+        local vol
+        vol=$(get_volume "$device_id") || exit 1
+        send_feedback "$vol" "false"
+        ;;
+esac
