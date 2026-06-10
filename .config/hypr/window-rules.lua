@@ -38,6 +38,7 @@ window_rule({ class = "steam", title = "Steam Settings" }, { float = true })
 -- window_rule({ class = "steam" }, { float = true }) -- Uncomment to float all Steam windows
 -- Steam apps: send to workspace 6, render in background for FPS stability
 window_rule({ class = "^(steam_app_[0-9]+)$" }, { monitor = "0 silent", workspace = "6 silent" })
+-- windows_rule({ class = "steam", title "notificationtoasts.*" }) -- Steam buttom right popups
 
 -- Elden Ring: prevent FPS drops when unfocused
 window_rule({ class = "steam_app_2622380", title = "ELDEN RING NIGHTREIGN" }, { render_unfocused = true })

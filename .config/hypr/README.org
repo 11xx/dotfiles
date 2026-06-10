@@ -20,13 +20,13 @@ The default example config file can be found in:
 
 #+begin_src lua
 require("lib")
-require("hyprmacs-keymap")
 require("displays-workspaces")
 require("startup")
 require("environment")
 require("keywords")
 require("window-rules")
 require("layer-surface-rules")
+require("hyprmacs-keymap")
 require("keybinds")
 require("theme")
 require("nvidia")
@@ -74,9 +74,7 @@ end
 #+end_src
 
 ** Hyprmacs keymap
-
-The Emacs-like Hyprland keymap helper lives in [[file:hyprmacs-keymap.org][hyprmacs-keymap.org]].
-That file is the source of truth for both documentation and implementation.
+Emacs-like keymap helper Hyprland plugin.
 
 ** Bubblemv
 Intuitive directional window movements
@@ -315,9 +313,6 @@ hl.config({
         key_press_enables_dpms = true,
         -- render_unfocused_fps = 30,
     },
-    debug = {
-        -- vfr = false,
-    },
 })
 #+end_src
 
@@ -491,7 +486,7 @@ bind("SUPER + ALT + pause", hl.dsp.dpms({ action = "disable" }), { locked = true
 
 keymap_exec("s-x space", "$(tofi-run)")
 keymap_exec("s-x d", "dolphin")
-keymap_set("s-x s-c", hl.dsp.window.close()) -- for kill with M-x M-c
+keymap_set("s-x s-c", hl.dsp.window.close())
 keymap_exec("s-x f", browser)
 keymap_exec("s-x z", "zen-browser")
 keymap_exec("s-x v", "vivaldi")
@@ -573,8 +568,10 @@ bind("SUPER + CTRL + ALT + N", hl.dsp.group.next())
 keymap_exec("print", "screenshot-jxl")
 keymap_exec("S-print", "screenshot-jxl --select")
 keymap_exec("C-print", "screenshot-jxl --select --copy image")
-keymap_exec("M-print", "screenshot-jxl --lossless")
+keymap_exec("M-print", "screenshot-jxl --lossy")
 keymap_exec("s-M-print", "shotdrag")
+keymap_exec("s-print d", "shotdrag")
+keymap_exec("s-print w", "screenshot-jxl --window")
 
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
@@ -650,10 +647,6 @@ exec_once("wob-volume-pw-extras")
 bind_exec("XF86AudioLowerVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3-", { repeating = true })
 bind_exec("XF86AudioRaiseVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3+", { repeating = true })
 
--- bind_exec("SUPER + ALT + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
--- bind_exec("SUPER + ALT + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
--- bind_exec("SUPER + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
--- bind_exec("SUPER + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
 keymap_exec("s-M-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
 keymap_exec("s-M-XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
 keymap_exec("s-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
@@ -1008,9 +1001,6 @@ hl.env("__GL_VRR_ALLOWED", "1")
 hl.config({
     misc = {
         vrr = 2, -- 0 - off, 1 - on, 2 - fullscreen only
-    },
-    debug = {
-        vfr = true,
     },
     cursor = {
         no_hardware_cursors = 1,

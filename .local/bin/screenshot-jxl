@@ -11,6 +11,7 @@ notify_enabled=1
 verbose=0
 
 jxl_effort=9
+jxl_distance=0
 output_dir=""
 
 usage() {
@@ -20,11 +21,14 @@ Usage:
 
 Capture mode:
   -s, --select               Capture a selected region with slurp
+  -w, --window               Click a window to capture it (Hyprland)
   -f, --fullscreen           Capture fullscreen (default)
   -c, --cursor               Include cursor in the capture
 
 Output:
-      --effort N             Set lossless JXL effort 1..9 (default: 9)
+      --lossy                Lossy JXL encode (--distance 2.0, smaller files)
+      --lossless             Mathematically lossless JXL (default)
+      --effort N             Set JXL effort 1..10 (default: 9)
       --output-dir DIR       Directory for screenshots
       --screenshots-dir DIR  Alias for --output-dir
 
@@ -46,7 +50,7 @@ Behavior:
   - Captures once using grim
   - Creates a small PNG notification thumbnail immediately
   - Sends the screenshot notification before JXL encoding
-  - Saves a mathematically lossless JPEG XL file
+  - Saves a JPEG XL file (lossless by default, lossy with --lossy)
 EOF
 }
 
@@ -71,8 +75,8 @@ need() {
 
 check_effort() {
     case "$1" in
-        [1-9]) ;;
-        *) die "--effort must be an integer from 1 to 9" ;;
+        [1-9]|10) ;;
+        *) die "--effort must be an integer from 1 to 10" ;;
     esac
 }
 
@@ -80,6 +84,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         -s|--select)
             mode="region"
+            shift
+            ;;
+        -w|--window)
+            mode="window"
             shift
             ;;
         -f|--fullscreen)
@@ -94,6 +102,14 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || die "--effort requires a value"
             jxl_effort="$2"
             shift 2
+            ;;
+        --lossy)
+            jxl_distance=2.0
+            shift
+            ;;
+        --lossless)
+            jxl_distance=0
+            shift
             ;;
         --output-dir|--screenshots-dir)
             [[ $# -ge 2 ]] || die "$1 requires a directory"
@@ -148,6 +164,12 @@ if [[ "$mode" = "region" ]]; then
     need slurp
 fi
 
+if [[ "$mode" = "window" ]]; then
+    need slurp
+    need jq
+    need hyprctl
+fi
+
 if [[ "$copy_mode" != "none" ]]; then
     need wl-copy
 fi
@@ -196,6 +218,24 @@ if [[ "$mode" = "region" ]]; then
     geometry="$(slurp || true)"
     [[ -n "${geometry:-}" ]] || die "selection cancelled"
     grim_args+=(-g "$geometry")
+elif [[ "$mode" = "window" ]]; then
+    visible_ws="$(hyprctl -j monitors \
+        | jq -c '[.[] | .activeWorkspace.id, .specialWorkspace.id]')" \
+        || die "could not query Hyprland monitors"
+
+    window_boxes="$(hyprctl -j clients \
+        | jq -r --argjson vis "$visible_ws" '
+            .[]
+            | select(.mapped and (.hidden | not))
+            | select(.workspace.id as $id | ($vis | index($id)) != null)
+            | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1]) \(.class)"')" \
+        || die "could not query Hyprland windows"
+
+    [[ -n "$window_boxes" ]] || die "no on-screen windows to select"
+
+    geometry="$(printf '%s\n' "$window_boxes" | slurp -r || true)"
+    [[ -n "${geometry:-}" ]] || die "selection cancelled"
+    grim_args+=(-g "$geometry")
 fi
 
 grim "${grim_args[@]}" "$tmp_ppm" || die "grim failed"
@@ -219,11 +259,19 @@ notify_captured() {
     local title
     case "$mode" in
         region) title="Region screenshot captured" ;;
+        window) title="Window screenshot captured" ;;
         *)      title="Fullscreen screenshot captured" ;;
     esac
 
+    local kind
+    if [[ "$jxl_distance" = "0" ]]; then
+        kind="lossless"
+    else
+        kind="lossy"
+    fi
+
     local body
-    body="Encoding lossless JPEG XL: $output_file"
+    body="Encoding $kind JPEG XL: $output_file"
 
     case "$copy_mode" in
         path)  body+=$'\nClipboard: copying output path' ;;
@@ -257,19 +305,20 @@ case "$copy_mode" in
         ;;
 esac
 
-encode_lossless() {
+encode_jxl() {
     cjxl "$tmp_ppm" "$output_file" \
-        --distance 0 \
+        --distance "$jxl_distance" \
         --effort "$jxl_effort" \
-        >/dev/null || die "lossless cjxl encode failed"
+        >/dev/null || die "cjxl encode failed"
 
-    [[ -s "$output_file" ]] || die "lossless output was not created"
+    [[ -s "$output_file" ]] || die "JXL output was not created"
 }
 
-encode_lossless
+encode_jxl
 
 find "$cache_dir" -type f -name '*-thumb.png' -mtime +7 -delete \
     >/dev/null 2>&1 || true
 
 printf 'OUTPUT=%s\n' "$output_file"
 printf 'EFFORT=%s\n' "$jxl_effort"
+printf 'DISTANCE=%s\n' "$jxl_distance"

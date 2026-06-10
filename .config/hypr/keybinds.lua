@@ -21,7 +21,7 @@ bind("SUPER + ALT + pause", hl.dsp.dpms({ action = "disable" }), { locked = true
 
 keymap_exec("s-x space", "$(tofi-run)")
 keymap_exec("s-x d", "dolphin")
-keymap_set("s-x s-c", hl.dsp.window.close()) -- for kill with M-x M-c
+keymap_set("s-x s-c", hl.dsp.window.close())
 keymap_exec("s-x f", browser)
 keymap_exec("s-x z", "zen-browser")
 keymap_exec("s-x v", "vivaldi")
@@ -103,8 +103,10 @@ bind("SUPER + CTRL + ALT + N", hl.dsp.group.next())
 keymap_exec("print", "screenshot-jxl")
 keymap_exec("S-print", "screenshot-jxl --select")
 keymap_exec("C-print", "screenshot-jxl --select --copy image")
-keymap_exec("M-print", "screenshot-jxl --lossless")
+keymap_exec("M-print", "screenshot-jxl --lossy")
 keymap_exec("s-M-print", "shotdrag")
+keymap_exec("s-print d", "shotdrag")
+keymap_exec("s-print w", "screenshot-jxl --window")
 
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
@@ -164,10 +166,6 @@ exec_once("wob-volume-pw-extras")
 bind_exec("XF86AudioLowerVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3-", { repeating = true })
 bind_exec("XF86AudioRaiseVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3+", { repeating = true })
 
--- bind_exec("SUPER + ALT + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
--- bind_exec("SUPER + ALT + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
--- bind_exec("SUPER + XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
--- bind_exec("SUPER + XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
 keymap_exec("s-M-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
 keymap_exec("s-M-XF86AudioRaiseVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
 keymap_exec("s-XF86AudioLowerVolume", "env WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })

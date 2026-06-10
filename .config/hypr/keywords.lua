@@ -74,9 +74,6 @@ hl.config({
         key_press_enables_dpms = true,
         -- render_unfocused_fps = 30,
     },
-    debug = {
-        -- vfr = false,
-    },
 })
 
 hl.config({

@@ -30,7 +30,7 @@ The script is Wayland-native and is intended for Hyprland or another compositor
 that works with =grim=.
 
 #+begin_src bash :tangle no
-sudo pacman -S grim slurp libjxl wl-clipboard libnotify imagemagick xdg-user-dirs
+sudo pacman -S grim slurp libjxl wl-clipboard libnotify imagemagick xdg-user-dirs jq
 #+end_src
 
 The relevant commands are:
@@ -41,6 +41,7 @@ The relevant commands are:
 - =wl-copy= for Wayland clipboard support;
 - =notify-send= for desktop notifications;
 - =magick= for the fast PNG thumbnail and optional PNG clipboard image;
+- =hyprctl= (ships with Hyprland) and =jq= for =--window= selection;
 - =xdg-user-dir= for the default Pictures directory, when available.
 
 The script can still fall back to =$HOME/Pictures= if =xdg-user-dir= is absent
@@ -82,7 +83,12 @@ The default mode is fullscreen capture.
 The default output is a single lossless JPEG XL file under
 =~/Pictures/screenshots/=. The default encoder effort is =9= because the slow
 part now happens after the immediate notification. Lower it with =--effort= if
-latency or CPU use matters more than file size.
+latency or CPU use matters more than file size. Effort accepts =1..10=, where
+=10= is the slowest and produces the smallest file.
+
+Encoding is mathematically lossless by default (=jxl_distance= is =0=). Pass
+=--lossy= for a smaller =--distance 2.0= encode when exact pixels are not
+required; =--lossless= is the explicit spelling of the default.
 
 The default clipboard behavior is =path=: the final output path is copied as
 soon as the path is known. The file may still be encoding for a short period
@@ -99,6 +105,7 @@ notify_enabled=1
 verbose=0
 
 jxl_effort=9
+jxl_distance=0
 output_dir=""
 #+end_src
 
@@ -115,11 +122,14 @@ Usage:
 
 Capture mode:
   -s, --select               Capture a selected region with slurp
+  -w, --window               Click a window to capture it (Hyprland)
   -f, --fullscreen           Capture fullscreen (default)
   -c, --cursor               Include cursor in the capture
 
 Output:
-      --effort N             Set lossless JXL effort 1..9 (default: 9)
+      --lossy                Lossy JXL encode (--distance 2.0, smaller files)
+      --lossless             Mathematically lossless JXL (default)
+      --effort N             Set JXL effort 1..10 (default: 9)
       --output-dir DIR       Directory for screenshots
       --screenshots-dir DIR  Alias for --output-dir
 
@@ -141,7 +151,7 @@ Behavior:
   - Captures once using grim
   - Creates a small PNG notification thumbnail immediately
   - Sends the screenshot notification before JXL encoding
-  - Saves a mathematically lossless JPEG XL file
+  - Saves a JPEG XL file (lossless by default, lossy with --lossy)
 EOF
 }
 #+end_src
@@ -178,13 +188,13 @@ need() {
 }
 #+end_src
 
-The effort value is deliberately constrained to =1..9= before capture starts.
+The effort value is deliberately constrained to =1..10= before capture starts.
 
 #+begin_src bash
 check_effort() {
     case "$1" in
-        [1-9]) ;;
-        *) die "--effort must be an integer from 1 to 9" ;;
+        [1-9]|10) ;;
+        *) die "--effort must be an integer from 1 to 10" ;;
     esac
 }
 #+end_src
@@ -201,6 +211,10 @@ while [[ $# -gt 0 ]]; do
             mode="region"
             shift
             ;;
+        -w|--window)
+            mode="window"
+            shift
+            ;;
         -f|--fullscreen)
             mode="fullscreen"
             shift
@@ -213,6 +227,14 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || die "--effort requires a value"
             jxl_effort="$2"
             shift 2
+            ;;
+        --lossy)
+            jxl_distance=2.0
+            shift
+            ;;
+        --lossless)
+            jxl_distance=0
+            shift
             ;;
         --output-dir|--screenshots-dir)
             [[ $# -ge 2 ]] || die "$1 requires a directory"
@@ -274,11 +296,18 @@ need cjxl
 need magick
 #+end_src
 
-Region selection requires =slurp= only in region mode.
+Region selection requires =slurp=. Window selection additionally needs =jq= and
+=hyprctl= to read window geometry from the compositor.
 
 #+begin_src bash
 if [[ "$mode" = "region" ]]; then
     need slurp
+fi
+
+if [[ "$mode" = "window" ]]; then
+    need slurp
+    need jq
+    need hyprctl
 fi
 #+end_src
 
@@ -374,9 +403,36 @@ fi
 For region screenshots, =slurp= returns the geometry string. An empty result
 means the selection was cancelled.
 
+For window screenshots, the geometries of every window on the currently visible
+workspaces are piped to =slurp -r=, which restricts the selection to those
+boxes; a single click then picks one window. Off-screen windows are excluded by
+keeping only clients whose workspace is active on some monitor, so only windows
+you can actually see are offered. This is a self-contained equivalent of the
+=hyprprop | grim= recipe, built from =hyprctl= and =jq= directly. The trailing
+=\(.class)= is a slurp label and is dropped from slurp's default geometry
+output, so =grim= still receives a clean =x,y WxH= string.
+
 #+begin_src bash
 if [[ "$mode" = "region" ]]; then
     geometry="$(slurp || true)"
+    [[ -n "${geometry:-}" ]] || die "selection cancelled"
+    grim_args+=(-g "$geometry")
+elif [[ "$mode" = "window" ]]; then
+    visible_ws="$(hyprctl -j monitors \
+        | jq -c '[.[] | .activeWorkspace.id, .specialWorkspace.id]')" \
+        || die "could not query Hyprland monitors"
+
+    window_boxes="$(hyprctl -j clients \
+        | jq -r --argjson vis "$visible_ws" '
+            .[]
+            | select(.mapped and (.hidden | not))
+            | select(.workspace.id as $id | ($vis | index($id)) != null)
+            | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1]) \(.class)"')" \
+        || die "could not query Hyprland windows"
+
+    [[ -n "$window_boxes" ]] || die "no on-screen windows to select"
+
+    geometry="$(printf '%s\n' "$window_boxes" | slurp -r || true)"
     [[ -n "${geometry:-}" ]] || die "selection cancelled"
     grim_args+=(-g "$geometry")
 fi
@@ -429,11 +485,19 @@ notify_captured() {
     local title
     case "$mode" in
         region) title="Region screenshot captured" ;;
+        window) title="Window screenshot captured" ;;
         *)      title="Fullscreen screenshot captured" ;;
     esac
 
+    local kind
+    if [[ "$jxl_distance" = "0" ]]; then
+        kind="lossless"
+    else
+        kind="lossy"
+    fi
+
     local body
-    body="Encoding lossless JPEG XL: $output_file"
+    body="Encoding $kind JPEG XL: $output_file"
 
     case "$copy_mode" in
         path)  body+=$'\nClipboard: copying output path' ;;
@@ -483,26 +547,27 @@ case "$copy_mode" in
 esac
 #+end_src
 
-** Lossless JPEG XL encoding
+** JPEG XL encoding
 
-The final file is encoded after the notification and clipboard work. =--distance
-0= is the important part: it requests mathematically lossless JPEG XL.
+The final file is encoded after the notification and clipboard work. The
+=--distance= value comes from =jxl_distance=: =0= is mathematically lossless
+(the default), while =--lossy= sets =2.0=.
 
 #+begin_src bash
-encode_lossless() {
+encode_jxl() {
     cjxl "$tmp_ppm" "$output_file" \
-        --distance 0 \
+        --distance "$jxl_distance" \
         --effort "$jxl_effort" \
-        >/dev/null || die "lossless cjxl encode failed"
+        >/dev/null || die "cjxl encode failed"
 
-    [[ -s "$output_file" ]] || die "lossless output was not created"
+    [[ -s "$output_file" ]] || die "JXL output was not created"
 }
 #+end_src
 
 Run the encoder as the final expensive operation.
 
 #+begin_src bash
-encode_lossless
+encode_jxl
 #+end_src
 
 ** Cache cleanup
@@ -523,6 +588,7 @@ the saved path if needed.
 #+begin_src bash
 printf 'OUTPUT=%s\n' "$output_file"
 printf 'EFFORT=%s\n' "$jxl_effort"
+printf 'DISTANCE=%s\n' "$jxl_distance"
 #+end_src
 
 ** Hyprland bindings
@@ -537,6 +603,12 @@ Use Shift+Print for region selection.
 
 #+begin_src lua :tangle no
 bind_exec("shift+print", "~/.local/bin/screenshot-jxl --select")
+#+end_src
+
+Use Super+Print to click a single window and capture just that window.
+
+#+begin_src lua :tangle no
+bind_exec("super+print", "~/.local/bin/screenshot-jxl --window")
 #+end_src
 
 Use Ctrl+Print when the next action is pasting the screenshot into an
@@ -565,6 +637,18 @@ Region screenshot:
 
 #+begin_src bash :tangle no
 screenshot-jxl --select
+#+end_src
+
+Window screenshot (click the window to capture):
+
+#+begin_src bash :tangle no
+screenshot-jxl --window
+#+end_src
+
+Smaller lossy encode instead of the lossless default:
+
+#+begin_src bash :tangle no
+screenshot-jxl --lossy
 #+end_src
 
 Copy PNG image data for pasting while saving the lossless JXL file:
