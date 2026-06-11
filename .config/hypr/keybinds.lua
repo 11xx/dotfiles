@@ -150,15 +150,15 @@ bind_exec("SUPER + ALT + tab", "gpu-screen-recorder-replay-toggle-recording")
 -- Media keys
 -- the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode
 -- is to use lower case for keysyms, it it stops working capitalized y'know
-bind_exec("XF86AudioNext", "playerctl next")
-bind_exec("XF86AudioPrev", "playerctl previous")
-bind_exec("XF86AudioPlay", "playerctl play-pause")
+bind_exec("SUPER + XF86AudioNext", "playerctl next")
+bind_exec("SUPER + XF86AudioPrev", "playerctl previous")
+bind_exec("SUPER + XF86AudioPlay", "playerctl play-pause")
 
--- MPD
-bind_exec("SUPER + XF86AudioNext", "playerctl --player=mpd next")
-bind_exec("SUPER + XF86AudioPrev", "playerctl --player=mpd previous")
-bind_exec("SUPER + XF86AudioPlay", "playerctl --player=mpd play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=mpd stop; wptoggle")
+-- Muzaiten
+bind_exec("XF86AudioNext", "playerctl --player=muzaiten next")
+bind_exec("XF86AudioPrev", "playerctl --player=muzaiten previous")
+bind_exec("XF86AudioPlay", "playerctl --player=muzaiten play-pause")
+bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop; wptoggle")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")

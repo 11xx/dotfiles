@@ -63,6 +63,7 @@ window_rule({ class = "^()$", title = "^()$" }, { no_blur = true })
 
 -- Inkscape
 window_rule({ class = "org.inkscape.Inkscape", title = "^(SVG Input)$" }, { float = true })
+window_rule({ class = "org.inkscape.Inkscape", title = "^(SVG Input)$" }, { float = true })
 
 window_rule({ initial_class = "^(dragon-drop)$" }, { float = true, pin = true })
 
