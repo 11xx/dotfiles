@@ -1577,15 +1577,15 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 (include "swaync.yuck")
 #+end_src
 
-#+begin_src yuck :tangle (tdir "mpd.yuck")
-(defvar mpd-current-poll-state-1st true)
+Muzaiten exposes the current track through MPRIS, so the bar uses a
+long-lived listener instead of spawning a one-second poller. The helper keeps
+the old JSON shape for this widget and advances elapsed time from its own
+monotonic clock while playback is active.
 
-(defpoll mpd-current-json-1st-instance
-         :interval "1s"
-         :run-while mpd-current-poll-state-1st
-         ;; dummy json until it loads the executable:
-         :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","album_artist":"","album":""}}'
-         "mpd-current-json")
+#+begin_src yuck :tangle (tdir "mpd.yuck")
+(deflisten mpd-current-json-1st-instance
+           :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","artist":"","album_artist":"","album":""}}'
+           "music-current-json --follow --player=muzaiten")
 
 (defwidget seconds-to-length-format-hours [secs]
            (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))

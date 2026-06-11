@@ -1,11 +1,6 @@
-(defvar mpd-current-poll-state-1st true)
-
-(defpoll mpd-current-json-1st-instance
-         :interval "1s"
-         :run-while mpd-current-poll-state-1st
-         ;; dummy json until it loads the executable:
-         :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","album_artist":"","album":""}}'
-         "mpd-current-json")
+(deflisten mpd-current-json-1st-instance
+           :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","artist":"","album_artist":"","album":""}}'
+           "music-current-json --follow --player=muzaiten")
 
 (defwidget seconds-to-length-format-hours [secs]
            (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
