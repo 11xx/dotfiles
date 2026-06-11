@@ -1493,7 +1493,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :halign "start"
                 (label :text "${time}" :class "time-label")
                 (sep)
-                (mpd-current :nth 0)))
+                (music-current :nth 0)))
 
 (defwidget bar2-right-modules []
            (box :orientation "h"
@@ -1573,7 +1573,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           ;; :truncate-left true
           )))
 
-(include "mpd.yuck")
+(include "music.yuck")
 (include "swaync.yuck")
 #+end_src
 
@@ -1582,8 +1582,8 @@ long-lived listener instead of spawning a one-second poller. The helper keeps
 the old JSON shape for this widget and advances elapsed time from its own
 monotonic clock while playback is active.
 
-#+begin_src yuck :tangle (tdir "mpd.yuck")
-(deflisten mpd-current-json-1st-instance
+#+begin_src yuck :tangle (tdir "music.yuck")
+(deflisten music-current-json-1st-instance
            :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","artist":"","album_artist":"","album":""}}'
            "music-current-json --follow --player=muzaiten")
 
@@ -1608,22 +1608,22 @@ monotonic clock while playback is active.
             ":"
             (seconds-to-length-format-seconds :secs secs)))
 
-(defwidget mpd-current-nth-instance [curr-json ?icon]
+(defwidget music-current-nth-instance [curr-json ?icon]
            (box
             :space-evenly false
 
-            (label :class "mpd-current-icon" :text icon)
+            (label :class "music-current-icon" :text icon)
             ;; Title
-            (label :class "mpd-current-meta-field mpd-current-meta-field-title"
+            (label :class "music-current-meta-field music-current-meta-field-title"
                    :limit-width 50
                    :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
                    :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
 
             ;; Title Artist separator
-            (label :class "mpd-current-artist-separator" :text "·")
+            (label :class "music-current-artist-separator" :text "·")
 
             ;; Artist: if album_artist is empty, use Artist
-            (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
+            (label :class "music-current-meta-field music-current-meta-field-albumartist"
                    :limit-width 50
                    :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
                                     curr-json.tags.artist != "null" ? curr-json.tags.artist : ""}
@@ -1631,22 +1631,22 @@ monotonic clock while playback is active.
                                        curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
 
             ;; Title Artist separator
-            (label :class "mpd-current-artist-separator" :text "·")
+            (label :class "music-current-artist-separator" :text "·")
 
             ;; Album
-            (label :class "mpd-current-meta-field mpd-current-meta-field-album"
+            (label :class "music-current-meta-field music-current-meta-field-album"
                    :limit-width 50
                    :text {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""}
                    :tooltip {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""})
 
             ;; Elapsed/Duration
             (box :spacing 2
-                 :class "mpd-current-meta-field mpd-current-meta-field-elapsed"
+                 :class "music-current-meta-field music-current-meta-field-elapsed"
                  :space-evenly false
                  (seconds-to-length :secs {curr-json.status.elapsed})
-                 (label :text "/" :class "mpd-time-sep")
+                 (label :text "/" :class "music-time-sep")
                  (seconds-to-length :secs {curr-json.status.duration})
-                 (circular-progress :class "mpd-circular-progress"
+                 (circular-progress :class "music-circular-progress"
                                     :width 20
                                     :height 20
                                     :value {curr-json.status.elapsed_percent}
@@ -1655,16 +1655,16 @@ monotonic clock while playback is active.
                                     :valign "center"
                                     :tooltip "${curr-json.status.elapsed_percent}%"))))
 
-(defwidget mpd-current-1st-wrap []
-           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}))
+(defwidget music-current-1st-wrap []
+           (music-current-nth-instance :curr-json {music-current-json-1st-instance}))
 
-(defvar mpd-expand-bool true)
-(defwidget mpd-current []
-           (box :class "mpd-current-box"
+(defvar music-expand-bool true)
+(defwidget music-current []
+           (box :class "music-current-box"
                 :space-evenly false
                 :orientation "h"
                 :valign "center"
-                (mpd-current-1st-wrap)))
+                (music-current-1st-wrap)))
 #+end_src
 
 ** =swaync.yuck=: swaync notification client
@@ -1871,42 +1871,42 @@ $focused-monitor-pad: 0 0 0 3px;
 
 
 
-.mpd-circular-progress {
+.music-circular-progress {
   color: #6c6c6c;
   background-color: transparent;
 }
 
-.mpd-current-box {
+.music-current-box {
   font-size: inherit;
 }
 
-.mpd-current-meta-field {
+.music-current-meta-field {
   margin: 0;
 }
 
-.mpd-current-meta-field-title {
+.music-current-meta-field-title {
   color: $neron-yellow;
 }
 
-.mpd-current-meta-field-albumartist {
+.music-current-meta-field-albumartist {
   color: $neron-green;
 }
 
-.mpd-current-meta-field-album {
+.music-current-meta-field-album {
   color: $neron-blue;
 }
 
-.mpd-current-meta-field-elapsed {
+.music-current-meta-field-elapsed {
   color: $neron-comment;
   margin: 0 0 0 15px;
 }
 
-.mpd-current-icon {
+.music-current-icon {
   color: $current-icon;
   margin-right: 15px;
 }
 
-.mpd-current-artist-separator {
+.music-current-artist-separator {
   color: $neron-pink;
   margin: 0 8px;
 }

@@ -1,4 +1,4 @@
-(deflisten mpd-current-json-1st-instance
+(deflisten music-current-json-1st-instance
            :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","artist":"","album_artist":"","album":""}}'
            "music-current-json --follow --player=muzaiten")
 
@@ -23,22 +23,22 @@
             ":"
             (seconds-to-length-format-seconds :secs secs)))
 
-(defwidget mpd-current-nth-instance [curr-json ?icon]
+(defwidget music-current-nth-instance [curr-json ?icon]
            (box
             :space-evenly false
 
-            (label :class "mpd-current-icon" :text icon)
+            (label :class "music-current-icon" :text icon)
             ;; Title
-            (label :class "mpd-current-meta-field mpd-current-meta-field-title"
+            (label :class "music-current-meta-field music-current-meta-field-title"
                    :limit-width 50
                    :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
                    :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
 
             ;; Title Artist separator
-            (label :class "mpd-current-artist-separator" :text "·")
+            (label :class "music-current-artist-separator" :text "·")
 
             ;; Artist: if album_artist is empty, use Artist
-            (label :class "mpd-current-meta-field mpd-current-meta-field-albumartist"
+            (label :class "music-current-meta-field music-current-meta-field-albumartist"
                    :limit-width 50
                    :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
                                     curr-json.tags.artist != "null" ? curr-json.tags.artist : ""}
@@ -46,22 +46,22 @@
                                        curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
 
             ;; Title Artist separator
-            (label :class "mpd-current-artist-separator" :text "·")
+            (label :class "music-current-artist-separator" :text "·")
 
             ;; Album
-            (label :class "mpd-current-meta-field mpd-current-meta-field-album"
+            (label :class "music-current-meta-field music-current-meta-field-album"
                    :limit-width 50
                    :text {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""}
                    :tooltip {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""})
 
             ;; Elapsed/Duration
             (box :spacing 2
-                 :class "mpd-current-meta-field mpd-current-meta-field-elapsed"
+                 :class "music-current-meta-field music-current-meta-field-elapsed"
                  :space-evenly false
                  (seconds-to-length :secs {curr-json.status.elapsed})
-                 (label :text "/" :class "mpd-time-sep")
+                 (label :text "/" :class "music-time-sep")
                  (seconds-to-length :secs {curr-json.status.duration})
-                 (circular-progress :class "mpd-circular-progress"
+                 (circular-progress :class "music-circular-progress"
                                     :width 20
                                     :height 20
                                     :value {curr-json.status.elapsed_percent}
@@ -70,13 +70,13 @@
                                     :valign "center"
                                     :tooltip "${curr-json.status.elapsed_percent}%"))))
 
-(defwidget mpd-current-1st-wrap []
-           (mpd-current-nth-instance :curr-json {mpd-current-json-1st-instance}))
+(defwidget music-current-1st-wrap []
+           (music-current-nth-instance :curr-json {music-current-json-1st-instance}))
 
-(defvar mpd-expand-bool true)
-(defwidget mpd-current []
-           (box :class "mpd-current-box"
+(defvar music-expand-bool true)
+(defwidget music-current []
+           (box :class "music-current-box"
                 :space-evenly false
                 :orientation "h"
                 :valign "center"
-                (mpd-current-1st-wrap)))
+                (music-current-1st-wrap)))

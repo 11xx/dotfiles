@@ -65,42 +65,42 @@ $focused-monitor-pad: 0 0 0 3px;
 
 
 
-.mpd-circular-progress {
+.music-circular-progress {
   color: #6c6c6c;
   background-color: transparent;
 }
 
-.mpd-current-box {
+.music-current-box {
   font-size: inherit;
 }
 
-.mpd-current-meta-field {
+.music-current-meta-field {
   margin: 0;
 }
 
-.mpd-current-meta-field-title {
+.music-current-meta-field-title {
   color: $neron-yellow;
 }
 
-.mpd-current-meta-field-albumartist {
+.music-current-meta-field-albumartist {
   color: $neron-green;
 }
 
-.mpd-current-meta-field-album {
+.music-current-meta-field-album {
   color: $neron-blue;
 }
 
-.mpd-current-meta-field-elapsed {
+.music-current-meta-field-elapsed {
   color: $neron-comment;
   margin: 0 0 0 15px;
 }
 
-.mpd-current-icon {
+.music-current-icon {
   color: $current-icon;
   margin-right: 15px;
 }
 
-.mpd-current-artist-separator {
+.music-current-artist-separator {
   color: $neron-pink;
   margin: 0 8px;
 }

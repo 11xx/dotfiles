@@ -66,7 +66,7 @@
                 :halign "start"
                 (label :text "${time}" :class "time-label")
                 (sep)
-                (mpd-current :nth 0)))
+                (music-current :nth 0)))
 
 (defwidget bar2-right-modules []
            (box :orientation "h"
@@ -146,5 +146,5 @@
           ;; :truncate-left true
           )))
 
-(include "mpd.yuck")
+(include "music.yuck")
 (include "swaync.yuck")
