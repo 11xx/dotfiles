@@ -9,10 +9,52 @@ if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
     exit 1
 fi
 
-exec 9>"${PIPE}.lock"
-flock -n 9 || exit 0
+LOCK="${PIPE}.lock"
+PIDFILE="${PIPE}.pid"
 
-while :; do
-    [ -p "$PIPE" ] || { rm -f "$PIPE"; mkfifo "$PIPE"; }
-    timeout 30 cat "$PIPE"
-done | wob -c "$CONFIG"
+stop_owner() {
+    pids=""
+
+    [ -r "$PIDFILE" ] && pids="$(cat "$PIDFILE" 2>/dev/null || :)"
+    if command -v fuser >/dev/null 2>&1; then
+        pids="$pids $(fuser "$LOCK" 2>/dev/null || :)"
+    fi
+
+    pids="$(printf '%s\n' $pids | awk -v self="$$" '$1 ~ /^[0-9]+$/ && $1 != self { print }' | sort -u)"
+    [ -n "$pids" ] || return 0
+
+    kill $pids 2>/dev/null || :
+    i=0
+    while [ "$i" -lt 20 ]; do
+        live=""
+        for pid in $pids; do
+            kill -0 "$pid" 2>/dev/null && live="$live $pid"
+        done
+        [ -z "$live" ] && return 0
+        i=$((i + 1))
+        sleep 0.05
+    done
+
+    kill -KILL $pids 2>/dev/null || :
+}
+
+cleanup() {
+    [ "$(cat "$PIDFILE" 2>/dev/null || :)" = "$$" ] && rm -f "$PIDFILE" "$PIPE"
+}
+
+trap cleanup EXIT
+trap 'cleanup; exit 0' INT TERM HUP
+
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    stop_owner
+    flock -w 2 9 || exit 1
+fi
+
+printf '%s\n' "$$" > "$PIDFILE"
+rm -f "$PIPE"
+mkfifo -m 600 "$PIPE"
+
+exec 3<>"$PIPE"
+wob -c "$CONFIG" <&3 &
+wait "$!"

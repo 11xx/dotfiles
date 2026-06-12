@@ -110,22 +110,15 @@ printf '%s\n' "$wobConfig" |
 
 Starts one =wob= reader for a given =(pipe, config)= pair. Takes the pipe and
 config as arguments so the same script drives the default bar and every
-per-sink bar. Robust against the two ways these bars die in practice:
+per-sink bar.
 
-- *Single reader.* It grabs an exclusive =flock= on =<pipe>.lock= and exits
-  quietly if another instance already holds it, so a duplicate launch can't
-  steal every other message. It never deletes the pipe on exit — an earlier
-  version did, and any duplicate or crashed instance then silently broke the
-  surviving reader.
-- *Self-healing pipe.* It re-opens the FIFO by path for every message rather
-  than letting =tail -f= pin one inode forever. If the pipe is removed under
-  it (e.g. aged out of =/tmp=, or stale on =$XDG_RUNTIME_DIR= after a crash),
-  the next loop iteration recreates it and writers keep working. The =timeout=
-  unblocks a =cat= stuck on a deleted inode so that recreate actually happens.
-
-With the pipes now under =$XDG_RUNTIME_DIR= (tmpfs, =0700=, not swept by
-=systemd-tmpfiles=) the aging case should no longer arise, but the guard costs
-nothing and keeps the script correct on the =/tmp= fallback.
+The instance is intentionally replace-on-start. Hyprland crashes can leave the
+old shell holding the lock after the visible =wob= process lost its Wayland
+connection, so a fresh login/startup should take the pipe back instead of
+silently exiting behind a stale lock. The FIFO is recreated under the lock on
+each start, which keeps the path and the live reader in sync. During normal
+operation the shell opens the FIFO read-write and hands that fd directly to
+=wob=, so there is no =tail=, =cat=, or =timeout= process in the hot path.
 
 #+begin_src shell
 # Usage: wob-instance <PIPE_PATH> <CONFIG_FILE>
@@ -138,13 +131,55 @@ if [ -z "$PIPE" ] || [ -z "$CONFIG" ]; then
     exit 1
 fi
 
-exec 9>"${PIPE}.lock"
-flock -n 9 || exit 0
+LOCK="${PIPE}.lock"
+PIDFILE="${PIPE}.pid"
 
-while :; do
-    [ -p "$PIPE" ] || { rm -f "$PIPE"; mkfifo "$PIPE"; }
-    timeout 30 cat "$PIPE"
-done | wob -c "$CONFIG"
+stop_owner() {
+    pids=""
+
+    [ -r "$PIDFILE" ] && pids="$(cat "$PIDFILE" 2>/dev/null || :)"
+    if command -v fuser >/dev/null 2>&1; then
+        pids="$pids $(fuser "$LOCK" 2>/dev/null || :)"
+    fi
+
+    pids="$(printf '%s\n' $pids | awk -v self="$$" '$1 ~ /^[0-9]+$/ && $1 != self { print }' | sort -u)"
+    [ -n "$pids" ] || return 0
+
+    kill $pids 2>/dev/null || :
+    i=0
+    while [ "$i" -lt 20 ]; do
+        live=""
+        for pid in $pids; do
+            kill -0 "$pid" 2>/dev/null && live="$live $pid"
+        done
+        [ -z "$live" ] && return 0
+        i=$((i + 1))
+        sleep 0.05
+    done
+
+    kill -KILL $pids 2>/dev/null || :
+}
+
+cleanup() {
+    [ "$(cat "$PIDFILE" 2>/dev/null || :)" = "$$" ] && rm -f "$PIDFILE" "$PIPE"
+}
+
+trap cleanup EXIT
+trap 'cleanup; exit 0' INT TERM HUP
+
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    stop_owner
+    flock -w 2 9 || exit 1
+fi
+
+printf '%s\n' "$$" > "$PIDFILE"
+rm -f "$PIPE"
+mkfifo -m 600 "$PIPE"
+
+exec 3<>"$PIPE"
+wob -c "$CONFIG" <&3 &
+wait "$!"
 #+end_src
 
 ** =wob-volume-pw=
@@ -155,14 +190,14 @@ done | wob -c "$CONFIG"
 
 The default bar, started once at login (=exec_once= in the Hyprland config).
 Hands the default pipe and config to [[#orgid-wobinstance][=wob-instance=]] and
-backgrounds it; zsh's =&!= is =nohup= + =disown= in one. The pipe path matches
-=pw-volume='s built-in default, so a bare =pw-volume @DEFAULT_AUDIO_SINK@ …=
-(no =WOB_PIPE=) lands here.
+detaches it into its own session. The pipe path matches =pw-volume='s built-in
+default, so a bare =pw-volume @DEFAULT_AUDIO_SINK@ …= (no =WOB_PIPE=) lands
+here.
 
 #+begin_src shell
 wobPipe="${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob"
 wobConfig="${XDG_CONFIG_HOME:-$HOME/.config}/wob/wob.ini"
-wob-instance "$wobPipe" "$wobConfig" &!
+setsid -f wob-instance "$wobPipe" "$wobConfig"
 #+end_src
 
 ** =wob-volume-pw-extras=
@@ -178,7 +213,6 @@ gets its own pipe under =$XDG_RUNTIME_DIR= and its own config, matching the
 #+begin_src shell
 wobRuntime="${XDG_RUNTIME_DIR:-/tmp}"
 wobConfigDir="${XDG_CONFIG_HOME:-$HOME/.config}/wob"
-wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini" &!
-wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"    &!
+setsid -f wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini"
+setsid -f wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"
 #+end_src
-

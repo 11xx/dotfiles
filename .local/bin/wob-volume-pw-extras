@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
 wobRuntime="${XDG_RUNTIME_DIR:-/tmp}"
 wobConfigDir="${XDG_CONFIG_HOME:-$HOME/.config}/wob"
-wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini" &!
-wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"    &!
+setsid -f wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini"
+setsid -f wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"

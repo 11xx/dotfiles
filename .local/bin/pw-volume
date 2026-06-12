@@ -7,7 +7,9 @@
 set -e
 
 # ===== Configuration =====
-typeset WOB_PIPE="${WOB_PIPE:-${XDG_RUNTIME_DIR:-/tmp}/pw-volume.wob}"
+typeset -r PW_VOLUME_RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+typeset -r PW_VOLUME_CACHE_DIR="$PW_VOLUME_RUNTIME/pw-volume"
+typeset WOB_PIPE="${WOB_PIPE:-$PW_VOLUME_RUNTIME/pw-volume.wob}"
 typeset -r SWAYNC_SEND="swaync-client"
 typeset -r DUNST_MSG_ID="991042"
 
@@ -120,21 +122,34 @@ list_devices() {
 }
 
 # Resolve sink/source identifier to node ID
-resolve_device() {
+device_cache_path() {
+    local key="${1:l}"
+    key="${key//[^[:alnum:]_.@-]/_}"
+    print -r -- "$PW_VOLUME_CACHE_DIR/$key.node"
+}
+
+pipewire_signature() {
+    local socket="$PW_VOLUME_RUNTIME/pipewire-0"
+    [[ -e "$socket" ]] || { print -r -- "missing"; return 0; }
+    stat -Lc '%i:%Y' "$socket" 2>/dev/null || print -r -- "unknown"
+}
+
+forget_device_cache() {
+    local identifier="$1"
+    [[ "$identifier" =~ ^@ || "$identifier" =~ ^[0-9]+$ ]] && return 0
+    rm -f "$(device_cache_path "$identifier")"
+}
+
+resolve_device_uncached() {
     local identifier="$1"
 
     # Already a wpctl-compatible identifier
     [[ "$identifier" =~ ^@ ]] && print "$identifier" && return 0
 
-    # Numeric ID - validate it exists
+    # Numeric ID - let wpctl validate it in the operation that follows
     if [[ "$identifier" =~ ^[0-9]+$ ]]; then
-        if wpctl inspect "$identifier" &>/dev/null; then
-            print "$identifier"
-            return 0
-        else
-            print "ERROR: Node ID $identifier does not exist" >&2
-            return 1
-        fi
+        print "$identifier"
+        return 0
     fi
 
     # Name search - case-insensitive, check name/nick/description
@@ -156,7 +171,30 @@ resolve_device() {
         return 1
     fi
 
+    mkdir -p "$PW_VOLUME_CACHE_DIR"
+    print -r -- "$node_id $(pipewire_signature)" > "$(device_cache_path "$identifier")"
     print "$node_id"
+}
+
+resolve_device() {
+    local identifier="$1"
+    local cache node_id signature
+
+    [[ "$identifier" =~ ^@ || "$identifier" =~ ^[0-9]+$ ]] && {
+        resolve_device_uncached "$identifier"
+        return
+    }
+
+    cache="$(device_cache_path "$identifier")"
+    if [[ -r "$cache" ]]; then
+        read -r node_id signature < "$cache"
+        if [[ "$node_id" =~ ^[0-9]+$ && "$signature" == "$(pipewire_signature)" ]]; then
+            print "$node_id"
+            return 0
+        fi
+    fi
+
+    resolve_device_uncached "$identifier"
 }
 
 # Get current volume (0-100) - NO external dependencies
@@ -170,8 +208,8 @@ get_volume() {
     }
 
     # Extract decimal from "Volume: 0.85" or "Volume: 0.85 [MUTED]"
-    local vol_decimal
-    vol_decimal=$(print "$vol_str" | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    local vol_decimal="${vol_str#Volume: }"
+    vol_decimal="${vol_decimal%% *}"
 
     if [[ -z "$vol_decimal" ]]; then
         print "ERROR: Could not parse volume from: $vol_str" >&2
@@ -192,8 +230,8 @@ get_volume() {
     print "$percent"
 }
 
-# Set volume with optional relative / absolute change
-# Supported forms (consistent with wpctl[web:24]):
+# Convert this script's percentage-oriented arguments to wpctl syntax.
+# Supported forms:
 #   50         -> set to 50%
 #   150        -> set to 100% (clamped)
 #   0.5        -> set to 0.5 (raw wpctl value, clamped 0–1)
@@ -204,77 +242,36 @@ get_volume() {
 #   5-         -> -5%
 #   0.5+       -> +0.5%
 #   0.5-       -> -0.5%
-set_volume() {
-    local device="$1"
-    local amount="$2"
+wpctl_amount() {
+    local amount="$1"
 
-    # --- Relative change: VOL[%, decimal][+|-] ---
     if [[ "$amount" == *[+-] ]]; then
         local op="${amount[-1]}"          # last char: + or -
         local num="${amount[1,-2]}"       # everything except last char
-
-        local current_vol
-        current_vol=$(get_volume "$device") || return 1   # 0–100 int
-
-        # Parse delta in percent (integer)
-        local delta
-        if [[ "$num" == *% ]]; then
-            # e.g. "5%" -> 5
-            num="${num%%%}"
-            delta="$num"
-        elif [[ "$num" == *.* ]]; then
-            # decimal, treat as percent fraction: 0.5 -> 0.5%
-            # convert to integer hundredths
-            delta=$(( num * 100.0 ))
-        else
-            # bare int: 5+ -> 5%
-            delta="$num"
-        fi
-        delta="${delta%.*}"  # floor to integer
-
-        local new_vol
-        if [[ "$op" == "+" ]]; then
-            new_vol=$(( current_vol + delta ))
-        else
-            new_vol=$(( current_vol - delta ))
-        fi
-
-        # Clamp to 0–100
-        (( new_vol > 100 )) && new_vol=100
-        (( new_vol < 0 )) && new_vol=0
-
-        # Convert to 0.0–1.0 and apply
-        local decimal=$(( new_vol / 100.0 ))
-        wpctl set-volume "$device" "$decimal"
+        num="${num%%%}"
+        print -r -- "${num}%${op}"
         return
     fi
 
-    # --- Absolute percentage with % suffix: VOL% ---
     if [[ "$amount" == *% ]]; then
-        local num="${amount%%%}"
-        local vol="$num"
-        (( vol > 100 )) && vol=100
-        (( vol < 0 )) && vol=0
-        local decimal=$(( vol / 100.0 ))
-        wpctl set-volume "$device" "$decimal"
+        print -r -- "$amount"
         return
     fi
 
-    # --- Absolute: either 0–100 int or 0.0–1.0 float ---
     if [[ "$amount" == *.* ]]; then
-        # Treat as raw 0.0–1.0 wpctl value
-        local val="$amount"
-        (( val > 1.0 )) && val=1.0
-        (( val < 0.0 )) && val=0.0
-        wpctl set-volume "$device" "$val"
+        print -r -- "$amount"
     else
-        # 0–100 integer percent
-        local vol="$amount"
-        (( vol > 100 )) && vol=100
-        (( vol < 0 )) && vol=0
-        local decimal=$(( vol / 100.0 ))
-        wpctl set-volume "$device" "$decimal"
+        print -r -- "${amount}%"
     fi
+}
+
+set_volume() {
+    local device="$1"
+    local amount="$2"
+    local normalized
+
+    normalized="$(wpctl_amount "$amount")" || return 1
+    wpctl set-volume -l 1.0 "$device" "$normalized"
 }
 
 # Send feedback via wob
@@ -408,8 +405,9 @@ if (( $# < 1 )); then
     show_usage 1
 fi
 
+local device_identifier="$1"
 local device_id
-device_id=$(resolve_device "$1") || exit 1
+device_id=$(resolve_device "$device_identifier") || exit 1
 shift
 
 case "$operation" in
@@ -436,7 +434,11 @@ case "$operation" in
             show_usage 1
         fi
 
-        set_volume "$device_id" "$1" || exit 1
+        if ! set_volume "$device_id" "$1"; then
+            forget_device_cache "$device_identifier"
+            device_id=$(resolve_device_uncached "$device_identifier") || exit 1
+            set_volume "$device_id" "$1" || exit 1
+        fi
         local vol
         vol=$(get_volume "$device_id") || exit 1
         send_feedback "$vol" "false"
