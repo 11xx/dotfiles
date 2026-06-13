@@ -192,10 +192,6 @@ SLUG is derived from the heading title and confirmed in the minibuffer."
 
   (with-eval-after-load 'org
     (keymap-set org-mode-map "C-c C-x T" #'tdir-set-heading-property)))
-(when (file-exists-p "~/www/11xx.org/lisp/11xx-org-publish.el")
-  (add-to-list 'load-path "~/www/11xx.org/lisp/")
-  (with-eval-after-load 'ox-publish
-    (require '11xx-org-publish)))
 (use-package ob-lob
   :ensure nil
   :after org
