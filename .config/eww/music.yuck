@@ -1,5 +1,5 @@
 (deflisten music-current-json-1st-instance
-           :initial '{"status":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"tags":{"title":"","artist":"","album_artist":"","album":""}}'
+           :initial '{"player":{},"playback":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
            "music-current-json --follow --player=muzaiten")
 
 (defwidget seconds-to-length-format-hours [secs]
@@ -31,8 +31,8 @@
             ;; Title
             (label :class "music-current-meta-field music-current-meta-field-title"
                    :limit-width 50
-                   :text {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""}
-                   :tooltip {"${curr-json.tags.title}" != "null" ? "${curr-json.tags.title}" : ""})
+                   :text {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""}
+                   :tooltip {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""})
 
             ;; Title Artist separator
             (label :class "music-current-artist-separator" :text "·")
@@ -40,10 +40,10 @@
             ;; Artist: if album_artist is empty, use Artist
             (label :class "music-current-meta-field music-current-meta-field-albumartist"
                    :limit-width 50
-                   :text {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
-                                    curr-json.tags.artist != "null" ? curr-json.tags.artist : ""}
-                   :tooltip {curr-json.tags.album_artist != "null" ? curr-json.tags.album_artist :
-                                       curr-json.tags.artist != "null" ? curr-json.tags.artist : ""})
+                   :text {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
+                                    curr-json.track.artist != "null" ? curr-json.track.artist : ""}
+                   :tooltip {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
+                                       curr-json.track.artist != "null" ? curr-json.track.artist : ""})
 
             ;; Title Artist separator
             (label :class "music-current-artist-separator" :text "·")
@@ -51,24 +51,24 @@
             ;; Album
             (label :class "music-current-meta-field music-current-meta-field-album"
                    :limit-width 50
-                   :text {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""}
-                   :tooltip {curr-json.tags.album != "null" ? "${curr-json.tags.album}" : ""})
+                   :text {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""}
+                   :tooltip {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""})
 
             ;; Elapsed/Duration
             (box :spacing 2
                  :class "music-current-meta-field music-current-meta-field-elapsed"
                  :space-evenly false
-                 (seconds-to-length :secs {curr-json.status.elapsed})
+                 (seconds-to-length :secs {curr-json.playback.elapsed})
                  (label :text "/" :class "music-time-sep")
-                 (seconds-to-length :secs {curr-json.status.duration})
+                 (seconds-to-length :secs {curr-json.playback.duration})
                  (circular-progress :class "music-circular-progress"
                                     :width 20
                                     :height 20
-                                    :value {curr-json.status.elapsed_percent}
+                                    :value {curr-json.playback.elapsed_percent}
                                     :thickness 4
                                     :start-at 70
                                     :valign "center"
-                                    :tooltip "${curr-json.status.elapsed_percent}%"))))
+                                    :tooltip "${curr-json.playback.elapsed_percent}%"))))
 
 (defwidget music-current-1st-wrap []
            (music-current-nth-instance :curr-json {music-current-json-1st-instance}))
