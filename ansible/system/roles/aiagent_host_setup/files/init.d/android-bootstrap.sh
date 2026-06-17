@@ -7,8 +7,8 @@ export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
-cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-14742923}"
-cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-48833c34b761c10cb20bcd16582129395d121b27}"
+cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-15641748}"
+cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-63523a02a975a81102238566f2a16c057d52301e}"
 cmdline_tools_url="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-${cmdline_tools_version}_latest.zip}"
 
 mkdir -p "$ANDROID_HOME/cmdline-tools" "$GRADLE_USER_HOME"

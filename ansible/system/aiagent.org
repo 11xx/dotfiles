@@ -124,10 +124,10 @@ ARG CLAUDE_CODE_VERSION="latest"
 # GitHub API release lookups during image construction.
 ARG HADOLINT_VERSION="2.14.0"
 ARG WATCHEXEC_VERSION="2.5.1"
-ARG TYPOS_VERSION="1.46.0"
+ARG TYPOS_VERSION="1.47.2"
 ARG TAPLO_VERSION="0.10.0"
 ARG ACTIONLINT_VERSION="1.7.12"
-ARG DUCKDB_VERSION="1.5.2"
+ARG DUCKDB_VERSION="1.5.3"
 
 RUN --mount=type=cache,target=/var/cache/libdnf5 \
     --mount=type=cache,target=/var/cache/dnf \
@@ -672,8 +672,8 @@ export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
-cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-14742923}"
-cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-48833c34b761c10cb20bcd16582129395d121b27}"
+cmdline_tools_version="${ANDROID_CMDLINE_TOOLS_VERSION:-15641748}"
+cmdline_tools_sha1="${ANDROID_CMDLINE_TOOLS_SHA1:-63523a02a975a81102238566f2a16c057d52301e}"
 cmdline_tools_url="${ANDROID_CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-${cmdline_tools_version}_latest.zip}"
 
 mkdir -p "$ANDROID_HOME/cmdline-tools" "$GRADLE_USER_HOME"
