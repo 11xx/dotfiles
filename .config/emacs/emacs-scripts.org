@@ -1,0 +1,828 @@
+# [2023-09-12 Tue 19:08:43 -03]
+:PROPERTIES:
+:tangle-dir: (concat (xdg-bin-home) "/emacs")
+:END:
+
+* Emacs launch script helper
+:PROPERTIES:
+:header-args:zsh+: :mkdirp yes :tangle-mode o755 :shebang #!/usr/bin/zsh -i
+:END:
+
+** emacs-launcher: Emacsclient or minimal config loader
+:PROPERTIES:
+:header-args:zsh+: :tangle (tdir "emacs-launcher")
+:END:
+
+#+begin_src zsh
+# Robust Emacs launcher with comprehensive fallbacks for zsh
+# Fixed version that eliminates infinite loop issues
+
+# Remove strict mode that was causing issues
+setopt PIPE_FAIL         # Only fail on pipe failures
+
+# Script metadata
+readonly SCRIPT_NAME="${0:t}"
+readonly SCRIPT_VERSION="2.0"
+
+# Global variables (zsh style)
+typeset DEBUG="${DEBUG:-0}"
+typeset VERBOSE="${VERBOSE:-0}"
+typeset nw=""
+typeset minimal=""
+typeset title_opt=""
+typeset title_arg=""
+
+# Color codes for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m'
+
+# Print colored message to stderr
+print_message() {
+    local color="$1"
+    shift
+    printf "${color}%s${NC}\n" "$*" >&2
+}
+
+debug() {
+    [[ "$DEBUG" == "1" ]] && print_message "$BLUE" "[DEBUG] $*"
+}
+
+verbose() {
+    [[ "$VERBOSE" == "1" ]] && print_message "$GREEN" "[INFO] $*"
+}
+
+die() {
+    print_message "$RED" "[ERROR] $*"
+    exit 1
+}
+
+warn() {
+    print_message "$YELLOW" "[WARN] $*"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+is_emacs_server_running() {
+    if command_exists emacsclient; then
+        emacsclient --alternate-editor=false --eval 't' >/dev/null 2>&1
+    else
+        return 1
+    fi
+}
+
+show_help() {
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS] [FILES...]
+
+Robust Emacs launcher with comprehensive fallbacks.
+
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --verbose           Enable verbose output
+    -d, --debug             Enable debug output
+    -nw, --no-window        Run in terminal mode
+    -m, --minimal           Force minimal config
+    -t, --title TITLE       Set window title
+    --float                 Set window title for floating
+    --env-check             Show environment variables
+    --version               Show version information
+
+FALLBACK STRATEGY:
+    1. emacsclient (if server is running)
+    2. emacs with minimal config
+    3. emacs -q (no init file, but loads site-start.el)
+    4. emacs -Q (absolutely minimal, fastest startup)
+    5. any available editor
+
+Examples:
+    ${SCRIPT_NAME} file.txt                    # Edit file with best method
+    ${SCRIPT_NAME} -nw file.txt               # Force terminal mode
+    ${SCRIPT_NAME} -m file.txt                # Force minimal config
+    DEBUG=1 ${SCRIPT_NAME} file.txt           # Debug mode
+
+EOF
+}
+
+show_version() {
+    echo "${SCRIPT_NAME} version ${SCRIPT_VERSION}"
+}
+
+show_env_check() {
+    echo "Environment Check:"
+    echo "=================="
+
+    local vars=(EDITOR VISUAL ALTERNATE_EDITOR)
+    for var in $vars; do
+        local var_value
+        eval "var_value=\$${var}"
+        if [[ -n "$var_value" ]]; then
+            print_message "$GREEN" "✓ ${var}=${var_value}"
+        else
+            print_message "$YELLOW" "⚠ ${var} is not set"
+        fi
+    done
+
+    echo
+    echo "Available editors:"
+    local editors=(emacsclient emacs emacs-minimal vim vi nano)
+    for editor in $editors; do
+        if command_exists "$editor"; then
+            print_message "$GREEN" "✓ $editor is available"
+        else
+            print_message "$RED" "✗ $editor is not available"
+        fi
+    done
+
+    echo
+    if is_emacs_server_running; then
+        print_message "$GREEN" "✓ Emacs server is running"
+    else
+        print_message "$YELLOW" "⚠ Emacs server is not running"
+    fi
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            --env-check)
+                show_env_check
+                exit 0
+                ;;
+            -v|--verbose)
+                VERBOSE=1
+                verbose "Verbose mode enabled"
+                ;;
+            -d|--debug)
+                DEBUG=1
+                debug "Debug mode enabled"
+                ;;
+            -nw|--no-window)
+                nw="-nw"
+                debug "Terminal mode enabled"
+                ;;
+            -m|--minimal)
+                minimal="1"
+                debug "Minimal mode enabled"
+                ;;
+            -t|--title)
+                if [[ -n "${2:-}" ]]; then
+                    title_opt="--title"
+                    title_arg="$2"
+                    debug "Title set to: $title_arg"
+                    shift
+                else
+                    die "Option $1 requires an argument"
+                fi
+                ;;
+            --float)
+                title_opt="--title"
+                title_arg="floatWMRULE"
+                debug "Float mode enabled"
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                die "Unknown option: $1"
+                ;;
+            *)
+                break
+                ;;
+        esac
+        shift
+    done
+
+    FILES=("$@")
+}
+
+# Launch functions - fixed to avoid return issues
+launch_emacsclient() {
+    debug "Trying emacsclient..."
+
+    if ! command_exists emacsclient; then
+        debug "emacsclient not available"
+        return 1
+    fi
+
+    if ! is_emacs_server_running; then
+        debug "Emacs server not running"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+        debug "Adding terminal mode to emacsclient"
+    else
+        cmd_args+=(--no-wait --create-frame)
+        debug "Adding GUI mode to emacsclient"
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+        debug "Adding title to emacsclient: $title_arg"
+    fi
+
+    verbose "Launching emacsclient with args: ${cmd_args[*]} $*"
+    exec emacsclient "${cmd_args[@]}" "$@"
+}
+
+launch_emacs_minimal() {
+    debug "Trying emacs with minimal config..."
+
+    if ! command_exists emacs; then
+        debug "emacs not available"
+        return 1
+    fi
+
+    local minimal_config=""
+    local config_paths=(
+        "$HOME/.config/emacs/minimal.el"
+        "$HOME/.emacs.d/minimal.el"
+        "$HOME/.minimal-emacs.el"
+    )
+
+    for config in $config_paths; do
+        if [[ -f "$config" ]]; then
+            minimal_config="$config"
+            debug "Found minimal config: $config"
+            break
+        fi
+    done
+
+    if [[ -z "$minimal_config" ]]; then
+        debug "No minimal config found"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+    fi
+
+    cmd_args+=(--quick -l "$minimal_config")
+
+    verbose "Launching emacs with minimal config: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_emacs_q() {
+    debug "Trying emacs -q..."
+
+    if ! command_exists emacs; then
+        debug "emacs not available"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+    fi
+
+    cmd_args+=(-q)
+
+    verbose "Launching emacs -q: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_emacs_Q() {
+    debug "Trying emacs -Q..."
+
+    if ! command_exists emacs; then
+        debug "emacs not available"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+    fi
+
+    cmd_args+=(-Q)
+
+    verbose "Launching emacs -Q: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_fallback_editor() {
+    debug "Trying fallback editors..."
+
+    local fallback_editors=(
+        "${VISUAL:-}"
+        "${EDITOR:-}"
+        vim
+        vi
+        nano
+        pico
+        ed
+    )
+
+    for editor in $fallback_editors; do
+        if [[ -n "$editor" ]] && command_exists "$editor"; then
+            warn "Falling back to: $editor"
+            exec "$editor" "$@"
+        fi
+    done
+
+    die "No suitable editor found! Please install emacs or set EDITOR/VISUAL environment variables."
+}
+
+main() {
+    parse_args "$@"
+
+    debug "Script started with args: $*"
+    verbose "Fallback strategy: emacsclient -> minimal config -> emacs -q -> emacs -Q -> fallback editor"
+
+    export LSP_USE_PLISTS=true
+
+    # Try each option in sequence, using || to chain fallbacks
+    if [[ "$minimal" == "1" ]]; then
+        verbose "Minimal mode forced, skipping emacsclient"
+        launch_emacs_minimal "${FILES[@]}" || \
+        launch_emacs_q "${FILES[@]}" || \
+        launch_emacs_Q "${FILES[@]}" || \
+        launch_fallback_editor "${FILES[@]}"
+    else
+        launch_emacsclient "${FILES[@]}" || \
+        launch_emacs_minimal "${FILES[@]}" || \
+        launch_emacs_q "${FILES[@]}" || \
+        launch_emacs_Q "${FILES[@]}" || \
+        launch_fallback_editor "${FILES[@]}"
+    fi
+}
+
+# Only run main if script is executed directly
+if [[ "${ZSH_EVAL_CONTEXT:-}" != *:file ]]; then
+    main "$@"
+fi
+
+#+end_src
+
+** emacs-minimal: Enhanced =emacs -Q= alternative
+:PROPERTIES:
+:header-args: :tangle (tdir "emacs-minimal")
+:END:
+
+#+begin_src zsh
+# Robust minimal Emacs launcher for zsh - handles server detection edge cases
+# Fixed version that properly handles when Emacs is running but server is not started
+
+# Set minimal error handling (no strict mode to avoid infinite loops)
+setopt PIPE_FAIL
+
+# Script metadata
+readonly SCRIPT_NAME="${0:t}"
+readonly SCRIPT_VERSION="2.1"
+
+# Global variables
+typeset DEBUG="${DEBUG:-0}"
+typeset VERBOSE="${VERBOSE:-0}"
+typeset nw=""
+typeset title_opt=""
+typeset title_arg=""
+typeset config_file=""
+
+# Color codes
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m'
+
+# Default config paths - search in XDG and traditional locations
+readonly DEFAULT_CONFIG_PATHS=(
+    "$HOME/.config/emacs/minimal.el"
+    "$HOME/.emacs.d/minimal.el"
+    "$HOME/.minimal-emacs.el"
+    "$HOME/minimal-emacs.el"
+    "${XDG_CONFIG_HOME:-$HOME/.config}/emacs/minimal.el"
+)
+
+print_message() {
+    local color="$1"
+    shift
+    printf "${color}%s${NC}\n" "$*" >&2
+}
+
+debug() {
+    [[ "$DEBUG" == "1" ]] && print_message "$BLUE" "[DEBUG] $*"
+}
+
+verbose() {
+    [[ "$VERBOSE" == "1" ]] && print_message "$GREEN" "[INFO] $*"
+}
+
+die() {
+    print_message "$RED" "[ERROR] $*"
+    exit 1
+}
+
+warn() {
+    print_message "$YELLOW" "[WARN] $*"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+show_help() {
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [OPTIONS] [FILES...]
+
+Robust minimal Emacs launcher with comprehensive fallback strategy.
+
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --verbose           Enable verbose output
+    -d, --debug             Enable debug output
+    -nw, --no-window        Run in terminal mode
+    -c, --config FILE       Use specific config file
+    -t, --title TITLE       Set window title
+    --float                 Set window title for floating
+    --version               Show version information
+
+FALLBACK STRATEGY:
+    1. Use specified config file (if -c option provided)
+    2. Search for minimal config in standard locations:
+       - ~/.config/emacs/minimal.el
+       - ~/.emacs.d/minimal.el
+       - ~/.minimal-emacs.el
+       - ~/minimal-emacs.el
+    3. Fall back to emacs -q (no init, but site files)
+    4. Fall back to emacs -Q (fastest, absolutely minimal)
+    5. Try any available editor (VISUAL, EDITOR, vim, vi, nano)
+
+WHY THIS SCRIPT IS NEEDED:
+    This script exists to handle the case where Emacs is running but
+    the server is not started. In this situation, emacsclient will fail
+    to connect, and we need a reliable fallback that doesn't load the
+    full init.el (which might have dependencies like setup.el that
+    aren't available in minimal mode).
+
+Examples:
+    ${SCRIPT_NAME} file.txt                           # Use default minimal config
+    ${SCRIPT_NAME} -c ~/.my-minimal.el file.txt       # Use specific config
+    ${SCRIPT_NAME} -nw file.txt                       # Terminal mode
+    DEBUG=1 ${SCRIPT_NAME} file.txt                   # Debug mode
+
+EOF
+}
+
+show_version() {
+    echo "${SCRIPT_NAME} version ${SCRIPT_VERSION}"
+}
+
+find_minimal_config() {
+    debug "Searching for minimal config file..."
+
+    # If user specified a config file, try it first
+    if [[ -n "$config_file" ]]; then
+        if [[ -f "$config_file" ]]; then
+            debug "Using specified config: $config_file"
+            echo "$config_file"
+            return 0
+        else
+            warn "Specified config file not found: $config_file"
+        fi
+    fi
+
+    # Search in default locations
+    for config in $DEFAULT_CONFIG_PATHS; do
+        if [[ -f "$config" ]]; then
+            debug "Found minimal config: $config"
+            echo "$config"
+            return 0
+        fi
+        debug "Config not found: $config"
+    done
+
+    debug "No minimal config found in any location"
+    return 1
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            -v|--verbose)
+                VERBOSE=1
+                verbose "Verbose mode enabled"
+                ;;
+            -d|--debug)
+                DEBUG=1
+                debug "Debug mode enabled"
+                ;;
+            -nw|--no-window)
+                nw="-nw"
+                debug "Terminal mode enabled"
+                ;;
+            -c|--config)
+                if [[ -n "${2:-}" ]]; then
+                    config_file="$2"
+                    debug "Config file specified: $config_file"
+                    shift
+                else
+                    die "Option $1 requires an argument"
+                fi
+                ;;
+            -t|--title)
+                if [[ -n "${2:-}" ]]; then
+                    title_opt="--title"
+                    title_arg="$2"
+                    debug "Title set to: $title_arg"
+                    shift
+                else
+                    die "Option $1 requires an argument"
+                fi
+                ;;
+            --float)
+                title_opt="--title"
+                title_arg="floatWMRULE"
+                debug "Float mode enabled"
+                ;;
+            --)
+                shift
+                break
+                ;;
+            -*)
+                die "Unknown option: $1"
+                ;;
+            *)
+                break
+                ;;
+        esac
+        shift
+    done
+
+    FILES=("$@")
+}
+
+# Launch functions with improved error handling
+launch_emacs_with_config() {
+    local config="$1"
+    shift
+
+    debug "Trying emacs with config: $config"
+
+    if ! command_exists emacs; then
+        die "emacs command not found"
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+        debug "Adding terminal mode"
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+        debug "Adding title: $title_arg"
+    fi
+
+    # Use --quick to skip normal init but load the minimal config
+    cmd_args+=(--quick -l "$config")
+
+    verbose "Launching emacs with minimal config: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_emacs_q() {
+    debug "Trying emacs -q as fallback..."
+
+    if ! command_exists emacs; then
+        debug "emacs not available"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+    fi
+
+    cmd_args+=(-q)
+
+    warn "Falling back to emacs -q (no init file, but loads site files)"
+    verbose "Launching emacs -q: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_emacs_Q() {
+    debug "Trying emacs -Q as fallback..."
+
+    if ! command_exists emacs; then
+        debug "emacs not available"
+        return 1
+    fi
+
+    local cmd_args=()
+
+    if [[ -n "$nw" ]]; then
+        cmd_args+=("$nw")
+    fi
+
+    if [[ -n "$title_opt" && -n "$title_arg" ]]; then
+        cmd_args+=("$title_opt=$title_arg")
+    fi
+
+    cmd_args+=(-Q)
+
+    warn "Falling back to emacs -Q (fastest startup, absolutely minimal)"
+    verbose "Launching emacs -Q: ${cmd_args[*]} $*"
+    exec emacs "${cmd_args[@]}" "$@"
+}
+
+launch_fallback_editor() {
+    debug "Trying fallback editors..."
+
+    local fallback_editors=(
+        "${VISUAL:-}"
+        "${EDITOR:-}"
+        vim
+        vi
+        nano
+        pico
+        ed
+    )
+
+    for editor in $fallback_editors; do
+        if [[ -n "$editor" ]] && command_exists "$editor"; then
+            warn "Falling back to: $editor"
+            exec "$editor" "$@"
+        fi
+    done
+
+    die "No suitable editor found! Please install emacs or set EDITOR/VISUAL environment variables."
+}
+
+main() {
+    parse_args "$@"
+
+    debug "Script started with args: $*"
+    verbose "Searching for minimal config..."
+
+    local minimal_config
+    if minimal_config=$(find_minimal_config); then
+        verbose "Found minimal config: $minimal_config"
+        launch_emacs_with_config "$minimal_config" "${FILES[@]}"
+    else
+        verbose "No minimal config found, using fallbacks"
+        launch_emacs_q "${FILES[@]}" || \
+        launch_emacs_Q "${FILES[@]}" || \
+        launch_fallback_editor "${FILES[@]}"
+    fi
+}
+
+# Only run main if script is executed directly (not sourced)
+if [[ "${ZSH_EVAL_CONTEXT:-}" != *:file ]]; then
+    main "$@"
+fi
+#+end_src
+
+* Systemd Daemon
+:PROPERTIES:
+:header-args:shell: :shebang #!/usr/bin/env sh
+:header-args:zsh: :shebang #!/usr/bin/env zsh
+:header-args:systemd: :tangle (expand-file-name "systemd/user/emacs-daemon@.service" (xdg-config-home))
+:END:
+
+Service template.
+
+The ~Environment=COLORTERM=truecolor~ line is what gives ~emacsclient -t~
+frames 24-bit color. Emacs decides terminal truecolor at C level (~init_tty~)
+by reading ~COLORTERM~ from the daemon's *own* launch environment, not from the
+per-frame environment the client forwards. Since systemd starts the daemon with
+no terminal (~TERM=dumb~, no ~COLORTERM~), every ~-t~ frame would otherwise cap
+at 256 colors and any ~:background~-driven face (region/rectangle, vertico,
+etc.) degrades to a near-invisible approximation. Setting it here fixes it for
+all named daemons. This assumes attachments come from truecolor terminals
+(Alacritty), which holds for this setup.
+
+#+begin_src systemd
+[Unit]
+Description=Emacs daemon (%i)
+After=network.target
+
+[Service]
+Type=forking
+Environment=COLORTERM=truecolor
+ExecStart=sh -c 'emacs-daemon-starter %i'
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=10min
+StartLimitBurst=5
+
+[Install]
+WantedBy=default.target
+#+end_src
+
+# Create daemon starter
+#+begin_src shell :tangle (expand-file-name "emacs/emacs-daemon-starter" (xdg-bin-home))
+exec emacs --daemon="${1:-def}"
+#+end_src
+
+#+begin_src zsh :tangle (expand-file-name "emacs/emacsclient-def" (xdg-bin-home))
+# emacsclient wrapper for the 'def' named daemon.
+# Infers the correct frame/blocking mode from invocation context
+# without interfering with any flags the caller explicitly provides.
+
+local server=def
+typeset -i nowait=0 has_frame_flag=0 has_files=0 skip_next=0 after_ddash=0
+
+for arg in "$@"; do
+    (( after_ddash )) && { has_files=1; continue }
+    (( skip_next ))      && { skip_next=0; continue }
+
+    case $arg in
+        --)
+            after_ddash=1 ;;
+        -n|--no-wait)
+            nowait=1 ;;
+        -c|--create-frame|-t|--tty|-r|--reuse-frame)
+            has_frame_flag=1 ;;
+        # Options that consume the next argument (not a file)
+        -e|--eval|-s|--socket-name|-f|--server-file|-d|--display|-F|--frame-parameters)
+            skip_next=1 ;;
+        -*)  ;;  # unknown flags — irrelevant to detection
+        ,*)
+            has_files=1 ;;
+    esac
+done
+
+# Caller explicitly chose a frame mode — trust them, just wire the socket.
+(( has_frame_flag )) && exec emacsclient -s $server "$@"
+
+if (( nowait )); then
+    # -n without a frame flag: fire-and-forget, default to GUI frame.
+    exec emacsclient -s $server -c "$@"
+
+elif (( !has_files )); then
+    # No file targets: launcher/keybind call (Hyprland, dmenu, etc.)
+    # Open a new GUI frame and return immediately to the caller.
+    exec emacsclient -s $server -c -n "$@"
+
+elif [[ -t 0 ]]; then
+    # Files + controlling TTY: $EDITOR-style blocking call.
+    # Take over the terminal; block until server-edit (C-x #).
+    exec emacsclient -s $server -t "$@"
+
+elif [[ -n $DISPLAY || -n $WAYLAND_DISPLAY ]]; then
+    # Files + no TTY + display available: GUI app invoked $EDITOR.
+    # New GUI frame, block until server-edit.
+    exec emacsclient -s $server -c "$@"
+
+else
+    # Files + no TTY + no display: headless/SSH fallback.
+    exec emacsclient -s $server -t "$@"
+fi
+#+end_src
+
+# #+begin_src shell :tangle (expand-file-name "emacs/emacsclient-def-wait" (xdg-bin-home))
+# exec emacsclient -s def --create-frame "$@"
+# #+end_src
+
+#+begin_src shell :tangle (expand-file-name "emacs/emacsclient-code" (xdg-bin-home))
+exec emacsclient -s code --create-frame --no-wait "$@"
+#+end_src
