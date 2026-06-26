@@ -1,51 +1,4 @@
-# [2023-09-12 Tue 19:08:43 -03]
-:PROPERTIES:
-:tangle-dir: (concat (xdg-bin-home) "/emacs")
-:END:
-
-* Systemd Daemon
-:PROPERTIES:
-:header-args:shell: :shebang #!/usr/bin/env sh
-:header-args:zsh: :shebang #!/usr/bin/env zsh
-:header-args:systemd: :tangle (expand-file-name "systemd/user/emacs-daemon@.service" (xdg-config-home))
-:END:
-
-Service template.
-
-The ~Environment=COLORTERM=truecolor~ line is what gives ~emacsclient -t~
-frames 24-bit color. Emacs decides terminal truecolor at C level (~init_tty~)
-by reading ~COLORTERM~ from the daemon's *own* launch environment, not from the
-per-frame environment the client forwards. Since systemd starts the daemon with
-no terminal (~TERM=dumb~, no ~COLORTERM~), every ~-t~ frame would otherwise cap
-at 256 colors and any ~:background~-driven face (region/rectangle, vertico,
-etc.) degrades to a near-invisible approximation. Setting it here fixes it for
-all named daemons. This assumes attachments come from truecolor terminals
-(Alacritty), which holds for this setup.
-
-#+begin_src systemd
-[Unit]
-Description=Emacs daemon (%i)
-After=network.target
-
-[Service]
-Type=forking
-Environment=COLORTERM=truecolor
-ExecStart=sh -c 'emacs-daemon-starter %i'
-Restart=on-failure
-RestartSec=5s
-StartLimitIntervalSec=10min
-StartLimitBurst=5
-
-[Install]
-WantedBy=default.target
-#+end_src
-
-Create daemon starter
-#+begin_src shell :tangle (expand-file-name "emacs/emacs-daemon-starter" (xdg-bin-home))
-exec emacs --daemon="${1:-def}"
-#+end_src
-
-#+begin_src zsh :tangle (expand-file-name "emacs/emacsclient-def" (xdg-bin-home))
+#!/usr/bin/env zsh
 # emacsclient wrapper for the 'def' named daemon.
 # Infers the correct frame/blocking mode from invocation context
 # without interfering with any flags the caller explicitly provides.
@@ -68,7 +21,7 @@ for arg in "$@"; do
         -e|--eval|-s|--socket-name|-f|--server-file|-d|--display|-F|--frame-parameters)
             skip_next=1 ;;
         -*)  ;;  # unknown flags — irrelevant to detection
-        ,*)
+        *)
             has_files=1 ;;
     esac
 done
@@ -99,10 +52,3 @@ else
     # Files + no TTY + no display: headless/SSH fallback.
     exec emacsclient -s $server -t "$@"
 fi
-#+end_src
-
-** Named daemons
-
-#+begin_src shell :tangle (expand-file-name "emacs/emacsclient-code" (xdg-bin-home))
-exec emacsclient -s code --create-frame --no-wait "$@"
-#+end_src
