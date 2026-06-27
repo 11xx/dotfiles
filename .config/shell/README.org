@@ -160,7 +160,7 @@ source "$XDG_CONFIG_HOME/shell/functions"
 ** Default Apps
 Commands
 #+begin_src shell
-export GIT_EDITOR=emacsclient-code
+export GIT_EDITOR=emacsclient-def
 export ALTERNATE_EDITOR=emacs
 export EDITOR=emacsclient-def
 export VISUAL=emacsclient-def

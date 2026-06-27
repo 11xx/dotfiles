@@ -1,0 +1,50 @@
+#!/usr/bin/env zsh
+local server=$1; shift
+typeset -i nowait=0 has_frame_flag=0 has_files=0 skip_next=0 after_ddash=0
+
+for arg in "$@"; do
+    (( after_ddash )) && { has_files=1; continue }
+    (( skip_next ))      && { skip_next=0; continue }
+
+    case $arg in
+        --)
+            after_ddash=1 ;;
+        -n|--no-wait)
+            nowait=1 ;;
+        -c|--create-frame|-t|--tty|-r|--reuse-frame)
+            has_frame_flag=1 ;;
+        # Options that consume the next argument (not a file)
+        -e|--eval|-s|--socket-name|-f|--server-file|-d|--display|-F|--frame-parameters)
+            skip_next=1 ;;
+        -*)  ;;  # unknown flags — irrelevant to detection
+        *)
+            has_files=1 ;;
+    esac
+done
+
+# Caller explicitly chose a frame mode — trust them, just wire the socket.
+(( has_frame_flag )) && exec emacsclient -s $server "$@"
+
+if (( nowait )); then
+    # -n without a frame flag: fire-and-forget, default to GUI frame.
+    exec emacsclient -s $server -c "$@"
+
+elif (( !has_files )); then
+    # No file targets: launcher/keybind call (Hyprland, dmenu, etc.)
+    # Open a new GUI frame and return immediately to the caller.
+    exec emacsclient -s $server -c -n "$@"
+
+elif [[ -t 0 ]]; then
+    # Files + controlling TTY: $EDITOR-style blocking call.
+    # Take over the terminal; block until server-edit (C-x #).
+    exec emacsclient -s $server -t "$@"
+
+elif [[ -n $DISPLAY || -n $WAYLAND_DISPLAY ]]; then
+    # Files + no TTY + display available: GUI app invoked $EDITOR.
+    # New GUI frame, block until server-edit.
+    exec emacsclient -s $server -c "$@"
+
+else
+    # Files + no TTY + no display: headless/SSH fallback.
+    exec emacsclient -s $server -t "$@"
+fi

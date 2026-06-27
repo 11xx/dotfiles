@@ -30,7 +30,7 @@ After=network.target
 [Service]
 Type=forking
 Environment=COLORTERM=truecolor
-ExecStart=sh -c 'emacs-daemon-starter %i'
+ExecStart=emacs --daemon=%i
 Restart=on-failure
 RestartSec=5s
 StartLimitIntervalSec=10min
@@ -40,17 +40,27 @@ StartLimitBurst=5
 WantedBy=default.target
 #+end_src
 
-Create daemon starter
-#+begin_src shell :tangle (expand-file-name "emacs/emacs-daemon-starter" (xdg-bin-home))
-exec emacs --daemon="${1:-def}"
-#+end_src
+The service starts the daemon directly, so there is no separate starter
+script — the old =emacs-daemon-starter= wrapper only added an =sh -c= hop and a
+=${1:-def}= default that a systemd template instance can never trigger.
 
-#+begin_src zsh :tangle (expand-file-name "emacs/emacsclient-def" (xdg-bin-home))
-# emacsclient wrapper for the 'def' named daemon.
-# Infers the correct frame/blocking mode from invocation context
-# without interfering with any flags the caller explicitly provides.
+** Client wrapper
 
-local server=def
+Every entry point funnels through one wrapper, =emacsclient-named-daemon=, which
+takes a daemon socket name as its first argument and infers the correct
+frame/blocking mode from the invocation context — without overriding any frame
+flag the caller passed explicitly. Keeping the inference here means it lives in
+exactly one place; the per-daemon scripts below are thin shims that just select
+a socket (and, for =code=, a fixed "fresh GUI frame" policy).
+
+The frame-mode decision splits on three signals gathered from the argument
+list: whether a frame flag was given, whether =-n/--no-wait= was given, and
+whether any file targets are present (so a launcher/keybind call with no files
+is told apart from a =$EDITOR= call with files). Options that consume a
+following argument are skipped so their value isn't mistaken for a file.
+
+#+begin_src zsh :tangle (expand-file-name "emacs/emacsclient-named-daemon" (xdg-bin-home))
+local server=$1; shift
 typeset -i nowait=0 has_frame_flag=0 has_files=0 skip_next=0 after_ddash=0
 
 for arg in "$@"; do
@@ -103,6 +113,17 @@ fi
 
 ** Named daemons
 
+=def= is the general-purpose editor daemon wired to =$EDITOR=/=$VISUAL= and the
+=s-x e e= keybind, so it wants the full context inference.
+
+#+begin_src shell :tangle (expand-file-name "emacs/emacsclient-def" (xdg-bin-home))
+exec emacsclient-named-daemon def "$@"
+#+end_src
+
+=code= is the dedicated code-session daemon, only reached from the =s-x e c=
+keybind. Its policy is fixed: always pop a fresh GUI frame and return
+immediately (=-c -n=), which the wrapper honours as an explicit frame choice.
+
 #+begin_src shell :tangle (expand-file-name "emacs/emacsclient-code" (xdg-bin-home))
-exec emacsclient -s code --create-frame --no-wait "$@"
+exec emacsclient-named-daemon code -c -n "$@"
 #+end_src

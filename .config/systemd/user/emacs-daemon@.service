@@ -1,0 +1,15 @@
+[Unit]
+Description=Emacs daemon (%i)
+After=network.target
+
+[Service]
+Type=forking
+Environment=COLORTERM=truecolor
+ExecStart=emacs --daemon=%i
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=10min
+StartLimitBurst=5
+
+[Install]
+WantedBy=default.target
