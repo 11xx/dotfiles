@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -u
+
+PATH="${PATH:-/usr/local/bin:/usr/bin}:${HOME}/.local/bin:${HOME}/.local/bin/ai:${HOME}/.local/share/npm/bin"
+
+prompt="${AI_WINDOW_PING_PROMPT:-Reply with OK only.}"
+timeout_duration="${AI_WINDOW_PING_TIMEOUT:-180s}"
+targets="${AI_WINDOW_PING_TARGETS:-codex claude}"
+state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/ai-window-ping"
+
+mkdir -p "$state_dir"
+
+log() {
+    printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
+}
+
+run_codex() {
+    timeout "$timeout_duration" \
+        codex exec \
+        --ephemeral \
+        --skip-git-repo-check \
+        --sandbox read-only \
+        --ignore-rules \
+        --cd "$HOME" \
+        "$prompt"
+}
+
+run_claude() {
+    timeout "$timeout_duration" \
+        claude -p \
+        --no-session-persistence \
+        "$prompt"
+}
+
+run_target() {
+    case "$1" in
+        codex) run_codex ;;
+        claude) run_claude ;;
+        *)
+            log "ERROR: unknown target '$1'"
+            return 64
+            ;;
+    esac
+}
+
+status=0
+for target in $targets; do
+    output_log="$(mktemp "${TMPDIR:-/tmp}/ai-window-ping.${target}.XXXXXX")"
+    log "Pinging ${target}..."
+    if run_target "$target" >"$output_log" 2>&1; then
+        date '+%Y-%m-%dT%H:%M:%S%z' > "${state_dir}/${target}.last-success"
+        log "${target} ping succeeded."
+    else
+        rc=$?
+        status=1
+        log "ERROR: ${target} ping failed with exit status ${rc}."
+        sed -n '1,80p' "$output_log" >&2
+    fi
+    rm -f "$output_log"
+done
+
+exit "$status"
