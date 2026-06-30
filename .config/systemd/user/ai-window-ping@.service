@@ -1,12 +1,12 @@
 [Unit]
-Description=Ping AI CLIs to start five-hour usage windows
+Description=Ping %i to start its five-hour usage window
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 TimeoutStartSec=6min
-ExecStart=%h/.local/bin/ai/ai-window-ping
+ExecStart=%h/.local/bin/ai/ai-window-ping %i
 
 [Install]
 WantedBy=default.target

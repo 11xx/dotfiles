@@ -5,7 +5,6 @@ PATH="${PATH:-/usr/local/bin:/usr/bin}:${HOME}/.local/bin:${HOME}/.local/bin/ai:
 
 prompt="${AI_WINDOW_PING_PROMPT:-Reply with OK only.}"
 timeout_duration="${AI_WINDOW_PING_TIMEOUT:-180s}"
-targets="${AI_WINDOW_PING_TARGETS:-codex claude}"
 state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/ai-window-ping"
 
 mkdir -p "$state_dir"
@@ -42,6 +41,12 @@ run_target() {
             ;;
     esac
 }
+
+if (( $# > 0 )); then
+    targets="$*"
+else
+    targets="${AI_WINDOW_PING_TARGETS:-codex claude}"
+fi
 
 status=0
 for target in $targets; do

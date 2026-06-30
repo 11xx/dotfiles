@@ -1,8 +1,8 @@
 [Unit]
-Description=Run AI window ping every five hours
+Description=Run %i window ping every five hours
 
 [Timer]
-OnStartupSec=2min
+OnActiveSec=5h 2min
 OnUnitActiveSec=5h 2min
 Persistent=true
 AccuracySec=30s
