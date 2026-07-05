@@ -4,6 +4,9 @@ set -u
 PATH="${PATH:-/usr/local/bin:/usr/bin}:${HOME}/.local/bin:${HOME}/.local/bin/ai:${HOME}/.local/share/npm/bin"
 
 prompt="${AI_WINDOW_PING_PROMPT:-Reply with OK only.}"
+claude_model="${AI_WINDOW_PING_CLAUDE_MODEL:-haiku}"
+codex_workdir="${AI_WINDOW_PING_CODEX_WORKDIR:-${HOME}/code/muzaiten}"
+codex_prompt="${AI_WINDOW_PING_CODEX_PROMPT:-Inspect this repository read-only. Run git status --short, git ls-files | sed -n '1,220p', sed -n '1,220p' README.md, sed -n '1,200p' CMakeLists.txt, and find src -maxdepth 2 -type f | sort | sed -n '1,80p'. Then summarize the repo in 5 concise bullets and end with OK. Do not modify files.}"
 timeout_duration="${AI_WINDOW_PING_TIMEOUT:-180s}"
 state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/ai-window-ping"
 
@@ -20,13 +23,14 @@ run_codex() {
         --skip-git-repo-check \
         --sandbox read-only \
         --ignore-rules \
-        --cd "$HOME" \
-        "$prompt"
+        --cd "$codex_workdir" \
+        "$codex_prompt"
 }
 
 run_claude() {
     timeout "$timeout_duration" \
         claude -p \
+        --model "$claude_model" \
         --no-session-persistence \
         "$prompt"
 }
