@@ -716,3 +716,77 @@ grim -g "$geometry" -t png "$out_file"
 dragon-drop "$out_file"
 #+end_src
 
+* tofimoji: Minimal emoji picker with tofi
+:PROPERTIES:
+:header-args:shell: :tangle tofimoji :shebang #!/usr/bin/env sh
+:END:
+# [2023-06-14 Wed 15:45:50 -03]
+# [2026-01-15 Thu 16:56:00 -03] @ak updated tofi config
+# [2026-03-25 Wed 13:52:53 -03] @ak added custom emojis.txt
+# [2026-07-05 Sun 15:37:12 -03] @ak moved to .local/bin/README
+
+- DEPENDENCIES
+  + =tofi=: fast wayland dmenu-like program
+  + =noto-fonts-emoji=: Display all emojis preview correctly
+  + =wl-clipboard=: Wayland clipboard
+  + =notify-send=: optional desktop error reporting
+  + =emojis.txt= from the local =emoji-index= checkout
+
+*NOTE*: the =--font= argument should point to a relative font name and not
+a full path because =tofi= also searches for alternative characters on
+fonts other than the one specified by name.
+
+This started from =whoisYoges/emojimenu=. The local version reads the generated
+emoji index, lets =tofi= filter the full searchable line, and copies only the
+first field from a confirmed selection. Canceling the picker should leave the
+clipboard alone. =TOFIMOJI_EMOJIS= and =TOFIMOJI_CONFIG= can override the
+defaults for testing or alternate indexes.
+
+#+begin_src shell
+set -eu
+
+font_name='Liberation Sans'
+emoji_file=${TOFIMOJI_EMOJIS:-${HOME}/code/emoji-index/emojis.txt}
+xdg_config_home=${XDG_CONFIG_HOME:-${HOME}/.config}
+tofi_config=${TOFIMOJI_CONFIG:-${xdg_config_home}/tofi/tofimoji}
+
+notify_error() {
+    message=$1
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "tofimoji" "$message"
+    fi
+    printf '%s\n' "tofimoji: $message" >&2
+}
+
+require_cmd() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        notify_error "missing required command: $1"
+        exit 127
+    fi
+}
+
+require_cmd tofi
+require_cmd wl-copy
+
+if [ ! -r "$emoji_file" ]; then
+    notify_error "emoji index not readable: $emoji_file"
+    exit 1
+fi
+
+if [ ! -r "$tofi_config" ]; then
+    tofi_config=${xdg_config_home}/tofi/center-box
+fi
+
+if [ ! -r "$tofi_config" ]; then
+    notify_error "tofi config not readable: $tofi_config"
+    exit 1
+fi
+
+selection=$(tofi --font="$font_name" -c "$tofi_config" < "$emoji_file") || exit 0
+[ -n "$selection" ] || exit 0
+
+emoji=${selection%% | *}
+[ -n "$emoji" ] || exit 0
+
+printf '%s' "$emoji" | wl-copy
+#+end_src

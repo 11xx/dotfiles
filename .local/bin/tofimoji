@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+set -eu
+
+font_name='Liberation Sans'
+emoji_file=${TOFIMOJI_EMOJIS:-${HOME}/code/emoji-index/emojis.txt}
+xdg_config_home=${XDG_CONFIG_HOME:-${HOME}/.config}
+tofi_config=${TOFIMOJI_CONFIG:-${xdg_config_home}/tofi/tofimoji}
+
+notify_error() {
+    message=$1
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "tofimoji" "$message"
+    fi
+    printf '%s\n' "tofimoji: $message" >&2
+}
+
+require_cmd() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        notify_error "missing required command: $1"
+        exit 127
+    fi
+}
+
+require_cmd tofi
+require_cmd wl-copy
+
+if [ ! -r "$emoji_file" ]; then
+    notify_error "emoji index not readable: $emoji_file"
+    exit 1
+fi
+
+if [ ! -r "$tofi_config" ]; then
+    tofi_config=${xdg_config_home}/tofi/center-box
+fi
+
+if [ ! -r "$tofi_config" ]; then
+    notify_error "tofi config not readable: $tofi_config"
+    exit 1
+fi
+
+selection=$(tofi --font="$font_name" -c "$tofi_config" < "$emoji_file") || exit 0
+[ -n "$selection" ] || exit 0
+
+emoji=${selection%% | *}
+[ -n "$emoji" ] || exit 0
+
+printf '%s' "$emoji" | wl-copy
