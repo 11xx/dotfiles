@@ -1499,6 +1499,35 @@ if [[ -o interactive ]] && [[ -t 0 ]]; then
 fi
 #+end_src
 
+** Pass
+:PROPERTIES:
+:header-args:shell+: :tangle setup-modules/pass.sh
+:END:
+
+The default password store remains the main personal store. The secondary
+wrapper keeps older project or test secrets reachable without exposing
+project names or recipient keys in this public dotfiles tree.
+#+begin_src shell
+PASSWORD_STORE_MAIN_DIR="${PASSWORD_STORE_MAIN_DIR:-$HOME/.password-store}"
+PASSWORD_STORE_SECONDARY_DIR="${PASSWORD_STORE_SECONDARY_DIR:-$HOME/.password-store-secondary}"
+
+pass-main () {
+    PASSWORD_STORE_DIR="${PASSWORD_STORE_MAIN_DIR}" command pass "$@"
+}
+
+pass-secondary () {
+    PASSWORD_STORE_DIR="${PASSWORD_STORE_SECONDARY_DIR}" command pass "$@"
+}
+
+pass-dev () {
+    pass-secondary "$@"
+}
+
+if [ -n "${ZSH_VERSION:-}" ] && command -v compdef >/dev/null 2>&1; then
+    compdef _pass pass-main pass-secondary pass-dev
+fi
+#+end_src
+
 ** NPM
 :PROPERTIES:
 :header-args:conf: :tangle (expand-file-name "environment.d/npm.conf" (xdg-config-home))
