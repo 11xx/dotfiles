@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+unit=darkman.service
+config_home=${XDG_CONFIG_HOME:-"${HOME}/.config"}
+data_home=${XDG_DATA_HOME:-"${HOME}/.local/share"}
+
+current_mode() {
+    local mode target
+
+    mode=$(darkman get 2>/dev/null || true)
+    case "$mode" in
+        dark|light)
+            printf '%s\n' "$mode"
+            return
+            ;;
+    esac
+
+    target=$(readlink -f "${config_home}/hypr/themes/active-theme.lua" 2>/dev/null || true)
+    case "$target" in
+        *.dark) printf '%s\n' dark ;;
+        *.light) printf '%s\n' light ;;
+        *)
+            printf '%s\n' 'darkman-toggle: cannot determine the current mode' >&2
+            return 1
+            ;;
+    esac
+}
+
+disable_darkman() {
+    local mode wallpaper_script wayland_display service_environment entry
+
+    mode=$(current_mode)
+    wallpaper_script="${data_home}/${mode}-mode.d/wallpaper.sh"
+    wayland_display=${WAYLAND_DISPLAY:-}
+    if [ -z "$wayland_display" ]; then
+        service_environment=$(systemctl --user show --value --property=Environment "$unit")
+        for entry in $service_environment; do
+            case "$entry" in
+                WAYLAND_DISPLAY=*)
+                    wayland_display=${entry#WAYLAND_DISPLAY=}
+                    break
+                    ;;
+            esac
+        done
+    fi
+
+    systemctl --user disable --now "$unit"
+    systemctl --user mask "$unit"
+
+    if systemctl --user is-active --quiet "$unit"; then
+        printf '%s\n' 'darkman-toggle: Darkman did not stop' >&2
+        return 1
+    fi
+    if [ ! -x "$wallpaper_script" ]; then
+        printf 'darkman-toggle: missing wallpaper script: %s\n' "$wallpaper_script" >&2
+        return 1
+    fi
+
+    XDG_CONFIG_HOME="$config_home" XDG_DATA_HOME="$data_home" \
+        WAYLAND_DISPLAY="$wayland_display" "$wallpaper_script"
+    printf 'Darkman disabled; retained %s wallpaper.\n' "$mode"
+}
+
+enable_darkman() {
+    systemctl --user unmask "$unit"
+    systemctl --user enable --now "$unit"
+    printf '%s\n' 'Darkman enabled.'
+}
+
+if systemctl --user is-enabled --quiet "$unit"; then
+    disable_darkman
+else
+    enable_darkman
+fi
