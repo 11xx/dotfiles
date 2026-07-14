@@ -21,7 +21,7 @@ current_mode() {
         *.dark) printf '%s\n' dark ;;
         *.light) printf '%s\n' light ;;
         *)
-            printf '%s\n' 'darkman-toggle: cannot determine the current mode' >&2
+            printf '%s\n' 'darkman-disable: cannot determine the current mode' >&2
             return 1
             ;;
     esac
@@ -49,11 +49,11 @@ disable_darkman() {
     systemctl --user mask "$unit"
 
     if systemctl --user is-active --quiet "$unit"; then
-        printf '%s\n' 'darkman-toggle: Darkman did not stop' >&2
+        printf '%s\n' 'darkman-disable: Darkman did not stop' >&2
         return 1
     fi
     if [ ! -x "$wallpaper_script" ]; then
-        printf 'darkman-toggle: missing wallpaper script: %s\n' "$wallpaper_script" >&2
+        printf 'darkman-disable: missing wallpaper script: %s\n' "$wallpaper_script" >&2
         return 1
     fi
 
