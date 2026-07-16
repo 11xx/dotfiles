@@ -38,7 +38,7 @@ alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
-alias c="bat"
+alias c="codex"
 alias b="bat"
 
 alias l='eza -la --no-user --color=auto --group-directories-first --time-style long-iso'

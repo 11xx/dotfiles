@@ -64,7 +64,7 @@ alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
-alias c="bat"
+alias c="codex"
 alias b="bat"
 #+end_src
 
