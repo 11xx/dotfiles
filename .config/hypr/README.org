@@ -1481,7 +1481,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
-                (harness-indicators)
+                (harness-status-codex)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
                 (sep)
                 (swaync_icon)
@@ -1584,25 +1584,25 @@ Only active and completed Codex turns are shown; clicking an indicator dismisses
 it without affecting the underlying thread.
 
 #+begin_src yuck :tangle (tdir "harness-status.yuck")
-(deflisten codex-spinner
+(deflisten harness-status-codex-spinner
   :initial "⠋"
   `while :; do for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏; do printf '%s\\n' "$frame"; sleep 0.08; done; done`)
 
-(deflisten harness-status-json
+(deflisten harness-status-codex-json
   :initial "{\"threads\":[]}"
   "harness-status codex --follow")
 
-(defwidget harness-indicators []
+(defwidget harness-status-codex []
   (box
-    :class "harness-indicators"
+    :class "harness-status harness-status--codex"
     :space-evenly false
-    (label :visible false :text "${codex-spinner}")
-    (for thread in {harness-status-json.threads}
+    (label :visible false :text "${harness-status-codex-spinner}")
+    (for thread in {harness-status-codex-json.threads}
       (button
-        :class "harness-indicator ${thread.state}"
-        :tooltip "${thread.harness}: ${thread.name} - ${thread.state}"
+        :class "harness-status__indicator harness-status__indicator--codex harness-status__indicator--${thread.state}"
+        :tooltip "${thread.harness}: ${thread.name} — ${thread.state}"
         :onclick "harness-status ack '${thread.id}'"
-        {thread.state == "working" ? codex-spinner : "✓"}))))
+        {thread.state == "working" ? harness-status-codex-spinner : "✓"}))))
 #+end_src
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a
@@ -1897,21 +1897,21 @@ $focused-monitor-pad: 0 0 0 3px;
   margin: 0 10px 0 0;
 }
 
-.harness-indicators {
+.harness-status {
   padding: 0 4px;
 }
 
-.harness-indicator {
+.harness-status__indicator {
   padding: 0 3px;
   background: transparent;
   border: 0;
 }
 
-.harness-indicator.working {
+.harness-status__indicator--working {
   color: $neron-yellow;
 }
 
-.harness-indicator.completed {
+.harness-status__indicator--completed {
   color: $neron-green;
 }
 

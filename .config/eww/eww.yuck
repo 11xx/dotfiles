@@ -54,7 +54,7 @@
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
-                (harness-indicators)
+                (harness-status-codex)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
                 (sep)
                 (swaync_icon)

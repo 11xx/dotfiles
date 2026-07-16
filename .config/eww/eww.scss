@@ -63,21 +63,21 @@ $focused-monitor-pad: 0 0 0 3px;
   margin: 0 10px 0 0;
 }
 
-.harness-indicators {
+.harness-status {
   padding: 0 4px;
 }
 
-.harness-indicator {
+.harness-status__indicator {
   padding: 0 3px;
   background: transparent;
   border: 0;
 }
 
-.harness-indicator.working {
+.harness-status__indicator--working {
   color: $neron-yellow;
 }
 
-.harness-indicator.completed {
+.harness-status__indicator--completed {
   color: $neron-green;
 }
 
