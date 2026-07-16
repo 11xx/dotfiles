@@ -1459,6 +1459,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :class "bar-all-modules"
                 :orientation "h"
                 (bar-left-modules)
+                (bar-middle-modules)
                 (bar-right-modules)))
 
 (defwidget bar2-all-modules []
@@ -1476,12 +1477,18 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (sep)
                 (window-title)))
 
+(defwidget bar-middle-modules []
+           (box :orientation "h"
+                :space-evenly false
+                :halign "center"
+                :class "bar-middle-modules"
+                (harness-status-codex)))
+
 (defwidget bar-right-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
-                (harness-status-codex)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
                 (sep)
                 (swaync_icon)
