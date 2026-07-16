@@ -958,6 +958,17 @@ unset __setupModulesDir
 source "$XDG_CONFIG_HOME/shell/functions"
 #+end_src
 
+** AI tools
+:PROPERTIES:
+:header-args:shell+: :tangle setup-modules/ai.sh
+:END:
+
+Keep the fast Codex shortcut explicit about both the model and reasoning effort,
+so it remains stable when the default Codex configuration changes.
+#+begin_src shell
+alias cf='codex -m gpt-5.6-sol -c model_reasoning_effort="low"'
+#+end_src
+
 ** Shell colors
 :PROPERTIES:
 :header-args:shell+: :tangle setup-modules/colors.sh
