@@ -64,7 +64,6 @@ alias e="$EDITOR"
 alias re="sudo $EDITOR"
 alias a="aria2c"
 alias f="fzf"
-alias c="codex"
 alias b="bat"
 #+end_src
 
@@ -966,6 +965,7 @@ source "$XDG_CONFIG_HOME/shell/functions"
 Keep the fast Codex shortcut explicit about both the model and reasoning effort,
 so it remains stable when the default Codex configuration changes.
 #+begin_src shell
+alias c='codex'
 alias cf='codex -m gpt-5.6-sol -c model_reasoning_effort="low"'
 #+end_src
 
