@@ -63,6 +63,24 @@ $focused-monitor-pad: 0 0 0 3px;
   margin: 0 10px 0 0;
 }
 
+.harness-indicators {
+  padding: 0 4px;
+}
+
+.harness-indicator {
+  padding: 0 3px;
+  background: transparent;
+  border: 0;
+}
+
+.harness-indicator.working {
+  color: $neron-yellow;
+}
+
+.harness-indicator.completed {
+  color: $neron-green;
+}
+
 
 
 .music-circular-progress {

@@ -1481,6 +1481,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
+                (harness-indicators)
                 (systray :orientation "h" :spacing 10 :icon-size 24)
                 (sep)
                 (swaync_icon)
@@ -1574,7 +1575,34 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           )))
 
 (include "music.yuck")
+(include "harness-status.yuck")
 (include "swaync.yuck")
+#+end_src
+
+Harness lifecycle hooks feed a process-local registry owned by Eww's listener.
+Only active and completed Codex turns are shown; clicking an indicator dismisses
+it without affecting the underlying thread.
+
+#+begin_src yuck :tangle (tdir "harness-status.yuck")
+(deflisten codex-spinner
+  :initial "⠋"
+  `while :; do for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏; do printf '%s\\n' "$frame"; sleep 0.08; done; done`)
+
+(deflisten harness-status-json
+  :initial "{\"threads\":[]}"
+  "harness-status codex --follow")
+
+(defwidget harness-indicators []
+  (box
+    :class "harness-indicators"
+    :space-evenly false
+    (label :visible false :text "${codex-spinner}")
+    (for thread in {harness-status-json.threads}
+      (button
+        :class "harness-indicator ${thread.state}"
+        :tooltip "${thread.harness}: ${thread.name} - ${thread.state}"
+        :onclick "harness-status ack '${thread.id}'"
+        {thread.state == "working" ? codex-spinner : "✓"}))))
 #+end_src
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a
@@ -1867,6 +1895,24 @@ $focused-monitor-pad: 0 0 0 3px;
 
 .time-label {
   margin: 0 10px 0 0;
+}
+
+.harness-indicators {
+  padding: 0 4px;
+}
+
+.harness-indicator {
+  padding: 0 3px;
+  background: transparent;
+  border: 0;
+}
+
+.harness-indicator.working {
+  color: $neron-yellow;
+}
+
+.harness-indicator.completed {
+  color: $neron-green;
 }
 
 
