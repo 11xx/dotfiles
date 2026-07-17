@@ -1482,7 +1482,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "center"
                 :class "bar-middle-modules"
-                (harness-status-codex)))
+                (harness-status-codex)
+                (harness-status-claude)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
@@ -1586,18 +1587,27 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 (include "swaync.yuck")
 #+end_src
 
-Harness lifecycle hooks feed a process-local registry owned by Eww's listener.
-Only active and completed Codex turns are shown; clicking an indicator dismisses
-it without affecting the underlying thread.
+Harness lifecycle hooks feed a process-local registry owned by Eww's listeners.
+Active and completed Codex and Claude turns use their native animations and
+completion marks; clicking an indicator dismisses it without affecting the
+underlying thread.
 
 #+begin_src yuck :tangle (tdir "harness-status.yuck")
 (deflisten harness-status-codex-spinner
   :initial "⠋"
   `while :; do for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏; do printf '%s\\n' "$frame"; sleep 0.08; done; done`)
 
+(deflisten harness-status-claude-spinner
+  :initial "·"
+  `while :; do for frame in · ✢ '*' ✶ ✻ ✽ ✽ ✻ ✶ '*' ✢ ·; do printf '%s\\n' "$frame"; sleep 0.12; done; done`)
+
 (deflisten harness-status-codex-json
   :initial "{\"threads\":[]}"
   "harness-status codex --follow")
+
+(deflisten harness-status-claude-json
+  :initial "{\"threads\":[]}"
+  "harness-status claude --follow")
 
 (defwidget harness-status-codex []
   (box
@@ -1610,6 +1620,18 @@ it without affecting the underlying thread.
         :tooltip "${thread.harness}: ${thread.name} — ${thread.state}"
         :onclick "harness-status ack '${thread.id}'"
         {thread.state == "working" ? harness-status-codex-spinner : "•"}))))
+
+(defwidget harness-status-claude []
+  (box
+    :class "harness-status harness-status--claude"
+    :space-evenly false
+    (label :visible false :text "${harness-status-claude-spinner}")
+    (for thread in {harness-status-claude-json.threads}
+      (button
+        :class "harness-status__indicator harness-status__indicator--claude harness-status__indicator--${thread.state}"
+        :tooltip "${thread.harness}: ${thread.name} — ${thread.state}"
+        :onclick "harness-status ack '${thread.id}'"
+        {thread.state == "working" ? harness-status-claude-spinner : "✻"}))))
 #+end_src
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a

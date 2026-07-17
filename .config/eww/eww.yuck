@@ -55,7 +55,8 @@
                 :space-evenly false
                 :halign "center"
                 :class "bar-middle-modules"
-                (harness-status-codex)))
+                (harness-status-codex)
+                (harness-status-claude)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
