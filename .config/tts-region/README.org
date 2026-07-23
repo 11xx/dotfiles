@@ -1,0 +1,42 @@
+#+TITLE: tts-region personal defaults
+#+OPTIONS: toc:2 num:nil
+#+PROPERTY: header-args :results silent
+#+PROPERTY: header-args:toml :mkdirp yes
+
+* tts-region
+:PROPERTIES:
+:header-args:toml: :tangle config.toml
+:END:
+
+The application keeps network-backed preparation opt-in for portable installs.
+This machine enables the conservative text-only Luna pass while retaining the
+exact Tesseract result beside the prepared speech text.
+
+#+begin_src toml
+[prep]
+backend = "luna"
+model = "gpt-5.6-luna"
+unwrap = true
+max_edit_ratio = 0.02
+#+end_src
+
+Retained screenshots use mathematically lossless JPEG XL.  Kokoro writes
+speech-oriented Opus directly from its PCM stream at a bitrate that leaves
+ample margin for synthetic mono narration.
+
+#+begin_src toml
+[artifacts]
+image_format = "jxl"
+audio_format = "opus"
+opus_bitrate = 32
+#+end_src
+
+The capture outline sits outside the selected pixels, accepts no input, and
+exists only while the scroll worker is collecting frames.
+
+#+begin_src toml
+[scroll]
+overlay = true
+overlay_color = "#f6c177"
+overlay_width = 4
+#+end_src
