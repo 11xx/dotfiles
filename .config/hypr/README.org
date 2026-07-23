@@ -642,7 +642,7 @@ bind_exec("SUPER + XF86AudioPlay", "playerctl play-pause")
 bind_exec("XF86AudioNext", "playerctl --player=muzaiten next")
 bind_exec("XF86AudioPrev", "playerctl --player=muzaiten previous")
 bind_exec("XF86AudioPlay", "playerctl --player=muzaiten play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop; wptoggle")
+bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")
@@ -1486,7 +1486,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :halign "center"
                 :class "bar-middle-modules"
                 (harness-status-codex)
-                (harness-status-claude)))
+                (harness-status-claude)
+                (harness-status-pi)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
@@ -1586,56 +1587,14 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           )))
 
 (include "music.yuck")
-(include "harness-status.yuck")
+(include "../../code/harness-status/eww/harness-status.yuck")
 (include "swaync.yuck")
 #+end_src
 
-Harness lifecycle hooks feed a process-local registry owned by Eww's listeners.
-Active and completed Codex and Claude turns use their native animations and
-completion marks; clicking an indicator dismisses it without affecting the
-underlying thread.
-
-#+begin_src yuck :tangle (tdir "harness-status.yuck")
-(deflisten harness-status-codex-spinner
-  :initial "⠋"
-  `while :; do for frame in ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏; do printf '%s\\n' "$frame"; sleep 0.08; done; done`)
-
-(deflisten harness-status-claude-spinner
-  :initial "·"
-  `while :; do for frame in · ✢ '*' ✶ ✻ ✽ ✽ ✻ ✶ '*' ✢ ·; do printf '%s\\n' "$frame"; sleep 0.12; done; done`)
-
-(deflisten harness-status-codex-json
-  :initial "{\"threads\":[]}"
-  "harness-status codex --follow")
-
-(deflisten harness-status-claude-json
-  :initial "{\"threads\":[]}"
-  "harness-status claude --follow")
-
-(defwidget harness-status-codex []
-  (box
-    :class "harness-status harness-status--codex"
-    :space-evenly false
-    (label :visible false :text "${harness-status-codex-spinner}")
-    (for thread in {harness-status-codex-json.threads}
-      (button
-        :class "harness-status__indicator harness-status__indicator--codex harness-status__indicator--${thread.state}"
-        :tooltip "${thread.harness}: ${thread.name} — ${thread.state}"
-        :onclick "harness-status ack '${thread.id}'"
-        {thread.state == "working" ? harness-status-codex-spinner : "•"}))))
-
-(defwidget harness-status-claude []
-  (box
-    :class "harness-status harness-status--claude"
-    :space-evenly false
-    (label :visible false :text "${harness-status-claude-spinner}")
-    (for thread in {harness-status-claude-json.threads}
-      (button
-        :class "harness-status__indicator harness-status__indicator--claude harness-status__indicator--${thread.state}"
-        :tooltip "${thread.harness}: ${thread.name} — ${thread.state}"
-        :onclick "harness-status ack '${thread.id}'"
-        {thread.state == "working" ? harness-status-claude-spinner : "✻"}))))
-#+end_src
+Harness lifecycle widgets and their listeners are imported directly from the
+=harness-status= repository checkout. The desktop config only places the
+widgets and supplies the shared working and completion colors, keeping the
+reusable module's behavior and presentation source in one place.
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a
 long-lived listener instead of spawning a one-second poller. The helper emits
@@ -1867,6 +1826,7 @@ Now, import a generic target where it is a symlink to one of the theme files.
 Based on the variables, customize the widgets:
 #+begin_src scss
 @import "swaync.scss";
+@import "../../code/harness-status/eww/harness-status.scss";
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
@@ -1927,16 +1887,6 @@ $focused-monitor-pad: 0 0 0 3px;
 
 .time-label {
   margin: 0 10px 0 0;
-}
-
-.harness-status {
-  padding: 0 4px;
-}
-
-.harness-status__indicator {
-  padding: 0 3px;
-  background: transparent;
-  border: 0;
 }
 
 .harness-status__indicator--working {

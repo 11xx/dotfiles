@@ -160,7 +160,7 @@ bind_exec("SUPER + XF86AudioPlay", "playerctl play-pause")
 bind_exec("XF86AudioNext", "playerctl --player=muzaiten next")
 bind_exec("XF86AudioPrev", "playerctl --player=muzaiten previous")
 bind_exec("XF86AudioPlay", "playerctl --player=muzaiten play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop; wptoggle")
+bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")

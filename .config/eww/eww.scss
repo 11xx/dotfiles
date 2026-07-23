@@ -1,6 +1,7 @@
 @import "colors.scss";
 
 @import "swaync.scss";
+@import "../../code/harness-status/eww/harness-status.scss";
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
@@ -61,16 +62,6 @@ $focused-monitor-pad: 0 0 0 3px;
 
 .time-label {
   margin: 0 10px 0 0;
-}
-
-.harness-status {
-  padding: 0 4px;
-}
-
-.harness-status__indicator {
-  padding: 0 3px;
-  background: transparent;
-  border: 0;
 }
 
 .harness-status__indicator--working {

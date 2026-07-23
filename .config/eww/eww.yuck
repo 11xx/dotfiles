@@ -56,7 +56,8 @@
                 :halign "center"
                 :class "bar-middle-modules"
                 (harness-status-codex)
-                (harness-status-claude)))
+                (harness-status-claude)
+                (harness-status-pi)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
@@ -156,5 +157,5 @@
           )))
 
 (include "music.yuck")
-(include "harness-status.yuck")
+(include "../../code/harness-status/eww/harness-status.yuck")
 (include "swaync.yuck")
