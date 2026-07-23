@@ -8,7 +8,6 @@ set -e
 
 # ===== Configuration =====
 typeset -r PW_VOLUME_RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
-typeset -r PW_VOLUME_CACHE_DIR="$PW_VOLUME_RUNTIME/pw-volume"
 typeset WOB_PIPE="${WOB_PIPE:-$PW_VOLUME_RUNTIME/pw-volume.wob}"
 typeset -r SWAYNC_SEND="swaync-client"
 typeset -r DUNST_MSG_ID="991042"
@@ -33,7 +32,7 @@ OPTIONS:
 SINK_IDENTIFIER:
   Can be any of:
   - Node ID number (e.g., 42)
-  - Sink name or nick (e.g., 'GameSink', 'firefox-sink', 'FiiO K5 Pro')
+  - Sink name or nick (e.g., 'GameSink', 'browser-sink', 'FiiO K5 Pro')
   - Partial name match (case-insensitive)
   - @DEFAULT_AUDIO_SINK@
   - @DEFAULT_AUDIO_SOURCE@
@@ -45,7 +44,7 @@ AMOUNT:
 EXAMPLES:
   pw-volume --list                    # Discover sink names and IDs
   pw-volume GameSink +5               # Increase GameSink by 5%
-  pw-volume -n wob firefox-sink -10   # Decrease firefox-sink by 10% with wob
+  pw-volume -n wob browser-sink -10   # Decrease Browser Sink by 10% with wob
   pw-volume --get GameSink            # Get GameSink current volume
   pw-volume GameSink --mute           # Toggle mute for GameSink
   pw-volume 'FiiO K5 Pro' +3          # Target by device nick
@@ -121,26 +120,9 @@ list_devices() {
     print "  @DEFAULT_AUDIO_SOURCE@    -> Default input device" >&2
 }
 
-# Resolve sink/source identifier to node ID
-device_cache_path() {
-    local key="${1:l}"
-    key="${key//[^[:alnum:]_.@-]/_}"
-    print -r -- "$PW_VOLUME_CACHE_DIR/$key.node"
-}
-
-pipewire_signature() {
-    local socket="$PW_VOLUME_RUNTIME/pipewire-0"
-    [[ -e "$socket" ]] || { print -r -- "missing"; return 0; }
-    stat -Lc '%i:%Y' "$socket" 2>/dev/null || print -r -- "unknown"
-}
-
-forget_device_cache() {
-    local identifier="$1"
-    [[ "$identifier" =~ ^@ || "$identifier" =~ ^[0-9]+$ ]] && return 0
-    rm -f "$(device_cache_path "$identifier")"
-}
-
-resolve_device_uncached() {
+# Resolve sink/source identifier against the current PipeWire graph. Node IDs
+# are ephemeral and may be reused while the PipeWire server remains running.
+resolve_device() {
     local identifier="$1"
 
     # Already a wpctl-compatible identifier
@@ -171,30 +153,7 @@ resolve_device_uncached() {
         return 1
     fi
 
-    mkdir -p "$PW_VOLUME_CACHE_DIR"
-    print -r -- "$node_id $(pipewire_signature)" > "$(device_cache_path "$identifier")"
     print "$node_id"
-}
-
-resolve_device() {
-    local identifier="$1"
-    local cache node_id signature
-
-    [[ "$identifier" =~ ^@ || "$identifier" =~ ^[0-9]+$ ]] && {
-        resolve_device_uncached "$identifier"
-        return
-    }
-
-    cache="$(device_cache_path "$identifier")"
-    if [[ -r "$cache" ]]; then
-        read -r node_id signature < "$cache"
-        if [[ "$node_id" =~ ^[0-9]+$ && "$signature" == "$(pipewire_signature)" ]]; then
-            print "$node_id"
-            return 0
-        fi
-    fi
-
-    resolve_device_uncached "$identifier"
 }
 
 # Get current volume (0-100) - NO external dependencies
@@ -435,8 +394,7 @@ case "$operation" in
         fi
 
         if ! set_volume "$device_id" "$1"; then
-            forget_device_cache "$device_identifier"
-            device_id=$(resolve_device_uncached "$device_identifier") || exit 1
+            device_id=$(resolve_device "$device_identifier") || exit 1
             set_volume "$device_id" "$1" || exit 1
         fi
         local vol
