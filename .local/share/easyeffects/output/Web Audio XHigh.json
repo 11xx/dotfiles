@@ -2,7 +2,7 @@
   "output": {
     "blocklist": [],
     "compressor#0": {
-      "attack": 3.0,
+      "attack": 1.5,
       "boost-amount": 6.0,
       "boost-threshold": -72.0,
       "bypass": false,
@@ -12,19 +12,19 @@
       "input-gain": 0.0,
       "input-to-link": -80.01,
       "input-to-sidechain": -80.01,
-      "knee": -16.0,
+      "knee": -18.0,
       "link-to-input": -80.01,
       "link-to-sidechain": -80.01,
       "lpf-frequency": 20000.0,
       "lpf-mode": "Off",
-      "makeup": 12.61,
+      "makeup": 19.51,
       "mode": "Downward",
       "output-gain": 0.0,
-      "ratio": 20.0,
-      "release": 250.0,
+      "ratio": 40.0,
+      "release": 400.0,
       "release-threshold": -80.01,
       "sidechain": {
-        "lookahead": 0.0,
+        "lookahead": 2.0,
         "mode": "Peak",
         "preamp": 0.0,
         "reactivity": 10.0,
@@ -35,7 +35,7 @@
       "sidechain-to-input": -80.01,
       "sidechain-to-link": -80.01,
       "stereo-split": false,
-      "threshold": -34.0,
+      "threshold": -40.0,
       "wet": 0.0
     },
     "plugins_order": [

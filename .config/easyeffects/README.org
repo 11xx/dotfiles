@@ -9,10 +9,11 @@ numeric copy does not preserve its response: LSP applies substantially more
 gain reduction at the same nominal threshold.
 
 Firefox's Web Audio implementation also applies 18.63 dB of implicit makeup
-gain for this curve.  Keeping that gain is what raises quiet passages while
-compression holds loud passages near the same listening level.  The peak
-detector follows the browser behavior, and the maximum of both channels keeps
-stereo linking independent of channel correlation.
+gain for this curve.  The system-wide default deliberately uses half that
+linear gain, 12.61 dB, which lowers the complete response and its loud-end
+target by 6.02 dB.  The peak detector follows the browser behavior, and the
+maximum of both channels keeps stereo linking independent of channel
+correlation.
 
 An offline steady-signal sweep from -80 through 0 dBFS maps the audible Web
 Audio curve to an LSP threshold of -34 dB and a -16 dB knee.  This calibrated
@@ -40,7 +41,7 @@ produced by copying the displayed threshold directly.
       "link-to-sidechain": -80.01,
       "lpf-frequency": 20000.0,
       "lpf-mode": "Off",
-      "makeup": 18.63,
+      "makeup": 12.61,
       "mode": "Downward",
       "output-gain": 0.0,
       "ratio": 20.0,
@@ -68,18 +69,77 @@ produced by copying the displayed threshold directly.
 }
 #+end_src
 
+* XHigh compressor
+
+The secondary profile starts reducing gain earlier and approaches the same
+-19.35 dBFS loud-end target more tightly.  A 40:1 ratio, faster attack, longer
+release, and a small lookahead suppress sudden peaks while avoiding rapid
+level recovery between words.  Its larger makeup value compensates for the
+additional reduction: it raises quiet material more strongly without raising
+the measured maximum above the default profile.
+
+#+begin_src json :tangle (expand-file-name "easyeffects/output/Web Audio XHigh.json" (xdg-data-home))
+{
+  "output": {
+    "blocklist": [],
+    "compressor#0": {
+      "attack": 1.5,
+      "boost-amount": 6.0,
+      "boost-threshold": -72.0,
+      "bypass": false,
+      "dry": -80.01,
+      "hpf-frequency": 10.0,
+      "hpf-mode": "Off",
+      "input-gain": 0.0,
+      "input-to-link": -80.01,
+      "input-to-sidechain": -80.01,
+      "knee": -18.0,
+      "link-to-input": -80.01,
+      "link-to-sidechain": -80.01,
+      "lpf-frequency": 20000.0,
+      "lpf-mode": "Off",
+      "makeup": 19.51,
+      "mode": "Downward",
+      "output-gain": 0.0,
+      "ratio": 40.0,
+      "release": 400.0,
+      "release-threshold": -80.01,
+      "sidechain": {
+        "lookahead": 2.0,
+        "mode": "Peak",
+        "preamp": 0.0,
+        "reactivity": 10.0,
+        "source": "Max",
+        "stereo-split-source": "Left/Right",
+        "type": "Feed-forward"
+      },
+      "sidechain-to-input": -80.01,
+      "sidechain-to-link": -80.01,
+      "stereo-split": false,
+      "threshold": -40.0,
+      "wet": 0.0
+    },
+    "plugins_order": [
+      "compressor#0"
+    ]
+  }
+}
+#+end_src
+
 * Toggle command
 
 =audio-compressor= treats the Web Audio preset as one feature rather than
 blindly toggling whatever Easy Effects happens to be doing.  Calling it with
-no argument turns the compressor off only when this preset is already active;
-otherwise it loads and enables the preset.  Explicit =on=, =off=, and =status=
-commands are also available for scripts and status bars.
+no argument turns either compressor off when active and otherwise loads the
+default profile.  The =high= and =xhigh= commands select and enable a profile
+directly; =default= and =on= remain aliases for =high=.  Explicit
+=off= and =status= commands are also available for scripts and status bars.
 
 #+begin_src shell :tangle (expand-file-name "audio-compressor" (xdg-bin-home)) :shebang #!/usr/bin/env sh :tangle-mode o755
 set -eu
 
-preset='Web Audio High'
+high_preset='Web Audio High'
+xhigh_preset='Web Audio XHigh'
 service='easyeffects.service'
 runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 socket="${runtime_dir}/EasyEffectsServer"
@@ -111,11 +171,17 @@ start_server() {
     wait_for_server
 }
 
-enable_compressor() {
+enable_profile() {
     start_server
+    profile=$1
+    case "$profile" in
+        high) preset=$high_preset ;;
+        xhigh) preset=$xhigh_preset ;;
+        *) return 64 ;;
+    esac
     easyeffects --load-preset "$preset"
     easyeffects --bypass 2
-    notify enabled
+    notify "enabled (${profile})"
 }
 
 disable_compressor() {
@@ -126,36 +192,43 @@ disable_compressor() {
     notify disabled
 }
 
-compressor_is_enabled() {
+active_profile() {
     systemctl --user is-active --quiet "$service" || return 1
     wait_for_server
-    [ "$(easyeffects --last-loaded-preset output)" = "$preset" ] &&
-        [ "$(easyeffects --bypass 3)" = 2 ]
+    [ "$(easyeffects --bypass 3)" = 2 ] || return 1
+    case "$(easyeffects --last-loaded-preset output)" in
+        "$high_preset") printf 'high\n' ;;
+        "$xhigh_preset") printf 'xhigh\n' ;;
+        *) return 1 ;;
+    esac
 }
 
 case "${1:-toggle}" in
     toggle)
-        if compressor_is_enabled; then
+        if active_profile >/dev/null; then
             disable_compressor
         else
-            enable_compressor
+            enable_profile high
         fi
         ;;
-    on)
-        enable_compressor
+    on|default|high)
+        enable_profile high
+        ;;
+    xhigh)
+        enable_profile xhigh
         ;;
     off)
         disable_compressor
         ;;
     status)
-        if compressor_is_enabled; then
-            printf 'on\n'
+        if profile=$(active_profile); then
+            printf '%s\n' "$profile"
         else
             printf 'off\n'
         fi
         ;;
     *)
-        printf 'usage: audio-compressor [toggle|on|off|status]\n' >&2
+        printf 'usage: audio-compressor [toggle|on|default|high|xhigh|off|status]\n' >&2
         exit 64
         ;;
 esac
