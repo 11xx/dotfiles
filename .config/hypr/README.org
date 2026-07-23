@@ -573,6 +573,8 @@ keymap_exec("M-print", "screenshot-jxl --lossy")
 keymap_exec("s-M-print", "shotdrag")
 keymap_exec("s-print d", "shotdrag")
 keymap_exec("s-print w", "screenshot-jxl --window")
+keymap_exec("s-print t t", "tts-region single")
+keymap_exec("s-print t s", "tts-region scroll")
 
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
