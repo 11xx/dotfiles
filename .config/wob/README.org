@@ -44,9 +44,9 @@ bar_color = ff0000ff
 background_color = 11111100
 #+end_src
 
-** wob-firefox-sink.ini
+** wob-browser-sink.ini
 :PROPERTIES:
-:header-args:conf: :tangle wob-firefox-sink.ini
+:header-args:conf: :tangle wob-browser-sink.ini
 :END:
 
 #+begin_src conf
@@ -205,7 +205,7 @@ setsid -f wob-instance "$wobPipe" "$wobConfig"
 :header-args:shell: :tangle (tdir "wob-volume-pw-extras") :shebang #!/usr/bin/env zsh
 :END:
 
-The per-sink bars (firefox-sink, game-sink), also started once at login. Each
+The per-sink bars (browser-sink, game-sink), also started once at login. Each
 gets its own pipe under =$XDG_RUNTIME_DIR= and its own config, matching the
 =WOB_PIPE== paths the volume keybinds export. Add a sink by dropping in a
 =wob-<name>-sink.ini= and one more line here.
@@ -213,6 +213,6 @@ gets its own pipe under =$XDG_RUNTIME_DIR= and its own config, matching the
 #+begin_src shell
 wobRuntime="${XDG_RUNTIME_DIR:-/tmp}"
 wobConfigDir="${XDG_CONFIG_HOME:-$HOME/.config}/wob"
-setsid -f wob-instance "$wobRuntime/wob-firefox-sink.pipe" "$wobConfigDir/wob-firefox-sink.ini"
+setsid -f wob-instance "$wobRuntime/wob-browser-sink.pipe" "$wobConfigDir/wob-browser-sink.ini"
 setsid -f wob-instance "$wobRuntime/wob-game-sink.pipe"    "$wobConfigDir/wob-game-sink.ini"
 #+end_src

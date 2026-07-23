@@ -650,8 +650,9 @@ bind_exec("XF86AudioRaiseVolume", "pw-volume @DEFAULT_AUDIO_SINK@ 3+", { repeati
 
 keymap_exec("s-M-XF86AudioLowerVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5-", { repeating = true })
 keymap_exec("s-M-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-game-sink.pipe pw-volume gamesink 5+", { repeating = true })
-keymap_exec("s-XF86AudioLowerVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5-", { repeating = true })
-keymap_exec("s-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-firefox-sink.pipe pw-volume firefox-sink 5+", { repeating = true })
+keymap_exec("s-XF86AudioLowerVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-browser-sink.pipe pw-volume browser-sink 5-", { repeating = true })
+keymap_exec("s-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-browser-sink.pipe pw-volume browser-sink 5+", { repeating = true })
+keymap_exec("s-M-C-XF86AudioRaiseVolume", "audio-compressor")
 #+end_src
 
 ** Theming
