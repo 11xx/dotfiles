@@ -24,6 +24,9 @@ PropagatesStopTo=graphical-session.target
 ** xremap
 #+INCLUDE: "../xremap/README.org::#systemd-user-service" :only-contents t
 
+** Easy Effects
+#+INCLUDE: "../easyeffects/README.org::#systemd-user-service" :only-contents t
+
 ** AI window ping timers
 These timers send tiny real prompts to Codex and Claude so each provider's
 five-hour subscription window is started before an interactive session needs
