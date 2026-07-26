@@ -934,3 +934,666 @@ else
     enable_darkman
 fi
 #+end_src
+
+* launch: Open files by extension and MIME type
+:PROPERTIES:
+:header-args:shell: :tangle launch :shebang #!/usr/bin/env sh
+:END:
+# [2026-07-26 Sun] @ak moved to .local/bin/README
+
+=launch= is the opener that =xdg-open= delegates to. It picks a program for
+each file, and for the programs that render into a terminal it also picks the
+window geometry, which is the part a plain MIME association cannot express.
+
+Dispatch happens in two passes. The first matches the lowercased file
+extension, so that formats sharing a MIME type can still reach different
+programs. Anything the extension pass does not claim falls through to a second
+pass over the MIME type reported by =file=, which ends in a catch-all that
+reports the unmatched extension and MIME type instead of failing silently.
+
+Every handler ends with =exit 0=, because both =case= statements run in
+sequence; a handler that returned normally would be re-dispatched by the MIME
+pass.
+
+- DEPENDENCIES
+  + =file=: MIME type detection
+  + =bat=: text rendering
+  + [[#terminal][=terminal=]]: floating terminal windows for text output
+  + [[#image-viewer][=image-viewer=]]: image display
+  + =mpv=, =zathura=, =inkview=, =firefox=, =dolphin=: viewers
+  + =bsdtar=, =7z=: archive listings
+  + =notify-send=: failure reporting
+
+** Window placement
+
+Floating is requested by embedding the string =FLOAT_WMRULE= in the window
+title or class. The compositor matches it and floats the window, which lets
+=launch= mark a window without the compositor needing a rule per program. The
+Hyprland side of the contract lives in =window-rules.lua=:
+
+#+begin_src lua :tangle no
+window_rule({ title = "^.*(floatWMRULE|FLOAT_WMRULE)$" },
+            { float = true, size = { "70%", "70%" } })
+window_rule({ class = "^.*(floatWMRULE|FLOAT_WMRULE)$" }, { float = true })
+#+end_src
+
+The two rules differ deliberately. Programs marked by *title* are media
+viewers with no useful size of their own, so the compositor gives them one.
+Programs marked by *class* are terminals launched by [[#terminal][=terminal=]], which have
+already been given an exact column and row count, so a size rule there would
+overwrite the measurement it just made.
+
+Both sites have to agree on the literal string; changing it in one place alone
+silently stops the floating.
+
+** Options and dispatch setup
+
+=--no-window= keeps output in the calling terminal, and =--script= additionally
+suppresses the pager so output can be piped.
+
+#+begin_src shell
+show_help() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]... FILE...
+
+Options:
+-nw, --no-window   Reuse the calling terminal for output instead of opening a
+                     new window. Fails for types that require a GUI.
+-x,  --script      Like --no-window, and also avoids interactive output such
+                     as a pager, so the result can be piped.
+--                 End of all options.
+-h,  --help        Display this help and exit.
+-v,  --verbose     Verbose mode. Enables the shell built-in 'set -x'.
+EOF
+}
+
+unset scriptMode noWindow
+
+while :; do
+    case $1 in
+        (-v|--verbose) set -x ;;
+        (-h|--help) show_help; exit 0 ;;
+        (-nw|--no-window) noWindow=t ;;
+        (-x|--script) noWindow=t; scriptMode=t ;;
+        (--) shift; break ;;
+        (-?*)
+            printf 'ERROR: Unrecognized option "%s". Aborting...\n\n' "$1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        (*) break
+    esac
+    shift
+done
+
+[ "$#" -gt 0 ] || { show_help >&2; exit 1; }
+
+mimeType=$(file -bL --mime-type -- "$1")
+ext=$(printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]')
+ext2=$(printf '%s\n' "$ext" | sed -E 's/(.*)(\.[^.]*)(\.[^.]*)$/\2\3/; s/^\.//')
+ext=${ext##*.}
+
+floatWc=FLOAT_WMRULE
+
+Color_Off='\033[0m'
+BRed='\033[1;31m'
+#+end_src
+
+** Temporary files
+
+Handlers that have to materialise their output before rendering it share one
+temporary file. The name carries the PID so concurrent invocations cannot
+delete each other's work, and it lives under =$XDG_RUNTIME_DIR=, which is a
+per-user tmpfs rather than the shared, periodically swept =/tmp=.
+
+#+begin_src shell
+tmpPrefix="${XDG_RUNTIME_DIR:-/tmp}/launch-$$"
+
+make_tmp() {
+    tmp=$(mktemp "$tmpPrefix.XXXXXXXXX")
+    trap 'rm -f "$tmpPrefix".*' 0 2 3 6
+}
+
+repeat_char() {
+    seq "${2:-20}" | while read -r _; do printf '%s' "${1:-=}"; done; printf '\n'
+}
+#+end_src
+
+** Media handlers
+
+Window size is the compositor's decision, not this script's. Every window
+marked by title gets sized by a single Hyprland rule, which is why no handler
+here computes geometry or asks what the screen resolution is.
+
+The =mpv= title carries the float marker through mpv's own title template, so
+the marker survives mpv rewriting its title as the file changes. mpv is the one
+program here that cannot be marked any other way: it offers no way to set its
+own =app_id= under Wayland.
+
+=mpv= and =jq= are wrapped as functions rather than aliases. =/bin/sh= is bash
+on this system, and bash does not expand aliases in non-interactive shells, so
+an alias here would be silently ignored. =command= inside each wrapper reaches
+the real binary instead of recursing.
+
+#+begin_src shell
+mpvTitleFlag=--title='${?media-title:${media-title}}${!media-title:No file} - mpv '"${floatWc}"
+
+mpv() { command mpv --player-operation-mode=pseudo-gui "$@"; }
+
+if command -v jaq >/dev/null 2>&1; then
+    jq() { command jaq "$@"; }
+fi
+
+audio() {
+    mpv "$@"
+    exit 0
+}
+
+images() {
+    image-viewer "$@"
+    exit 0
+}
+
+svg() {
+    unset title
+    [ $# -gt 1 ] && title="SVG View"
+    title=${title:-$1}
+    inkview --name "$title | org.inkscape.Inkscape" "$@"
+    exit 0
+}
+
+pdf() {
+    zathura "$@"
+    exit 0
+}
+
+browser() {
+    firefox "$@"
+    exit 0
+}
+
+fm() {
+    dolphin --qwindowtitle 'Dolphin (launch script)'"${floatWc}" "$@"
+    exit 0
+}
+
+video() {
+    mpv "${mpvTitleFlag}" "$@"
+    exit 0
+}
+
+gif() {
+    mpv --loop=10 "${mpvTitleFlag}" "$@"
+    exit 0
+}
+#+end_src
+
+** Text handler
+
+The window is sized to the content. =bat= is measured against the longest of
+the first 500 lines: narrow files get the default 120 columns, wider ones grow
+to fit, and anything past the maximum is capped so the window still fits on
+screen. The height for the middle case is derived from the width, which keeps
+wide-and-short output from opening a tall, mostly empty window.
+
+=--style= differs between one file and several, because the grid separators
+are what makes a multi-file listing readable.
+
+#+begin_src shell
+text() {
+    while :; do
+        case "$1" in
+            (-l)
+                [ -n "$2" ] || {
+                    printf 'ERROR: "%s" cannot be empty.\n' "$1" >&2; exit 1; }
+                case "$2" in
+                    (json) usingTmp=t; isJq=t; batLang="-l json" ;;
+                    (pts|picard) batLang="-l pts" ;;
+                esac
+                shift
+                ;;
+            (-s|--style)
+                [ -n "$2" ] || {
+                    printf 'ERROR: "%s" cannot be empty.\n' "$1" >&2; exit 1; }
+                case "$2" in
+                    (h|header) batStyle=header ;;
+                    (g|grid) batStyle=grid ;;
+                    (hg|header-grid) batStyle=header,grid ;;
+                    (*) batStyle="$2" ;;
+                esac
+                shift
+                ;;
+            (*) break
+        esac
+        shift
+    done
+
+    maxTermCols=220
+    maxTermLines=60
+    defTermCols=120
+    defTermLines=30
+
+    if [ "$usingTmp" = t ]; then
+        make_tmp
+        [ "$isJq" = t ] && jq '.' "$@" > "$tmp"
+        set -- "$tmp"
+    fi
+
+    len=$(head -500 "$@" | wc -L)
+
+    batPagingOpt=--paging=${scriptMode:+never}
+    batPagingOpt=${scriptMode:+$batPagingOpt}
+    batPagingOpt=${batPagingOpt:---paging=always}
+
+    if [ "$#" -gt 1 ]; then
+        batCmd="bat $batLang --style=${batStyle:-header,grid} $batPagingOpt"
+    else
+        batCmd="bat $batLang --style=${batStyle:-header} $batPagingOpt"
+    fi
+
+    if [ -n "$scriptMode" ] || [ -n "$noWindow" ]; then
+        $batCmd "$@"
+        exit 0
+    fi
+
+    if [ "$len" -lt $((defTermCols - 1)) ]; then
+        termW=$defTermCols; termH=$defTermLines
+    elif [ "$len" -lt $((maxTermCols - 1)) ]; then
+        termW=$((len + 1)); termH=$((len / 4))
+    else
+        termW=$maxTermCols; termH=$maxTermLines
+    fi
+
+    terminal --float -w "$termW" -h "$termH" "$batCmd" "$@"
+    exit 0
+}
+#+end_src
+
+** Archive handler
+
+Archives are listed, never extracted; extraction is =xtodir='s job. Several
+archives are concatenated into one buffer separated by a rule as wide as the
+widest line, so the result reads as a single grid rather than as unrelated
+listings.
+
+Listing goes through =bsdtar= first, since libarchive reads tar, zip, 7z, rar,
+iso and cpio through one interface. =7z= covers the remainder, and a failure of
+both is reported per file rather than aborting the whole listing.
+
+#+begin_src shell
+list_archive() {
+    bsdtar --list --file "$1" 2>/dev/null ||
+        7z l -- "$1" 2>/dev/null ||
+        printf 'Cannot list this archive.\n'
+}
+
+archive() {
+    make_tmp
+    if [ "$#" -gt 1 ]; then
+        for file in "$@"; do
+            printf 'File: %s\n%s\nGRIDMARKER\n\n' \
+                   "$file" "$(list_archive "$file")"
+        done > "$tmp"
+        wcL=$(head -500 "$tmp" | wc -L)
+        sed -i "s/GRIDMARKER/$(repeat_char "─" "$wcL")/g" "$tmp"
+        text --style grid "$tmp"
+    else
+        list_archive "$1" > "$tmp"
+        text --style plain "$tmp"
+    fi
+}
+#+end_src
+
+** Extension dispatch
+
+Matching on extension first lets formats that share a MIME type reach separate
+programs, and lets partially downloaded files be recognised by their real
+format. There is deliberately no catch-all here: unmatched extensions fall
+through to the MIME pass below.
+
+#+begin_src shell
+case "$ext" in
+    (part)
+        case "$ext2" in
+            (mp4.part) video "$@" ;;
+        esac
+        ;;
+    (ts|rmvb|m2ts|mp4) video "$@" ;;
+    (svg) svg "$@" ;;
+    (png|jpg|jpeg) images "$@" ;;
+    (par2) terminal --float --hold 'par2 verify' "$@"; exit 0 ;;
+    (txt|url) text "$@" ;;
+    (html|htm) browser "$@" ;;
+    (json) text -l json "$@" ;;
+    (pts|picard) text -l pts "$@" ;;
+    (msg) text -l msg "$@" ;;
+    (a|ace|alz|arc|arj|bz|bz2|cab|cpio|deb|gz|jar|lha|lz|lzh|lzma|lzo|rpm|rz|\
+     t7z|tar|tbz|tbz2|tgz|tlz|txz|tZ|tzo|war|xpi|xz|Z|zip|zst|vsix)
+        archive "$@" ;;
+    (pdf|epub) pdf "$@" ;;
+    (sfv) terminal --float --hold 'cksfv -f' "$@"; exit 0 ;;
+esac
+#+end_src
+
+** MIME dispatch
+
+The catch-all reports both the extension and the MIME type, since knowing
+which of the two failed to match is what makes the message actionable.
+
+#+begin_src shell
+case "$mimeType" in
+    (video/*) video "$@" ;;
+    (audio/*) audio "$@" ;;
+    (image/gif) gif "$@" ;;
+    (image/*) images "$@" ;;
+    (application/pdf|application/postscript|application/epub*) pdf "$@" ;;
+    (text/*) text "$@" ;;
+    (message/news) text -l msg "$@" ;;
+    (application/json) text -l json "$@" ;;
+    (application/zip|application/x-rar|application/x-7z-compressed|\
+     application/x-xz|application/x-bzip2|application/x-gzip|\
+     application/x-tar)
+        archive "$@" ;;
+    (application/x-mswinurl) text "$@" ;;
+    (inode/directory|application/x-directory) fm "$@" ;;
+    (*)
+        couldntStr="Couldn't find a matching program."
+        thereWasntStr="There was no program specified to handle:"
+        extMimeStr="Extension: $ext | MIME type: $mimeType"
+
+        printf '%bERROR:%b %s\n%s\n%s\n' \
+               "$BRed" "$Color_Off" \
+               "$couldntStr" "$thereWasntStr" "$extMimeStr" >&2
+        notify-send -t 10000 -a launch "$couldntStr" \
+                    "$thereWasntStr
+$extMimeStr"
+        exit 1
+        ;;
+esac
+#+end_src
+
+** launch.desktop
+:PROPERTIES:
+:header-args:conf-desktop: :tangle ~/.local/share/applications/launch.desktop :tangle-mode (identity #o644) :mkdirp yes
+:END:
+
+The desktop entry is what makes =launch= reachable from =xdg-open= and from
+any program that opens files through the XDG portal. Associations that should
+route here are listed in =mimeapps.list= against =launch.desktop=.
+
+#+begin_src conf-desktop
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Type=Application
+Terminal=false
+Exec=launch %F
+Name=Custom launch script
+#+end_src
+
+* image-viewer: Open images in the selected viewer
+:PROPERTIES:
+:CUSTOM_ID: image-viewer
+:header-args:shell: :tangle image-viewer :shebang #!/usr/bin/env sh
+:END:
+
+A single entry point for displaying images, so that swapping viewers is one
+command rather than an edit to [[#launch][=launch=]]. The choice persists in
+=$XDG_STATE_HOME/image-viewer= and =--toggle= flips it.
+
+=qimgv= is the default. It decodes through a parallel-capable Qt plugin and
+preloads neighbouring files, which is what makes stepping through a folder feel
+immediate. It needs the =kimageformats= package for JPEG XL, AVIF and HEIF.
+
+=qimgv= is started under XWayland. Its native Wayland backend scales
+fit-to-window by half, leaving the image at a quarter of its correct area in
+the middle of the window; the same image under =xcb= fills the window exactly.
+A default configuration reproduces the fault and enabling OpenGL does not
+change it, so the platform override is the fix itself rather than a workaround
+for local settings. The cost is that XWayland does not do fractional scaling,
+so qimgv is slightly soft on an output whose scale is not 1.
+
+=imv= is the alternative: Wayland-native, decoding JPEG XL through =libjxl=
+with no optional plugin, and setting its own =app_id= so the compositor can
+float it by class rather than by a marker smuggled through the window title.
+
+Its weakness is speed on large files. It gives =libjxl= no parallel runner and
+does not preload the next image, so a 10-megapixel screenshot costs roughly two
+seconds against a quarter of that decoded in parallel, and holding a navigation
+key pins a core. Neither behaviour is configurable, which makes it the wrong
+choice for folders of large images and a fine one for ordinary photographs.
+
+*** qimgv settings this relies on
+
+qimgv rewrites its own configuration when it exits, so the file is owned by the
+program rather than tangled from here. These are the values to restore if it is
+ever reset, in =$XDG_CONFIG_HOME/qimgv/qimgv.conf=:
+
+#+begin_src conf :tangle no
+useSystemColorScheme=false
+infoBarWindowed=true
+infoBarFullscreen=true
+#+end_src
+
+=useSystemColorScheme= must be off. Left on, qimgv takes the Qt palette and
+renders the thumbnail panel on a white background and the info bar as dark text
+on a dark background, which makes the bar invisible in fullscreen. Turning it
+off makes qimgv use its own =bgColor=, =bgColorFullscreen= and
+=fullscreenInfoTextColor= values, which are already set to a dark theme.
+
+The cursor comes from a third place again. Under XWayland with
+=QT_QPA_PLATFORMTHEME=kde=, Qt takes the cursor theme from KDE's =kcminputrc=
+rather than from =$XCURSOR_THEME=, and falls back to Breeze when that file does
+not name one. =~/.config/kcminputrc= therefore has to agree with the cursor
+theme set in =hypr/theme.lua=.
+
+imv only opens the paths it is handed. Passing a lone file would therefore give
+a gallery of exactly one image, with nothing for =j= and =k= to move through.
+Opening the *containing directory* and preselecting the file with =-n= is what
+makes navigation walk the whole folder, which is the behaviour qimgv has by
+default.
+
+- DEPENDENCIES
+  + =imv= or =qimgv=
+  + =notify-send=: toggle feedback
+
+#+begin_src shell
+show_help() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]... [FILE|DIRECTORY]...
+
+Opens images in the currently selected viewer.
+
+Options:
+--toggle        Switch to the other viewer and report the new selection.
+--set VIEWER    Select a viewer by name: imv or qimgv.
+--status        Print the currently selected viewer and exit.
+-h, --help      Display this help and exit.
+EOF
+}
+
+stateFile="${XDG_STATE_HOME:-$HOME/.local/state}/image-viewer"
+defaultViewer=qimgv
+floatWc=FLOAT_WMRULE
+imvAppId=imv-float
+
+viewer=$(cat "$stateFile" 2>/dev/null)
+case "$viewer" in
+    (imv|qimgv) ;;
+    (*) viewer=$defaultViewer ;;
+esac
+
+set_viewer() {
+    mkdir -p "${stateFile%/*}"
+    printf '%s\n' "$1" > "$stateFile"
+    printf '%s\n' "$1"
+}
+
+case "$1" in
+    (-h|--help) show_help; exit 0 ;;
+    (--status) printf '%s\n' "$viewer"; exit 0 ;;
+    (--toggle)
+        if [ "$viewer" = imv ]; then viewer=qimgv; else viewer=imv; fi
+        set_viewer "$viewer"
+        notify-send -t 2000 -a image-viewer 'Image viewer' "Now using $viewer"
+        exit 0
+        ;;
+    (--set)
+        case "$2" in
+            (imv|qimgv) set_viewer "$2"; exit 0 ;;
+            (*)
+                printf '%s: unknown viewer "%s"\n' "${0##*/}" "$2" >&2
+                exit 1
+                ;;
+        esac
+        ;;
+esac
+
+[ "$#" -gt 0 ] || { show_help >&2; exit 1; }
+
+case "$viewer" in
+    (imv)
+        if [ "$#" -eq 1 ] && [ -f "$1" ]; then
+            exec imv -i "$imvAppId" -n "$1" "$(dirname -- "$1")"
+        fi
+        exec imv -i "$imvAppId" "$@"
+        ;;
+    (qimgv)
+        exec env QT_QPA_PLATFORM=xcb qimgv --qwindowtitle "$floatWc" "$@"
+        ;;
+esac
+#+end_src
+
+* terminal: Run a command in a terminal window
+:PROPERTIES:
+:CUSTOM_ID: terminal
+:header-args:shell: :tangle terminal :shebang #!/usr/bin/env sh
+:END:
+# [2026-07-26 Sun] @ak moved to .local/bin/README
+
+=terminal= wraps Alacritty so that callers can request a sized, optionally
+floating window without repeating the option syntax. [[#launch][=launch=]] uses it for every
+file type it renders with a terminal program.
+
+Because a command and its flags have to survive being passed through a
+positional parameter, the command is quoted as a single argument and the
+remaining arguments follow it:
+
+#+begin_src shell :tangle no
+terminal --float -w 100 -h 40 'bat --style=header' file.txt
+#+end_src
+
+=--float= sets the window class to =FLOAT_WMRULE=, which is the same marker
+[[#launch][=launch=]] uses and which =window-rules.lua= matches on. An explicit =--class=
+overrides it.
+
+- DEPENDENCIES
+  + =alacritty=
+
+#+begin_src shell
+set -e
+
+show_help() {
+    cat << EOF
+Usage: ${0##*/} COMMAND [ARGUMENTS]
+
+NOTE: If COMMAND requires flags, pass them as one argument, such as:
+   ${0##*/} --float 'cmd -f file -v' arg1 arg2 arg3
+
+Options:
+--float                 Set the window class to FLOAT_WMRULE so the compositor
+                          floats the window.
+--class                 Set the window class to this argument instead.
+-t, --title             Set the window title to this argument.
+-w                      Window width in terminal cells. Defaults to 120.
+-h                      Window height in terminal cells. Defaults to 30.
+--hold                  Keep the window open after COMMAND finishes.
+-s                      Run COMMAND through 'sh -c'.
+-p, -np, --no-padding   Load the Alacritty configuration without padding.
+--help                  Display this help and exit.
+-v, --verbose           Verbose mode. Enables the shell built-in 'set -x'.
+--                      End of all options.
+EOF
+}
+
+unset float class title h w spawn hold noPadding
+
+while :; do
+    case "$1" in
+        (--help) show_help; exit 0 ;;
+        (-v) set -x ;;
+        (--float) float=t ;;
+        (--class) [ -n "$2" ] && class=--class="$2"; shift ;;
+        (-t|--title) [ -n "$2" ] && title=--title="$2"; shift ;;
+        (-w) [ -n "$2" ] && w="$2"; shift ;;
+        (-h) [ -n "$2" ] && h="$2"; shift ;;
+        (-s) spawn=t ;;
+        (--hold) hold=--hold ;;
+        (-p|-np|--no-padding)
+            noPadding="--config-file ${XDG_CONFIG_HOME:-$HOME/.config}/alacritty/alacritty-no-padding.toml"
+            ;;
+        (--) shift; break ;;
+        (*) break
+    esac
+    shift
+done
+
+floatWMRULE=FLOAT_WMRULE
+title=${title:---title=Terminal}
+if [ "$float" = t ]; then
+    class=${class:---class=${floatWMRULE}}
+else
+    class=${class:---class=Terminal}
+fi
+#+end_src
+
+Explicit dimensions are only sent for floating windows. A tiled window is sized
+by the compositor, so forcing a cell count there would fight the layout instead
+of the terminal's own defaults.
+
+#+begin_src shell
+unset dimensions
+if [ "$float" = t ]; then
+    dimensions="--option window.dimensions.columns=${w:-120} window.dimensions.lines=${h:-30}"
+fi
+
+if [ "$spawn" = t ]; then
+    alacritty "${class}" "${title}" $dimensions $hold $noPadding --command sh -c "$@"
+else
+    cmd="$1" && shift
+    alacritty "${class}" "${title}" $dimensions $hold $noPadding --command $cmd "$@"
+fi
+#+end_src
+
+* xwcheck: Report the session's display protocol
+:PROPERTIES:
+:CUSTOM_ID: xwcheck
+:header-args:shell: :tangle xwcheck :shebang #!/usr/bin/env sh
+:END:
+# [2026-07-26 Sun] @ak moved to .local/bin/README
+
+Prints =Wayland=, =X11=, or =TTY= for the current session.
+
+=$WAYLAND_DISPLAY= is checked first because XWayland sets =$DISPLAY= as well,
+so a session that sets both is a Wayland session running an X11 compatibility
+layer. Only when =$DISPLAY= is set on its own is the session really X11.
+
+=loginctl show-session self -p Type= is the more official answer, but it
+reports the wrong type when the session was started from a system-wide systemd
+unit rather than a display manager, so the environment variables are the more
+reliable signal here.
+
+#+begin_src shell
+p_exit() {
+    printf '%s\n' "$@"
+    exit
+}
+
+[ -n "$WAYLAND_DISPLAY" ] &&
+    p_exit Wayland
+
+[ -n "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] &&
+    p_exit X11
+
+p_exit TTY
+#+end_src
