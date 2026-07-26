@@ -17,6 +17,16 @@ exec_once("gsettings set org.gnome.desktop.interface cursor-size " .. XCursorSiz
 hl.env("XCURSOR_THEME", XCursorTheme)
 hl.env("XCURSOR_SIZE", tostring(XCursorSize))
 
+-- Qt's xcb backend ignores $XCURSOR_THEME. With no XSettings daemon running it
+-- falls back to the theme literally named "default", so every XWayland Qt app
+-- follows whatever that points at. Appearance tools write it too -- nwg-look
+-- to $XDG_DATA_HOME/icons, lxqt-config-appearance to ~/.icons -- and the two
+-- had drifted apart, leaving XWayland on Breeze while native clients used the
+-- hyprcursor above. Re-asserting it on launch keeps one source of truth.
+exec_once("d=${XDG_DATA_HOME:-$HOME/.local/share}/icons/default; mkdir -p $d; "
+              .. "printf '[Icon Theme]\\nName=Default\\nInherits="
+              .. XCursorTheme .. "\\n' > $d/index.theme")
+
 hl.config({
     cursor = {
         inactive_timeout = 5,

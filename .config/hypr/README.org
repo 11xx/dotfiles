@@ -692,6 +692,26 @@ Hyprcursors are installed the same way as normal ones. The cursor
 theme directory should be installed preferably user-local in
 =$XDG_DATA_HOME/icons= or alternatively system-wide in =/usr/share/icons/=.
 
+Four places have to agree on the cursor, and only the first two are set by the
+variables below:
+
+1. *hyprcursor*, for native Wayland clients, via =hyprctl setcursor= and
+   =$HYPRCURSOR_THEME=;
+2. *XCursor*, via =$XCURSOR_THEME= and the GNOME schema, for clients that
+   consult either;
+3. the theme named *=default=*, which is what Qt's =xcb= backend falls back to
+   when no XSettings daemon is running. Every XWayland Qt application follows
+   it, so it is re-asserted on launch below;
+4. *=~/.config/kcminputrc=*, read by KDE-themed Qt applications under
+   =QT_QPA_PLATFORMTHEME=kde=. It is not written from here, because that file
+   also holds unrelated KDE input settings; its =[Mouse] cursorTheme= has to be
+   kept equal to =XCursorTheme= by hand.
+
+Appearance tools rewrite (3) without warning: =nwg-look= owns the copy under
+=$XDG_DATA_HOME/icons= and =lxqt-config-appearance= the one under =~/.icons=.
+Those two disagreeing is what leaves XWayland applications on a Breeze cursor
+while native clients render the intended one.
+
 - Cursor themes
   + [[https://codeberg.org/useless-utils/simp1e-amber-hyprcursor][Codeberg/useless-utils/simp1e-amber-hyprcursor: A gold-yellow hyprcursor]]
   + [[https://github.com/rose-pine/cursor][GitHub - rose-pine/cursor: Soho vibes for Cursors]]
@@ -715,6 +735,16 @@ exec_once("gsettings set org.gnome.desktop.interface cursor-theme '" .. XCursorT
 exec_once("gsettings set org.gnome.desktop.interface cursor-size " .. XCursorSize)
 hl.env("XCURSOR_THEME", XCursorTheme)
 hl.env("XCURSOR_SIZE", tostring(XCursorSize))
+
+-- Qt's xcb backend ignores $XCURSOR_THEME. With no XSettings daemon running it
+-- falls back to the theme literally named "default", so every XWayland Qt app
+-- follows whatever that points at. Appearance tools write it too -- nwg-look
+-- to $XDG_DATA_HOME/icons, lxqt-config-appearance to ~/.icons -- and the two
+-- had drifted apart, leaving XWayland on Breeze while native clients used the
+-- hyprcursor above. Re-asserting it on launch keeps one source of truth.
+exec_once("d=${XDG_DATA_HOME:-$HOME/.local/share}/icons/default; mkdir -p $d; "
+              .. "printf '[Icon Theme]\\nName=Default\\nInherits="
+              .. XCursorTheme .. "\\n' > $d/index.theme")
 
 hl.config({
     cursor = {
