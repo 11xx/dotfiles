@@ -1,0 +1,138 @@
+#+TITLE: imv configuration
+#+PROPERTY: header-args :results silent
+
+#+options: toc:2 num:nil
+
+* imv
+:PROPERTIES:
+:header-args:conf: :tangle config :mkdirp yes
+:END:
+
+=imv= is a Wayland-native image viewer driven entirely from the keyboard. It
+decodes JPEG XL through =libjxl= directly rather than through a plugin chain,
+so JXL works without any optional package.
+
+The binds below reproduce the qimgv layout: =j=/=k= and =n=/=p= move through
+the directory, the same letters under =Ctrl= pan, and under =Shift= they zoom.
+=suppress_default_binds= is on because imv's stock layout puts =j=/=k= on
+panning, which would otherwise shadow the navigation binds.
+
+imv only ever opens the paths it is given, so "browse the rest of this folder"
+is the launcher's job rather than a setting here. [[file:~/.local/bin/README.org::*image-viewer][=image-viewer=]] opens the
+containing directory and preselects the requested file with =-n=, which is what
+makes =j=/=k= walk the whole folder.
+
+** Options
+
+=scaling_mode = full= is the fit-to-window behaviour: images scale both up and
+down so they always fit the window exactly.
+
+The overlay is the info bar. Its text is shell-expanded every time it is drawn,
+so it is built only from the environment variables imv already exports;
+invoking a command such as =stat= here would run that command on every redraw.
+
+#+begin_src conf
+[options]
+background = 1b1b1c
+scaling_mode = full
+upscaling_method = linear
+loop_input = true
+
+overlay = true
+overlay_position_bottom = true
+overlay_font = monospace:11
+overlay_background_alpha = c3
+overlay_text = [$imv_current_index/$imv_file_count]  $imv_current_file  |  ${imv_width}x${imv_height}  |  $imv_scale%  |  $imv_scaling_mode
+
+suppress_default_binds = true
+#+end_src
+
+The fields are position in the folder, path, pixel dimensions, zoom level, and
+the current scaling mode. Scaling mode earns its place because =Return= and =s=
+both change it, and without it there is nothing on screen saying which mode is
+active.
+
+Every field above is a variable imv already holds, so drawing the bar costs
+nothing. The two remaining variables are deliberately left out: =$imv_loading=
+only differs from =0= during the moment a frame is being decoded, and the
+slideshow counters read as zero unless a slideshow is running.
+
+On-disk byte size is the one genuinely useful field imv does not expose, so it
+needs a command. This runs on every redraw rather than once per image:
+
+#+begin_src conf :tangle no
+overlay_text = $imv_current_file  |  $(stat -c%s "$imv_current_file" | numfmt --to=iec)
+#+end_src
+
+** Binds
+
+Navigation is the pair the qimgv config used, kept on the unshifted keys
+because it is the motion used most.
+
+#+begin_src conf
+[binds]
+q = quit
+<Escape> = quit
+
+j = next
+k = prev
+n = next
+p = prev
+<Right> = next
+<Left> = prev
+gg = goto 1
+<Shift+G> = goto -1
+#+end_src
+
+Panning moves to the =Ctrl= layer, covering both the Emacs and the Vim
+direction keys, as the qimgv shortcuts did.
+
+#+begin_src conf
+<Ctrl+h> = pan 50 0
+<Ctrl+l> = pan -50 0
+<Ctrl+k> = pan 0 50
+<Ctrl+j> = pan 0 -50
+<Ctrl+b> = pan 50 0
+<Ctrl+f> = pan -50 0
+<Ctrl+p> = pan 0 50
+<Ctrl+n> = pan 0 -50
+#+end_src
+
+Zoom sits on the shifted navigation keys, so zooming and moving share a hand
+position.
+
+#+begin_src conf
+<Shift+K> = zoom 1
+<Shift+J> = zoom -1
+<Shift+N> = zoom 1
+<Shift+P> = zoom -1
+<Up> = zoom 1
+<Down> = zoom -1
+#+end_src
+
+=Return= cycles the scaling mode, matching qimgv's fit-mode toggle. Rotation is
+on =r= as it was in qimgv, which displaces imv's stock =r= for resetting the
+view onto =Ctrl+r=.
+
+#+begin_src conf
+<Return> = scaling next
+s = scaling next
+<Shift+S> = upscaling next
+f = fullscreen
+d = overlay
+c = center
+a = zoom actual
+<Ctrl+r> = reset
+r = rotate by 90
+<Shift+R> = rotate by -90
+#+end_src
+
+Animation control and file actions. =y= yanks the current file to the Wayland
+clipboard.
+
+#+begin_src conf
+<period> = next_frame
+<space> = toggle_playing
+x = close
+y = exec wl-copy < "$imv_current_file"
+#+end_src
