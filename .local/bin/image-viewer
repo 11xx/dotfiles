@@ -1,0 +1,65 @@
+#!/usr/bin/env sh
+show_help() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]... [FILE|DIRECTORY]...
+
+Opens images in the currently selected viewer.
+
+Options:
+--toggle        Switch to the other viewer and report the new selection.
+--set VIEWER    Select a viewer by name: imv or qimgv.
+--status        Print the currently selected viewer and exit.
+-h, --help      Display this help and exit.
+EOF
+}
+
+stateFile="${XDG_STATE_HOME:-$HOME/.local/state}/image-viewer"
+defaultViewer=qimgv
+floatWc=FLOAT_WMRULE
+imvAppId=imv-float
+
+viewer=$(cat "$stateFile" 2>/dev/null)
+case "$viewer" in
+    (imv|qimgv) ;;
+    (*) viewer=$defaultViewer ;;
+esac
+
+set_viewer() {
+    mkdir -p "${stateFile%/*}"
+    printf '%s\n' "$1" > "$stateFile"
+    printf '%s\n' "$1"
+}
+
+case "$1" in
+    (-h|--help) show_help; exit 0 ;;
+    (--status) printf '%s\n' "$viewer"; exit 0 ;;
+    (--toggle)
+        if [ "$viewer" = imv ]; then viewer=qimgv; else viewer=imv; fi
+        set_viewer "$viewer"
+        notify-send -t 2000 -a image-viewer 'Image viewer' "Now using $viewer"
+        exit 0
+        ;;
+    (--set)
+        case "$2" in
+            (imv|qimgv) set_viewer "$2"; exit 0 ;;
+            (*)
+                printf '%s: unknown viewer "%s"\n' "${0##*/}" "$2" >&2
+                exit 1
+                ;;
+        esac
+        ;;
+esac
+
+[ "$#" -gt 0 ] || { show_help >&2; exit 1; }
+
+case "$viewer" in
+    (imv)
+        if [ "$#" -eq 1 ] && [ -f "$1" ]; then
+            exec imv -i "$imvAppId" -n "$1" "$(dirname -- "$1")"
+        fi
+        exec imv -i "$imvAppId" "$@"
+        ;;
+    (qimgv)
+        exec env QT_QPA_PLATFORM=xcb qimgv --qwindowtitle "$floatWc" "$@"
+        ;;
+esac

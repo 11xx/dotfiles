@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+set -e
+
+show_help() {
+    cat << EOF
+Usage: ${0##*/} COMMAND [ARGUMENTS]
+
+NOTE: If COMMAND requires flags, pass them as one argument, such as:
+   ${0##*/} --float 'cmd -f file -v' arg1 arg2 arg3
+
+Options:
+--float                 Set the window class to FLOAT_WMRULE so the compositor
+                          floats the window.
+--class                 Set the window class to this argument instead.
+-t, --title             Set the window title to this argument.
+-w                      Window width in terminal cells. Defaults to 120.
+-h                      Window height in terminal cells. Defaults to 30.
+--hold                  Keep the window open after COMMAND finishes.
+-s                      Run COMMAND through 'sh -c'.
+-p, -np, --no-padding   Load the Alacritty configuration without padding.
+--help                  Display this help and exit.
+-v, --verbose           Verbose mode. Enables the shell built-in 'set -x'.
+--                      End of all options.
+EOF
+}
+
+unset float class title h w spawn hold noPadding
+
+while :; do
+    case "$1" in
+        (--help) show_help; exit 0 ;;
+        (-v) set -x ;;
+        (--float) float=t ;;
+        (--class) [ -n "$2" ] && class=--class="$2"; shift ;;
+        (-t|--title) [ -n "$2" ] && title=--title="$2"; shift ;;
+        (-w) [ -n "$2" ] && w="$2"; shift ;;
+        (-h) [ -n "$2" ] && h="$2"; shift ;;
+        (-s) spawn=t ;;
+        (--hold) hold=--hold ;;
+        (-p|-np|--no-padding)
+            noPadding="--config-file ${XDG_CONFIG_HOME:-$HOME/.config}/alacritty/alacritty-no-padding.toml"
+            ;;
+        (--) shift; break ;;
+        (*) break
+    esac
+    shift
+done
+
+floatWMRULE=FLOAT_WMRULE
+title=${title:---title=Terminal}
+if [ "$float" = t ]; then
+    class=${class:---class=${floatWMRULE}}
+else
+    class=${class:---class=Terminal}
+fi
+
+unset dimensions
+if [ "$float" = t ]; then
+    dimensions="--option window.dimensions.columns=${w:-120} window.dimensions.lines=${h:-30}"
+fi
+
+if [ "$spawn" = t ]; then
+    alacritty "${class}" "${title}" $dimensions $hold $noPadding --command sh -c "$@"
+else
+    cmd="$1" && shift
+    alacritty "${class}" "${title}" $dimensions $hold $noPadding --command $cmd "$@"
+fi

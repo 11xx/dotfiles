@@ -1,0 +1,250 @@
+#!/usr/bin/env sh
+show_help() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]... FILE...
+
+Options:
+-nw, --no-window   Reuse the calling terminal for output instead of opening a
+                     new window. Fails for types that require a GUI.
+-x,  --script      Like --no-window, and also avoids interactive output such
+                     as a pager, so the result can be piped.
+--                 End of all options.
+-h,  --help        Display this help and exit.
+-v,  --verbose     Verbose mode. Enables the shell built-in 'set -x'.
+EOF
+}
+
+unset scriptMode noWindow
+
+while :; do
+    case $1 in
+        (-v|--verbose) set -x ;;
+        (-h|--help) show_help; exit 0 ;;
+        (-nw|--no-window) noWindow=t ;;
+        (-x|--script) noWindow=t; scriptMode=t ;;
+        (--) shift; break ;;
+        (-?*)
+            printf 'ERROR: Unrecognized option "%s". Aborting...\n\n' "$1" >&2
+            show_help >&2
+            exit 1
+            ;;
+        (*) break
+    esac
+    shift
+done
+
+[ "$#" -gt 0 ] || { show_help >&2; exit 1; }
+
+mimeType=$(file -bL --mime-type -- "$1")
+ext=$(printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]')
+ext2=$(printf '%s\n' "$ext" | sed -E 's/(.*)(\.[^.]*)(\.[^.]*)$/\2\3/; s/^\.//')
+ext=${ext##*.}
+
+floatWc=FLOAT_WMRULE
+
+Color_Off='\033[0m'
+BRed='\033[1;31m'
+
+tmpPrefix="${XDG_RUNTIME_DIR:-/tmp}/launch-$$"
+
+make_tmp() {
+    tmp=$(mktemp "$tmpPrefix.XXXXXXXXX")
+    trap 'rm -f "$tmpPrefix".*' 0 2 3 6
+}
+
+repeat_char() {
+    seq "${2:-20}" | while read -r _; do printf '%s' "${1:-=}"; done; printf '\n'
+}
+
+mpvTitleFlag=--title='${?media-title:${media-title}}${!media-title:No file} - mpv '"${floatWc}"
+
+mpv() { command mpv --player-operation-mode=pseudo-gui "$@"; }
+
+if command -v jaq >/dev/null 2>&1; then
+    jq() { command jaq "$@"; }
+fi
+
+audio() {
+    mpv "$@"
+    exit 0
+}
+
+images() {
+    image-viewer "$@"
+    exit 0
+}
+
+svg() {
+    unset title
+    [ $# -gt 1 ] && title="SVG View"
+    title=${title:-$1}
+    inkview --name "$title | org.inkscape.Inkscape" "$@"
+    exit 0
+}
+
+pdf() {
+    zathura "$@"
+    exit 0
+}
+
+browser() {
+    firefox "$@"
+    exit 0
+}
+
+fm() {
+    dolphin --qwindowtitle 'Dolphin (launch script)'"${floatWc}" "$@"
+    exit 0
+}
+
+video() {
+    mpv "${mpvTitleFlag}" "$@"
+    exit 0
+}
+
+gif() {
+    mpv --loop=10 "${mpvTitleFlag}" "$@"
+    exit 0
+}
+
+text() {
+    while :; do
+        case "$1" in
+            (-l)
+                [ -n "$2" ] || {
+                    printf 'ERROR: "%s" cannot be empty.\n' "$1" >&2; exit 1; }
+                case "$2" in
+                    (json) usingTmp=t; isJq=t; batLang="-l json" ;;
+                    (pts|picard) batLang="-l pts" ;;
+                esac
+                shift
+                ;;
+            (-s|--style)
+                [ -n "$2" ] || {
+                    printf 'ERROR: "%s" cannot be empty.\n' "$1" >&2; exit 1; }
+                case "$2" in
+                    (h|header) batStyle=header ;;
+                    (g|grid) batStyle=grid ;;
+                    (hg|header-grid) batStyle=header,grid ;;
+                    (*) batStyle="$2" ;;
+                esac
+                shift
+                ;;
+            (*) break
+        esac
+        shift
+    done
+
+    maxTermCols=220
+    maxTermLines=60
+    defTermCols=120
+    defTermLines=30
+
+    if [ "$usingTmp" = t ]; then
+        make_tmp
+        [ "$isJq" = t ] && jq '.' "$@" > "$tmp"
+        set -- "$tmp"
+    fi
+
+    len=$(head -500 "$@" | wc -L)
+
+    batPagingOpt=--paging=${scriptMode:+never}
+    batPagingOpt=${scriptMode:+$batPagingOpt}
+    batPagingOpt=${batPagingOpt:---paging=always}
+
+    if [ "$#" -gt 1 ]; then
+        batCmd="bat $batLang --style=${batStyle:-header,grid} $batPagingOpt"
+    else
+        batCmd="bat $batLang --style=${batStyle:-header} $batPagingOpt"
+    fi
+
+    if [ -n "$scriptMode" ] || [ -n "$noWindow" ]; then
+        $batCmd "$@"
+        exit 0
+    fi
+
+    if [ "$len" -lt $((defTermCols - 1)) ]; then
+        termW=$defTermCols; termH=$defTermLines
+    elif [ "$len" -lt $((maxTermCols - 1)) ]; then
+        termW=$((len + 1)); termH=$((len / 4))
+    else
+        termW=$maxTermCols; termH=$maxTermLines
+    fi
+
+    terminal --float -w "$termW" -h "$termH" "$batCmd" "$@"
+    exit 0
+}
+
+list_archive() {
+    bsdtar --list --file "$1" 2>/dev/null ||
+        7z l -- "$1" 2>/dev/null ||
+        printf 'Cannot list this archive.\n'
+}
+
+archive() {
+    make_tmp
+    if [ "$#" -gt 1 ]; then
+        for file in "$@"; do
+            printf 'File: %s\n%s\nGRIDMARKER\n\n' \
+                   "$file" "$(list_archive "$file")"
+        done > "$tmp"
+        wcL=$(head -500 "$tmp" | wc -L)
+        sed -i "s/GRIDMARKER/$(repeat_char "─" "$wcL")/g" "$tmp"
+        text --style grid "$tmp"
+    else
+        list_archive "$1" > "$tmp"
+        text --style plain "$tmp"
+    fi
+}
+
+case "$ext" in
+    (part)
+        case "$ext2" in
+            (mp4.part) video "$@" ;;
+        esac
+        ;;
+    (ts|rmvb|m2ts|mp4) video "$@" ;;
+    (svg) svg "$@" ;;
+    (png|jpg|jpeg) images "$@" ;;
+    (par2) terminal --float --hold 'par2 verify' "$@"; exit 0 ;;
+    (txt|url) text "$@" ;;
+    (html|htm) browser "$@" ;;
+    (json) text -l json "$@" ;;
+    (pts|picard) text -l pts "$@" ;;
+    (msg) text -l msg "$@" ;;
+    (a|ace|alz|arc|arj|bz|bz2|cab|cpio|deb|gz|jar|lha|lz|lzh|lzma|lzo|rpm|rz|\
+     t7z|tar|tbz|tbz2|tgz|tlz|txz|tZ|tzo|war|xpi|xz|Z|zip|zst|vsix)
+        archive "$@" ;;
+    (pdf|epub) pdf "$@" ;;
+    (sfv) terminal --float --hold 'cksfv -f' "$@"; exit 0 ;;
+esac
+
+case "$mimeType" in
+    (video/*) video "$@" ;;
+    (audio/*) audio "$@" ;;
+    (image/gif) gif "$@" ;;
+    (image/*) images "$@" ;;
+    (application/pdf|application/postscript|application/epub*) pdf "$@" ;;
+    (text/*) text "$@" ;;
+    (message/news) text -l msg "$@" ;;
+    (application/json) text -l json "$@" ;;
+    (application/zip|application/x-rar|application/x-7z-compressed|\
+     application/x-xz|application/x-bzip2|application/x-gzip|\
+     application/x-tar)
+        archive "$@" ;;
+    (application/x-mswinurl) text "$@" ;;
+    (inode/directory|application/x-directory) fm "$@" ;;
+    (*)
+        couldntStr="Couldn't find a matching program."
+        thereWasntStr="There was no program specified to handle:"
+        extMimeStr="Extension: $ext | MIME type: $mimeType"
+
+        printf '%bERROR:%b %s\n%s\n%s\n' \
+               "$BRed" "$Color_Off" \
+               "$couldntStr" "$thereWasntStr" "$extMimeStr" >&2
+        notify-send -t 10000 -a launch "$couldntStr" \
+                    "$thereWasntStr
+$extMimeStr"
+        exit 1
+        ;;
+esac

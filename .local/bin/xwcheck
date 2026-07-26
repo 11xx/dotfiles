@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+p_exit() {
+    printf '%s\n' "$@"
+    exit
+}
+
+[ -n "$WAYLAND_DISPLAY" ] &&
+    p_exit Wayland
+
+[ -n "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] &&
+    p_exit X11
+
+p_exit TTY
