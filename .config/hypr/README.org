@@ -344,9 +344,23 @@ window_rule({ title = "^(Picture-in-Picture)$" }, { float = true, pin = true })
 -- Emacs floating frames
 window_rule({ title = "^(Edit with Emacs FRAME)$" }, { float = true })
 
--- Wine/Proton windows
+-- Windows marked by the `launch' script and its helpers.
+-- Title-marked windows are media viewers with no useful size of their own, so
+-- the compositor gives them one. Class-marked windows come from `terminal',
+-- which has already sized them in columns and rows; a size rule there would
+-- overwrite the measurement it just made.
+-- size takes pixels only: percentage strings are accepted but ignored.
+-- A sized floating window still needs a position: without `center' Hyprland
+-- places it by the default float logic, which can leave it hanging off the
+-- bottom of the monitor. `center' also respects reserved areas such as a bar.
+local mediaSize = { 1792, 1008 } -- 70% of 2560x1440
+window_rule({ title = "^.*(floatWMRULE|FLOAT_WMRULE)$" },
+            { float = true, size = mediaSize, center = true })
 window_rule({ class = "^.*(floatWMRULE|FLOAT_WMRULE)$" }, { float = true })
-window_rule({ title = "^.*(floatWMRULE|FLOAT_WMRULE)$" }, { float = true })
+
+-- imv, spawned by `image-viewer' with its own app_id so it needs no marker
+-- smuggled through the window title.
+window_rule({ class = "^(imv-float)$" }, { float = true, size = mediaSize, center = true })
 
 -- File open dialogs (anchor pattern at start, not middle)
 window_rule({ title = "^Open File" }, { float = true })
