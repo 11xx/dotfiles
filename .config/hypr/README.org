@@ -1637,8 +1637,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 Harness lifecycle widgets and their listeners are imported directly from the
 =harness-status= repository checkout. The desktop config only places the
-widgets and supplies the shared working and completion colors, keeping the
-reusable module's behavior and presentation source in one place.
+widgets and supplies the shared working, completion, and attention colors,
+keeping the reusable module's behavior and presentation source in one place.
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a
 long-lived listener instead of spawning a one-second poller. The helper emits
@@ -1941,6 +1941,9 @@ $focused-monitor-pad: 0 0 0 3px;
   color: $neron-green;
 }
 
+.harness-status__indicator--attention {
+  color: $neron-red;
+}
 
 
 .music-circular-progress {

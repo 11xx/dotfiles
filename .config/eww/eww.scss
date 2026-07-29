@@ -72,6 +72,9 @@ $focused-monitor-pad: 0 0 0 3px;
   color: $neron-green;
 }
 
+.harness-status__indicator--attention {
+  color: $neron-red;
+}
 
 
 .music-circular-progress {
