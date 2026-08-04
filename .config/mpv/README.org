@@ -1,0 +1,683 @@
+#+title: MPV Video Player Configuration
+# moved [2022-04-01 Fri 02:17:07]
+# moved back # [2024-02-15 Thu 04:10:35 -03] @ak
+
+* mpv.conf
+:PROPERTIES:
+:header-args:conf: :tangle mpv.conf
+:END:
+
+- Documentation: [[https://mpv.io/manual/master/][mpv.io]]
+- Example config
+  + [[https://iamscum.wordpress.com/guides/videoplayback-guide/mpv-conf/][mpv.conf – I am Scum … and so are you.]]
+  + [[https://github.com/Tsubajashi/mpv-settings][Tsubajashi/mpv-settings: basically my settings for MPV]]
+
+The cache is sized for network streams, where reading ahead aggressively is
+what prevents stalls. =auto= restricts it to those, because on a local file
+the read-ahead is redundant with the kernel page cache and the demuxer will
+happily pull a multi-gigabyte recording into resident memory to no benefit.
+
+#+begin_src conf
+#osc=no
+#osd-bar=no
+
+# hwdec=nvdec
+hwdec=nvdec-copy
+
+cache=auto
+demuxer-max-back-bytes=5GiB
+demuxer-max-bytes=7GiB
+watch-later-directory=~/.local/share/mpv/watch_later
+
+# audio-device='alsa/front:CARD=Pro,DEV=0'
+# audio-exclusive=yes
+# demuxer-rawaudio-format=u32be
+
+# https://superuser.com/questions/1051206/how-can-i-make-mpv-show-the-duration-counter-constantly
+# osd-level=2
+# osd-font-size=20
+# osd-blur=12
+# osd-scale=
+# osd-scale-by-window=no
+
+# https://hund.tty1.se/2021/10/12/how-to-use-yt-dlp-instead-of-yt-dl-with-mpv.html
+# script-opts-append=ytdl_hook-ytdl_path=yt-dlp
+# https://www.reddit.com/r/mpv/comments/opoorx/mpv_with_ytdlp/
+# script-opts=ytdl_hook-ytdl_path=yt-dlp
+# script-opts=ytdl_hook-ytdl_path=/usr/bin/yt-dlp
+
+
+
+# keep open after last video ends
+# [[https://unix.stackexchange.com/questions/390574/make-mpv-hold-on-the-last-picture-instead-of-closing/390579#390579][Make mpv hold on the last picture instead of closing - Unix & Linux Stack Exchange]]
+# [2022-11-12 Sat 21:15:02 -03]
+# keep-open=yes
+force-window=yes # for audio
+
+# sub-color='#bfbfbf' #subtitle color in rgb
+# sub-shadow-color='#000000' #shadow color
+# # sub-font='Noto Sans' #set font
+# # sub-bold=yes
+# sub-font-size=35
+# # sub-pos=95 #subtitle position 5 percent above the bottom of the screen
+# sub-blur=4
+
+sub-font='Arial Regular'
+sub-border-size=1
+sub-color='#CDCDCD'
+# sub-shadow=3
+
+
+# Customize .ass fonts
+# - Defined subtitle font using sub-font & sub-ass-force-style=FontName is no longer working · Issue #7333 · mpv-player/mpv
+#   https://github.com/mpv-player/mpv/issues/7333
+# - Mpv ignores ass-force-style when subtitle is str · Issue #1994 · mpv-player/mpv
+#   https://github.com/mpv-player/mpv/issues/1994
+# - How to change font when using ASS subtitle style override : r/mpv
+#   https://www.reddit.com/r/mpv/comments/uadg7v/how_to_change_font_when_using_ass_subtitle_style/
+# ass-style-override='FontName=Arial,Default.Regular=1,Default.FontSize=24,Shadow=1.5,BackColour=Black'
+sub-ass-style-overrides='PrimaryColour=&H00BFBFBF'
+
+profile=high-quality
+#+end_src
+
+** Language preferences
+[[https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes][List of ISO 639-1 codes - Wikipedia]]
+#+begin_src conf
+alang=jp,jpn,eng,en
+slang=en,eng
+#+end_src
+
+** OSD customizaton
+#+begin_src conf
+osd-bar-align-y=-1
+osd-align-y=top
+osd-font='LiterationSans Nerd Font'
+osd-playing-msg='file: ${filename}'
+
+osd-scale-by-window=no
+#+end_src
+
+** Screenshot
+#+begin_src conf
+screenshot-format=jxl
+#+end_src
+
+** Low VRAM profile
+
+When another process is holding most of the GPU's memory, the default output
+cannot allocate its video textures and playback dies with
+=VK_ERROR_OUT_OF_DEVICE_MEMORY= before the first frame. Neither a cheaper
+render profile nor the older =gpu= output avoids this, because the allocation
+that fails is the frame upload itself rather than anything the shader chain
+adds. =dmabuf-wayland= passes frames to the compositor instead of allocating
+its own textures, so it still plays when there is no headroom left.
+
+Run it with =mpv --profile=lowvram=.
+
+This block stays last in the file. Every option following a profile header
+belongs to that profile, so anything tangled after it would silently stop
+applying to normal playback.
+
+#+begin_src conf
+[lowvram]
+profile-desc=Playback while another process holds the GPU memory
+vo=dmabuf-wayland
+#+end_src
+
+* MPV input.conf
+:PROPERTIES:
+:header-args:conf:  :tangle input.conf
+:END:
+
+https://bbs.archlinux.org/viewtopic.php?id=177347
+
+# Rotate by 90 degrees clockwise
+~Alt+RIGHT no-osd vf add rotate=1~
+Rotate by 90 degrees counterclockwise
+~Alt+LEFT no-osd vf add rotate=2~
+
+https://wiki.archlinux.org/title/Mpv#Key_bindings
+
+The defaults can be seen [[https://mpv.io/manual/stable/#keyboard-control][mpv.io#keyboard-control]]
+
+For numpad keys use =KP0-KP9=
+#+begin_src conf
+RIGHT        seek 1 exact
+LEFT         seek -1 exact
+Ctrl+RIGHT   seek 5
+Ctrl+LEFT    seek -5
+LEFT         seek -1 exact
+LEFT         seek -1 exact
+s            ignore
+Shift+UP     seek  600
+Shift+DOWN   seek -600
+#            =            cycle video-unscaled
+#            -            cycle-values window-scale 2 3 1 .5
+UP           add volume 5
+DOWN         add volume -5
+#WHEEL_UP    add volume 5
+WHEEL_UP     seek 2
+#WHEEL_DOWN  add volume -5
+WHEEL_DOWN   seek -2
+WHEEL_LEFT   ignore
+WHEEL_RIGHT  ignore
+Alt+RIGHT    add video-rotate 90
+Alt+LEFT     add video-rotate -90
+-        add video-zoom -0.25
+=        add video-zoom 0.25
++        add video-zoom 0.25
+Ctrl+f       add video-pan-x 0.05
+Ctrl+b       add video-pan-x -0.05
+Ctrl+p       add video-pan-y -0.05
+Ctrl+n       add video-pan-y 0.05
+Ctrl+BS      set video-zoom 0; set video-pan-x 0; set video-pan-y 0; set video-scale-x 1; set video-scale-y 1
+Ctrl+0       set video-zoom 0; set video-pan-x 0; set video-pan-y 0; set video-scale-x 1; set video-scale-y 1
+# numpad, keypad
+END          quit
+KP0          playlist-next
+KP_ENTER     playlist-next
+KP_DEC       playlist-prev
+/            ignore
+w add speed -0.1
+e add speed 0.1
+r            set speed 1
+# top row numbers
+0            seek 0 absolute-percent
+1            ignore
+2            ignore
+3            ignore
+4            ignore
+5            ignore
+6            ignore
+7            ignore
+8            ignore
+9            ignore
+
+# Keybinding to cycle through video aspect ratios
+A            cycle-values video-aspect-override "16:9" "4:3" "2.35:1" "1:1" "9:16" "5:4" "3:2" "14:9" "21:9" "32:9" "64:27" "-1"
+
+R            set video-aspect-override -1
+
+# S            cycle shuffle
+shift+s      cycle shuffle
+
+# Audio sync
+KP4          add audio-delay 0.100
+KP5          add audio-delay -0.100
+KP6          set audio-delay 0 # Reset audio delay
+# sub timings
+KP1          add sub-delay 0.1
+KP2          add sub-delay -0.1
+KP3          set sub-delay 0 # Reset subtitle delay
+# Video scale
+
+KP7   add video-scale-x  0.025
+KP8   add video-scale-y  0.025
+KP9   set video-scale-x 1; set video-scale-y 1
+# Ctrl+Alt+n   add video-scale-y -0.05  # shrink vertically
+# Ctrl+Alt+g   set video-scale-x 1; set video-scale-y 1 # reset scale
+
+Ctrl+Alt+f   add video-scale-x  0.025  # expand horizontally
+Ctrl+Alt+b   add video-scale-x -0.025  # shrink horizontally
+Ctrl+Alt+p   add video-scale-y  0.025  # expand vertically
+Ctrl+Alt+n   add video-scale-y -0.025  # shrink vertically
+Ctrl+Alt+g   set video-scale-x 1; set video-scale-y 1 # reset scale
+
+Ctrl+Alt+h   add video-scale-x  0.025  # expand horizontally
+Ctrl+Alt+l   add video-scale-x -0.025  # shrink horizontally
+Ctrl+Alt+j   add video-scale-y  0.025  # expand vertically
+Ctrl+Alt+k   add video-scale-y -0.025  # shrink vertically
+
+a script-message toggle-fullpath
+
+h vf toggle hflip # toggle horizontal mirror
+# v vf toggle vflip # toggle vertical flip​
+
+Ctrl+h cycle-values hwdec nvdec-copy none
+Ctrl+Alt+v cycle drm-vrr-enabled
+#+end_src
+- Note:
+  + =video-aspect= as renamed to =video-aspect-override=.
+    * Though [[https://github.com/mpv-player/mpv/commit/cb95ce75b5c114b6fd2c6b37ac6941b6848c8014][here]] it says the option remained unchanged, it changed
+    since.
+    * [[https://www.reddit.com/r/mpv/comments/nsruyu/comment/h0u48ls/?utm_source=share&utm_medium=web2x&context=3][Suggestion: 16:10 stretch : mpv]]
+    # [2024-02-15 Thu 05:17:21 -03] @ak
+
+* MPV Lua Extension Scripts
+:PROPERTIES:
+:header-args:lua: :mkdirp yes
+:END:
+
+Scripts that extend the functionality of MPV
+
+** TODO =cut-ffmpeg.lua=
+:PROPERTIES:
+:header-args:lua+: :tangle scripts/cut-ffmpeg.lua
+:END:
+#+begin_src lua
+-- define function to copy timestamp to clipboard
+function copy_timestamp_to_clipboard()
+   local timestamp = os.date("%H:%M:%S", mp.get_property_number("time-pos")) -- get the current timestamp in the format HH:MM:SS
+   mp.commandv("run", "echo", timestamp, "|", "xclip", "-selection", "clipboard") -- copy the timestamp to the clipboard using xclip
+   mp.osd_message("Copied timestamp to clipboard: " .. timestamp, 2) -- display an OSD message with the copied timestamp
+end
+
+-- register key binding to copy timestamp to clipboard
+mp.add_key_binding("c", "copy-timestamp-to-clipboard", copy_timestamp_to_clipboard)
+
+-- define function to create cut command for ffmpeg
+function create_cut_command()
+   local start_timestamp = mp.get_property_osd("osd-playing-time") -- get the start timestamp from the OSD
+   local end_timestamp = mp.get_property_osd("osd-bar") -- get the end timestamp from the OSD bar
+   local input_filename = mp.get_property("filename") -- get the input filename
+   local output_filename = "output.mp4" -- set the output filename
+   local cut_command = string.format("ffmpeg -i '%s' -ss %s -to %s -c copy '%s'", input_filename, start_timestamp, end_timestamp, output_filename) -- format the cut command with the input filename, start and end timestamps, and output filename
+   mp.commandv("run", "echo", cut_command, "|", "xclip", "-selection", "clipboard") -- copy the cut command to the clipboard using xclip
+   mp.osd_message("Copied cut command to clipboard:\n" .. cut_command, 5) -- display an OSD message with the copied cut command
+end
+
+-- register key binding to create cut command for ffmpeg
+mp.add_key_binding("C", "create-cut-command-for-ffmpeg", create_cut_command)
+
+#+end_src
+
+** =write-timestamp-to-file.lua=
+:PROPERTIES:
+:header-args:lua+: :tangle scripts/write-timestamp-to-file.lua
+:END:
+#+begin_src lua
+local mp = require "mp"
+local utils = require "mp.utils"
+
+function write_timestamp()
+    local file_path = mp.get_property("path")
+    local timestamp = mp.get_property_osd("playback-time/full")
+    local filename = mp.get_property("media-title")
+    if filename == nil or filename == "" then
+        filename = utils.split_path(file_path).filename
+    end
+    local output_file = io.open(file_path..".timestamps", "a")
+    output_file:write("["..filename.."] "..timestamp.."\n")
+    output_file:close()
+    mp.osd_message("Timestamp saved to file")
+end
+
+mp.add_key_binding("Ctrl+t", "write_timestamp", write_timestamp)
+#+end_src
+
+** =toggle-fullpath.lua=
+:PROPERTIES:
+:header-args:lua+: :tangle scripts/toggle-fullpath.lua
+:END:
+
+Display an overlay in the bottom-right that shows the currently
+playing file's full path. Works across playlists and stays on until
+toggled off.
+# [2025-01-04 Sat 18:44:13 -03] @ak
+#+begin_src lua
+local options = {
+    font_size = 22,
+    position_x = 98,  -- percentage from left
+    position_y = 98,  -- percentage from top
+    border_size = 1.0,
+    font_name = "sans-serif",
+    bold = false,
+    italic = false,
+    prefix_text = "path: "
+}
+
+-- Read options from config file if it exists
+opt = require "mp.options"
+opt.read_options(options, "toggle-fullpath")
+-- mp.get_script_name())
+
+local show_path = false
+local overlay = mp.create_osd_overlay("ass-events")
+
+-- Function to format the ASS text with advanced styling
+local function format_text(text)
+    -- Use \an3 for bottom-right alignment
+    -- This way the text grows left and up from the anchor point
+    return string.format(
+        "{\\an3\\fs%d\\bord%f\\b%d\\i%d\\fn%s}%s",
+        options.font_size,
+        options.border_size,
+        options.bold and 1 or 0,
+        options.italic and 1 or 0,
+        options.font_name,
+        text or ""
+    )
+end
+
+-- Function to update the displayed path
+local function update_path()
+    if show_path then
+        local path = mp.get_property("path", "N/A")
+        -- Use margins instead of absolute positioning
+        overlay.res_x = mp.get_property_number("osd-width", 1280)
+        overlay.res_y = mp.get_property_number("osd-height", 720)
+        -- Set margins based on percentages
+        overlay.data = string.format(
+            "{\\pos(%d,%d)}",
+            overlay.res_x * options.position_x / 100,
+            overlay.res_y * options.position_y / 100
+        ) .. format_text(options.prefix_text .. path)
+        overlay:update()
+    end
+end
+
+-- Function to toggle path display
+local function toggle_path_display()
+    show_path = not show_path
+    if show_path then
+        update_path()
+    else
+        overlay.data = ""
+        overlay:update()
+    end
+end
+
+-- Update when file changes
+mp.observe_property("path", "string", update_path)
+
+-- Update when screen size changes
+mp.observe_property("osd-width", "number", update_path)
+mp.observe_property("osd-height", "number", update_path)
+
+-- Expose the toggle function for manual binding
+mp.register_script_message("toggle-fullpath", toggle_path_display)
+
+-- Remove overlay when mpv exits
+mp.register_event("shutdown", function()
+    overlay:remove()
+end)
+#+end_src
+
+
+#+begin_src conf :tangle script-opts/toggle-fullpath.conf :mkdirp yes
+prefix_text=
+font_size=20
+#+end_src
+
+
+*** COMMENT claude.ai explanation
+
+I'll break down this script and explain how it works from the ground up,
+since you're new to both Lua and MPV scripting.
+
+Let's start with the basics. Lua is a lightweight programming language,
+and in this context, we're using it to control MPV's on-screen display
+(OSD) system. The script creates a customizable text overlay that shows
+the current file's path.
+
+First, let's look at how we handle configuration:
+
+#+begin_src lua
+local options = {
+    font_size = 22,
+    position_x = 98,  -- percentage from left
+    position_y = 98,  -- percentage from top
+    border_size = 0.5,
+    font_name = "sans-serif",
+    bold = false,
+    italic = false
+}
+#+end_src
+
+This creates a table (similar to a dictionary or record in other
+languages) with default settings. In Lua, =local= means this variable is
+scoped to the current file, similar to how you might scope variables in
+Haskell.
+
+#+begin_src lua
+mp.options = require "mp.options"
+mp.options.read_options(options, "path_display")
+#+end_src
+
+This part is MPV-specific. It loads MPV's options system and tells it to
+look for a configuration file named "path_display.conf". If it finds
+one, it will override our default options with any values from that
+file. This is how users can customize the script without changing the
+code.
+
+#+begin_src lua
+local show_path = false
+local overlay = mp.create_osd_overlay("ass-events")
+#+end_src
+
+Here we create two important variables: - =show_path= is our toggle
+state (similar to a boolean flag in Haskell) - =overlay= is an MPV
+object that represents our on-screen display. "ass-events" means it uses
+Advanced SubStation Alpha formatting, which is a subtitle formatting
+system that gives us precise control over text display.
+
+The =format_text= function is where we create the styling commands:
+
+#+begin_src lua
+local function format_text(text)
+    return string.format(
+        "{\\an3\\fs%d\\bord%f\\b%d\\i%d\\fn%s}%s",
+        options.font_size,
+        options.border_size,
+        options.bold and 1 or 0,
+        options.italic and 1 or 0,
+        options.font_name,
+        text or ""
+    )
+end
+#+end_src
+
+This is similar to string formatting in other languages. The =\an3=,
+=\fs=, etc. are ASS commands that control text appearance: - =\an3= sets
+the anchor point to bottom-right - =\fs%d= sets font size - =\bord%f=
+sets border thickness - =\b%d= controls bold (0 or 1) - =\i%d= controls
+italic (0 or 1) - =\fn%s= sets the font name
+
+The =update_path= function handles the actual display:
+
+#+begin_src lua
+local function update_path()
+    if show_path then
+        local path = mp.get_property("path", "N/A")
+        overlay.res_x = mp.get_property_number("osd-width", 1280)
+        overlay.res_y = mp.get_property_number("osd-height", 720)
+        overlay.data = string.format(
+            "{\\pos(%d,%d)}",
+            overlay.res_x * options.position_x / 100,
+            overlay.res_y * options.position_y / 100
+        ) .. format_text("fullpath: " .. path)
+        overlay:update()
+    end
+end
+#+end_src
+
+This function: 1. Gets the current file path from MPV 2. Gets the
+current screen dimensions 3. Calculates the exact pixel position based
+on our percentage settings 4. Combines positioning and styling commands
+with the actual text 5. Updates the display
+
+The toggle function is straightforward:
+
+#+begin_src lua
+local function toggle_path_display()
+    show_path = not show_path
+    if show_path then
+        update_path()
+    else
+        overlay.data = ""
+        overlay:update()
+    end
+end
+#+end_src
+
+It flips the display state and either shows or hides the text.
+
+Finally, we set up event handlers:
+
+#+begin_src lua
+mp.observe_property("path", "string", update_path)
+mp.observe_property("osd-width", "number", update_path)
+mp.observe_property("osd-height", "number", update_path)
+#+end_src
+
+This tells MPV to run our update function whenever: - The file path
+changes (new file playing) - The window size changes - The screen
+resolution changes
+
+#+begin_src lua
+mp.register_script_message("toggle-fullpath", toggle_path_display)
+#+end_src
+
+This exposes our toggle function so it can be bound to a key in MPV's
+configuration.
+
+The script uses a functional approach similar to Haskell, where we
+define pure functions for formatting and then combine them with MPV's
+state-changing functions to create the final behavior.
+
+/(end of response)/
+
+also what the 1280x720 mean:
+
+- /(prompt)/ \\
+  Can you explain this section to me in more detail?
+  #+begin_src lua
+  overlay.res_x = mp.get_property_number("osd-width", 1280)
+  overlay.res_y = mp.get_property_number("osd-height", 720)
+  #+end_src
+
+Those numbers (1280 and 720) are just fallback default values in case
+the =osd-width= and =osd-height= properties can't be read from MPV for
+some reason. They're the second argument to =get_property_number()=
+which acts as a default value.
+
+So this line:
+
+#+begin_src lua
+overlay.res_x = mp.get_property_number("osd-width", 1280)
+#+end_src
+
+means "get MPV's current OSD width, but if that fails for any reason,
+use 1280 as a fallback."
+
+In practice, MPV will almost always provide the actual OSD dimensions,
+so these fallbacks rarely come into play. The script will use whatever
+your actual window/fullscreen dimensions are. We could just as well use
+any other numbers as fallbacks, like:
+
+#+begin_src lua
+overlay.res_x = mp.get_property_number("osd-width", 1920)  -- using 1920 as fallback
+overlay.res_y = mp.get_property_number("osd-height", 1080) -- using 1080 as fallback
+#+end_src
+
+Setting =overlay.res_x= and =overlay.res_y= tells the overlay system
+what resolution to use for positioning calculations. This is necessary
+because the ASS (Advanced SubStation Alpha) positioning system used by
+MPV's overlays needs to know the total available space to correctly
+calculate percentages and positions.
+
+/(end of response)/
+
+
+* MPV Shell Scripts
+:PROPERTIES:
+:header-args:shell: :shebang #!/usr/bin/env sh
+:tangle-dir: (xdg-bin-home)
+:END:
+
+Shortcuts to some other functionality
+
+** mpv-recursive
+:PROPERTIES:
+:header-args:shell+: :tangle (tdir "mpv-recursive")
+:END:
+Find and play all videos under the current directory
+
+- DEPENDENCIES
+  + fd
+  + fd-vid: script
+  + shuf: coreutils
+  + mpv
+#+begin_src shell
+show_help() {
+    cat <<EOF
+${helpText}
+EOF
+}
+
+opt_check() {
+    [ -n "$2" ] && return 0
+
+    printf 'ERROR: "%s" cannot be empty.\n' "$1"; exit 1
+    # usage: opt_check "$@" && shift && cmd $1
+}
+
+helpText=$(cat <<EOF
+Usage: ${0##*/} [OPTIONS] [DIR(s)]
+
+DIR is optional. If more than one is provided the video file paths
+will be searched for on all of them and merged into one playlist file.
+
+Options:
+--                                    End of all options.
+-h, --help                            Display this help and exit
+-v, --verbose                         Verbose mode. Enables shell built-in 'set -x'. For debugging.
+-s, --shuffle                         Shuffle all found video files before adding them to the
+                                        playlists file.
+EOF
+        )
+
+while :
+do case $1 in
+       -v|--verbose)
+           set -x
+           ;;
+       -h|--help)
+           show_help
+           exit 0
+           ;;
+       -s|--shuffle)
+           shuffle=t
+           ;;
+       --) # End of all options.
+           shift; break
+           ;;
+       -?*)
+           printf 'ERROR: Unrecognized option "%s". Aborting...\n\n' "$1" >&2
+           show_help
+           exit 1
+           ;;
+       ,*) break
+   esac; shift; done
+
+make_tmp () {
+    tmp=$(mktemp /tmp/mpv-recursive-playlist.tmp.XXXXXXXXX)
+    trap 'rm /tmp/mpv-recursive-playlist.tmp.*' 0 1 2 3 6
+}
+
+make_tmp
+
+if [ $# -gt 0 ]; then
+    for dir in "$@"; do
+        [ -d "${dir}" ] &&
+            fd-vid -a "${dir}" >> "${tmp}" &&
+            continue
+        printf '"%s" is not a directory.\n' "${dir}"
+    done
+else
+    fd-vid -a >> "${tmp}"
+fi
+
+[ -n "${shuffle}" ] &&
+    shuf "${tmp}" > "${tmp}".shuffled &&
+    mpv --playlist="${tmp}".shuffled &&
+    exit 0
+
+mpv --playlist="${tmp}" &&
+    exit 0
+
+exit 1
+
+#+end_src
+
