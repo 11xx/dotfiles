@@ -98,7 +98,7 @@ replay() {
             dir="$video_dir/replay-games"
             container=mkv
             audio=GameSink.monitor
-            rate_flags='-bm cbr -q 50000 -fm cfr'
+            rate_flags='-bm cbr -q 30000 -fm cfr'
             ;;
         *)
             die "unknown replay profile: $1 (use desktop, secondary, or games)"

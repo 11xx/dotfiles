@@ -1793,9 +1793,11 @@ actually changes; it is valid here because these profiles capture through the
 portal, and has no effect on direct monitor capture under Wayland.
 
 Games are high motion, where constant quality has no upper bound on size and
-the buffer lives in RAM. Constant bitrate bounds it instead. Constant frame
-rate avoids the variable-frame-rate output that many editors mishandle, and
-Matroska survives an interrupted write.
+the buffer lives in RAM. Constant bitrate bounds it instead, at a rate chosen
+to stay visually close to constant quality at this resolution while keeping an
+hour of capture near twelve gigabytes rather than twenty. Constant frame rate
+avoids the variable-frame-rate output that many editors mishandle, and Matroska
+survives an interrupted write.
 
 #+begin_src shell
 replay() {
@@ -1822,7 +1824,7 @@ replay() {
             dir="$video_dir/replay-games"
             container=mkv
             audio=GameSink.monitor
-            rate_flags='-bm cbr -q 50000 -fm cfr'
+            rate_flags='-bm cbr -q 30000 -fm cfr'
             ;;
         *)
             die "unknown replay profile: $1 (use desktop, secondary, or games)"
