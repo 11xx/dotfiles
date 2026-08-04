@@ -1566,6 +1566,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "start"
                 (label :text "${time}" :class "time-label")
+                (gsr-indicator)
                 (sep)
                 (music-current :nth 0)))
 
@@ -1587,6 +1588,15 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 (defwidget sep []
            (label :class "separator" :text "|"))
+
+(defpoll gsr-state :interval "2s"
+                   :initial "idle"
+                   "gsr status")
+
+(defwidget gsr-indicator []
+           (box :visible {gsr-state != "idle"}
+                :class "gsr-indicator gsr-indicator--${gsr-state}"
+                (label :text {gsr-state == "recording" ? "● REC" : "● BUF"})))
 
 (defvar time-visible false)   ; for :run-while property of below variable
                               ; when this turns true, the polling starts and
@@ -1656,6 +1666,14 @@ Harness lifecycle widgets and their listeners are imported directly from the
 =harness-status= repository checkout. The desktop config only places the
 widgets and supplies the shared working, completion, and attention colors,
 keeping the reusable module's behavior and presentation source in one place.
+
+=gsr-indicator= sits beside the date on the second bar and reports whether a
+screen recording is running. =gsr status= is the single source of that answer:
+it derives the state from the running recorder rather than from anything the
+bar tracks itself, so the indicator is correct even when the recorder was
+started from a terminal or when it exited without telling anyone. The widget is
+hidden entirely while nothing is recording, since an always-present idle icon
+would be noise on a bar this dense.
 
 Muzaiten exposes the current track through MPRIS, so the bar uses a
 long-lived listener instead of spawning a one-second poller. The helper emits
@@ -1948,6 +1966,19 @@ $focused-monitor-pad: 0 0 0 3px;
 
 .time-label {
   margin: 0 10px 0 0;
+}
+
+.gsr-indicator {
+  margin: 0 10px 0 0;
+  font-weight: bold;
+}
+
+.gsr-indicator--recording {
+  color: $neron-red;
+}
+
+.gsr-indicator--buffer {
+  color: $neron-comment;
 }
 
 .harness-status__indicator--working {

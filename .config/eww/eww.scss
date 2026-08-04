@@ -64,6 +64,19 @@ $focused-monitor-pad: 0 0 0 3px;
   margin: 0 10px 0 0;
 }
 
+.gsr-indicator {
+  margin: 0 10px 0 0;
+  font-weight: bold;
+}
+
+.gsr-indicator--recording {
+  color: $neron-red;
+}
+
+.gsr-indicator--buffer {
+  color: $neron-comment;
+}
+
 .harness-status__indicator--working {
   color: $neron-yellow;
 }
