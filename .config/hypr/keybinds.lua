@@ -134,20 +134,18 @@ bind_exec("ALT + F4", "notify-send lmao")
 
 bind_exec("SUPER + CTRL + ALT + D", "aria2-dragdrop")
 
--- Save last 60 seconds
-bind_exec("SUPER + ALT + SPACE", "gpu-screen-recorder-replay-save")
+bind_exec("SUPER + ALT + R", "gsr replay desktop")
+bind_exec("SUPER + ALT + G", "gsr replay games")
 
--- Pause/resume replay buffer
-bind_exec("SUPER + ALT + home", "gpu-screen-recorder-replay-toggle")
+bind_exec("SUPER + ALT + SPACE", "gsr save")
+bind_exec("SUPER + ALT + F1", "gsr save 10")
+bind_exec("SUPER + ALT + F2", "gsr save 30")
+bind_exec("SUPER + ALT + F3", "gsr save 60")
 
--- Stop replay buffer entirely
-bind_exec("SUPER + ALT + end", "gpu-screen-recorder-replay-stop")
+bind_exec("SUPER + ALT + tab", "gsr record")
+bind_exec("SUPER + ALT + end", "gsr stop")
 
-bind_exec("SUPER + ALT + F1", "gpu-screen-recorder-replay-save-10")
-bind_exec("SUPER + ALT + F2", "gpu-screen-recorder-replay-save-30")
-bind_exec("SUPER + ALT + F3", "gpu-screen-recorder-replay-save-60")
-
-bind_exec("SUPER + ALT + tab", "gpu-screen-recorder-replay-toggle-recording")
+bind_exec("SUPER + ALT + S", "gsr region")
 
 -- Media keys
 -- the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode

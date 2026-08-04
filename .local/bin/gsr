@@ -1,0 +1,193 @@
+#!/usr/bin/env sh
+set -eu
+
+self=$(realpath -- "$(command -v -- "$0")")
+
+video_dir="${GSR_VIDEO_DIR:-$HOME/videos}"
+token_dir="${XDG_CONFIG_HOME:-$HOME/.config}/gpu-screen-recorder"
+recorder_pattern='(^|/)gpu-screen-recorder '
+marker="${XDG_RUNTIME_DIR:-/tmp}/gsr-recording"
+
+encode_flags='-k hevc_10bit -tune quality -cr full -ac opus -ab 192'
+
+notify() {
+    notify-send -a gsr -u low -t 2000 "$@"
+}
+
+die() {
+    printf 'gsr: %s\n' "$1" >&2
+    exit 1
+}
+
+signal() {
+    if ! pkill "-$1" -f "$recorder_pattern"; then
+        notify 'No recorder running' 'gsr | nothing to signal'
+        die 'no gpu-screen-recorder process found'
+    fi
+}
+
+status() {
+    if ! pgrep -f "$recorder_pattern" >/dev/null 2>&1; then
+        rm -f -- "$marker"
+        printf 'idle\n'
+    elif [ -e "$marker" ]; then
+        printf 'recording\n'
+    elif pgrep -f "$recorder_pattern.* -r " >/dev/null 2>&1; then
+        printf 'buffer\n'
+    else
+        printf 'recording\n'
+    fi
+}
+
+record() {
+    signal SIGRTMIN
+    if [ -e "$marker" ]; then
+        rm -f -- "$marker"
+        notify 'Recording stopped' 'gsr | saving'
+    else
+        : > "$marker"
+        notify 'Recording started' 'gsr | buffer still armed'
+    fi
+}
+
+on_save() {
+    notify "Saved | $2" "$(basename -- "$1")"
+}
+
+start_replay() {
+    mkdir -p -- "$dir"
+    notify 'Replay buffer started' "$profile | ${secs}s"
+    exec gpu-screen-recorder \
+        -w portal \
+        -f 60 \
+        -r "$secs" \
+        -c "$container" \
+        -a "$audio" \
+        $encode_flags \
+        $rate_flags \
+        -df yes \
+        -restore-portal-session yes \
+        -restart-replay-on-save yes \
+        -portal-session-token-filepath "$token_dir/$token" \
+        -sc "$self" \
+        -ro "$dir" \
+        -o "$dir"
+}
+
+replay() {
+    case ${1:-desktop} in
+        desktop)
+            profile=desktop
+            token=restore_token_desktop
+            dir="$video_dir/replay-desktop"
+            container=mp4
+            audio=default_output
+            rate_flags='-bm qp -q ultra -fm content -keyint 1'
+            ;;
+        secondary)
+            profile=secondary
+            token=restore_token_desktop_second_monitor
+            dir="$video_dir/replay-desktop"
+            container=mp4
+            audio=default_output
+            rate_flags='-bm qp -q ultra -fm content -keyint 1'
+            ;;
+        games)
+            profile=games
+            token=restore_token_games
+            dir="$video_dir/replay-games"
+            container=mkv
+            audio=GameSink.monitor
+            rate_flags='-bm cbr -q 50000 -fm cfr'
+            ;;
+        *)
+            die "unknown replay profile: $1 (use desktop, secondary, or games)"
+            ;;
+    esac
+
+    secs=${2:-300}
+    start_replay
+}
+
+save() {
+    case ${1:-full} in
+        full) signal SIGUSR1 ;;
+        10)   signal SIGRTMIN+1 ;;
+        30)   signal SIGRTMIN+2 ;;
+        60)   signal SIGRTMIN+3 ;;
+        300)  signal SIGRTMIN+4 ;;
+        600)  signal SIGRTMIN+5 ;;
+        1800) signal SIGRTMIN+6 ;;
+        *)    die "unknown save length: $1 (use 10, 30, 60, 300, 600, or 1800)" ;;
+    esac
+}
+
+region() {
+    geometry=$(slurp -f '%wx%h+%x+%y') || exit 0
+    [ -n "$geometry" ] || exit 0
+
+    mkdir -p -- "$video_dir"
+    exec gpu-screen-recorder \
+        -w region \
+        -region "$geometry" \
+        -f 60 \
+        -c mp4 \
+        -a default_output \
+        $encode_flags \
+        -bm qp -q ultra \
+        -fm cfr \
+        -sc "$self" \
+        -o "$video_dir/${1:-screen-rec-region}-$(now).mp4"
+}
+
+usage() {
+    cat <<'EOF'
+usage: gsr <command> [arguments]
+
+  replay [desktop|secondary|games] [seconds]   start a replay buffer (default: desktop, 300)
+  save [10|30|60|300|600|1800]                 save from the buffer (default: the whole buffer)
+  record                                       toggle a regular recording while a buffer runs
+  stop                                         stop the buffer without saving
+  region [name]                                select a region and record it
+  status                                       print idle, buffer, or recording
+
+Stopping a regular recording started with 'record' saves it; stopping a replay
+buffer does not.
+EOF
+}
+
+case ${1:-} in
+    /*)
+        on_save "$@"
+        ;;
+    replay)
+        shift
+        replay "$@"
+        ;;
+    save)
+        shift
+        save "$@"
+        ;;
+    record)
+        record
+        ;;
+    stop)
+        signal SIGINT
+        rm -f -- "$marker"
+        notify 'Replay buffer stopped'
+        ;;
+    status)
+        status
+        ;;
+    region)
+        shift
+        region "$@"
+        ;;
+    ''|-h|--help|help)
+        usage
+        ;;
+    *)
+        usage >&2
+        die "unknown command: $1"
+        ;;
+esac

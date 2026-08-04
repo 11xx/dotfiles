@@ -625,22 +625,39 @@ bind_exec("SUPER + CTRL + ALT + D", "aria2-dragdrop")
 # libdisplay-info-git
 # xorg-xwayland
 **** video recording
-Using =gpu-screen-recorder=
+Driven through =gsr=, the single dispatcher for =gpu-screen-recorder=. It owns
+the encoder settings and the signal names; these bindings only name intent.
+
+Start a replay buffer. The desktop profile captures through the portal with the
+default output audio, the games profile captures the game audio sink.
+
 #+begin_src lua
--- Save last 60 seconds
-bind_exec("SUPER + ALT + SPACE", "gpu-screen-recorder-replay-save")
+bind_exec("SUPER + ALT + R", "gsr replay desktop")
+bind_exec("SUPER + ALT + G", "gsr replay games")
+#+end_src
 
--- Pause/resume replay buffer
-bind_exec("SUPER + ALT + home", "gpu-screen-recorder-replay-toggle")
+Save the whole buffer, or a fixed tail of it. The notification comes from the
+recorder's own post-save hook, so it reports a real file rather than a keypress.
 
--- Stop replay buffer entirely
-bind_exec("SUPER + ALT + end", "gpu-screen-recorder-replay-stop")
+#+begin_src lua
+bind_exec("SUPER + ALT + SPACE", "gsr save")
+bind_exec("SUPER + ALT + F1", "gsr save 10")
+bind_exec("SUPER + ALT + F2", "gsr save 30")
+bind_exec("SUPER + ALT + F3", "gsr save 60")
+#+end_src
 
-bind_exec("SUPER + ALT + F1", "gpu-screen-recorder-replay-save-10")
-bind_exec("SUPER + ALT + F2", "gpu-screen-recorder-replay-save-30")
-bind_exec("SUPER + ALT + F3", "gpu-screen-recorder-replay-save-60")
+Toggle a regular recording while the buffer keeps running, and stop the buffer.
+Stopping a regular recording saves it; stopping a buffer does not.
 
-bind_exec("SUPER + ALT + tab", "gpu-screen-recorder-replay-toggle-recording")
+#+begin_src lua
+bind_exec("SUPER + ALT + tab", "gsr record")
+bind_exec("SUPER + ALT + end", "gsr stop")
+#+end_src
+
+Select a region with =slurp= and record it.
+
+#+begin_src lua
+bind_exec("SUPER + ALT + S", "gsr region")
 #+end_src
 
 **** media/volume

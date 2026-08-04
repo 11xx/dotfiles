@@ -1597,3 +1597,386 @@ p_exit() {
 
 p_exit TTY
 #+end_src
+
+* gsr: GPU Screen Recorder profiles and replay control
+:PROPERTIES:
+:CUSTOM_ID: gsr
+:header-args:shell: :tangle gsr :shebang #!/usr/bin/env sh
+:END:
+
+#+subtitle: One dispatcher for instant replay, regular recordings, and region capture
+
+=gpu-screen-recorder= is driven by two separate mechanisms: long-lived
+processes started with a full set of encoder flags, and Unix signals sent to
+those processes to save or stop them. This script is the single entry point for
+both, so the encoder settings live in exactly one place and the signal names
+are never spelled out at a call site.
+
+The name matters. Helper scripts named =gpu-screen-recorder-*= cannot signal
+the recorder safely, because =pkill -f= matches against the whole command line
+and a helper's own command line contains the pattern it is searching for. Such
+a helper sends the signal to itself as well as to the recorder, and since the
+default action for =SIGUSR1= is termination, it dies before it can report what
+it did. Naming this script =gsr= removes the collision at its source.
+
+** Prelude
+
+=$0= is whatever name the caller used, so it is resolved through =PATH= and
+made absolute. The recorder is told to run this same script as its post-save
+hook, and that hook path must be absolute because the recorder's working
+directory is not this script's.
+
+#+begin_src shell
+set -eu
+
+self=$(realpath -- "$(command -v -- "$0")")
+#+end_src
+
+** Paths and process matching
+
+#+begin_src shell
+video_dir="${GSR_VIDEO_DIR:-$HOME/videos}"
+token_dir="${XDG_CONFIG_HOME:-$HOME/.config}/gpu-screen-recorder"
+recorder_pattern='(^|/)gpu-screen-recorder '
+marker="${XDG_RUNTIME_DIR:-/tmp}/gsr-recording"
+#+end_src
+
+=$marker= records that a regular recording was started on top of a running
+replay buffer. That is the one piece of state the recorder does not expose:
+a buffer and a buffer-plus-recording look identical from the outside. It lives
+in the runtime directory, which is tmpfs and cleared between logins, so a
+marker cannot outlive the session that created it.
+
+The trailing space in =recorder_pattern= is what makes it precise. Anchoring
+with =^gpu-screen-recorder$= matches nothing at all, because =pkill -f= tests
+the entire command line including arguments and a running recorder always has
+some. The leading =(^|/)= keeps the pattern correct whether the recorder was
+started by bare name or by absolute path.
+
+Linux truncates process names to fifteen characters, so =gpu-screen-recorder=
+is stored as =gpu-screen-reco= and =pkill -x= refuses the longer name outright.
+Matching the full command line is the only option that works.
+
+** Encoder settings
+
+These flags apply to every profile. HEVC 10-bit is the best encoder this
+hardware offers, since consumer Ampere has no AV1 encoder; the extra bit depth
+mainly removes banding in gradients and sharpens small text. =-tune quality= is
+NVIDIA-only and is off by default. Full color range preserves true black and
+white levels, at the cost of clips looking washed out in players that assume
+limited range.
+
+#+begin_src shell
+encode_flags='-k hevc_10bit -tune quality -cr full -ac opus -ab 192'
+#+end_src
+
+Where this variable and =$rate_flags= are used below they are left unquoted so
+the shell splits them into separate arguments. Every value in them is a literal
+without whitespace, so the split is exactly the intended one.
+
+** Notifications and failure
+
+The recorder reports its own saves through the =-sc= hook, so nothing here
+announces a save optimistically. The one thing worth reporting eagerly is a
+signal sent to a recorder that is not running, which is otherwise silent.
+
+#+begin_src shell
+notify() {
+    notify-send -a gsr -u low -t 2000 "$@"
+}
+
+die() {
+    printf 'gsr: %s\n' "$1" >&2
+    exit 1
+}
+
+signal() {
+    if ! pkill "-$1" -f "$recorder_pattern"; then
+        notify 'No recorder running' 'gsr | nothing to signal'
+        die 'no gpu-screen-recorder process found'
+    fi
+}
+#+end_src
+
+** Reporting state
+
+The status bar polls this. Three states are reported: =idle= when no recorder
+is running, =recording= while a regular recording or a region capture is being
+written, and =buffer= while a replay buffer is armed but writing nothing.
+
+A recorder started without =-r= is writing a file directly, so it is recording
+whatever the marker says. The marker is removed whenever no recorder is running,
+which is what keeps a stale one from surviving a recorder that crashed.
+
+#+begin_src shell
+status() {
+    if ! pgrep -f "$recorder_pattern" >/dev/null 2>&1; then
+        rm -f -- "$marker"
+        printf 'idle\n'
+    elif [ -e "$marker" ]; then
+        printf 'recording\n'
+    elif pgrep -f "$recorder_pattern.* -r " >/dev/null 2>&1; then
+        printf 'buffer\n'
+    else
+        printf 'recording\n'
+    fi
+}
+#+end_src
+
+** Recording on top of a buffer
+
+Toggling is the only operation the recorder offers here, so the marker is what
+lets this report which direction it just toggled.
+
+#+begin_src shell
+record() {
+    signal SIGRTMIN
+    if [ -e "$marker" ]; then
+        rm -f -- "$marker"
+        notify 'Recording stopped' 'gsr | saving'
+    else
+        : > "$marker"
+        notify 'Recording started' 'gsr | buffer still armed'
+    fi
+}
+#+end_src
+
+** Post-save hook
+
+The recorder runs its =-sc= program with two arguments, the saved file's path
+and one of =replay=, =regular=, or =screenshot=. It is executed directly rather
+than through a shell, so the option cannot carry arguments of its own and this
+script has to recognise the call by its shape: a first argument that is an
+absolute path is the recorder calling back, never a subcommand.
+
+#+begin_src shell
+on_save() {
+    notify "Saved | $2" "$(basename -- "$1")"
+}
+#+end_src
+
+** Replay buffers
+
+=start_replay= reads the profile variables set by =replay= immediately before
+it is called.
+
+#+begin_src shell
+start_replay() {
+    mkdir -p -- "$dir"
+    notify 'Replay buffer started' "$profile | ${secs}s"
+    exec gpu-screen-recorder \
+        -w portal \
+        -f 60 \
+        -r "$secs" \
+        -c "$container" \
+        -a "$audio" \
+        $encode_flags \
+        $rate_flags \
+        -df yes \
+        -restore-portal-session yes \
+        -restart-replay-on-save yes \
+        -portal-session-token-filepath "$token_dir/$token" \
+        -sc "$self" \
+        -ro "$dir" \
+        -o "$dir"
+}
+#+end_src
+
+Each profile keeps its own portal restore token, which is what lets the buffer
+restart without prompting for a screen-share target again.
+
+The desktop profiles hold quality constant with =-bm qp=, which suits mostly
+static content and keeps text clean. A one-second keyframe interval makes short
+saved clips seek precisely, which matters when the useful part of a five-minute
+buffer is a few seconds long. =-fm content= encodes only when the screen
+actually changes; it is valid here because these profiles capture through the
+portal, and has no effect on direct monitor capture under Wayland.
+
+Games are high motion, where constant quality has no upper bound on size and
+the buffer lives in RAM. Constant bitrate bounds it instead. Constant frame
+rate avoids the variable-frame-rate output that many editors mishandle, and
+Matroska survives an interrupted write.
+
+#+begin_src shell
+replay() {
+    case ${1:-desktop} in
+        desktop)
+            profile=desktop
+            token=restore_token_desktop
+            dir="$video_dir/replay-desktop"
+            container=mp4
+            audio=default_output
+            rate_flags='-bm qp -q ultra -fm content -keyint 1'
+            ;;
+        secondary)
+            profile=secondary
+            token=restore_token_desktop_second_monitor
+            dir="$video_dir/replay-desktop"
+            container=mp4
+            audio=default_output
+            rate_flags='-bm qp -q ultra -fm content -keyint 1'
+            ;;
+        games)
+            profile=games
+            token=restore_token_games
+            dir="$video_dir/replay-games"
+            container=mkv
+            audio=GameSink.monitor
+            rate_flags='-bm cbr -q 50000 -fm cfr'
+            ;;
+        *)
+            die "unknown replay profile: $1 (use desktop, secondary, or games)"
+            ;;
+    esac
+
+    secs=${2:-300}
+    start_replay
+}
+#+end_src
+
+** Saving from the buffer
+
+Each buffer length the recorder supports has its own real-time signal. A
+cancelled save is reported by =signal=, and a successful one by the hook.
+
+#+begin_src shell
+save() {
+    case ${1:-full} in
+        full) signal SIGUSR1 ;;
+        10)   signal SIGRTMIN+1 ;;
+        30)   signal SIGRTMIN+2 ;;
+        60)   signal SIGRTMIN+3 ;;
+        300)  signal SIGRTMIN+4 ;;
+        600)  signal SIGRTMIN+5 ;;
+        1800) signal SIGRTMIN+6 ;;
+        *)    die "unknown save length: $1 (use 10, 30, 60, 300, 600, or 1800)" ;;
+    esac
+}
+#+end_src
+
+** Region capture
+
+=slurp= emits the recorder's own geometry format directly when given a format
+string, so no reshaping of its output is needed. Cancelling the selection exits
+quietly.
+
+#+begin_src shell
+region() {
+    geometry=$(slurp -f '%wx%h+%x+%y') || exit 0
+    [ -n "$geometry" ] || exit 0
+
+    mkdir -p -- "$video_dir"
+    exec gpu-screen-recorder \
+        -w region \
+        -region "$geometry" \
+        -f 60 \
+        -c mp4 \
+        -a default_output \
+        $encode_flags \
+        -bm qp -q ultra \
+        -fm cfr \
+        -sc "$self" \
+        -o "$video_dir/${1:-screen-rec-region}-$(now).mp4"
+}
+#+end_src
+
+** Usage and dispatch
+
+#+begin_src shell
+usage() {
+    cat <<'EOF'
+usage: gsr <command> [arguments]
+
+  replay [desktop|secondary|games] [seconds]   start a replay buffer (default: desktop, 300)
+  save [10|30|60|300|600|1800]                 save from the buffer (default: the whole buffer)
+  record                                       toggle a regular recording while a buffer runs
+  stop                                         stop the buffer without saving
+  region [name]                                select a region and record it
+  status                                       print idle, buffer, or recording
+
+Stopping a regular recording started with 'record' saves it; stopping a replay
+buffer does not.
+EOF
+}
+#+end_src
+
+An absolute path in the first argument means the recorder is invoking this
+script as its post-save hook, so that case is tested before any subcommand.
+
+#+begin_src shell
+case ${1:-} in
+    /*)
+        on_save "$@"
+        ;;
+    replay)
+        shift
+        replay "$@"
+        ;;
+    save)
+        shift
+        save "$@"
+        ;;
+    record)
+        record
+        ;;
+    stop)
+        signal SIGINT
+        rm -f -- "$marker"
+        notify 'Replay buffer stopped'
+        ;;
+    status)
+        status
+        ;;
+    region)
+        shift
+        region "$@"
+        ;;
+    ''|-h|--help|help)
+        usage
+        ;;
+    *)
+        usage >&2
+        die "unknown command: $1"
+        ;;
+esac
+#+end_src
+
+** Hyprland bindings
+
+Start the desktop buffer, and the game buffer when one is wanted instead.
+
+#+begin_src lua :tangle no
+bind_exec("SUPER + ALT + R", "gsr replay desktop")
+bind_exec("SUPER + ALT + G", "gsr replay games")
+#+end_src
+
+Save the whole buffer, or a fixed tail of it.
+
+#+begin_src lua :tangle no
+bind_exec("SUPER + ALT + SPACE", "gsr save")
+bind_exec("SUPER + ALT + F1", "gsr save 10")
+bind_exec("SUPER + ALT + F2", "gsr save 30")
+bind_exec("SUPER + ALT + F3", "gsr save 60")
+#+end_src
+
+Toggle a regular recording while the buffer runs, and stop the buffer.
+
+#+begin_src lua :tangle no
+bind_exec("SUPER + ALT + tab", "gsr record")
+bind_exec("SUPER + ALT + end", "gsr stop")
+#+end_src
+
+Select a region and record it. This is a recording rather than a buffer, so it
+stops with the same =gsr stop= binding.
+
+#+begin_src lua :tangle no
+bind_exec("SUPER + ALT + S", "gsr region")
+#+end_src
+
+** Tangling
+
+With point inside this Org file:
+
+#+begin_src text :tangle no
+M-x org-babel-tangle
+#+end_src
