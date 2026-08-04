@@ -105,13 +105,24 @@ screenshot-format=jxl
 
 ** Low VRAM profile
 
-When another process is holding most of the GPU's memory, the default output
-cannot allocate its video textures and playback dies with
-=VK_ERROR_OUT_OF_DEVICE_MEMORY= before the first frame. Neither a cheaper
-render profile nor the older =gpu= output avoids this, because the allocation
-that fails is the frame upload itself rather than anything the shader chain
-adds. =dmabuf-wayland= passes frames to the compositor instead of allocating
-its own textures, so it still plays when there is no headroom left.
+When another process is holding most of the GPU's memory, playback needs to
+stop touching the card altogether. Every stage claims video memory on its own,
+so relaxing one of them only moves the failure to the next: the decoder dies
+first with =CUDA_ERROR_OUT_OF_MEMORY=, and a hardware-backed output then fails
+to upload the frame it never received. Changing the output alone leaves the
+decoder allocating, which reports as an audio-only session rather than as an
+error.
+
+All three stages therefore give up their claim together. Software decoding and
+a shared-memory output keep the card out of the path entirely, and disabling
+the cache keeps a multi-gigabyte recording from being pulled into memory that
+is also under pressure.
+
+The cost is decoding 1440p60 HEVC on the CPU and reading the file as it plays,
+which is the right trade only while there are cores to spare and the recording
+sits on fast storage. Both hold here, and neither is guaranteed: a game that
+saturates the CPU, or a file on a slow disk, takes this option away rather than
+merely slowing it down.
 
 Run it with =mpv --profile=lowvram=.
 
@@ -122,7 +133,9 @@ applying to normal playback.
 #+begin_src conf
 [lowvram]
 profile-desc=Playback while another process holds the GPU memory
-vo=dmabuf-wayland
+hwdec=no
+vo=wlshm
+cache=no
 #+end_src
 
 * MPV input.conf
