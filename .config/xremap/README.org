@@ -140,28 +140,55 @@ WantedBy=graphical-session.target
 :tangle-dir: (xdg-bin-home)
 :END:
 
+The =--device= filter is load-bearing, not an optimization. Without it xremap
+grabs /every/ keyboard on the seat, including virtual =uinput= devices — so any
+tool that synthesizes keystrokes (accessibility software, automation, an agent
+driving the desktop) has its input silently rewritten by the Emacs layer, and
+an injected =C-f= arrives at the browser as =right=. That failure is invisible
+from both ends: the sender believes it sent =C-f=, the application honestly
+received =right=, and nothing logs a remap.
+
+So this script never runs xremap unfiltered. If the keyboard is absent it waits
+for it rather than starting in a degraded mode or exiting — the unit sets
+=Restart=always=, so exiting would just reproduce the same situation every few
+seconds and notify each time. Waiting keeps the service alive, quiet, and
+correct, and xremap begins the moment the keyboard is plugged in.
+
+The device name lives in exactly one place here. It previously also appeared in
+an unreferenced helper function, which is the kind of duplicate that survives
+right up until someone updates one copy.
+
+Signals get two traps rather than one. A handler that only notifies leaves the
+shell running, which was invisible while xremap held the foreground — the
+signal killed xremap, the script then ended on its own. With a wait loop the
+script /is/ the foreground, so a notify-only handler swallows =SIGTERM= and
+keeps polling until systemd escalates to =SIGKILL=. Terminating signals
+therefore exit, and =EXIT= carries the notification for every path.
+
 #+begin_src shell :tangle (tdir "xremap-default") :shebang #!/bin/sh
 command -v xremap >/dev/null || {
     notify-send -a "xremap-default script" "ERROR: xremap command not available" "add it to path of the running shell"
     exit 1
 }
 
-cmd () {
-    xremap ~/.config/xremap/browser-emacs.yaml --device 'SINO WEALTH USB KEYBOARD'
-}
-
 notify() {
     notify-send -a "xremap-default script" "xremap killed" "restart it as necessary."
 }
 
-trap notify INT QUIT TSTP TERM EXIT
+trap notify EXIT
+trap 'exit 143' INT QUIT TSTP TERM
 
 kbname='SINO WEALTH USB KEYBOARD'
 
-if xremap --list-devices 2>/dev/null | grep -q "${kbname}"; then
-    xremap ~/.config/xremap/browser-emacs.yaml --device "${kbname}"
-else
-    notify-send -a "xremap-default" "Device \"${kbname}\" not found, running without --device filter"
-    xremap ~/.config/xremap/browser-emacs.yaml
-fi
+waiting=0
+while ! xremap --list-devices 2>/dev/null | grep -qF "${kbname}"; do
+    [ "${waiting}" -eq 0 ] && {
+        notify-send -a "xremap-default script" "Waiting for keyboard" \
+            "\"${kbname}\" not connected. Remapping stays off until it is; xremap is never run unfiltered."
+        waiting=1
+    }
+    sleep 5
+done
+
+xremap ~/.config/xremap/browser-emacs.yaml --device "${kbname}"
 #+end_src
