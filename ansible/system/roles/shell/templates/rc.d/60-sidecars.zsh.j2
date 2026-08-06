@@ -1,0 +1,19 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+# Managed by Ansible (role: shell) — edit the role, not this file.
+#
+# Each sidecar is probed before it is initialised, so a host that carries only
+# some of them still gets a working shell instead of an error on every login.
+{% for sidecar in zsh_sidecars %}
+
+{% if sidecar == 'atuin' %}
+# --disable-up-arrow keeps Up bound to zsh's own prefix search from
+# 50-keybinds.zsh; atuin stays on Ctrl-R.
+(( $+commands[atuin] )) && eval "$(atuin init zsh --disable-up-arrow)"
+{% elif sidecar == 'zoxide' %}
+# --cmd cd shadows cd entirely, so plain `cd` learns frecency and no second verb
+# has to be remembered.
+(( $+commands[zoxide] )) && eval "$(zoxide init zsh --cmd cd)"
+{% else %}
+(( $+commands[{{ sidecar }}] )) && eval "$({{ sidecar }} init zsh)"
+{% endif %}
+{% endfor %}

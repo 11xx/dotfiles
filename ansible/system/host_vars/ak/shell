@@ -1,0 +1,4 @@
+# ak predates the shared layer and its interactive config is tangled from
+# ~/.config/shell/README.org, so its ZDOTDIR keeps the historical name. The
+# shared fragments land in rc.d under it exactly as they do elsewhere.
+zdotdir: "{{ xdg_config_home }}/shell"

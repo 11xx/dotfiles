@@ -1,12 +1,33 @@
-[arch]
-ak
+# Three machines, grouped twice over: by distribution (which package manager and
+# file layout a role must speak) and by purpose (what the machine is for).
+#
+#   ak   Arch desktop, managed locally by the playbook running on it.
+#   gak  Guix System home server. Declarative, so Ansible only ships its .scm
+#        files and never reconfigures it.
+#   pak  Raspberry Pi 4 on Debian, running the LAN DNS/proxy/vault stack.
+all:
+  children:
+    arch:
+      hosts:
+        ak:
+          ansible_connection: local
 
-[arch:vars]
-ansible_connection=local
+    guix:
+      hosts:
+        gak: {}
 
-[raspberry_pi]
-pak
+    debian:
+      hosts:
+        pak:
+          ansible_python_interpreter: /usr/bin/python3
 
-[raspberry_pi:vars]
-ansible_ssh_pipelining=true
-ansible_python_interpreter=/usr/bin/python3
+    # A workstation has a display, a session, and a human in front of it.
+    workstations:
+      hosts:
+        ak: {}
+
+    # Servers are headless and share the trimmed shell profile.
+    servers:
+      hosts:
+        gak: {}
+        pak: {}

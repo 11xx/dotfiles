@@ -1,7 +1,0 @@
-- name: Clone antidote (zsh plugin manager) to system share
-  ansible.builtin.git:
-    repo: https://github.com/mattmc3/antidote.git
-    dest: /usr/share/zsh-antidote
-    depth: 1
-    update: false
-  become: true

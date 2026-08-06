@@ -1,0 +1,87 @@
+---
+# Ansible is the source of truth for gak's Guix configuration, and does not
+# apply it.
+#
+# Guix is declarative already, and its own tooling is what turns these files
+# into a running system. Reconfiguring is slow, needs the whole store, and can
+# leave the host unbootable if an expression is wrong — none of which belongs in
+# an unattended play. So this role ships the files, `--diff` shows exactly what
+# changed, and the reconfigure is a deliberate act on the host afterwards.
+#
+# Nothing here escalates: every path is under the user's home, so gak needs no
+# become password.
+
+- name: 'guix: Create configuration directories'
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ guix_config_dir }}"
+    - "{{ guix_home_config_dir }}"
+    - "{{ guix_channel_dir }}/11xx/packages"
+  tags: ['guix-system', 'guix-home', 'guix-channel']
+
+# Templated rather than copied so the FQDN and SSH port of the build machine
+# come from the vault: this repository is public, and those are the two values
+# in it that describe the private network rather than the machine.
+- name: 'guix: Deploy the system configuration'
+  ansible.builtin.template:
+    src: system.scm.j2
+    dest: "{{ guix_config_dir }}/system.scm"
+    mode: "0644"
+  register: guix_system_config
+  tags: ['guix-system']
+
+- name: 'guix: Deploy the channel list'
+  ansible.builtin.copy:
+    src: channels.scm
+    dest: "{{ guix_config_dir }}/channels.scm"
+    mode: "0644"
+  register: guix_channels_config
+  tags: ['guix-system']
+
+- name: 'guix: Deploy the local 11xx channel'
+  ansible.builtin.copy:
+    src: 11xx-guix-channel/
+    dest: "{{ guix_channel_dir }}/"
+    mode: "0644"
+    directory_mode: "0755"
+  register: guix_channel_source
+  tags: ['guix-channel']
+
+- name: 'guix: Deploy the home configuration'
+  ansible.builtin.template:
+    src: home-configuration.scm.j2
+    dest: "{{ guix_home_config_dir }}/home-configuration.scm"
+    mode: "0644"
+  register: guix_home_config
+  tags: ['guix-home']
+
+# The 11xx channel is consumed over file:// by commit, so an edit is invisible
+# to `guix pull` until it is committed. Leaving it uncommitted is the single
+# easiest way to reconfigure and wonder why nothing changed.
+- name: 'guix: Check whether the 11xx channel has uncommitted changes'
+  ansible.builtin.command:
+    cmd: git status --porcelain
+    chdir: "{{ guix_channel_dir }}"
+  register: guix_channel_status
+  changed_when: false
+  failed_when: false
+  tags: ['guix-channel']
+
+- name: 'guix: Report what still needs applying by hand'
+  ansible.builtin.debug:
+    msg: "{{ guix_pending_steps }}"
+  vars:
+    guix_pending_steps: >-
+      {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' commit -am "update zsh plugins"']
+              if guix_channel_status.stdout | default('') | length > 0 else [])
+         + (['guix pull   (channels.scm changed)']
+              if guix_channels_config.changed or guix_channel_source.changed else [])
+         + (['sudo guix system reconfigure ' ~ guix_config_dir ~ '/system.scm']
+              if guix_system_config.changed else [])
+         + (['guix home reconfigure ' ~ guix_home_config_dir ~ '/home-configuration.scm']
+              if guix_home_config.changed or guix_channel_source.changed else [])
+         ) | default(['Nothing to apply: gak is in sync.'], true) }}
+  tags: ['guix-system', 'guix-home', 'guix-channel']

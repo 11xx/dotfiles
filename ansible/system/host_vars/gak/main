@@ -1,0 +1,18 @@
+# gak needs no vault: everything Ansible touches on it lives under $HOME, so no
+# task escalates and there is no become password to hold. Reconfiguring the Guix
+# system itself is a manual step run on the host.
+ansible_user: lobo
+ansible_group: lobo
+
+# Guix System has no /usr/bin/python3 — it has no /usr/bin at all beyond `env` —
+# so interpreter discovery finds nothing and every module fails before it runs.
+# `python` is declared in home-configuration.scm to keep this path populated and
+# rooted against `guix gc`.
+#
+# Bootstrapping a fresh gak therefore needs one manual step before Ansible can
+# reach it at all:
+#
+#   guix install python
+#
+# after which `guix home reconfigure` takes over ownership of it.
+ansible_python_interpreter: "/home/lobo/.guix-home/profile/bin/python3"

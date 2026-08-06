@@ -1,0 +1,98 @@
+# Managed by Ansible (role: pak_services) — edit the role, not this file.
+#
+# The LAN's DNS, TLS front door and password vault. Runs rootless, so the
+# unprivileged port start is lowered to 53 by the containers_pak role rather
+# than any of this asking for root.
+
+services:
+  # Built rather than pulled: the stock caddy image has no DNS provider plugins,
+  # and the Cloudflare one is what lets vaultwarden get a real certificate for a
+  # name that never resolves outside the LAN.
+  caddy:
+    container_name: caddy
+    build:
+      context: .
+      dockerfile: ./caddy-cloudflare.Dockerfile
+    networks:
+      - caddy-net
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./etc-caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./etc-caddy/conf.d:/etc/caddy/conf.d
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file: "./etc-caddy/caddy.env"
+
+  pihole-unbound:
+    container_name: pihole-unbound
+    image: mpgirro/pihole-unbound:latest
+    # Written in directly rather than through ${HOSTNAME}/${DOMAIN_NAME}.
+    # Compose interpolates those from the invoking shell, never from env_file,
+    # so under systemd they fell back to the defaults and by hand they picked up
+    # the host's own name — two different hostnames for the same stack.
+    hostname: {{ pihole_hostname }}
+    domainname: {{ pihole_domain_name }}
+    networks:
+      - caddy-net
+    ports:
+      - "53:53/tcp"
+      # Two UDP bindings on purpose. Podman's own DNS wants the loopback one,
+      # and LAN clients need the address they were handed by DHCP; a single
+      # 0.0.0.0 binding collides with podman's resolver.
+      - "127.0.0.1:53:53/udp"
+      - "{{ pak_address }}:53:53/udp"
+      - "{{ pihole_webport }}:80/tcp"
+      - "853:853/tcp"   # DNS-over-TLS
+    environment:
+      - TZ={{ pak_timezone }}
+      - FTLCONF_LOCAL_IPV4={{ pak_address }}
+      - FTLCONF_webserver_api_passwordFile=/run/secrets/pihole-web-password
+      - FTLCONF_webserver_user_interface_theme=default-auto
+      - FTLCONF_dns_upstreams=127.0.0.1#5335   # unbound, in the same container
+      - FTLCONF_dns_listeningMode=single
+      - FTLCONF_dns_dnssec=true
+      # dnsmasq warns above 10000 that a larger cache is unlikely to help and
+      # may hurt, so this sits exactly at the ceiling.
+      - FTLCONF_dns_cache_size=10000
+    volumes:
+      - etc_pihole-unbound:/etc/pihole:rw
+      - etc_pihole_dnsmasq-unbound:/etc/dnsmasq.d:rw
+      - ./etc-pihole/custom.list:/etc/pihole/custom.list:rw
+      - ./etc-pihole/pihole.toml:/etc/pihole/pihole.toml:rw
+    restart: unless-stopped
+    secrets:
+      - pihole-web-password
+
+  vaultwarden:
+    container_name: vaultwarden
+    image: vaultwarden/server:latest
+    networks:
+      - caddy-net
+    ports:
+      - "5050:80"
+    volumes:
+      - vaultwarden_data:/data/
+    restart: unless-stopped
+
+networks:
+  caddy-net:
+    driver: bridge
+    name: caddy-net
+
+volumes:
+  # External so that a `podman-compose down -v` cannot take the issued
+  # certificates with it; re-issuing them hits Let's Encrypt rate limits.
+  caddy_data:
+    external: true
+  caddy_config:
+  etc_pihole-unbound:
+  etc_pihole_dnsmasq-unbound:
+  vaultwarden_data:
+
+secrets:
+  pihole-web-password:
+    external: true

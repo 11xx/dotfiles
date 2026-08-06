@@ -1,0 +1,12 @@
+---
+# Every host, in dependency order: ak is the build machine gak offloads to, and
+# pak serves the DNS the other two resolve through.
+#
+# Run a single host with its own playbook (`system.yaml`, `gak.yaml`,
+# `pak.yaml`) or with `--limit`. Tags apply across all three, so
+# `ansible-playbook site.yaml --tags shell` updates the shared shell layer
+# everywhere at once — which is the point of it being shared.
+
+- ansible.builtin.import_playbook: system.yaml
+- ansible.builtin.import_playbook: gak.yaml
+- ansible.builtin.import_playbook: pak.yaml

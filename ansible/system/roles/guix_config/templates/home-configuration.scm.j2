@@ -1,0 +1,116 @@
+;;; Managed by Ansible (role: guix_config) — edit the role, not this file.
+;;;
+;;; Ansible ships this file; it never reconfigures gak. Apply it by hand:
+;;;
+;;;   guix home reconfigure ~/.config/guix-home/home-configuration.scm
+
+(use-modules (gnu home)
+             (gnu home services)
+             (gnu packages)
+             (gnu services)
+             (guix gexp)
+             (gnu home services shells)
+             (gnu home services gnupg)
+             (gnu home services shepherd)
+
+             ((11xx packages shell-utils) #:prefix 11xx:))
+
+(home-environment
+ (packages
+  (append
+   (specifications->packages
+    (list "bash-completion"
+          "zsh-completions"
+
+          ;; Guix System ships no python, and Ansible needs one on the target to
+          ;; run any module at all. Declared here so the interpreter has a
+          ;; stable, garbage-collection-rooted path in the Home profile rather
+          ;; than a /gnu/store path that `guix gc` can remove underneath it.
+          "python"
+
+          "git"
+          "curl"
+          "wget"
+          "gnupg"
+
+          "eza"
+          "fd"
+          "bat"
+          "ripgrep"
+          "rsync"
+          "nnn"
+          "btop"
+          "smartmontools"
+
+          ;; Sidecars 60-sidecars.zsh initialises.
+          "zoxide"
+          "fzf"
+          "atuin"
+
+          "podman-compose"))
+
+   ;; zsh plugins come from the local 11xx channel rather than Guix upstream, so
+   ;; they land under share/zsh/plugins/<name>/ with the same names and entry
+   ;; files ak and pak use. That is what lets rc.d be shared verbatim.
+   (list 11xx:zsh-powerlevel10k
+         11xx:zsh-autopair
+         11xx:zsh-autosuggestions
+         11xx:zsh-syntax-highlighting
+         11xx:zsh-history-substring-search)))
+
+ (services
+  (append
+   (list
+    (service home-zsh-service-type
+             (home-zsh-configuration
+              (xdg-flavor? #t)
+              (zshrc
+               (list
+                ;; Emacs TRAMP and other dumb terminals get a bare shell. A
+                ;; themed prompt makes TRAMP hang waiting for a banner it cannot
+                ;; parse. This cannot move into rc.d: `return` inside a sourced
+                ;; file leaves only that file, not the whole zshrc.
+                (plain-file "00-dumb-terminal-guard.zsh"
+                            "if [[ $TERM == dumb ]] || [[ -n $INSIDE_EMACS ]]; then
+    unsetopt zle
+    PS1='$ '
+    export HISTFILE=$HOME/.tramp_history
+    return
+fi
+")
+
+                ;; Everything else is the shared layer, deployed by Ansible's
+                ;; shell role and identical on ak, gak and pak. Host-specific
+                ;; zsh code belongs below this loop, not inside rc.d.
+                (plain-file "10-shared-fragments.zsh"
+                            "for _fragment in {{ zsh_rc_dir }}/*.zsh(N.); do
+    source \"$_fragment\"
+done
+unset _fragment
+")))))
+
+    ;; Rootless podman. The store lives on /marak because the root filesystem is
+    ;; a 500 GB NVMe and container images are the one thing here that grows
+    ;; without bound.
+    (simple-service 'podman-user-config
+                    home-xdg-configuration-files-service-type
+                    `(("containers/registries.conf"
+                       ,(plain-file "registries.conf"
+                                    "unqualified-search-registries = ['docker.io', 'registry.fedoraproject.org', 'registry.access.redhat.com', 'registry.centos.org']"))
+
+                      ("containers/storage.conf"
+                       ,(plain-file "storage.conf"
+                                    (string-append "[storage]\n"
+                                                   "driver = \"overlay\"\n"
+                                                   "runroot = \"/run/user/1000/containers\"\n"
+                                                   "graphroot = \"/marak/podman-storage\"\n")))
+
+                      ("containers/policy.json"
+                       ,(plain-file "policy.json"
+                                    "{\"default\": [{\"type\": \"insecureAcceptAnything\"}]}"))))
+
+    (service home-gpg-agent-service-type
+             (home-gpg-agent-configuration
+              (ssh-support? #t))))
+
+   %base-home-services)))

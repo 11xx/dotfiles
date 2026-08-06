@@ -1,0 +1,23 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+# Managed by Ansible (role: shell) — edit the role, not this file.
+#
+# Plugins are installed as plain checkouts rather than distribution packages, so
+# every host resolves them from one layout and the load order below is the same
+# everywhere. The order matters: syntax highlighting wraps the line editor and
+# has to see the widgets it colours already defined, and history-substring-search
+# rebinds keys highlighting has just hooked, so it follows.
+#
+# A missing plugin is skipped rather than fatal. Losing autosuggestions is a
+# nuisance; failing to get a login shell on a headless box is not.
+ZSH_PLUGIN_DIR={{ zsh_plugin_dir }}
+
+{% for plugin in zsh_plugins %}
+[[ -r $ZSH_PLUGIN_DIR/{{ plugin.name }}/{{ plugin.entry }} ]] &&
+    source $ZSH_PLUGIN_DIR/{{ plugin.name }}/{{ plugin.entry }}
+{% endfor %}
+
+# Written by `p10k configure`, and large enough that it stays out of version
+# control. Loaded after the theme so it can override the theme's defaults.
+[[ -r ${ZDOTDIR:-$HOME}/.p10k.zsh ]] && source "${ZDOTDIR:-$HOME}/.p10k.zsh"
+
+AUTOSUGGESTION_ACCEPT_RIGHT_ARROW=1

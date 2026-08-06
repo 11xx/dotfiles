@@ -1,0 +1,38 @@
+;;; Managed by Ansible (role: guix_config) — edit the role, not this file.
+;;;
+;;; Applied by `guix pull`, run by hand on gak.
+
+(cons* (channel
+        (name 'nonguix)
+        (url "https://gitlab.com/nonguix/nonguix")
+        ;; Enable signature verification:
+        (introduction
+         (make-channel-introduction
+          "897c1a470da759236cc11798f4e0a5f7d4d59fbc"
+          (openpgp-fingerprint
+           "2A39 3FFF 68F4 EF7A 3D29  12AF 6F51 20A0 22FB B2D5"))))
+
+       (channel
+        (name 'rosenthal)
+        (url "https://codeberg.org/hako/rosenthal.git")
+        (branch "trunk")
+        (introduction
+         (make-channel-introduction
+          "7677db76330121a901604dfbad19077893865f35"
+          (openpgp-fingerprint
+           "13E7 6CD6 E649 C28C 3385  4DF5 5E5A A665 6149 17F7"))))
+
+       ;; (channel
+       ;;  (name 'bugchan)
+       ;;  (url "https://gitlab.com/bigbookofbug/bugchan.git")
+       ;;  (branch "master")
+       ;;  (introduction
+       ;;   (make-channel-introduction
+       ;;    "c2ed428f3a41c1fce149b245253f9f5382f42efd"
+       ;;    (openpgp-fingerprint
+       ;;     "ACF7 CA25 C886 9B8A 1669 67D7 7350 3372 E2C6 3BCF"))))
+       (channel
+        (name '11xx)
+        (url (string-append "file://" (getenv "HOME") "/11xx-guix-channel")))
+
+       %default-channels)

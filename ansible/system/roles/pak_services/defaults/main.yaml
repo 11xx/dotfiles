@@ -1,0 +1,6 @@
+---
+pak_services_dir: "{{ ansible_facts['user_dir'] }}/local-net-services"
+
+# Pi-hole stamps query logs with this, so it wants the household's timezone
+# rather than the host's UTC.
+pak_timezone: America/Sao_Paulo

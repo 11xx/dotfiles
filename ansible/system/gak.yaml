@@ -1,0 +1,17 @@
+---
+# gak — the Guix System home server: NFS for the media trees, rootless podman,
+# and an offload build machine for ak.
+#
+# Guix is declarative and applies its own configuration, so this playbook ships
+# files and stops there. It never runs `guix system reconfigure` or `guix home
+# reconfigure`; the role prints whichever of those the change now needs.
+#
+# Nothing here escalates — every path is under the user's home — so gak needs no
+# become password and no vault.
+
+- name: Guix home server
+  hosts: gak
+
+  roles:
+    - { role: guix_config, tags: ['guix'] }
+    - { role: shell, tags: ['shell'] }

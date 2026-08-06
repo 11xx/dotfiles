@@ -1,0 +1,120 @@
+---
+# The LAN services stack, previously tangled straight onto pak from
+# raspberry-pi-4/README.org with no record of what was deployed.
+#
+# Everything runs rootless as the login user, so nothing here escalates except
+# the ufw rules. Applying config is deliberately separate from restarting the
+# stack: rebuilding caddy with xcaddy on a Pi 4 takes minutes, so the handler
+# only fires when a file actually changed.
+
+- name: 'pak_services: Create the stack directory tree'
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ pak_services_dir }}"
+    - "{{ pak_services_dir }}/etc-caddy"
+    - "{{ pak_services_dir }}/etc-caddy/conf.d"
+    - "{{ pak_services_dir }}/etc-pihole"
+  tags: ['pak-services-config']
+
+# compose bind-mounts these two as single files. If a path is missing, podman
+# creates a *directory* there instead, and pihole then fails to start with an
+# error that points nowhere near the cause. Both hold state pihole rewrites at
+# runtime, so they are created empty and never overwritten.
+- name: 'pak_services: Ensure bind-mounted pihole config files exist'
+  ansible.builtin.copy:
+    dest: "{{ pak_services_dir }}/etc-pihole/{{ item }}"
+    content: ""
+    force: false
+    mode: "0644"
+  loop:
+    - custom.list
+    - pihole.toml
+  tags: ['pak-services-config']
+
+- name: 'pak_services: Deploy the caddy build and site config'
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ pak_services_dir }}/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: caddy-cloudflare.Dockerfile, dest: caddy-cloudflare.Dockerfile }
+    - { src: etc-caddy/Caddyfile, dest: etc-caddy/Caddyfile }
+    - { src: etc-caddy/conf.d/vaultwarden, dest: etc-caddy/conf.d/vaultwarden }
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Restart local-net-services
+  tags: ['pak-services-config']
+
+- name: 'pak_services: Deploy the compose file'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ pak_services_dir }}/compose.yaml"
+    mode: "0644"
+  notify: Restart local-net-services
+  tags: ['pak-services-config']
+
+# 0600: this is the Cloudflare API token that can edit the zone's DNS.
+- name: 'pak_services: Deploy the caddy environment file'
+  ansible.builtin.template:
+    # Named without the .env infix so the repository's "never commit a .env"
+    # ignore rule keeps applying to real ones.
+    src: caddy-env.j2
+    dest: "{{ pak_services_dir }}/etc-caddy/caddy.env"
+    mode: "0600"
+  notify: Restart local-net-services
+  tags: ['pak-services-config', 'pak-services-secrets']
+
+# Compose declares this secret `external`, so podman must already hold it. It is
+# mounted into the container as a file rather than passed as an environment
+# variable, which would show up in `podman inspect`.
+- name: 'pak_services: Check whether the pihole web password secret exists'
+  ansible.builtin.command:
+    cmd: podman secret inspect pihole-web-password
+  register: pak_pihole_secret
+  changed_when: false
+  failed_when: false
+  tags: ['pak-services-secrets']
+
+- name: 'pak_services: Create the pihole web password secret'
+  ansible.builtin.shell:
+    cmd: printf '%s' '{{ pihole_web_password }}' | podman secret create pihole-web-password -
+  # The check above is a command, which --check skips, leaving rc undefined —
+  # hence the default rather than relying on condition evaluation order.
+  when:
+    - not ansible_check_mode
+    - pak_pihole_secret.rc | default(1) != 0
+  no_log: true
+  tags: ['pak-services-secrets']
+
+# Declared external so that tearing the stack down with -v cannot delete the
+# issued certificates; re-issuing them runs into Let's Encrypt rate limits.
+- name: 'pak_services: Ensure the external caddy_data volume exists'
+  ansible.builtin.command:
+    cmd: podman volume create caddy_data
+  register: pak_caddy_volume
+  changed_when: "'already exists' not in pak_caddy_volume.stderr"
+  failed_when:
+    - pak_caddy_volume.rc != 0
+    - "'already exists' not in pak_caddy_volume.stderr"
+  when: not ansible_check_mode
+  tags: ['pak-services-config']
+
+- name: 'pak_services: Install the stack systemd user unit'
+  ansible.builtin.template:
+    src: local-net-services.service.j2
+    dest: "{{ xdg_config_home }}/systemd/user/local-net-services.service"
+    mode: "0644"
+  notify: Restart local-net-services
+  tags: ['pak-services-unit']
+
+- name: 'pak_services: Enable the stack at boot'
+  ansible.builtin.systemd_service:
+    name: local-net-services.service
+    enabled: true
+    daemon_reload: true
+    scope: user
+  when: not ansible_check_mode
+  tags: ['pak-services-unit']

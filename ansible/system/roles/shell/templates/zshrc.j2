@@ -1,0 +1,21 @@
+# Managed by Ansible (role: shell) — edit the role, not this file.
+#
+# Deliberately thin. Everything of substance is a shared fragment in rc.d, so
+# this host's shell is the same one ak and gak get.
+
+# Repeated from .zshenv because a shell can be started with ZDOTDIR already set,
+# skipping .zshenv entirely. A `return` inside a sourced fragment would only
+# leave that fragment, so this guard cannot move into rc.d.
+if [[ $TERM == dumb ]] || [[ -n $INSIDE_EMACS ]]; then
+    unsetopt zle
+    PS1='$ '
+    export HISTFILE=$HOME/.tramp_history
+    return
+fi
+
+[[ $- != *i* ]] && return
+
+for _fragment in {{ zsh_rc_dir }}/*.zsh(N.); do
+    source "$_fragment"
+done
+unset _fragment

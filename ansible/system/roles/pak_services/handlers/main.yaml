@@ -1,0 +1,11 @@
+---
+# Restarting means a full down/pull/up, and rebuilding caddy with xcaddy on a
+# Pi 4 is slow, so this fires only when a deployed file actually changed. It
+# also takes DNS down for the whole LAN while it runs.
+- name: Restart local-net-services
+  ansible.builtin.systemd_service:
+    name: local-net-services.service
+    state: restarted
+    daemon_reload: true
+    scope: user
+  when: not ansible_check_mode

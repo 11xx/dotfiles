@@ -1,2 +1,0 @@
-- name: Include eza install tasks
-  ansible.builtin.include_tasks: eza.yaml

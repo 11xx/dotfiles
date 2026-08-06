@@ -1,0 +1,95 @@
+---
+# Plugins as pinned checkouts rather than distribution packages.
+#
+# zsh and its plugin ecosystem are feature-complete enough that tracking a
+# distribution's packaging buys nothing: Arch splits them across the repos and
+# the AUR, Debian ships a subset, and the two disagree on install paths
+# (/usr/share/zsh/plugins/<name>/ against /usr/share/<name>/). A checkout at a
+# tag gives every host the same files in the same place. Arch's layout is the
+# one both can use, so it is the one all hosts get.
+
+- name: 'shell: Ensure git is available to fetch plugins'
+  ansible.builtin.package:
+    name: git
+    state: present
+  become: true
+
+# Removal comes first, and has to: on Arch these packages own
+# /usr/share/zsh/plugins/<name>/ outright, and cloning into a populated
+# directory that is not already a checkout fails. Elsewhere they merely leave a
+# second copy for the shared fragments to load by accident.
+- name: 'shell: Remove packaged zsh plugins superseded by checkouts'
+  community.general.pacman:
+    name:
+      - zsh-syntax-highlighting
+      - zsh-autosuggestions
+      - zsh-history-substring-search
+      - zsh-fast-syntax-highlighting
+      - zsh-autopair-git
+      - zsh-theme-powerlevel10k-git
+    state: absent
+  become: true
+  when: "'arch' in group_names"
+
+- name: 'shell: Remove packaged zsh plugins superseded by checkouts'
+  ansible.builtin.apt:
+    name:
+      - zsh-syntax-highlighting
+      - zsh-autosuggestions
+    state: absent
+  become: true
+  when: "'debian' in group_names"
+
+# antidote was cloned here as a plugin manager and then never referenced by any
+# shell config on any host. Pinned checkouts make it redundant outright.
+- name: 'shell: Remove the unused antidote clone'
+  ansible.builtin.file:
+    path: /usr/share/zsh-antidote
+    state: absent
+  become: true
+
+- name: 'shell: Create the plugin directory'
+  ansible.builtin.file:
+    path: "{{ zsh_plugin_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: 'shell: Check out zsh plugins at their pinned tags'
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "{{ zsh_plugin_dir }}/{{ item.name }}"
+    version: "{{ item.version }}"
+    depth: 1
+    # A tag never moves, so a re-run has nothing to fetch. Left at the default,
+    # every play would hit the network once per plugin to learn that.
+    update: false
+  loop: "{{ zsh_plugins }}"
+  loop_control:
+    label: "{{ item.name }} {{ item.version }}"
+  become: true
+
+- name: 'shell: Verify every plugin the shared fragments will source exists'
+  ansible.builtin.stat:
+    path: "{{ zsh_plugin_dir }}/{{ item.name }}/{{ item.entry }}"
+  loop: "{{ zsh_plugins }}"
+  loop_control:
+    label: "{{ item.name }}/{{ item.entry }}"
+  register: zsh_plugin_entries
+  changed_when: false
+
+# 40-plugins.zsh skips a missing plugin rather than breaking the login shell,
+# which is right at runtime and wrong here: a checkout whose entry file moved
+# between tags would degrade silently and never be noticed.
+- name: 'shell: Fail if a plugin entry file is missing'
+  ansible.builtin.assert:
+    that: item.stat.exists
+    fail_msg: >-
+      {{ item.item.name }} {{ item.item.version }} has no {{ item.item.entry }}.
+      The upstream layout changed; update `entry` in group_vars/all/shell.
+  loop: "{{ zsh_plugin_entries.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not ansible_check_mode

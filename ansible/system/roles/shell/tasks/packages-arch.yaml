@@ -1,0 +1,62 @@
+---
+# zsh plugins and the powerlevel10k theme are deliberately absent here: they are
+# checkouts managed by plugins.yaml, identically on every host, so that a shell
+# fix does not wait on a package rebuild.
+
+- name: 'shell: Install zsh and its completion data'
+  community.general.pacman:
+    name:
+      - zsh
+      - zsh-completions
+      - bash-completion
+      - run-parts
+    state: present
+  become: true
+
+- name: 'shell: Install shell sidecars'
+  community.general.pacman:
+    name:
+      - atuin          # searchable shell history
+      - zoxide         # frecency-ranked cd
+      - fzf            # the picker atuin and zoxide both drive
+      - grc            # generic colouriser
+      - perl-rename    # regex rename; plain `rename` elsewhere
+    state: present
+  become: true
+
+- name: 'shell: Install command-line tools'
+  community.general.pacman:
+    name:
+      - bat
+      - fd
+      - eza
+      - ripgrep
+      - duf
+      - btop
+      - ncdu
+      - nnn
+      - rsync
+    state: present
+  become: true
+
+- name: 'shell: Install workstation-only shell tools'
+  community.general.pacman:
+    name:
+      - nvtop          # needs a GPU worth watching
+      - pulsemixer     # needs an audio server
+      - xclip          # X11 clipboard
+      - wl-clipboard   # Wayland clipboard
+    state: present
+  become: true
+  when: "'workstations' in group_names"
+
+- name: 'shell: Install shell tools from the AUR'
+  aur:
+    name:
+      - advcpmv        # cp/mv with a progress bar, aliased in 70-aliases.zsh
+      - dragon-drop    # nnn's dragdrop plugin
+    use: paru
+    state: present
+  become: true
+  become_user: aurbuilder
+  when: "'workstations' in group_names"
