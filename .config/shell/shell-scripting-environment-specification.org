@@ -1,0 +1,67 @@
+#+TITLE: POSIX shell scripting environment specification
+
+# [2024-03-21 Thu 13:29:04 -03] @ak
+
+The idea here is how shell scripting can have supporting libraries for
+it's scripts. Similarly to ~#include~ in C or ~import~ +in every other
+language+.
+
+* PATH libraries
+- The objective is to add the functionality of a "load path" to
+  scripts with minimal setup, e.g.:
+  : mkdir $HOME/.shlib
+- Add it to path
+  : PATH=$PATH:$HOME/.shlib
+- Create a "shell library" file and place it in =$HOME/.shlib=. The name
+  of that shell library file have to be unique, standarized and
+  different than any other script in PATH. The convention is up to the
+  user, so here's some suggestions:
+  + =@name= or =@@name=, because almost no script begins with =@=, or double
+    the =@@= for double the disambiguation.
+  + =#name= or =##name=, (same as before).
+  # + =.@name= or =@.name=, because a name like a dotfile "=.name="
+  # would be similar to directories that are also executable. The dot
+  # (=.=) refers to a sourceable file.
+  + =#include_= or =#include-=, to be similar to C. This also clarifies
+    that the file is meant to be sourced.
+    # PS [2024-04-16 Tue 10:20:44 -03] @ak
+
+sh lib scripts could include sourcing inside itself when ran as a
+command but I'd recommend keeping sourcing on the target script
+instead and lead shlib scripts just for provides and exports because
+that's more explicit and less abstract.
+
+
+* TODO Source shell files that provide helper functions like libraries in PATH
+they should be tr4eated like any other script in PATH except they should have a name begining with =_shlib_= or =@@=
+# [2024-02-21 Wed 23:11:30 -03] @ak
+- Be in PATH
+- Be executable
+- Sourceable by ~source $(which @@my-shell-lib)~
+
+maybe ~/.local/share/shlib or shell-sourceable.d
+
+or use =command -v= (recommended)
+- [[https://unix.stackexchange.com/questions/85249/why-not-use-which-what-to-use-then][shell - Why not use "which"? What to use then? - Unix & Linux Stack Exchange]]
+
+
+* Another alternative
+is to have a script that manages a directory and exports it's sources 
+
+shlib name
+
+and it would 
+
+* Similar implementations
+- [[https://github.com/jandob/rebash][GitHub - jandob/rebash: ReBash - bash scripting library/framework]]
+- [[https://github.com/modernish/modernish?tab=readme-ov-file#user-content-use-syscmdmapr][GitHub - modernish/modernish: Modernish is a library for writing robust, portable, readable, and powerful programs for POSIX-based shells and utilities.]]
+
+
+* Shell Script Style
+- Functions should be =snake_cased=;
+- in-scope script variables should be =lowerCamelCase=;
+- environment variables should be =UPPER_SNAKE_CASED=. Environment
+  variables are meant for going beyond the local scope of a script.
+  # afaik .-.
+- script filenames should be =kebab-cased=.
+# [2024-04-16 Tue 10:17:47 -03] @ak

@@ -1,0 +1,79 @@
+**** Live reload color scheme
+- [[https://codeberg.org/dnkl/foot/issues/708#issuecomment-1342120][#708 - Dynamically reloading configuration - dnkl/foot - Codeberg.org]]
+#+begin_src bash
+TRAPUSR1() {
+    source "$XDG_CONFIG_HOME"/shell/theme.zsh
+}
+#+end_src
+
+***** theme.zsh
+Depends on [[https://github.com/lemnos/theme.sh][theme.sh]] and [[file:~/org/arch-linux.org::*=lightordark=: Get the current color scheme setting][lightordark script]].
+- Where
+  + 0: black
+  + 1: red
+  + 2: green
+  + 3: yellow
+  + 4: blue
+  + 5: magenta
+  + 6: cyan
+  + 7: white
+  + 8: bright black
+  + 9: bright red
+  + 10: bright green
+  + 11: bright yellow
+  + 12: bright blue
+  + 13: bright magenta
+  + 14: bright cyan
+  + 15: bright white
+
+#+begin_src bash
+is_cmd() {
+    command -v "$1" > /dev/null
+}
+
+is_cmd_die() {
+    is_cmd "$1" ||
+        printf '"%s" not found, aborting %s' "$1" "$0" &&
+            exit 1
+}
+
+is_cmd_die theme.sh
+is_cmd_die lightordark
+
+scheme=$(lightordark)
+
+neron_dark_theme() {
+    cat << EOF
+color0: #414a44
+color1: #f88785
+color2: #61bd00
+color3: #b8aa07
+color4: #63abff
+color5: #ff77ce
+color6: #16b0cf
+color7: #929595
+color8: #555d58
+color9: #e88e8c
+color10: #6fb922
+color11: #b4aa27
+color12: #70aaee
+color13: #ed81c7
+color14: #33aec7
+color15: #a6a8a9
+background: #18251b
+foreground: #a6a8a9
+cursor: #4455bb
+EOF
+}
+
+[[ $scheme == dark ]] &&
+    theme.sh
+#+end_src
+
+* POSIX
+- [[https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html][CONTENTS]]
+
+- What commands are POSIX?
+  + [[https://pubs.opengroup.org/onlinepubs/9699919799/idx/utilities.html][Utilities]]
+    # [2024-03-21 Thu 07:09:45 -03] @ak
+  + [[https://unix.stackexchange.com/questions/228888/what-are-the-posix-mandatory-utilities/639997#639997][What are the POSIX "mandatory utilities"? - Unix & Linux Stack Exchange]]

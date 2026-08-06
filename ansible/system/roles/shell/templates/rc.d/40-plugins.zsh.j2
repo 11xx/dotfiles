@@ -16,8 +16,9 @@ ZSH_PLUGIN_DIR={{ zsh_plugin_dir }}
     source $ZSH_PLUGIN_DIR/{{ plugin.name }}/{{ plugin.entry }}
 {% endfor %}
 
-# Written by `p10k configure`, and large enough that it stays out of version
-# control. Loaded after the theme so it can override the theme's defaults.
+# Written by `p10k configure`, per host, so each machine's prompt can differ.
+# Loaded after the theme so it can override the theme's defaults, and skipped
+# without complaint on a host where the wizard has not been run yet.
 [[ -r ${ZDOTDIR:-$HOME}/.p10k.zsh ]] && source "${ZDOTDIR:-$HOME}/.p10k.zsh"
 
 AUTOSUGGESTION_ACCEPT_RIGHT_ARROW=1

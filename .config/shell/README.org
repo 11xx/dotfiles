@@ -316,13 +316,33 @@ If not interactive don't load configuration file.
 [[ $- != *i* ]] && return
 #+end_src
 
+*** Shared fragments
+Everything from here to the end of this file is what makes /this/ machine's
+shell different from the other two. The parts that are not — history, options,
+completion, plugin loading, the portable keybinds, atuin and zoxide — are
+deployed by Ansible into =rc.d= and sourced identically on ak, gak and pak.
+
+Sourced early and deliberately, so that everything below can override it. That
+is what lets this file stay long and opinionated without any of it having to be
+copied onto a headless server to make that server usable.
+
+Blocks below marked =:tangle no= were moved into a shared fragment. Their prose
+is kept because it explains why the setting exists; the setting itself now lives
+in the Ansible =shell= role.
+#+begin_src bash
+for _fragment in "${ZDOTDIR}"/rc.d/*.zsh(N.); do
+    source "$_fragment"
+done
+unset _fragment
+#+end_src
+
 *** powerlevel10k
 - See
   + [[https://github.com/romkatv/powerlevel10k#instant-prompt][romkatv/powerlevel10k#instant-prompt]]
   + [[https://github.com/romkatv/powerlevel10k#how-do-i-configure-instant-prompt][romkatv/powerlevel10k#How-Do-I-Configure-Instant-Prompt]]
 
 #+NAME: powerlevel10k-header
-#+begin_src bash
+#+begin_src bash :tangle no
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
@@ -347,7 +367,7 @@ Install =grc=.
 [[ -z $DEBUG ]] && [[ -s "/etc/grc.zsh" ]] && source /etc/grc.zsh
 #+end_src
 
-#+begin_src bash
+#+begin_src bash :tangle no
 autoload -U colors && colors
 #+end_src
 
@@ -367,7 +387,7 @@ ZSH_HIGHLIGHT_STYLES[double-quoted-argument]=fg=magenta
 #+end_src
 
 *** zsh-newuser-install
-#+begin_src bash
+#+begin_src bash :tangle no
 unsetopt beep
 bindkey -e # set emacs mode
 setopt autocd extendedglob nomatch notify
@@ -376,14 +396,14 @@ setopt autocd extendedglob nomatch notify
 *** Enable case insensitivity
 wizard [[https://stackoverflow.com/questions/24226685/have-zsh-return-case-insensitive-auto-complete-matches-but-prefer-exact-matches/24237590#24237590][oh my zsh - Have zsh return case-insensitive auto-complete matches, but prefer exact matches - Stack Overflow]]
 # [2022-11-09 Wed 22:06:25 -03]
-#+begin_src bash
+#+begin_src bash :tangle no
 zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 #+end_src
 
 *** Sourcing
 
 **** Installed packages
-#+begin_src bash
+#+begin_src bash :tangle no
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
 [[ -z $DEBUG ]] && source "/usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
@@ -397,12 +417,12 @@ source "$XDG_CONFIG_HOME/shell/aliases"
 #+end_src
 
 **** Theme
-#+begin_src bash
+#+begin_src bash :tangle no
 source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 #+end_src
 
 *** Autosuggestions
-#+begin_src bash
+#+begin_src bash :tangle no
 AUTOSUGGESTION_ACCEPT_RIGHT_ARROW=1
 #+end_src
 
@@ -803,7 +823,7 @@ provided by =compinit=.
 
 *** History
 Default zsh history setup
-#+begin_src bash
+#+begin_src bash :tangle no
 [[ -d ${XDG_STATE_HOME}/zsh ]] || mkdir -p "${XDG_STATE_HOME}"/zsh
 export HISTFILE=$XDG_STATE_HOME/zsh/history
 export HISTSIZE=10000000
@@ -842,7 +862,7 @@ setopt HIST_SAVE_NO_DUPS
 # [2024-03-11 Mon 00:22:43 -03] @ak
 
 Shell history third party tool
-#+begin_src bash
+#+begin_src bash :tangle no
 eval "$(atuin init zsh --disable-up-arrow)"
 #+end_src
 # set additional keybinds
@@ -853,7 +873,7 @@ eval "$(atuin init zsh --disable-up-arrow)"
 *** zoxide: cd alternative
 [[https://github.com/ajeetdsouza/zoxide][GitHub - ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
 
-#+begin_src bash
+#+begin_src bash :tangle no
 eval "$(zoxide init zsh --cmd cd)"
 #+end_src
 
