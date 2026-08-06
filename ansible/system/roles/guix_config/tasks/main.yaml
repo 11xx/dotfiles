@@ -70,18 +70,38 @@
   failed_when: false
   tags: ['guix-channel']
 
+# Whether a reconfigure is owed is a property of the host, not of this run: a
+# play that changed nothing still needs to say so if the last one was never
+# applied. Compare the config against the generation currently running, so the
+# reminder survives until it is actually acted on.
+- name: 'guix: Check the deployed config against the running generation'
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ guix_config_dir }}/system.scm"
+    - /run/current-system
+    - "{{ guix_home_config_dir }}/home-configuration.scm"
+    - "{{ ansible_facts['user_dir'] }}/.guix-home"
+  register: guix_generations
+  changed_when: false
+  tags: ['guix-system', 'guix-home']
+
 - name: 'guix: Report what still needs applying by hand'
   ansible.builtin.debug:
     msg: "{{ guix_pending_steps }}"
   vars:
+    _stamps: "{{ guix_generations.results | map(attribute='stat') | list }}"
+    _system_stale: "{{ _stamps[0].mtime | default(0) > _stamps[1].mtime | default(0) }}"
+    _home_stale: "{{ _stamps[2].mtime | default(0) > _stamps[3].mtime | default(0) }}"
     guix_pending_steps: >-
       {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' commit -am "update zsh plugins"']
               if guix_channel_status.stdout | default('') | length > 0 else [])
-         + (['guix pull   (channels.scm changed)']
+         + (['guix pull   (channels changed)']
               if guix_channels_config.changed or guix_channel_source.changed else [])
          + (['sudo guix system reconfigure ' ~ guix_config_dir ~ '/system.scm']
-              if guix_system_config.changed else [])
+              if guix_system_config.changed or _system_stale else [])
          + (['guix home reconfigure ' ~ guix_home_config_dir ~ '/home-configuration.scm']
-              if guix_home_config.changed or guix_channel_source.changed else [])
+              if guix_home_config.changed or guix_channel_source.changed or _home_stale else [])
          ) | default(['Nothing to apply: gak is in sync.'], true) }}
+  tags: ['guix-system', 'guix-home']
   tags: ['guix-system', 'guix-home', 'guix-channel']

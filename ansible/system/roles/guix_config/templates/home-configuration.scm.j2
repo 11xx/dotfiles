@@ -22,11 +22,12 @@
     (list "bash-completion"
           "zsh-completions"
 
-          ;; Guix System ships no python, and Ansible needs one on the target to
-          ;; run any module at all. Declared here so the interpreter has a
-          ;; stable, garbage-collection-rooted path in the Home profile rather
-          ;; than a /gnu/store path that `guix gc` can remove underneath it.
-          "python"
+          ;; Python is deliberately absent here. Ansible needs an interpreter
+          ;; before it can run anything, including whatever would apply this
+          ;; file, so it lives in the user profile where gak.yaml's bootstrap
+          ;; play can install it with `raw`. Declaring it in both places would
+          ;; put two interpreters on PATH and make which one Ansible used depend
+          ;; on profile ordering.
 
           "git"
           "curl"

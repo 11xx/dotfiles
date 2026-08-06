@@ -35,6 +35,9 @@ services:
     # so under systemd they fell back to the defaults and by hand they picked up
     # the host's own name — two different hostnames for the same stack.
     hostname: {{ pihole_hostname }}
+    # Inert under podman, which has no --domainname to map this onto; kept
+    # because it records the intended FQDN. What pi-hole actually serves is
+    # decided by the FTLCONF_* settings below.
     domainname: {{ pihole_domain_name }}
     networks:
       - caddy-net

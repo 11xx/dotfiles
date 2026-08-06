@@ -17,7 +17,8 @@
              (gnu system accounts)
              )
 
-(use-service-modules cups
+(use-service-modules base          ; hosts-service-type, for the static LAN entries
+                     cups
                      desktop
                      networking
                      ssh
@@ -72,13 +73,31 @@
            (service ntp-service-type)
            (service avahi-service-type)
 
-           ;; After changing exports here the nfs herd service needs
-           ;; to be restarted to update:
-           ;; $ sudo herd restart nfs
-           ;; Check current exports with
-           ;; $ guix shell nfs-utils -- sudo exportfs -v
-           ;; Add the DNS waiter service
-           ;; Add the NFS service (already configured with DNS dependency)
+           ;; The LAN, written down.
+           ;;
+           ;; This machine's only nameserver is pak, and pak's resolver runs in
+           ;; a container on pak. So DNS for the house depends on pak being up,
+           ;; and the NFS exports below are keyed on a hostname — which made
+           ;; serving files to ak depend on a Raspberry Pi that is not involved
+           ;; in serving files to ak. A power cut took pak down and nfsd came up
+           ;; with nothing exported, needing a hand to recover.
+           ;;
+           ;; Static entries break that: exportfs resolves these three names out
+           ;; of /etc/hosts without a packet leaving the machine, so the NAS
+           ;; keeps serving whether or not pak has finished booting, or is
+           ;; booting at all. Nothing to poll and nothing to wait for.
+           ;;
+           ;; DNS for everything else still goes to pak, and still fails when
+           ;; pak is down. That is fine — nothing here needs it.
+           (simple-service 'lan-hosts hosts-service-type
+                           (list (host "{{ ak_address }}" "{{ ak_fqdn }}" '("ak"))
+                                 (host "{{ gak_address }}" "{{ gak_fqdn }}" '("gak"))
+                                 (host "{{ pak_address }}" "{{ pak_fqdn }}" '("pak"))))
+
+           ;; Exports are read once, when nfsd starts. After changing them:
+           ;;   sudo herd restart nfs
+           ;; and to see what is actually exported right now:
+           ;;   guix shell nfs-utils -- sudo exportfs -v
            (service nfs-service-type
                     (nfs-configuration
                      (exports '(("/turak" "{{ ak_fqdn }}(rw,no_all_squash,root_squash)")

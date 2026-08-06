@@ -9,6 +9,33 @@
 # Nothing here escalates — every path is under the user's home — so gak needs no
 # become password and no vault.
 
+# Guix System ships no Python, and Ansible needs one on the target before it can
+# run a single module. Without this play, reaching a rebuilt gak means logging in
+# and installing it by hand first.
+#
+# `raw` is the one action that needs no interpreter: it is a bare command down
+# the SSH connection. Facts are off because gathering them is itself a module.
+- name: Guix home server — interpreter bootstrap
+  hosts: gak
+  gather_facts: false
+
+  tasks:
+    - name: 'bootstrap: Look for the Python interpreter'
+      ansible.builtin.raw: "test -x {{ ansible_python_interpreter }}"
+      register: gak_python
+      changed_when: false
+      failed_when: false
+      tags: ['always']
+
+    # Into the user profile rather than the Home profile: `guix home
+    # reconfigure` is a manual step by design, and the interpreter has to exist
+    # before Ansible can do anything at all, so it cannot wait on one. Being a
+    # profile entry, it is also rooted against `guix gc`.
+    - name: 'bootstrap: Install Python through guix'
+      ansible.builtin.raw: "guix install python"
+      when: gak_python.rc != 0
+      tags: ['always']
+
 - name: Guix home server
   hosts: gak
 
