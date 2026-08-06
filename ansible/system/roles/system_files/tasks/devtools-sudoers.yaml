@@ -1,0 +1,10 @@
+- name: Allow user to run devtools build commands without a password
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/12-devtools-build
+    content: |
+      {{ ansible_user }} ALL=(ALL) NOPASSWD: /usr/bin/pkgctl build, /usr/bin/mkarchroot, /usr/bin/arch-nspawn, /usr/bin/makechrootpkg
+    owner: root
+    group: root
+    mode: "0440"
+    validate: 'visudo -cf %s'

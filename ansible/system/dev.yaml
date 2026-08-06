@@ -1,0 +1,27 @@
+- name: Packages for development
+  hosts: localhost
+  become: true
+
+  roles:
+    - aur
+
+  tasks:
+    - name: Install git and git related packages on Arch Linux
+      pacman:
+        name:
+          - base-devel
+          - git
+          - github-cli
+
+    - name: Install ghcup for Haskell management (from the AUR)
+      aur:
+        name:
+          - ghcup-hs-bin
+      become: true
+      become_user: aurbuilder
+
+    - name: Install packages for binary distribution
+      pacman:
+        name:
+          - upx
+          # "strip" # is provided by binutils, dep of base-devel
