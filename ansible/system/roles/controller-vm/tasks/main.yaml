@@ -58,14 +58,6 @@
   notify:
     - Reload udev rules
 
-- name: Create qcow2 disk image (idempotent — skip if already present)
-  ansible.builtin.command:
-    cmd: >
-      qemu-img create -f qcow2
-      {{ xbox_vm_dir }}/{{ xbox_vm_disk }}
-      {{ xbox_vm_disk_size }}
-    creates: "{{ xbox_vm_dir }}/{{ xbox_vm_disk }}"
-
 # - name: Download VirtIO drivers ISO
 #   ansible.builtin.get_url:
 #     url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso

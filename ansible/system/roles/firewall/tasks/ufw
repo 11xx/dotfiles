@@ -1,16 +1,29 @@
-- name: Install UFW
+---
+# host_vars/<host>/ufw is the single source of truth for the whole ruleset.
+#
+# That is what the reset below enforces: rules are declared, not accumulated, so
+# deleting one from host_vars actually removes it from the host. Any other role
+# that adds rules of its own gets them silently erased on the next play, which
+# is exactly what used to happen to the container ports on pak — they now live
+# in host_vars/pak/ufw with the rest.
+
+- name: 'firewall: Install ufw'
   ansible.builtin.package:
     name: ufw
     state: present
   become: true
+  tags: ['firewall-packages']
 
-- name: Reset UFW to defaults before applying rules
+# Skipped under --check because ufw reports no diff for a reset, so a check run
+# would show the whole ruleset being added on top of itself.
+- name: 'firewall: Reset to defaults before reapplying the declared rules'
   community.general.ufw:
     state: reset
   become: true
   when: not ansible_check_mode
+  tags: ['firewall-rules']
 
-- name: Set default policies
+- name: 'firewall: Set default policies'
   community.general.ufw:
     direction: "{{ item.direction }}"
     policy: "{{ item.policy }}"
@@ -18,15 +31,17 @@
     - { direction: incoming, policy: deny }
     - { direction: outgoing, policy: allow }
   become: true
+  tags: ['firewall-rules']
 
-- name: Allow loopback interface
+- name: 'firewall: Allow the loopback interface'
   community.general.ufw:
     rule: allow
     interface: lo
     direction: in
   become: true
+  tags: ['firewall-rules']
 
-- name: Apply host-specific UFW rules
+- name: 'firewall: Apply the host ruleset'
   community.general.ufw:
     rule: "{{ item.rule | default('allow') }}"
     port: "{{ item.port | default(omit) }}"
@@ -36,10 +51,14 @@
     direction: "{{ item.direction | default('in') }}"
     comment: "{{ item.comment | default(omit) }}"
   loop: "{{ ufw_rules }}"
+  loop_control:
+    label: "{{ item.rule | default('allow') }} {{ item.port | default('any') }}/{{ item.proto | default('any') }}"
   become: true
+  tags: ['firewall-rules']
 
-- name: Enable UFW
+- name: 'firewall: Enable ufw'
   community.general.ufw:
     state: enabled
-    logging: on
+    logging: 'on'
   become: true
+  tags: ['firewall-rules']

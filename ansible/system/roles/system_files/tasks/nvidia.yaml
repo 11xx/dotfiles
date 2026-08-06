@@ -1,11 +1,11 @@
-- name: Enable Nvidia DRM
+- name: Enable Nvidia DRM kernel mode setting
   become: true
   ansible.builtin.lineinfile:
     path: /etc/modprobe.d/00-nvidia.conf
     line: 'options nvidia-drm modeset=1 fbdev=1'
     create: true
 
-- name: Enable Nvidia DRM
+- name: Build the Nvidia modules into the initramfs
   become: true
   ansible.builtin.lineinfile:
     path: /etc/mkinitcpio.conf.d/50-nvidia.conf
