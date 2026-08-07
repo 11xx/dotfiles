@@ -1,5 +1,13 @@
 ufw_rules:
-  # SSH — TCP only, both allow and rate-limit
+  # SSH — rate-limited, except from gak.
+  #
+  # ufw takes the first rule that matches, and the firewall role applies them in
+  # the order written here, so gak's exemption has to come first. `guix offload`
+  # opens one SSH connection per build slot and gak grants ak six of them, which
+  # is exactly the threshold `limit` rejects at: six connections from one address
+  # in thirty seconds. Offloaded builds then die mid-run on a connection refused
+  # that looks nothing like a firewall.
+  - { port: "{{ ssh_port }}", proto: tcp, rule: allow, src: "{{ gak_address }}", comment: "SSH from gak (guix offload)" }
   - { port: "{{ ssh_port }}", proto: tcp, rule: allow, comment: "SSH" }
   - { port: "{{ ssh_port }}", proto: tcp, rule: limit, comment: "SSH rate limit" }
 
