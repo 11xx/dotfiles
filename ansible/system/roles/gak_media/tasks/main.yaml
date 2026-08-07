@@ -1,0 +1,93 @@
+---
+# The `starrs` media stack, previously tangled onto gak from /media/README.org
+# with no record of what was deployed — and by the end, tangling something other
+# than what was running.
+#
+# Ansible owns the declarative half only: the compose file, recyclarr's
+# configuration, and the systemd unit. It does not own the per-service state
+# under .config, because each service reads its own configuration at start and
+# writes it back at runtime; a templated copy would be overwritten as soon as
+# the container came up and reported changed on every run thereafter. Those
+# files carry credentials and are backed up in the private vault repository
+# instead, under .local/share/gak-media-config.
+#
+# Nothing here escalates. The stack runs rootless as the login user, and the
+# whole tree is owned by that user.
+
+- name: 'gak_media: Create the stack directory tree'
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ gak_media_dir }}"
+    - "{{ gak_media_dir }}/.config"
+    - "{{ gak_media_dir }}/.config/recyclarr"
+    - "{{ xdg_config_home }}/systemd/user"
+  tags: ['gak-media-config', 'gak-media-unit']
+
+- name: 'gak_media: Deploy the compose file'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ gak_media_dir }}/compose.yaml"
+    mode: "0644"
+  notify: Restart starrs
+  tags: ['gak-media-config']
+
+# Public: recyclarr.yml names its instance but never its URL or key, so the only
+# thing in it is which Trash Guides format IDs to sync.
+- name: 'gak_media: Deploy the recyclarr configuration'
+  ansible.builtin.copy:
+    src: "recyclarr/{{ item }}"
+    dest: "{{ gak_media_dir }}/.config/recyclarr/{{ item }}"
+    mode: "0644"
+  loop:
+    - recyclarr.yml
+    - settings.yml
+  notify: Restart starrs
+  tags: ['gak-media-config']
+
+# 0600: this is Sonarr's API key, which is full control of the instance.
+- name: 'gak_media: Deploy the recyclarr secrets'
+  ansible.builtin.template:
+    src: recyclarr-secrets.yml.j2
+    dest: "{{ gak_media_dir }}/.config/recyclarr/secrets.yml"
+    mode: "0600"
+  notify: Restart starrs
+  tags: ['gak-media-config', 'gak-media-secrets']
+
+# The handler restarts the stack only if it is already up, so it needs to know.
+# A missing unit reports `inactive` here, which is the answer that matters.
+- name: 'gak_media: Check whether the stack is running'
+  ansible.builtin.command:
+    cmd: systemctl --user is-active starrs.service
+  register: gak_media_unit_state
+  changed_when: false
+  failed_when: false
+  tags: ['gak-media-config', 'gak-media-unit']
+
+- name: 'gak_media: Record whether the stack is running'
+  ansible.builtin.set_fact:
+    gak_media_unit_active: "{{ gak_media_unit_state.stdout | default('') | trim == 'active' }}"
+  tags: ['gak-media-config', 'gak-media-unit']
+
+# Installed but deliberately not enabled and not started. Nothing about
+# deploying a unit file should be what first puts a torrent client on the
+# network; that is a decision, taken by hand:
+#   systemctl --user enable --now starrs
+- name: 'gak_media: Install the stack systemd user unit'
+  ansible.builtin.template:
+    src: starrs.service.j2
+    dest: "{{ xdg_config_home }}/systemd/user/starrs.service"
+    mode: "0644"
+  notify: Restart starrs
+  tags: ['gak-media-unit']
+
+- name: 'gak_media: Report how to start the stack'
+  ansible.builtin.debug:
+    msg: >-
+      The starrs unit is installed but not enabled, and the stack is
+      {{ 'running' if gak_media_unit_active else 'down' }}. Start it with
+      `systemctl --user enable --now starrs` on gak.
+  when: not gak_media_unit_active
+  tags: ['gak-media-unit']

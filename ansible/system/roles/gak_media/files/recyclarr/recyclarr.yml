@@ -1,0 +1,152 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/recyclarr/recyclarr/master/schemas/config-schema.json
+
+# For more details on the configuration, see the Configuration Reference on the wiki here:
+# https://recyclarr.dev/wiki/reference/config-reference
+
+# Configuration specific to Sonarr
+# sonarr:
+#   series:
+    # Set the URL/API Key to your actual instance
+    # base_url: !secret sonarr_local_url
+    # api_key: !secret sonarr_local_apikey
+
+    # Quality definitions from the guide to sync to Sonarr. Choices: series, anime
+    # quality_definition:
+    #   type: series
+
+    # Release profiles from the guide to sync to Sonarr v3 (Sonarr v4 does not use this!)
+    # Use `recyclarr list release-profiles` for values you can put here.
+    # https://trash-guides.info/Sonarr/Sonarr-Release-Profile-RegEx/
+    # release_profiles:
+      # Series
+      # - trash_ids:
+      #     - EBC725268D687D588A20CBC5F97E538B # Low Quality Groups
+      #     - 1B018E0C53EC825085DD911102E2CA36 # Release Sources (Streaming Service)
+      #     - 71899E6C303A07AF0E4746EFF9873532 # P2P Groups + Repack/Proper
+      # Anime (Uncomment below if you want it)
+      #- trash_ids:
+      #    - d428eda85af1df8904b4bbe4fc2f537c # Anime - First release profile
+      #    - 6cd9e10bb5bb4c63d2d7cd3279924c7b # Anime - Second release profile
+
+# # Configuration specific to Radarr.
+# radarr:
+#   movies:
+#     # Set the URL/API Key to your actual instance
+#     base_url: !secret radarr_local_url
+#     api_key: !secret radarr_local_apikey
+
+#     # Which quality definition in the guide to sync to Radarr. Only choice right now is 'movie'
+#     quality_definition:
+#       type: movie
+
+#     # Set to 'true' to automatically remove custom formats from Radarr when they are removed from
+#     # the guide or your configuration. This will NEVER delete custom formats you manually created!
+#     delete_old_custom_formats: true
+
+#     custom_formats:
+#       # A list of custom formats to sync to Radarr.
+#       # Use `recyclarr list custom-formats radarr` for values you can put here.
+#       # https://trash-guides.info/Radarr/Radarr-collection-of-custom-formats/
+#       - trash_ids:
+#           - ed38b889b31be83fda192888e2286d83 # BR-DISK
+#           - 90cedc1fea7ea5d11298bebd3d1d3223 # EVO (no WEBDL)
+#           - 90a6f9a284dff5103f6346090e6280c8 # LQ
+#           - dc98083864ea246d05a42df0d05f81cc # x265 (720/1080p)
+#           - b8cd450cbfa689c0259a01d9e29ba3d6 # 3D
+
+#         # Uncomment the below properties to specify one or more quality profiles that should be
+#         # updated with scores from the guide for each custom format. Without this, custom formats
+#         # are synced to Radarr but no scores are set in any quality profiles.
+#         #quality_profiles:
+#         #  - name: Quality Profile 1
+#         #  - name: Quality Profile 2
+#         #    #score: -9999 # Optional score to assign to all CFs. Overrides scores in the guide.
+#         #    #reset_unmatched_scores: true # Optionally set other scores to 0 if they are not listed in 'names' above.
+
+
+
+
+##### after starrs docker
+
+###################################################################################################
+# Recyclarr Configuration Template: Anime Sonarr                                                  #
+# Updated: 2023-10-07                                                                             #
+# Documentation: https://recyclarr.dev                                                            #
+# Note: If you are using multiple profiles in a single instance, please read the following        #
+# documentation about file merging:                                                               #
+# https://recyclarr.dev/wiki/yaml/config-examples/#merge-single-instance                          #
+# This config file is for use with Sonarr V4 only                                                 #
+###################################################################################################
+
+# Instance Definition: https://recyclarr.dev/wiki/yaml/config-reference/basic/
+sonarr:
+  sonarrv4:
+    delete_old_custom_formats: true
+    replace_existing_custom_formats: true
+    # include:
+    #   # Comment out any of the following includes to disable them
+    #   - template: sonarr-quality-definition-anime
+    #   - template: sonarr-v4-quality-profile-anime
+    #   - template: sonarr-v4-custom-formats-anime
+
+# Custom Formats: https://recyclarr.dev/wiki/yaml/config-reference/custom-formats/
+    custom_formats:
+      - trash_ids:
+
+          # Anime Misc/Streaming Services
+          - a370d974bc7b80374de1d9ba7519760b # ABEMA
+          - d54cd2bf1326287275b56bccedb72ee2 # ADN
+          - 7dd31f3dee6d2ef8eeaa156e23c3857e # B-Global
+          - 4c67ff059210182b59cdd41697b8cb08 # Bilibili
+          - 3e0b26604165f463f3e8e192261e7284 # CR
+          - 1284d18e693de8efe0fe7d6b3e0b9170 # FUNi
+          - 570b03b3145a25011bf073274a407259 # HIDIVE
+          - 44a8ee6403071dd7b8a3a8dd3fe8cb20 # VRV
+          - e5e6405d439dcd1af90962538acd4fe0 # WKN
+          - d2d7b8a9d39413da5f44054080e028a3 # v0
+          - 273bd326df95955e1b6c26527d1df89b # v1
+          - 228b8ee9aa0a609463efca874524a6b8 # v2
+          - 0e5833d3af2cc5fa96a0c29cd4477feb # v3
+          - 4fc15eeb8f2f9a749f918217d4234ad8 # v4
+
+          # Anime Source Groups
+          - 949c16fe0a8147f50ba82cc2df9411c9 # Anime BD Tier 01 (Top SeaDex Muxers)
+          - ed7f1e315e000aef424a58517fa48727 # Anime BD Tier 02 (SeaDex Muxers)
+          - 096e406c92baa713da4a72d88030b815 # Anime BD Tier 03 (SeaDex Muxers)
+          - 30feba9da3030c5ed1e0f7d610bcadc4 # Anime BD Tier 04 (SeaDex Muxers)
+          - 545a76b14ddc349b8b185a6344e28b04 # Anime BD Tier 05 (Remuxes)
+          # - 25d2afecab632b1582eaf03b63055f72 # Anime BD Tier 06 (FanSubs)
+          # - 0329044e3d9137b08502a9f84a7e58db # Anime BD Tier 07 (P2P/Scene)
+          # - c81bbfb47fed3d5a3ad027d077f889de # Anime BD Tier 08 (Mini Encodes)
+          - b4a1b3d705159cdca36d71e57ca86871 # Anime Raws
+          - e0014372773c8f0e1bef8824f00c7dc4 # Anime Web Tier 01 (Muxers)
+          - 19180499de5ef2b84b6ec59aae444696 # Anime Web Tier 02 (Top FanSubs)
+          - c27f2ae6a4e82373b0f1da094e2489ad # Anime Web Tier 03 (Official Subs)
+          - 4fd5528a3a8024e6b49f9c67053ea5f3 # Anime Web Tier 04 (Official Subs)
+          # - 29c2a13d091144f63307e4a8ce963a39 # Anime Web Tier 05 (FanSubs)
+          # - dc262f88d74c651b12e9d90b39f6c753 # Anime Web Tier 06 (FanSubs)
+
+        quality_profiles:
+          - name: 2160p/1080p
+            # score_set: anime-sonarr
+
+      - trash_ids:
+          - e3515e519f3b1360cbfc17651944354c # Anime LQ Groups
+        quality_profiles:
+          - name: 2160p/1080p
+            score: -10000
+
+      - trash_ids:
+          # Anime Optional
+          - b2550eb333d27b75833e25b8c2557b38 # 10bit
+          - 026d5aadd1a6b4e550b134cb6c72b3ca # Uncensored
+
+        quality_profiles:
+          - name: 2160p/1080p
+            score: 10000
+
+      # - trash_ids:
+      #     - 418f50b10f1907201b6cfdf881f467b7 # Anime Dual Audio
+      #   quality_profiles:
+      #     - name: Remux-1080p - Dual Audio - Anime
+      #       score: 100 # Adjust scoring as desired

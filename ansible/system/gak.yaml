@@ -6,8 +6,9 @@
 # files and stops there. It never runs `guix system reconfigure` or `guix home
 # reconfigure`; the role prints whichever of those the change now needs.
 #
-# Nothing here escalates — every path is under the user's home — so gak needs no
-# become password and no vault.
+# Nothing here escalates. Every path is either under the user's home or on the
+# media filesystem, which that user owns, so gak needs no become password. It
+# does have a vault: the media stack's Sonarr API key is in it.
 
 # Guix System ships no Python, and Ansible needs one on the target before it can
 # run a single module. Without this play, reaching a rebuilt gak means logging in
@@ -45,3 +46,4 @@
   roles:
     - { role: guix_config, tags: ['guix'] }
     - { role: shell, tags: ['shell'] }
+    - { role: gak_media, tags: ['gak-media'] }

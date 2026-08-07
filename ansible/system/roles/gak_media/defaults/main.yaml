@@ -1,0 +1,19 @@
+---
+# The stack lives on the media filesystem rather than under $HOME, because the
+# service state directories next to it run to several gigabytes and belong on
+# the 16 TB array, not the 500 GB root NVMe.
+gak_media_dir: /media
+
+# Every service writes as this pair. 1000 is the login user; 134 is the shared
+# `media` group declared in guix_config's system.scm, which is also what the NFS
+# exports are keyed on. 134 spells M-D: the 13th and 4th letters.
+gak_media_uid: 1000
+gak_media_gid: 134
+
+# The *arr services stamp their logs and schedules with this, so they want the
+# household's timezone rather than the host's UTC.
+gak_media_timezone: America/Sao_Paulo
+
+# Sonarr's port, named once because both the compose port mapping and the URL
+# recyclarr reaches it on have to agree.
+gak_media_sonarr_port: 8989

@@ -1,0 +1,91 @@
+#+TITLE: The starrs media stack
+#+options: toc:nil num:nil
+
+Seven rootless podman containers on gak: SABnzbd and qBittorrent fetch,
+Prowlarr indexes, Sonarr and Radarr organise, Recyclarr keeps Sonarr's custom
+formats in step with the Trash Guides, and Jellyfin serves the result.
+
+This file is documentation, not a source. Nothing tangles out of it — the role
+beside it is the source of truth. It exists because the operational knowledge
+below was learned the hard way and is not derivable from the configuration.
+
+* What Ansible owns, and what it does not
+
+The role deploys the compose file, Recyclarr's configuration, and the systemd
+user unit. Everything else under =/media/.config= is service state: each one
+reads its configuration at start and writes it back at runtime, so a templated
+copy is overwritten as soon as the container comes up.
+
+Those state files carry credentials — the Usenet provider account, qBittorrent's
+proxy account, and an API key for each service — so they are backed up in the
+private vault repository, under =.local/share/gak-media-config=, rather than
+here. This repository is public.
+
+* Users and groups
+
+Everything runs as uid 1000 and gid 134, a shared group called =media=. 134 is
+=M= and =D=: the 13th and 4th letters. The group is declared in =guix_config='s
+=system.scm=, and the NFS exports are keyed on it, so a container writing as
+anything else produces files ak cannot read over the share.
+
+Rootless podman maps the login user to root inside the container. Without the
+=x-podman= idmaps, files land owned by an unmapped subuid that nothing on the
+host can read.
+
+* Starting it
+
+The unit is installed but not enabled, so a deploy never starts the stack:
+
+#+begin_src sh
+systemctl --user enable --now starrs
+#+end_src
+
+* Troubleshooting
+
+** Recyclarr: "did not find expected key" while parsing a block mapping
+
+Recyclarr resolves secrets implicitly — an instance named =sonarrv4= takes its
+URL and key from =sonarrv4_base_url= and =sonarrv4_api_key=. If =secrets.yml=
+carries a key no instance claims, parsing fails for the whole document, and the
+error points at the block mapping rather than the unused line. Keep that file to
+exactly the keys in use.
+
+** Sonarr/Radarr: folder not writable by user abc
+
+If a container binds an NTFS volume, the mount needs =uid=, =gid= and =umask=
+options that give the target host user permission; NTFS carries no Unix
+ownership of its own. See =~/org/arch-linux.org=, "Permissions when binding to
+an NTFS drive on Linux".
+
+** Jellyfin: UI works, playback fails on =/config/transcodes=
+
+: Error processing request: Invalid argument : '/config/transcodes'
+
+A failed transcode can corrupt that directory, after which any shell operation
+on it returns =Invalid argument (os error 22)=. Delete it and restart; Jellyfin
+recreates it. The path is set under Dashboard > Playback > Transcode path.
+
+Seen after an attempt to use NVENC under Docker on Linux. On a filesystem that
+survived a bad shutdown, =ntfsfix= or =chkdsk= may be the actual repair.
+
+** Sonarr: unable to open database file
+
+: EPIC FAIL! code = CantOpen (14) ... unable to open database file
+
+Ownership, in every case seen so far: the config directory is not writable as
+uid 1000 / gid 134. =/media/.config/sonarr-old-corrupt= is the remains of one of
+these and is not used by anything.
+
+** Permission denied after migrating from Docker to Podman
+
+Rootless containers share one user namespace, so a volume written by a container
+under Docker's mapping is not readable under Podman's. See
+[[https://www.tutorialworks.com/podman-rootless-volumes/#rootless-containers-share-the-same-user-namespace][Using volumes with rootless podman]].
+
+* Moving the stack
+
+=compose.yaml= binds =shared_volume= to a path relative to itself. Moving the
+directory does not update a volume that already exists — remove the volume
+first, or the containers keep binding the old path. The volume's real name is
+prefixed with the project name, which =name: starrs= at the top of the compose
+file pins rather than leaving to the directory name.

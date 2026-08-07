@@ -1,6 +1,7 @@
-# gak needs no vault: everything Ansible touches on it lives under $HOME, so no
-# task escalates and there is no become password to hold. Reconfiguring the Guix
-# system itself is a manual step run on the host.
+# No become password: everything Ansible touches on gak is owned by this user,
+# whether under $HOME or on the media filesystem, so no task escalates. The
+# vault beside this file holds credentials only. Reconfiguring the Guix system
+# itself is a manual step run on the host.
 ansible_user: lobo
 ansible_group: lobo
 
