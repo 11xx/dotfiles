@@ -15,6 +15,7 @@
     - { role: file_system, tags: ['file_system'] }
     - { role: firewall, tags: ['firewall'] }
     - { role: services, tags: ['services'] }
+    - { role: guix_offload, tags: ['guix-offload'] }
     - { role: aur, tags: ['aur'] }
 
     # Shell — the one role shared with gak and pak.

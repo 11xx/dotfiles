@@ -1,0 +1,10 @@
+---
+# root has no guix on PATH: Guix on a foreign distribution installs itself into
+# /var/guix rather than /usr, and the daemon's own unit calls it by absolute
+# path for the same reason.
+guix_root_binary: /var/guix/profiles/per-user/root/current-guix/bin/guix
+
+# Where each side of the offload pair keeps the key it signs store items with.
+guix_signing_key: /etc/guix/signing-key.pub
+guix_signing_key_secret: /etc/guix/signing-key.sec
+guix_acl: /etc/guix/acl

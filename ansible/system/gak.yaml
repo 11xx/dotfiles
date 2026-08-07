@@ -33,7 +33,10 @@
     # profile entry, it is also rooted against `guix gc`.
     - name: 'bootstrap: Install Python through guix'
       ansible.builtin.raw: "guix install python"
-      when: gak_python.rc != 0
+      # `raw` does not run under --check, so the probe above registers no exit
+      # status there. Treating that as "present" keeps a dry run dry; a real run
+      # always has the status and decides on it.
+      when: gak_python.rc | default(0) != 0
       tags: ['always']
 
 - name: Guix home server

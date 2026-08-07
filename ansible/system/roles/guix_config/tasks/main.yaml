@@ -22,6 +22,39 @@
     - "{{ guix_channel_dir }}/11xx/packages"
   tags: ['guix-system', 'guix-home', 'guix-channel']
 
+# gak authorizes ak so it can accept the results of the builds it offloads
+# there. Read from ak on every run rather than written down here, because
+# reinstalling Guix on ak regenerates this key, and a copy in the repository
+# would silently name a key that no longer exists. ak's own half of the pair is
+# the guix_offload role.
+- name: 'guix: Read ak''s signing key'
+  ansible.builtin.slurp:
+    src: /etc/guix/signing-key.pub
+  delegate_to: ak
+  register: ak_signing_key
+  failed_when: false
+  tags: ['guix-system']
+
+- name: 'guix: Require ak to have a signing key'
+  ansible.builtin.assert:
+    that: ak_signing_key.content is defined
+    fail_msg: >-
+      ak has no Guix signing key, so system.scm cannot say which key to trust
+      for offloaded builds. Create it first:
+      ansible-playbook system.yaml --tags guix-offload
+  tags: ['guix-system']
+
+# Guix writes the key across six lines; system.scm carries it as one string
+# among several written on a single line. Collapsing the runs of whitespace and
+# then closing up the trailing parens produces that form without changing what
+# the S-expression says.
+- name: 'guix: Normalize ak''s signing key onto one line'
+  ansible.builtin.set_fact:
+    ak_signing_key_sexp: >-
+      {{ ak_signing_key.content | b64decode
+         | regex_replace('\s+', ' ') | regex_replace(' *\)', ')') | trim }}
+  tags: ['guix-system']
+
 # Templated rather than copied so the FQDN and SSH port of the build machine
 # come from the vault: this repository is public, and those are the two values
 # in it that describe the private network rather than the machine.
@@ -89,19 +122,25 @@
 - name: 'guix: Report what still needs applying by hand'
   ansible.builtin.debug:
     msg: "{{ guix_pending_steps }}"
+  # This task answers to every tag the role defines, so any subset of the tasks
+  # above may have been skipped and left its register unset. Each one therefore
+  # defaults to "did not change", which is what a task that never ran means.
   vars:
-    _stamps: "{{ guix_generations.results | map(attribute='stat') | list }}"
+    _stamps: "{{ guix_generations.results | default([]) | map(attribute='stat') | list }}"
     _system_stale: "{{ _stamps[0].mtime | default(0) > _stamps[1].mtime | default(0) }}"
     _home_stale: "{{ _stamps[2].mtime | default(0) > _stamps[3].mtime | default(0) }}"
+    _channels_changed: "{{ guix_channels_config.changed | default(false) }}"
+    _channel_changed: "{{ guix_channel_source.changed | default(false) }}"
+    _system_changed: "{{ guix_system_config.changed | default(false) }}"
+    _home_changed: "{{ guix_home_config.changed | default(false) }}"
     guix_pending_steps: >-
       {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' commit -am "update zsh plugins"']
               if guix_channel_status.stdout | default('') | length > 0 else [])
          + (['guix pull   (channels changed)']
-              if guix_channels_config.changed or guix_channel_source.changed else [])
+              if _channels_changed or _channel_changed else [])
          + (['sudo guix system reconfigure ' ~ guix_config_dir ~ '/system.scm']
-              if guix_system_config.changed or _system_stale else [])
+              if _system_changed or _system_stale else [])
          + (['guix home reconfigure ' ~ guix_home_config_dir ~ '/home-configuration.scm']
-              if guix_home_config.changed or guix_channel_source.changed or _home_stale else [])
+              if _home_changed or _channel_changed or _home_stale else [])
          ) | default(['Nothing to apply: gak is in sync.'], true) }}
-  tags: ['guix-system', 'guix-home']
   tags: ['guix-system', 'guix-home', 'guix-channel']

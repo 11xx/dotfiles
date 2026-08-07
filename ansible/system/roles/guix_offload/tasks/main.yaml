@@ -1,0 +1,67 @@
+---
+# ak is the build machine gak offloads to, and offloading is a two-way trust.
+# gak signs the inputs it sends here; ak signs the results it sends back. Each
+# side has to hold the other's public key, or the build transfers everything and
+# then dies on `guix offload: error: unauthorized public key`.
+#
+# gak's half of that is declarative and lives in guix_config's system.scm. ak's
+# half is guix-daemon state with no configuration file behind it, which is what
+# this role exists to establish.
+#
+# Reinstalling Guix on ak recreates /etc/guix empty, taking both the ACL and
+# ak's own signing key with it. Nothing surfaces that until the next offloaded
+# build fails, so the keys are read off the two hosts on every run rather than
+# copied into this repository: a regenerated key propagates by itself instead of
+# going stale here and breaking the pair a second time.
+
+# Guix generates this on first use on a Guix System, but never on a foreign
+# distribution. Without it ak still builds, and then `guix archive --export`
+# refuses to run, so nothing it built can reach gak.
+- name: 'guix-offload: Generate ak''s signing key'
+  ansible.builtin.command:
+    cmd: "{{ guix_root_binary }} archive --generate-key"
+    creates: "{{ guix_signing_key_secret }}"
+  become: true
+  tags: ['guix-offload']
+
+- name: 'guix-offload: Read gak''s signing key'
+  ansible.builtin.slurp:
+    src: "{{ guix_signing_key }}"
+  delegate_to: gak
+  register: guix_gak_key
+  ignore_unreachable: true
+  tags: ['guix-offload']
+
+- name: 'guix-offload: Read ak''s authorized keys'
+  ansible.builtin.slurp:
+    src: "{{ guix_acl }}"
+  register: guix_ak_acl
+  tags: ['guix-offload']
+
+# Both sides are canonical S-expressions differing only in layout, so comparing
+# them with the whitespace removed asks the one question that matters: is gak's
+# key already in there? `guix archive --authorize` appends unconditionally and
+# would otherwise grow a duplicate entry on every run.
+- name: 'guix-offload: Authorize gak to send builds to ak'
+  ansible.builtin.command:
+    cmd: "{{ guix_root_binary }} archive --authorize"
+    stdin: "{{ _gak_key }}"
+  become: true
+  vars:
+    _gak_key: "{{ guix_gak_key.content | b64decode }}"
+    _acl: "{{ guix_ak_acl.content | b64decode | regex_replace('\\s+', '') }}"
+  when:
+    - guix_gak_key.content is defined
+    - _gak_key | regex_replace('\\s+', '') not in _acl
+  tags: ['guix-offload']
+
+# gak being down is not a failure of ak's play — but it does mean the pair was
+# left half-configured, which is worth saying out loud rather than passing.
+- name: 'guix-offload: Report that gak could not be reached'
+  ansible.builtin.debug:
+    msg: >-
+      gak is unreachable, so its signing key could not be authorized here.
+      Offloaded builds from gak will fail until this play is run again with gak
+      up.
+  when: guix_gak_key.content is not defined
+  tags: ['guix-offload']
