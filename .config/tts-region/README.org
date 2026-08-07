@@ -9,13 +9,23 @@
 :END:
 
 The application keeps network-backed preparation opt-in for portable installs.
-This machine enables the conservative text-only Luna pass while retaining the
-exact Tesseract result beside the prepared speech text.
+This machine enables the conservative text-only pass while retaining the exact
+Tesseract result beside the prepared speech text.
+
+Preparation sits on the critical path between reading the screen and hearing
+it, so the backend is chosen for latency rather than reasoning.  A coding model
+spends tens of seconds deliberating over what is really copy-editing; gpt-oss-20b
+on Groq returns the same corrections at several hundred output tokens per second
+for a fraction of the price.  Groq's on-demand tier caps tokens per minute, so a
+long capture can exhaust it partway through; Flash-Lite finishes any chunk Groq
+refuses rather than losing the run to the deterministic text.
 
 #+begin_src toml
 [prep]
-backend = "luna"
-model = "gpt-5.6-luna"
+backend = "groq"
+model = "openai/gpt-oss-20b"
+fallback_backend = "gemini"
+fallback_model = "gemini-3.5-flash-lite"
 unwrap = true
 max_edit_ratio = 0.02
 #+end_src
