@@ -9,6 +9,10 @@ This file is documentation, not a source. Nothing tangles out of it — the role
 beside it is the source of truth. It exists because the operational knowledge
 below was learned the hard way and is not derivable from the configuration.
 
+The literate Org file the compose file used to be tangled from is retired, in
+=~/org/.cemetary= on ak and =~/starrs-bkp/org-sources= on gak. It is not a
+second source to keep in step; everything worth keeping from it is here.
+
 * What Ansible owns, and what it does not
 
 The role deploys the compose file, Recyclarr's configuration, and the systemd
@@ -73,8 +77,8 @@ survived a bad shutdown, =ntfsfix= or =chkdsk= may be the actual repair.
 : EPIC FAIL! code = CantOpen (14) ... unable to open database file
 
 Ownership, in every case seen so far: the config directory is not writable as
-uid 1000 / gid 134. =/media/.config/sonarr-old-corrupt= is the remains of one of
-these and is not used by anything.
+uid 1000 / gid 134. The remains of one of these, two generations deep, are kept
+at =~/starrs-bkp/sonarr-old-corrupt= on gak.
 
 ** Permission denied after migrating from Docker to Podman
 

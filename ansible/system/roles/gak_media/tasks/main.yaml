@@ -1,7 +1,7 @@
 ---
-# The `starrs` media stack, previously tangled onto gak from /media/README.org
+# The `starrs` media stack, previously tangled onto gak from a literate Org file
 # with no record of what was deployed — and by the end, tangling something other
-# than what was running.
+# than what was running. That source is retired; this role replaces it.
 #
 # Ansible owns the declarative half only: the compose file, recyclarr's
 # configuration, and the systemd unit. It does not own the per-service state
