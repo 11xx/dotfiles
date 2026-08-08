@@ -257,8 +257,9 @@ esac
 
 Easy Effects stays available as a hidden graphical-session service, so the
 toggle command never opens its window.  Automatic processing of every output
-stream is disabled before startup: only the Browser Sink loopback explicitly
-targets the processing sink, while music and games stay on the hardware path.
+and input stream is disabled before startup.  Only explicitly routed streams
+target the processing sink or source, while ordinary playback and capture stay
+on their hardware paths.
 
 #+begin_src systemd :tangle (tdir "easyeffects.service")
 [Unit]
@@ -269,6 +270,7 @@ PartOf=graphical-session.target
 [Service]
 Type=exec
 ExecStartPre=/usr/bin/kwriteconfig6 --file %h/.config/easyeffects/db/easyeffectsrc --group EffectsPipelines --key processAllOutputs false
+ExecStartPre=/usr/bin/kwriteconfig6 --file %h/.config/easyeffects/db/easyeffectsrc --group EffectsPipelines --key processAllInputs false
 ExecStart=/usr/bin/easyeffects --service-mode
 Restart=on-failure
 RestartSec=2
