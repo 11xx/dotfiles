@@ -159,6 +159,7 @@ exec_once("/usr/lib/polkit-kde-authentication-agent-1")
 #+begin_src lua
 exec_once("lightordark-wallpaper") -- script
 exec_once("kdeconnectd") -- KDE connect daemon
+exec_once("hypr-dynamic-float-bitwarden-unlock-firefox")
 exec_once("sleep 2 && hypr-eww-open")
 exec_once("hypr-eww-restart-on-monitor-change")
 exec_once("xsettingsd") -- GTK2-3 theme live changes
@@ -1353,153 +1354,19 @@ systemctl --user start "${target}"
 /usr/bin/start-hyprland "$@"
 #+end_src
 
-** noweb setup helpers
-
-#+NAME: hyprland-scripts-check-alias-jaq-or-jq
-#+begin_src shell
-unset __usingjaq
-
-command -v jaq > /dev/null &&
-    alias jq=jaq &&
-    __usingjaq=t
-# jaq is a faster jq clone
-
-# if [`jq' is not alias] AND [`jq' not found] = fail
-! alias jq > /dev/null && ! command -v jq > /dev/null &&
-    notify-send -a hypr-workspace script \
-                'jaq or jq not found' \
-                'Install jaq or jq' &&
-    exit 1
-#+end_src
-
-A window title is text an application chose, so a status bar must treat it as
-hostile input. A carriage return or a =U+2028= line separator survives a
-line-oriented reader and then makes Pango lay the label out over two lines,
-which grows the bar's layer surface and shifts every widget on it; zero-width
-and format characters change width without showing anything; and a stack of
-combining marks renders as a smear over its neighbours.
-
-This filter reduces each line to one line of printable text. It composes to NFC
-first, so real accents survive as single characters. Characters that were a break
-in the original -- controls, line and paragraph separators -- become a space,
-because deleting one glues the words either side of it together; format,
-surrogate, private-use and leftover combining characters carry no width and are
-simply dropped. Collapsing the remaining whitespace finishes the job. It is a
-long-lived process at the end of a feed's pipeline rather than a call per title,
-so titles cost nothing to sanitize. Unicode categories are the whole job here,
-which is why this is Python and not =sed=.
-
-A feed that ends leaves its widget frozen at whatever it last printed: eww does
-not restart a =deflisten= command, and a frozen widget looks exactly like a
-correct one. =socat= ending -- because the compositor was reloaded, or its socket
-blinked -- is enough to cause it. So every feed runs under this, which reprints
-the current value and reconnects. The cost of a restart is one repeated line,
-which is the value the widget is already showing.
-
-#+NAME: hyprland-scripts-feed-forever
-#+begin_src shell
-# Each feed defines feed(): print the current value, then stream changes.
-feed_forever() {
-    while :; do
-        feed
-        sleep 1
-    done
-}
-#+end_src
-
-#+NAME: hyprland-scripts-sanitize-bar-text
-#+begin_src shell
-sanitize_bar_text() {
-    python3 -u -c '
-import sys, unicodedata as ud
-
-BREAK = {"Cc", "Zl", "Zp"}
-DROP = {"Cf", "Cs", "Co", "Cn", "Mn", "Me"}
-
-def clean(c):
-    kind = ud.category(c)
-    return "" if kind in DROP else " " if kind in BREAK else c
-
-for line in sys.stdin:
-    text = ud.normalize("NFC", line)
-    print(" ".join("".join(clean(c) for c in text).split()))
-'
-}
-#+end_src
-
-** DONE =hypr-workspace=: Workspace switching like xmonad/qtile
-:PROPERTIES:
-:header-args:shell: :tangle (tdir "/hypr-workspace") :shebang #!/usr/bin/env sh :mkdirp yes
-:END:
-- DEPRECATED by [[https://wiki.hyprland.org/Configuring/Dispatchers/#:~:text=focusworkspaceoncurrentmonitor][focusworkspaceoncurrentmonitor]].
-  + Added by commit =3c964a9fdc220250a85b1c498e5b6fad9390272f= on Jan 15
-    2024 but I only saw it now ;p
-    # [2024-09-08 Sun 13:22:15 -03] @ak
-  + [[https://github.com/hyprwm/Hyprland/pull/4439][Implement a dispatcher for xmonad/qtile-style workspace switching by virchau13 · Pull Request #4439 · hyprwm/Hyprland]]
-
-- Sources:
-  Original code +i think+: [[https://github.com/taylor85345/hyprland-dotfiles/blob/master/hypr/scripts/workspace][taylor85345/hyprland-dotfiles/workspace]]
-  from https://github.com/hyprwm/Hyprland/issues/747
-  also: [[https://github.com/Jareng/dotfiles/blob/main/.config/hypr/scripts/workspace][Jareng/dotfiles/workspace]]
-  [[https://www.reddit.com/r/hyprland/comments/11z8w7u/comment/jdbrh24/?context=3][Make Hyperland Workspaces Work Like Qtile Work Spaces : hyprland]]
-
-# from April 8th
-# [2023-05-23 Tue 19:59:53 -03]
-#+begin_src shell
-while :
-do case $1 in
-       -v|--verbose)
-           set -x
-           ;;
-       ,*) break
-   esac; shift; done
-#+end_src
-
-#+begin_src shell :noweb yes
-«hyprland-scripts-check-alias-jaq-or-jq»
-
-p() {
-    printf '%s\n' "$@"
-}
-
-monitors=$(hyprctl monitors -j)
-
-if [ -z "$1" ]; then
-    workspace=$(p "${monitors}" | jq '.[] | select(.focused == false).activeWorkspace.id')
-else
-    workspace=$1
-fi
-
-activemonitor=$(p "${monitors}" | jq -r '.[] | select(.focused == true).name')
-passivemonitor=$(p "${monitors}" | jq -r '.[] | select(.focused == false).name')
-
-passivews=$(p "${monitors}" | jq -r ".[] | select(.name == \"${passivemonitor}\").activeWorkspace.id")
-
-if [ "${workspace}" = "${passivews}" ] && [ "${activemonitor}" != "${passivemonitor}" ]; then
-    hyprctl dispatch swapactiveworkspaces "${activemonitor}" "${passivemonitor}"
-    # echo "${activemonitor}" "${passivemonitor}"
-else
-    hyprctl --batch \
-            "dispatch moveworkspacetomonitor ${workspace} ${activemonitor} ;\
-             dispatch workspace ${workspace}"
-fi
-
-exit 0
-#+end_src
-
-
-# check: [ERR] Error in getMonitorFromString: invalid arg 1
-# [ERR] Ignoring moveWorkspaceToMonitor: monitor doesnt exist
-# after disconnecting monitors and their number changing, could it be a higher = problem? # [2023-04-17 Mon 05:36:43 -03] --- seems fixed on recent workspace overhaul stuff # [2023-04-28 Fri 22:23:13 -03]
-# [[https://github.com/hyprwm/Hyprland/issues/2154][Switching workspace on focused monitor sometimes also changes workspace on non-focused monitor · Issue #2154 · hyprwm/Hyprland]]
-
-** =hypr-dynamic-float-bitwarden-unlock-firefox=: Hack for dealing with Bitwarden's extension window on Firefox
+** =hypr-dynamic-float-bitwarden-unlock-firefox=: Bitwarden's unlock window on Firefox
 :PROPERTIES:
 :header-args:shell: :tangle (tdir "/hypr-dynamic-float-bitwarden-unlock-firefox") :shebang #!/usr/bin/env sh :mkdirp yes
 :END:
 
-Big name because this is so specific it will never be used outside of
-=exec-once=.
+Bitwarden's vault-unlock window opens maximized. A window rule cannot fix it:
+Hyprland matches rules when a window is mapped, and this window is already
+mapped by the time its title says what it is. Measured -- a rule on a title that
+only appears later never applies, while the same rule on a title present at map
+time floats the window immediately. So the title is watched from outside.
+
+The dispatchers go through the config's own Lua API, because a raw
+=hyprctl dispatch= string is intercepted by that layer and does nothing at all.
 
 - See
   + [[https://github.com/hyprwm/Hyprland/issues/3835][Make `float` rule dynamic (related issue with Bitwarden opening maximized window on vault unlock) · Issue #3835 · hyprwm/Hyprland]]
@@ -1508,27 +1375,14 @@ Big name because this is so specific it will never be used outside of
     ~misc:new_window_takes_over_fullscreen = 2~ may also be desired.
 
 #+begin_src shell
+set -eu
+
 socat -U - UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock |
     stdbuf -o0 grep '^activewindow>>.*Extension: (Bitwarden Password Manager) - Bitwarden — Mozilla Firefox$' |
     while read -r _; do
-        hyprctl --batch \
-                dispatch setfloating title:'^(Extension:)(.*)(- Bitwarden — Mozilla Firefox)$' \; \
-                dispatch centerwindow
+        hyprctl dispatch 'hl.dsp.window.float({ action = "on", window = "title:^(Extension:)(.*)(- Bitwarden — Mozilla Firefox)$" })'
+        hyprctl dispatch 'hl.dsp.window.center({})'
     done
-#+end_src
-
-** =hypr-gamemode-monitors=
-:PROPERTIES:
-:header-args:shell: :tangle (tdir "hypr-gamemode-monitors") :shebang #!/usr/bin/env sh :mkdirp yes
-:END:
-Having different fractional scaling messes somethings up with some games.
-
-So I have a source keyword for a file that overrides the default.
-#+begin_src shell
-sed -Ei 's/^[[:blank:]]*source = \.\/monitors-gamemode\.conf$/#&/
-t
-s/^#([[:blank:]]*source = \.\/monitors-gamemode\.conf)$/\1/' \
-    ~/.config/hypr/monitors.conf
 #+end_src
 
 * Hyprland Notes
@@ -1564,7 +1418,9 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
   + [[https://dharmx.is-a.dev/eww-powermenu/][EWW Powermenu - dead airspace]]
 
 #+begin_src yuck :noweb yes
-(deflisten current-monitor :initial '{"focused":true}' "hypr-active-monitor DP-1")
+(deflisten bar
+           :initial '{"monitors":{"DP-1":{"focused":true,"workspace":"0","title":""},"DP-2":{"focused":false,"workspace":"0","title":""}},"workspaces":[]}'
+           "hypr-bar-feed")
 
 (defwindow mainbar [monitor ?height-px]
            :monitor monitor
@@ -1614,9 +1470,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :halign "start"
                 :class "bar-left-modules"
                 :spacing 14
-                (active-monitor-indicator :focused {current-monitor.focused})
-                (workspaces-bar :monitor-name "DP-1")
-                (window-title :text window-listen :limit 50)))
+                (active-monitor-indicator :focused {bar.monitors.DP-1.focused})
+                (workspaces-bar :here {bar.monitors.DP-1.workspace}
+                                :elsewhere {bar.monitors.DP-2.workspace})
+                (window-title :text {bar.monitors.DP-1.title} :limit 50)))
 
 (defwidget bar-middle-modules []
            (box :orientation "h"
@@ -1657,9 +1514,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "end"
                 :spacing 14
-                (window-title :text window-listen-second-monitor :limit 70)
-                (workspaces-bar :monitor-name "DP-2")
-                (active-monitor-indicator :focused {!current-monitor.focused})))
+                (window-title :text {bar.monitors.DP-2.title} :limit 70)
+                (workspaces-bar :here {bar.monitors.DP-2.workspace}
+                                :elsewhere {bar.monitors.DP-1.workspace})
+                (active-monitor-indicator :focused {bar.monitors.DP-2.focused})))
 
 (defwidget active-monitor-indicator [focused]
            (box :class {focused ? "focused-monitor" : "unfocused-monitor"}))
@@ -1686,37 +1544,23 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (label :class "clock__date" :text {clock.date})
                 (label :class "clock__time" :text {clock.time})))
 
-(deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
-(deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1","active_workspace_id":1,"name":"DP-1"},"unfocused_monitor":{"active_workspace":"10","active_workspace_id":10,"name":"DP-2"}}'
-           "hypr-get-current-monitor-workspace")
-
 (defwidget workspace-entry [id windows here elsewhere]
   (eventbox
     (box :class "workspace-entry ${id == here ? 'current' : ''} ${windows > 0 ? 'occupied' : 'empty'} ${id == elsewhere ? 'active-unfocused' : ''}"
          (label :text id))))
 
-(defwidget workspaces-bar [monitor-name]
+(defwidget workspaces-bar [here elsewhere]
   (eventbox
     :class "workspaces-widget-eventbox"
     (box
       :space-evenly true
-      ;; The entries are drawn from the workspace list, so this hidden label is
-      ;; what makes the focus feed a dependency and redraws them when it moves.
-      (label :text "${current-workspace}"
-             :visible false)
-      (for workspace in workspaces-listen
+      (for workspace in {bar.workspaces}
         (workspace-entry
           :id {workspace.id}
           :windows {workspace.windows}
-          :here {current-workspace.focused_monitor.name == monitor-name
-                 ? current-workspace.focused_monitor.active_workspace
-                 : current-workspace.unfocused_monitor.active_workspace}
-          :elsewhere {current-workspace.focused_monitor.name == monitor-name
-                      ? current-workspace.unfocused_monitor.active_workspace
-                      : current-workspace.focused_monitor.active_workspace})))))
+          :here here
+          :elsewhere elsewhere)))))
 
-(deflisten window-listen :initial "..." "hypr-get-window-title")
-(deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
 (defwidget window-title [text limit]
            (label :class "window-title-label"
                   :limit-width limit
@@ -2176,147 +2020,153 @@ pink while do-not-disturb is swallowing them.
 
 Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Status bars – Hyprland Wiki#Eww]]
 
-- DEPENDENCIES
-  + socat
-  + jaq or jq
-  + coreutils: provides stdbuf
+The feed talks to the compositor's own sockets and needs nothing installed.
+=hypr-eww-open= uses =jq=; the watcher uses =socat=.
 
-*** =hypr-get-active-workspace= (superseded)
+*** =hypr-bar-feed=: everything the bar reads, as one object
 :PROPERTIES:
-:header-args:shell+: :tangle no
+:header-args:python: :tangle (tdir "hypr-bar-feed") :shebang #!/usr/bin/env python3 :mkdirp yes
 :END:
 
-Superseded by =hypr-get-current-monitor-workspace=, which answers the same
-question from the event socket rather than by shelling out to =hyprctl= twice per
-event, and which nothing else here reproduces. Nothing consumes this feed any
-more, so it no longer tangles; the source stays as the record of what the bar
-used to read. An older tangled copy may still sit in the bin directory.
+The bar used to be fed by five programs: two window titles, a workspace list, a
+monitor-focus feed, and a compiled helper for the workspace each monitor shows.
+Each opened its own connection to the event socket, each re-ran =hyprctl= per
+event -- the workspace list did so on *every* event, including ones that cannot
+change it -- and each could die on its own, freezing one widget while the rest
+kept working.
 
-#+begin_src shell
-# tested on a dual-monitor setup, may not work with different ones
+This is all of it in one process. It recomputes on any event rather than
+filtering by name, because event names drift between Hyprland versions and a
+missed name is a widget that stops updating; the cost of that generosity is paid
+back by emitting only when the result actually differs from the last one. Bursts
+coalesce, so a wake or a workspace switch produces one line rather than one per
+event.
 
-«hyprland-scripts-check-alias-jaq-or-jq»
+It speaks to the compositor directly over both of its sockets, so nothing here
+spawns a process per event.
 
-active_focused_ws() {
-    hyprctl monitors -j | jq -r ".[] | select(.focused == $1).activeWorkspace.id"
-}
+#+begin_src python
+"""One JSON object per change, describing everything the status bar draws."""
 
-json_out_format() {
-    printf '{"focused":"%s","unfocused":"%s"}\n' "$1" "$2"
-}
+import json
+import os
+import socket
+import sys
+import time
+import unicodedata
 
-json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+SIGNATURE = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+HYPR_DIR = os.path.join(RUNTIME, "hypr", SIGNATURE)
+REQUEST_SOCKET = os.path.join(HYPR_DIR, ".socket.sock")
+EVENT_SOCKET = os.path.join(HYPR_DIR, ".socket2.sock")
 
-socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 awk -F '>>|,' -e '/^workspace>>/ {print $2}' -e '/^focusedmon>>/ {print $3}' |
-    while read -r line; do
-        json_out_format "$(active_focused_ws true)" "$(active_focused_ws false)"
-    done
+WORKSPACES = [str(n) for n in range(1, 11)]
+
+#: Coalescing window. Long enough that one user action is one line, short enough
+#: that the bar is never visibly behind the desktop.
+SETTLE_SECONDS = 0.04
+
+#: A window title is text an application chose. Characters that were a break
+#: become a space -- deleting one glues the words either side together -- and
+#: characters with no width of their own are dropped, so a title cannot lay a
+#: label out over two lines and resize the bar.
+BREAK = {"Cc", "Zl", "Zp"}
+DROP = {"Cf", "Cs", "Co", "Cn", "Mn", "Me"}
+
+
+def sanitize(text):
+    composed = unicodedata.normalize("NFC", text or "")
+    kept = []
+    for char in composed:
+        category = unicodedata.category(char)
+        if category in DROP:
+            continue
+        kept.append(" " if category in BREAK else char)
+    return " ".join("".join(kept).split())
+
+
+def request(command):
+    """Ask the compositor a question over its request socket."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.connect(REQUEST_SOCKET)
+        sock.sendall(command.encode())
+        chunks = []
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    return json.loads(b"".join(chunks))
+
+
+def snapshot():
+    monitors = request("j/monitors")
+    workspaces = request("j/workspaces")
+
+    # The workspace a monitor shows names the window the bar labels it with:
+    # for the focused monitor that is the active window, and for the other one
+    # it is whatever was last focused there.
+    titles = {ws["id"]: ws.get("lastwindowtitle", "") for ws in workspaces}
+    counts = {str(ws["id"]): ws.get("windows", 0) for ws in workspaces}
+
+    return {
+        "monitors": {
+            monitor["name"]: {
+                "focused": monitor["focused"],
+                "workspace": str(monitor["activeWorkspace"]["id"]),
+                "title": sanitize(titles.get(monitor["activeWorkspace"]["id"], "")),
+            }
+            for monitor in monitors
+        },
+        "workspaces": [
+            {"id": name, "windows": counts.get(name, 0)} for name in WORKSPACES
+        ],
+    }
+
+
+def emit(state, last):
+    if state == last:
+        return last
+    json.dump(state, sys.stdout, separators=(",", ":"))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+    return state
+
+
+def main():
+    last = None
+    while True:
+        try:
+            last = emit(snapshot(), last)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as events:
+                events.connect(EVENT_SOCKET)
+                while True:
+                    if not events.recv(65536):
+                        break
+                    # Drain whatever else arrived with it: one action on the
+                    # desktop is usually several events.
+                    time.sleep(SETTLE_SECONDS)
+                    events.setblocking(False)
+                    try:
+                        while events.recv(65536):
+                            pass
+                    except BlockingIOError:
+                        pass
+                    events.setblocking(True)
+                    last = emit(snapshot(), last)
+        except (OSError, ValueError):
+            # The compositor restarted, or answered something unparseable. A
+            # feed that exits here leaves every widget frozen at its last value.
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    main()
 #+end_src
 
-*** =hypr-get-window-title=
-:PROPERTIES:
-:CUSTOM_ID: window-title-sanitizing
-:header-args:shell+: :tangle (tdir "hypr-get-window-title")
-:END:
-
-The current title comes from =hyprctl= and every later one from the event
-socket; both leave through [[#window-title-sanitizing][the same sanitizer]], so the bar never receives a title
-that can resize it.
-
-#+begin_src shell :noweb yes
-«hyprland-scripts-check-alias-jaq-or-jq»
-«hyprland-scripts-sanitize-bar-text»
-«hyprland-scripts-feed-forever»
-
-feed() {
-    {
-        hyprctl activewindow -j | jq --raw-output .title
-
-        # shellcheck disable=SC2016
-        socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-            stdbuf -o0 grep '^activewindow>>' |
-            stdbuf -o0 awk -F '>>|,' '{print $3}'
-    } | sanitize_bar_text
-}
-
-feed_forever
-#+end_src
-
-*** =hypr-get-workspaces=
-:PROPERTIES:
-:header-args:shell+: :tangle (tdir "hypr-get-workspaces")
-:END:
-
-This is the workspace list with its window counts, which is what decides whether
-a number is drawn as occupied or empty. The Haskell feed below answers a
-different question -- which workspace each monitor is showing -- so the two are
-not alternatives.
-
-#+begin_src shell :noweb yes
-«hyprland-scripts-check-alias-jaq-or-jq»
-«hyprland-scripts-feed-forever»
-
-spacesJq (){
-    WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jq 'map({key: .id | tostring, value: .windows}) | from_entries')
-    seq 1 10 | jq --argjson windows "${WORKSPACE_WINDOWS}" --slurp -Mc 'map(tostring) | map({id: ., windows: ($windows[.]//0)})'
-}
-
-spacesJaq() {
-    WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jaq 'map({key: .id | tostring, value: .windows}) | from_entries')
-    seq 1 10 | jaq --arg windows "${WORKSPACE_WINDOWS}" --slurp -M -c 'map(tostring) | map({id: ., windows: (($windows | fromjson)[.]//0)})'
-}
-
-if [ -n "${__usingjaq}" ]; then
-    alias spaces=spacesJaq
-else
-    alias spaces=spacesJq
-fi
-
-feed() {
-    spaces
-
-    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-        while read -r _; do
-            spaces
-        done
-}
-
-feed_forever
-#+end_src
 
 
-*** =hypr-get-window-title-second-monitor=
-:PROPERTIES:
-:header-args:shell+: :tangle (tdir "hypr-get-window-title-second-monitor")
-:END:
-#+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :noweb yes
-«hyprland-scripts-check-alias-jaq-or-jq»
-«hyprland-scripts-sanitize-bar-text»
-«hyprland-scripts-feed-forever»
-
-MONITOR_PORT=${MONITOR_PORT:-$1}
-MONITOR_PORT=${MONITOR_PORT:-"DP-2"}
-
-get_window_title_workspace_mon() {
-    idActiveWorkspaceOnMon=$(hyprctl monitors -j | jq -r --arg monitor_port "${MONITOR_PORT}" '.[] | select(.name == $monitor_port).activeWorkspace.id')
-    hyprctl workspaces -j | jq --arg idActiveWorkspaceOnMon "$idActiveWorkspaceOnMon" -r '.[] | select(.id == ($idActiveWorkspaceOnMon | tonumber)).lastwindowtitle'
-}
-
-feed() {
-    {
-        get_window_title_workspace_mon
-
-        socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-            stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
-            while read -r _; do
-                get_window_title_workspace_mon
-            done
-    } | sanitize_bar_text
-}
-
-feed_forever
-#+end_src
 
 *** =hypr-eww-restart-on-monitor-change=: Restart eww on monitor on/off/reconnect
 :PROPERTIES:
@@ -2354,33 +2204,6 @@ while :; do
 done
 #+end_src
 
-*** =hypr-active-monitor=: Get current monitor information
-:PROPERTIES:
-:header-args:shell: :tangle (tdir "/hypr-active-monitor") :shebang #!/usr/bin/env sh :mkdirp yes
-:END:
-
-# [2026-01-07 Wed 20:29:11 -03] @ak
-Without a monitor name the comparison can only ever be false, which reads on the
-bar as a monitor that is never focused rather than as a mistake, so the argument
-is required.
-
-#+begin_src shell :noweb yes
-«hyprland-scripts-feed-forever»
-
-# - jaq doesn't have --unbuffered
-# - needs to be single line or eww's (deflisten) won't work
-[ $# -eq 1 ] || { printf 'usage: hypr-active-monitor <monitor-name>\n' >&2; exit 64; }
-
-monitor="$1"
-
-feed() {
-    hypr-get-current-monitor-workspace |
-        jq -c -M --unbuffered --arg mon "${monitor}" '{focused: (.focused_monitor.name == $mon)}'
-}
-
-feed_forever
-#+end_src
-
 
 *** =hypr-eww-open=: Open widgets meant for Hyprland
 :PROPERTIES:
@@ -2409,9 +2232,7 @@ absent does not merely fail to open -- eww closes the window of that name that
 was already open -- so naming both monitors unconditionally is what turns a wake
 with one monitor into a wake with no second bar at all.
 
-#+begin_src shell :noweb yes
-«hyprland-scripts-check-alias-jaq-or-jq»
-
+#+begin_src shell
 set -eu
 
 height="${1:-26}"

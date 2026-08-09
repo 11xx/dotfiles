@@ -1,4 +1,6 @@
-(deflisten current-monitor :initial '{"focused":true}' "hypr-active-monitor DP-1")
+(deflisten bar
+           :initial '{"monitors":{"DP-1":{"focused":true,"workspace":"0","title":""},"DP-2":{"focused":false,"workspace":"0","title":""}},"workspaces":[]}'
+           "hypr-bar-feed")
 
 (defwindow mainbar [monitor ?height-px]
            :monitor monitor
@@ -48,9 +50,10 @@
                 :halign "start"
                 :class "bar-left-modules"
                 :spacing 14
-                (active-monitor-indicator :focused {current-monitor.focused})
-                (workspaces-bar :monitor-name "DP-1")
-                (window-title :text window-listen :limit 50)))
+                (active-monitor-indicator :focused {bar.monitors.DP-1.focused})
+                (workspaces-bar :here {bar.monitors.DP-1.workspace}
+                                :elsewhere {bar.monitors.DP-2.workspace})
+                (window-title :text {bar.monitors.DP-1.title} :limit 50)))
 
 (defwidget bar-middle-modules []
            (box :orientation "h"
@@ -91,9 +94,10 @@
                 :space-evenly false
                 :halign "end"
                 :spacing 14
-                (window-title :text window-listen-second-monitor :limit 70)
-                (workspaces-bar :monitor-name "DP-2")
-                (active-monitor-indicator :focused {!current-monitor.focused})))
+                (window-title :text {bar.monitors.DP-2.title} :limit 70)
+                (workspaces-bar :here {bar.monitors.DP-2.workspace}
+                                :elsewhere {bar.monitors.DP-1.workspace})
+                (active-monitor-indicator :focused {bar.monitors.DP-2.focused})))
 
 (defwidget active-monitor-indicator [focused]
            (box :class {focused ? "focused-monitor" : "unfocused-monitor"}))
@@ -120,37 +124,23 @@
                 (label :class "clock__date" :text {clock.date})
                 (label :class "clock__time" :text {clock.time})))
 
-(deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
-(deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1","active_workspace_id":1,"name":"DP-1"},"unfocused_monitor":{"active_workspace":"10","active_workspace_id":10,"name":"DP-2"}}'
-           "hypr-get-current-monitor-workspace")
-
 (defwidget workspace-entry [id windows here elsewhere]
   (eventbox
     (box :class "workspace-entry ${id == here ? 'current' : ''} ${windows > 0 ? 'occupied' : 'empty'} ${id == elsewhere ? 'active-unfocused' : ''}"
          (label :text id))))
 
-(defwidget workspaces-bar [monitor-name]
+(defwidget workspaces-bar [here elsewhere]
   (eventbox
     :class "workspaces-widget-eventbox"
     (box
       :space-evenly true
-      ;; The entries are drawn from the workspace list, so this hidden label is
-      ;; what makes the focus feed a dependency and redraws them when it moves.
-      (label :text "${current-workspace}"
-             :visible false)
-      (for workspace in workspaces-listen
+      (for workspace in {bar.workspaces}
         (workspace-entry
           :id {workspace.id}
           :windows {workspace.windows}
-          :here {current-workspace.focused_monitor.name == monitor-name
-                 ? current-workspace.focused_monitor.active_workspace
-                 : current-workspace.unfocused_monitor.active_workspace}
-          :elsewhere {current-workspace.focused_monitor.name == monitor-name
-                      ? current-workspace.unfocused_monitor.active_workspace
-                      : current-workspace.focused_monitor.active_workspace})))))
+          :here here
+          :elsewhere elsewhere)))))
 
-(deflisten window-listen :initial "..." "hypr-get-window-title")
-(deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
 (defwidget window-title [text limit]
            (label :class "window-title-label"
                   :limit-width limit

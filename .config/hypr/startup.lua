@@ -2,6 +2,7 @@ exec_once("/usr/lib/polkit-kde-authentication-agent-1")
 
 exec_once("lightordark-wallpaper") -- script
 exec_once("kdeconnectd") -- KDE connect daemon
+exec_once("hypr-dynamic-float-bitwarden-unlock-firefox")
 exec_once("sleep 2 && hypr-eww-open")
 exec_once("hypr-eww-restart-on-monitor-change")
 exec_once("xsettingsd") -- GTK2-3 theme live changes
