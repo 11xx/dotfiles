@@ -8,7 +8,7 @@
                                :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
+           :reserve (struts :distance {height-px ?: "26px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
            (bar-all-modules))
@@ -21,7 +21,7 @@
                                :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
+           :reserve (struts :distance {height-px ?: "26px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
@@ -37,6 +37,8 @@
 
 (defwidget bar2-all-modules []
            (box :space-evenly true
+                :class "bar-all-modules"
+                :orientation "h"
                 (bar2-left-modules)
                 (bar2-right-modules)))
 
@@ -45,10 +47,10 @@
                 :space-evenly false
                 :halign "start"
                 :class "bar-left-modules"
-                (active-monitor-indicator)
+                :spacing 14
+                (active-monitor-indicator :focused {current-monitor.focused})
                 (workspaces-bar :monitor-name "DP-1")
-                (sep)
-                (window-title)))
+                (window-title :text window-listen :limit 50)))
 
 (defwidget bar-middle-modules []
            (box :orientation "h"
@@ -57,46 +59,44 @@
                 :class "bar-middle-modules"
                 (harness-status-codex)
                 (harness-status-claude)
-                (harness-status-pi)))
+                (harness-status-pi)
+                ;; On this bar only: cu drives one desktop, not one monitor, so a
+                ;; second copy would poll the same state twice.
+                (cu-indicator)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
-                (systray :orientation "h" :spacing 10 :icon-size 24)
-                (sep)
+                ;; Tray icons sized to the text they sit beside, and spacing
+                ;; instead of rules: three unlike things in a row read as three
+                ;; things without being fenced off from each other.
+                :spacing 14
+                (systray :orientation "h" :spacing 9 :icon-size 17)
                 (swaync_icon)
-                (sep)
-                (label :text "${time}" :class "time-label")))
+                (clock :edge "right")))
 
 (defwidget bar2-left-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "start"
-                (label :text "${time}" :class "time-label")
+                :spacing 14
+                (clock :edge "left")
                 (gsr-indicator)
-                (sep)
-                (music-current :nth 0)))
+                (music-current)))
 
 (defwidget bar2-right-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "end"
-                (window-title-second-monitor)
-                (sep)
+                :spacing 14
+                (window-title :text window-listen-second-monitor :limit 70)
                 (workspaces-bar :monitor-name "DP-2")
-                (sep)
-                (active-monitor2-indicator)
-                ))
+                (active-monitor-indicator :focused {!current-monitor.focused})))
 
-(defwidget active-monitor-indicator []
-           (box :class "${current-monitor.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
-(defwidget active-monitor2-indicator []
-           (box :class "${current-monitor.focused == false ? 'focused-monitor' : 'unfocused-monitor' }"))
-
-(defwidget sep []
-           (label :class "separator" :text "|"))
+(defwidget active-monitor-indicator [focused]
+           (box :class {focused ? "focused-monitor" : "unfocused-monitor"}))
 
 (defpoll gsr-state :interval "2s"
                    :initial "idle"
@@ -105,67 +105,59 @@
 (defwidget gsr-indicator []
            (box :visible {gsr-state != "idle"}
                 :class "gsr-indicator gsr-indicator--${gsr-state}"
-                (label :text {gsr-state == "recording" ? "● REC" : "● BUF"})))
+                (label :text {gsr-state == "recording" ? "● REC"
+                              : gsr-state == "buffer" ? "● BUF"
+                              : "● ${gsr-state}"})))
 
-(defvar time-visible false)   ; for :run-while property of below variable
-                              ; when this turns true, the polling starts and
-                              ; var gets updated with given interval
+(defpoll clock :interval "20s"
+               :initial '{"date":"--------- ---","time":"--:--"}'
+               `date +'{"date":"%Y-%m-%d %a","time":"%H:%M"}'`)
 
-(defpoll time :interval "5s"
-              :initial "Loading date..."  ; optional, defaults to poll at startup
-              :run-while time-visible   ; optional, defaults to 'true'
-              "date +'%Y/%m/%d (%H:%M)'")
+(defwidget clock [edge]
+           (box :class "clock clock--${edge}"
+                :space-evenly false
+                :spacing 7
+                (label :class "clock__date" :text {clock.date})
+                (label :class "clock__time" :text {clock.time})))
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
 (deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1","active_workspace_id":1,"name":"DP-1"},"unfocused_monitor":{"active_workspace":"10","active_workspace_id":10,"name":"DP-2"}}'
            "hypr-get-current-monitor-workspace")
+
+(defwidget workspace-entry [id windows here elsewhere]
+  (eventbox
+    (box :class "workspace-entry ${id == here ? 'current' : ''} ${windows > 0 ? 'occupied' : 'empty'} ${id == elsewhere ? 'active-unfocused' : ''}"
+         (label :text id))))
 
 (defwidget workspaces-bar [monitor-name]
   (eventbox
     :class "workspaces-widget-eventbox"
     (box
       :space-evenly true
-      ;; trigger deflisten to update the whole widget
+      ;; The entries are drawn from the workspace list, so this hidden label is
+      ;; what makes the focus feed a dependency and redraws them when it moves.
       (label :text "${current-workspace}"
              :visible false)
       (for workspace in workspaces-listen
-        (eventbox
-          (box
-            :class "workspace-entry ${
-              workspace.id == (
-                current-workspace.focused_monitor.name == monitor-name
-                  ? current-workspace.focused_monitor.active_workspace
-                  : current-workspace.unfocused_monitor.active_workspace
-              ) ? "current" : ""
-            } ${
-              workspace.windows > 0 ? "occupied" : "empty"
-            } ${
-              workspace.id == (
-                current-workspace.focused_monitor.name == monitor-name
-                  ? current-workspace.unfocused_monitor.active_workspace
-                  : current-workspace.focused_monitor.active_workspace
-              ) ? "active-unfocused" : ""
-            }"
-            (label :text "${workspace.id}")))))))
+        (workspace-entry
+          :id {workspace.id}
+          :windows {workspace.windows}
+          :here {current-workspace.focused_monitor.name == monitor-name
+                 ? current-workspace.focused_monitor.active_workspace
+                 : current-workspace.unfocused_monitor.active_workspace}
+          :elsewhere {current-workspace.focused_monitor.name == monitor-name
+                      ? current-workspace.unfocused_monitor.active_workspace
+                      : current-workspace.focused_monitor.active_workspace})))))
 
 (deflisten window-listen :initial "..." "hypr-get-window-title")
 (deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
-(defwidget window-title []
-  (box
-   (label :text "${window-listen}"
-          :limit-width 50
-          :class "window-title-label"
-          ;; :truncate-left true
-          )))
-
-(defwidget window-title-second-monitor []
-  (box
-   (label :text "${window-listen-second-monitor}"
-          :limit-width 70
-          :class "window-title-label"
-          ;; :truncate-left true
-          )))
+(defwidget window-title [text limit]
+           (label :class "window-title-label"
+                  :limit-width limit
+                  :text text
+                  :tooltip text))
 
 (include "music.yuck")
 (include "../../code/harness-status/eww/harness-status.yuck")
+(include "../../code/ai-agent-computer-use/eww/cu.yuck")
 (include "swaync.yuck")

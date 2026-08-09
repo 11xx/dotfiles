@@ -2,11 +2,15 @@
 
 @import "swaync.scss";
 @import "../../code/harness-status/eww/harness-status.scss";
+@import "../../code/ai-agent-computer-use/eww/cu.scss";
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
 
-.mainbar {
+/* Both bars, or the second one inherits whatever the GTK theme happens to be and
+   only resembles the first by coincidence. */
+.mainbar,
+.mainbar2 {
   color: $neron-fg;
   background-color: $bar-bg;
 }
@@ -50,22 +54,30 @@ $focused-monitor-pad: 0 0 0 3px;
   border-bottom: $current-bb-t solid $neron-pink;
 }
 
-.separator {
-  color: $neron-current;
-  margin: 0 1em;
-  font-weight: bold;
-}
-
 .window-title-label {
   color: $middle-gray;
 }
 
-.time-label {
+/* The padding faces the screen edge the clock sits against: right on the first
+   monitor, left on the second. */
+.clock--right {
   margin: 0 10px 0 0;
 }
 
+.clock--left {
+  margin: 0 0 0 10px;
+}
+
+.clock__date {
+  color: $middle-gray;
+}
+
+.clock__time {
+  color: $neron-fg;
+  font-weight: bold;
+}
+
 .gsr-indicator {
-  margin: 0 10px 0 0;
   font-weight: bold;
 }
 
@@ -90,42 +102,56 @@ $focused-monitor-pad: 0 0 0 3px;
 }
 
 
-.music-circular-progress {
-  color: #6c6c6c;
-  background-color: transparent;
+/* Orange rather than the harness yellow: a harness thinking and a harness moving
+   this pointer are different things to know, and they sit side by side. */
+.cu__driver {
+  color: $neron-orange;
 }
 
-.music-current-box {
-  font-size: inherit;
+.cu__aborted {
+  color: $neron-red;
 }
 
-.music-current-meta-field {
-  margin: 0;
+$music-dim: darken($middle-gray, 22%);
+
+.music__field--title {
+  color: $neron-fg;
 }
 
-.music-current-meta-field-title {
-  color: $neron-yellow;
+.music__field--artist,
+.music__field--album {
+  color: $middle-gray;
 }
 
-.music-current-meta-field-albumartist {
-  color: $neron-green;
+.music__sep {
+  color: $music-dim;
 }
 
-.music-current-meta-field-album {
-  color: $neron-blue;
+/* Playing is the quiet default; paused is the state worth noticing, so it is the
+   one that brightens. */
+.music__state {
+  color: $music-dim;
 }
 
-.music-current-meta-field-elapsed {
-  color: $neron-comment;
-  margin: 0 0 0 15px;
+.music__state--paused {
+  color: $middle-gray;
 }
 
-.music-current-icon {
-  color: $current-icon;
-  margin-right: 15px;
-}
+.music__progress {
+  margin: 0 0 0 6px;
 
-.music-current-artist-separator {
-  color: $neron-pink;
-  margin: 0 8px;
+  trough {
+    min-width: 56px;
+    min-height: 3px;
+    border: none;
+    border-radius: 0;
+    background-color: $neron-current;
+  }
+
+  progress {
+    min-height: 3px;
+    border: none;
+    border-radius: 0;
+    background-color: $middle-gray;
+  }
 }

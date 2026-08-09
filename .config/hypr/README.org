@@ -1551,7 +1551,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                                :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
+           :reserve (struts :distance {height-px ?: "26px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
            (bar-all-modules))
@@ -1564,7 +1564,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                                :height {height-px ?: "26px"}
                                :anchor "top center")
            :stacking "fg" ; foreground is still below fullscreen
-           :reserve (struts :distance {height-px ?: "${height-px + 4}px"} :side "top")
+           :reserve (struts :distance {height-px ?: "26px"} :side "top")
            :exclusive true ; wayland
            :namespace "bar" ; wayland
 
@@ -1580,6 +1580,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 (defwidget bar2-all-modules []
            (box :space-evenly true
+                :class "bar-all-modules"
+                :orientation "h"
                 (bar2-left-modules)
                 (bar2-right-modules)))
 
@@ -1588,10 +1590,10 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :space-evenly false
                 :halign "start"
                 :class "bar-left-modules"
-                (active-monitor-indicator)
+                :spacing 14
+                (active-monitor-indicator :focused {current-monitor.focused})
                 (workspaces-bar :monitor-name "DP-1")
-                (sep)
-                (window-title)))
+                (window-title :text window-listen :limit 50)))
 
 (defwidget bar-middle-modules []
            (box :orientation "h"
@@ -1600,46 +1602,44 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :class "bar-middle-modules"
                 (harness-status-codex)
                 (harness-status-claude)
-                (harness-status-pi)))
+                (harness-status-pi)
+                ;; On this bar only: cu drives one desktop, not one monitor, so a
+                ;; second copy would poll the same state twice.
+                (cu-indicator)))
 
 (defwidget bar-right-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "end"
                 :class "bar-right-modules"
-                (systray :orientation "h" :spacing 10 :icon-size 24)
-                (sep)
+                ;; Tray icons sized to the text they sit beside, and spacing
+                ;; instead of rules: three unlike things in a row read as three
+                ;; things without being fenced off from each other.
+                :spacing 14
+                (systray :orientation "h" :spacing 9 :icon-size 17)
                 (swaync_icon)
-                (sep)
-                (label :text "${time}" :class "time-label")))
+                (clock :edge "right")))
 
 (defwidget bar2-left-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "start"
-                (label :text "${time}" :class "time-label")
+                :spacing 14
+                (clock :edge "left")
                 (gsr-indicator)
-                (sep)
-                (music-current :nth 0)))
+                (music-current)))
 
 (defwidget bar2-right-modules []
            (box :orientation "h"
                 :space-evenly false
                 :halign "end"
-                (window-title-second-monitor)
-                (sep)
+                :spacing 14
+                (window-title :text window-listen-second-monitor :limit 70)
                 (workspaces-bar :monitor-name "DP-2")
-                (sep)
-                (active-monitor2-indicator)
-                ))
+                (active-monitor-indicator :focused {!current-monitor.focused})))
 
-(defwidget active-monitor-indicator []
-           (box :class "${current-monitor.focused == true ? 'focused-monitor' : 'unfocused-monitor' }"))
-(defwidget active-monitor2-indicator []
-           (box :class "${current-monitor.focused == false ? 'focused-monitor' : 'unfocused-monitor' }"))
-
-(defwidget sep []
-           (label :class "separator" :text "|"))
+(defwidget active-monitor-indicator [focused]
+           (box :class {focused ? "focused-monitor" : "unfocused-monitor"}))
 
 (defpoll gsr-state :interval "2s"
                    :initial "idle"
@@ -1648,71 +1648,90 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 (defwidget gsr-indicator []
            (box :visible {gsr-state != "idle"}
                 :class "gsr-indicator gsr-indicator--${gsr-state}"
-                (label :text {gsr-state == "recording" ? "● REC" : "● BUF"})))
+                (label :text {gsr-state == "recording" ? "● REC"
+                              : gsr-state == "buffer" ? "● BUF"
+                              : "● ${gsr-state}"})))
 
-(defvar time-visible false)   ; for :run-while property of below variable
-                              ; when this turns true, the polling starts and
-                              ; var gets updated with given interval
+(defpoll clock :interval "20s"
+               :initial '{"date":"--------- ---","time":"--:--"}'
+               `date +'{"date":"%Y-%m-%d %a","time":"%H:%M"}'`)
 
-(defpoll time :interval "5s"
-              :initial "Loading date..."  ; optional, defaults to poll at startup
-              :run-while time-visible   ; optional, defaults to 'true'
-              "date +'%Y/%m/%d (%H:%M)'")
+(defwidget clock [edge]
+           (box :class "clock clock--${edge}"
+                :space-evenly false
+                :spacing 7
+                (label :class "clock__date" :text {clock.date})
+                (label :class "clock__time" :text {clock.time})))
 
 (deflisten workspaces-listen :initial "[]" "hypr-get-workspaces")
 (deflisten current-workspace :initial '{"focused_monitor":{"active_workspace":"1","active_workspace_id":1,"name":"DP-1"},"unfocused_monitor":{"active_workspace":"10","active_workspace_id":10,"name":"DP-2"}}'
            "hypr-get-current-monitor-workspace")
+
+(defwidget workspace-entry [id windows here elsewhere]
+  (eventbox
+    (box :class "workspace-entry ${id == here ? 'current' : ''} ${windows > 0 ? 'occupied' : 'empty'} ${id == elsewhere ? 'active-unfocused' : ''}"
+         (label :text id))))
 
 (defwidget workspaces-bar [monitor-name]
   (eventbox
     :class "workspaces-widget-eventbox"
     (box
       :space-evenly true
-      ;; trigger deflisten to update the whole widget
+      ;; The entries are drawn from the workspace list, so this hidden label is
+      ;; what makes the focus feed a dependency and redraws them when it moves.
       (label :text "${current-workspace}"
              :visible false)
       (for workspace in workspaces-listen
-        (eventbox
-          (box
-            :class "workspace-entry ${
-              workspace.id == (
-                current-workspace.focused_monitor.name == monitor-name
-                  ? current-workspace.focused_monitor.active_workspace
-                  : current-workspace.unfocused_monitor.active_workspace
-              ) ? "current" : ""
-            } ${
-              workspace.windows > 0 ? "occupied" : "empty"
-            } ${
-              workspace.id == (
-                current-workspace.focused_monitor.name == monitor-name
-                  ? current-workspace.unfocused_monitor.active_workspace
-                  : current-workspace.focused_monitor.active_workspace
-              ) ? "active-unfocused" : ""
-            }"
-            (label :text "${workspace.id}")))))))
+        (workspace-entry
+          :id {workspace.id}
+          :windows {workspace.windows}
+          :here {current-workspace.focused_monitor.name == monitor-name
+                 ? current-workspace.focused_monitor.active_workspace
+                 : current-workspace.unfocused_monitor.active_workspace}
+          :elsewhere {current-workspace.focused_monitor.name == monitor-name
+                      ? current-workspace.unfocused_monitor.active_workspace
+                      : current-workspace.focused_monitor.active_workspace})))))
 
 (deflisten window-listen :initial "..." "hypr-get-window-title")
 (deflisten window-listen-second-monitor :initial "..." "hypr-get-window-title-second-monitor DP-2")
-(defwidget window-title []
-  (box
-   (label :text "${window-listen}"
-          :limit-width 50
-          :class "window-title-label"
-          ;; :truncate-left true
-          )))
-
-(defwidget window-title-second-monitor []
-  (box
-   (label :text "${window-listen-second-monitor}"
-          :limit-width 70
-          :class "window-title-label"
-          ;; :truncate-left true
-          )))
+(defwidget window-title [text limit]
+           (label :class "window-title-label"
+                  :limit-width limit
+                  :text text
+                  :tooltip text))
 
 (include "music.yuck")
 (include "../../code/harness-status/eww/harness-status.yuck")
+(include "../../code/ai-agent-computer-use/eww/cu.yuck")
 (include "swaync.yuck")
 #+end_src
+
+Both bars are one widget set parameterised by which monitor they describe, not
+two near-copies: one window title, one monitor indicator asking whether the
+focused monitor is its own, one workspace entry that receives the two workspace
+ids it needs to compare against rather than deriving them once per class. The
+clusters are spaced rather than ruled, so the =sep= widget is gone with them.
+
+=gsr status= is polled because there is no event to listen to: the state is
+derived from whether a recorder process exists, and a process starting is not
+something the compositor or the recorder announces. The widget names every state
+=gsr= can print and falls back to showing an unknown one verbatim, so a state
+added later appears as itself instead of silently reading as a buffer.
+
+The =cu= indicator is imported the same way, from the computer-use repository,
+and reports when an agent is driving this desktop: one mark per agent, a stop
+mark once the user's abort flag is set, and nothing at all while the desktop is
+the user's alone. It sits on the first bar only, because =cu= describes one
+desktop rather than one monitor and a second copy would poll the same state
+twice.
+
+The clock reads =2026-08-09 Sun 12:41=: ISO order, so it sorts the way dates are
+written everywhere else here, with the weekday appended for the question a date
+alone does not answer. One =date= call emits both fields as JSON, which lets the
+stylesheet hold the reference part and the glanced-at part apart without a
+second process. =edge= names the screen edge the clock sits against on its own
+bar, since the padding belongs on the side facing that edge -- right on the
+first monitor, left on the second.
 
 Harness lifecycle widgets and their listeners are imported directly from the
 =harness-status= repository checkout. The desktop config only places the
@@ -1732,89 +1751,81 @@ long-lived listener instead of spawning a one-second poller. The helper emits
 the canonical normalised shape (~playback~/~track~/… sections) and advances
 elapsed time from its own monotonic clock while playback is active.
 
+The line is one voice: the title carries it and the fields qualifying it sit a
+step back, because three saturated colours competed with each other and with
+every other thing on the bar. Position is a filled length rather than two
+timestamps to compare or a ring that is a speck at this height; the exact figure
+is a hover away.
+
+Any field too long to fit scrolls, but only while the track is playing -- a
+paused track is not going anywhere, and motion the user cannot act on is just
+motion. eww needs no helper for this: =substring= over a tick is the whole
+mechanism, and one tick drives every field, so a line that scrolls costs no more
+than a line that does not. The title gets the widest allowance, since it is the
+field worth reading in full.
+
 #+begin_src yuck :tangle (tdir "music.yuck")
-(deflisten music-current-json-1st-instance
-           :initial '{"player":{},"playback":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
+(deflisten music-data
+           :initial '{"player":{},"playback":{"state":"stopped","duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
            "music-current-json --follow --player=muzaiten")
 
-(defwidget seconds-to-length-format-hours [secs]
-           (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
+;; One step per 400ms: enough to read as movement, slow enough not to pull the
+;; eye away from whatever the user is actually doing.
+(deflisten music-tick
+           :initial "0"
+           `i=0; while :; do printf '%s\\n' "$i"; i=$((i + 1)); sleep 0.4; done`)
 
-(defwidget seconds-to-length-format-minutes [secs]
-           (label :text { (secs / 60) < 10 ?
-                          "0${round(secs / 60, 0)}" :
-                          "${round(secs / 60, 0)}" }))
+;; The window is cut from the text, a gap, and the text again, so it wraps around
+;; instead of snapping back when it reaches the end. Every field shares the one
+;; tick, so a scrolling line costs no more than a still one.
+(defwidget music-marquee [text limit class]
+           (label :class "music__field ${class}"
+                  :limit-width limit
+                  :tooltip text
+                  :text {music-data.playback.state != "playing" || strlength(text) <= limit
+                         ? text
+                         : substring("${text}  ·  ${text}",
+                                     music-tick % (strlength(text) + 5),
+                                     limit)}))
 
-(defwidget seconds-to-length-format-seconds [secs]
-           (label :text { (secs % 60) < 10 ?
-                          "0${round(secs % 60, 0)}" :
-                          "${round(secs % 60, 0)}" }))
+;; Its separator belongs to the field, so a track naming no album leaves no
+;; dangling dot behind. mpris reports a missing tag as the string "null".
+(defwidget music-field [text class limit]
+           (box :space-evenly false
+                :spacing 8
+                :visible {text != "" && text != "null"}
+                (label :class "music__sep" :text "·")
+                (music-marquee :text text :class class :limit limit)))
 
-(defwidget seconds-to-length [secs]
-           (box
-            :space-evenly false
-            (seconds-to-length-format-hours :secs secs)
-            (seconds-to-length-format-minutes :secs secs)
-            ":"
-            (seconds-to-length-format-seconds :secs secs)))
+;; Paused is the state worth seeing: without it, a line that has stopped moving
+;; is indistinguishable from one that simply is not being redrawn.
+(defwidget music-state []
+           (label :class "music__state music__state--${music-data.playback.state}"
+                  :text {music-data.playback.state == "playing" ? "󰐊"
+                         : music-data.playback.state == "paused" ? "󰏤"
+                         : "󰓛"}))
 
-(defwidget music-current-nth-instance [curr-json ?icon]
-           (box
-            :space-evenly false
-
-            (label :class "music-current-icon" :text icon)
-            ;; Title
-            (label :class "music-current-meta-field music-current-meta-field-title"
-                   :limit-width 50
-                   :text {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""}
-                   :tooltip {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""})
-
-            ;; Title Artist separator
-            (label :class "music-current-artist-separator" :text "·")
-
-            ;; Artist: if album_artist is empty, use Artist
-            (label :class "music-current-meta-field music-current-meta-field-albumartist"
-                   :limit-width 50
-                   :text {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
-                                    curr-json.track.artist != "null" ? curr-json.track.artist : ""}
-                   :tooltip {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
-                                       curr-json.track.artist != "null" ? curr-json.track.artist : ""})
-
-            ;; Title Artist separator
-            (label :class "music-current-artist-separator" :text "·")
-
-            ;; Album
-            (label :class "music-current-meta-field music-current-meta-field-album"
-                   :limit-width 50
-                   :text {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""}
-                   :tooltip {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""})
-
-            ;; Elapsed/Duration
-            (box :spacing 2
-                 :class "music-current-meta-field music-current-meta-field-elapsed"
-                 :space-evenly false
-                 (seconds-to-length :secs {curr-json.playback.elapsed})
-                 (label :text "/" :class "music-time-sep")
-                 (seconds-to-length :secs {curr-json.playback.duration})
-                 (circular-progress :class "music-circular-progress"
-                                    :width 20
-                                    :height 20
-                                    :value {curr-json.playback.elapsed_percent}
-                                    :thickness 4
-                                    :start-at 70
-                                    :valign "center"
-                                    :tooltip "${curr-json.playback.elapsed_percent}%"))))
-
-(defwidget music-current-1st-wrap []
-           (music-current-nth-instance :curr-json {music-current-json-1st-instance}))
-
-(defvar music-expand-bool true)
 (defwidget music-current []
-           (box :class "music-current-box"
+           (box :class "music"
                 :space-evenly false
-                :orientation "h"
+                :spacing 8
                 :valign "center"
-                (music-current-1st-wrap)))
+                :visible {music-data.track.title != "" && music-data.track.title != "null"}
+                (music-state)
+                (music-marquee :text {music-data.track.title}
+                               :class "music__field--title"
+                               :limit 45)
+                (music-field :class "music__field--artist"
+                             :limit 30
+                             :text {music-data.track.album_artist != "null" ? music-data.track.album_artist
+                                    : music-data.track.artist})
+                (music-field :class "music__field--album"
+                             :limit 30
+                             :text {music-data.track.album})
+                (progress :class "music__progress"
+                          :valign "center"
+                          :value {music-data.playback.elapsed_percent}
+                          :tooltip "${round(music-data.playback.elapsed_percent, 0)}% played")))
 #+end_src
 
 ** =swaync.yuck=: swaync notification client
@@ -1822,60 +1833,32 @@ elapsed time from its own monotonic clock while playback is active.
 :header-args:yuck: :tangle (tdir "/swaync.yuck") :mkdirp yes
 :END:
 
+Nothing else on this bar draws a container, so neither does this: a bell, a count
+when there is one, and colour for the state. =alt= distinguishes six states, but
+only one of them changes what a notification means to the user -- whether
+do-not-disturb is swallowing them -- so only that splits the glyph. The rest
+reach the stylesheet as a class.
+
 #+begin_src yuck :noweb yes
 (deflisten swaync_data :initial '{"text": "0", "alt": "none", "tooltip": "", "class": "none"}'
            "swaync-client -swb")
 
-(defwidget swaync_btn []
-           (eventbox
-            :onclick "swaync-client -t -sw"
-            :onrightclick "swaync-client -d -sw"
-            :onmiddleclick "swaync-client -C -sw"
-            :tooltip "${swaync_data.tooltip}"
-            :class "notification-button ${swaync_data.alt} ${swaync_data.class}"
-            (box
-             :class "notification-content"
-             :space-evenly false
-             :spacing 6
-             ;; Icon based on alt status
-             (label
-              :text "${swaync_data.alt == 'dnd-notification' || swaync_data.alt == 'dnd-inhibited-notification' || swaync_data.alt == 'dnd-none' ? '󰂛' : '󰂚'}"
-              :class "notification-icon")
-             ;; Notification count
-             (label
-              :text "${swaync_data.text}"
-              :class "notification-count"
-              :visible {swaync_data.text != "0"}))))
-
-;; More detailed notification widget
 (defwidget swaync_icon []
            (eventbox
             :onclick "swaync-client -t -sw"
             :onrightclick "swaync-client -d -sw"
             :onmiddleclick "swaync-client -C -sw"
-            :tooltip "Notifications: ${swaync_data.text} ${swaync_data.alt == 'none' ? '' : '(' + swaync_data.alt + ')'}"
-            :class "notification-widget ${swaync_data.alt} ${swaync_data.class}"
+            :tooltip {swaync_data.tooltip != "" ? swaync_data.tooltip : "${swaync_data.text} notifications"}
+            :class "swaync swaync--${swaync_data.alt}"
             (box
-             :orientation "h"
              :space-evenly false
-             :spacing 6
-             ;; Dynamic icon based on status
-             (label
-              :text "${swaync_data.alt == 'dnd-notification' ? '󰂛' :
-                swaync_data.alt == 'dnd-none' ? '󰂛' :
-                swaync_data.alt == 'dnd-inhibited-notification' ? '󰂛' :
-                swaync_data.alt == 'dnd-inhibited-none' ? '󰂛' :
-                swaync_data.alt == 'inhibited-notification' ? '󰂚' :
-                swaync_data.alt == 'inhibited-none' ? '󰂚' :
-                swaync_data.alt == 'notification' ? '󰂚' : '󰂚'}"
-              :class "notification-icon")
-             ;; Count badge (only show when > 0)
-             (label
-              :text "${swaync_data.text}"
-              :class "notification-count ${swaync_data.text != '0' ? 'has-count' : ''}"
-              :visible {swaync_data.text != "0"}))))
+             :spacing 5
+             (label :class "swaync__bell"
+                    :text {matches(swaync_data.alt, "dnd") ? "󰂛" : "󰂚"})
+             (label :class "swaync__count"
+                    :visible {swaync_data.text != "0"}
+                    :text {swaync_data.text}))))
 #+end_src
-
 
 ** =eww.scss=: Customization for =eww.yuck= widgets
 :PROPERTIES:
@@ -1958,11 +1941,15 @@ Based on the variables, customize the widgets:
 #+begin_src scss
 @import "swaync.scss";
 @import "../../code/harness-status/eww/harness-status.scss";
+@import "../../code/ai-agent-computer-use/eww/cu.scss";
 
 $current-bb-t: .15em;
 $focused-monitor-pad: 0 0 0 3px;
 
-.mainbar {
+/* Both bars, or the second one inherits whatever the GTK theme happens to be and
+   only resembles the first by coincidence. */
+.mainbar,
+.mainbar2 {
   color: $neron-fg;
   background-color: $bar-bg;
 }
@@ -2006,22 +1993,30 @@ $focused-monitor-pad: 0 0 0 3px;
   border-bottom: $current-bb-t solid $neron-pink;
 }
 
-.separator {
-  color: $neron-current;
-  margin: 0 1em;
-  font-weight: bold;
-}
-
 .window-title-label {
   color: $middle-gray;
 }
 
-.time-label {
+/* The padding faces the screen edge the clock sits against: right on the first
+   monitor, left on the second. */
+.clock--right {
   margin: 0 10px 0 0;
 }
 
+.clock--left {
+  margin: 0 0 0 10px;
+}
+
+.clock__date {
+  color: $middle-gray;
+}
+
+.clock__time {
+  color: $neron-fg;
+  font-weight: bold;
+}
+
 .gsr-indicator {
-  margin: 0 10px 0 0;
   font-weight: bold;
 }
 
@@ -2046,45 +2041,60 @@ $focused-monitor-pad: 0 0 0 3px;
 }
 
 
-.music-circular-progress {
-  color: #6c6c6c;
-  background-color: transparent;
+/* Orange rather than the harness yellow: a harness thinking and a harness moving
+   this pointer are different things to know, and they sit side by side. */
+.cu__driver {
+  color: $neron-orange;
 }
 
-.music-current-box {
-  font-size: inherit;
+.cu__aborted {
+  color: $neron-red;
 }
 
-.music-current-meta-field {
-  margin: 0;
+$music-dim: darken($middle-gray, 22%);
+
+.music__field--title {
+  color: $neron-fg;
 }
 
-.music-current-meta-field-title {
-  color: $neron-yellow;
+.music__field--artist,
+.music__field--album {
+  color: $middle-gray;
 }
 
-.music-current-meta-field-albumartist {
-  color: $neron-green;
+.music__sep {
+  color: $music-dim;
 }
 
-.music-current-meta-field-album {
-  color: $neron-blue;
+/* Playing is the quiet default; paused is the state worth noticing, so it is the
+   one that brightens. */
+.music__state {
+  color: $music-dim;
 }
 
-.music-current-meta-field-elapsed {
-  color: $neron-comment;
-  margin: 0 0 0 15px;
+.music__state--paused {
+  color: $middle-gray;
 }
 
-.music-current-icon {
-  color: $current-icon;
-  margin-right: 15px;
+.music__progress {
+  margin: 0 0 0 6px;
+
+  trough {
+    min-width: 56px;
+    min-height: 3px;
+    border: none;
+    border-radius: 0;
+    background-color: $neron-current;
+  }
+
+  progress {
+    min-height: 3px;
+    border: none;
+    border-radius: 0;
+    background-color: $middle-gray;
+  }
 }
 
-.music-current-artist-separator {
-  color: $neron-pink;
-  margin: 0 8px;
-}
 #+end_src
 
 ** =swaync.scss=: Styles for =swaync.yuck=
@@ -2092,86 +2102,46 @@ $focused-monitor-pad: 0 0 0 3px;
 :header-args:scss: :tangle (tdir "/swaync.scss") :mkdirp yes
 :END:
 
+A filled pill announced itself whether or not anything had arrived, so the state
+lives entirely in colour now: grey while quiet, warning while something waits,
+pink while do-not-disturb is swallowing them.
+
 #+begin_src scss
-/* ===== SwayNC Notification Styles ===== */
-/* Base notification button/widget */
-.notification-button,
-.notification-widget {
-  background-color: $bar-bg;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 0px 4px;
-  transition: all 0.3s ease;
-
-  &:hover {
-    background-color: lighten($bar-bg, 10%);
-  }
-
-  /* State-based styling using your existing color palette */
-  &.none {
-    /* Normal state - uses default bar-bg */
-  }
-
-  &.notification {
-    border-right: 1px solid rgba($neron-warning, 0.5);
-    background-image: linear-gradient(90deg, rgba($neron-warning, 0.5), transparent);
-  }
-
-  &.dnd-notification,
-  &.dnd-none {
-    background-color: rgba($neron-pink, 0.1); // neron-pink with alpha
-  }
-
-  &.inhibited-notification,
-  &.inhibited-none {
-    background-color: rgba(128, 128, 128, 0.2); // middle-gray with alpha
-    border: 1px solid $middle-gray;
-  }
-
-  &.dnd-inhibited-notification,
-  &.dnd-inhibited-none {
-    background-color: rgba($neron-current, 0.8);
-    border: 1px solid $neron-current;
+.swaync {
+  &:hover .swaync__bell {
+    color: $neron-fg;
   }
 }
 
-/* Icon styling */
-.notification-icon {
-  color: $neron-fg;
-  font-size: 20px;
-  padding: 0 10px;
+.swaync__bell {
+  color: $middle-gray;
+  font-size: 15px;
 }
 
-/* DnD state icons use pink accent */
-.notification-button.dnd-notification .notification-icon,
-.notification-button.dnd-none .notification-icon,
-.notification-button.dnd-inhibited-notification .notification-icon,
-.notification-button.dnd-inhibited-none .notification-icon,
-.notification-widget.dnd-notification .notification-icon,
-.notification-widget.dnd-none .notification-icon,
-.notification-widget.dnd-inhibited-notification .notification-icon,
-.notification-widget.dnd-inhibited-none .notification-icon {
+.swaync__count {
+  color: $neron-warning;
+  font-weight: bold;
+}
+
+.swaync--notification .swaync__bell,
+.swaync--inhibited-notification .swaync__bell {
+  color: $neron-warning;
+}
+
+.swaync--dnd-notification .swaync__bell,
+.swaync--dnd-none .swaync__bell,
+.swaync--dnd-inhibited-notification .swaync__bell,
+.swaync--dnd-inhibited-none .swaync__bell {
   color: $neron-pink;
 }
 
-/* Notification count badge */
-.notification-count {
-  color: $neron-fg;
-  font-size: 12px;
-  font-weight: bold;
-  min-width: 16px;
-}
-
-/* Count with background when has notifications */
-.notification-count.has-count {
-  color: $neron-fg;
-  border-radius: 10px;
-  padding: 2px 6px;
-}
-
-/* Alternative: Simple notification content styling */
-.notification-content {
-  /* Container for icon and count */
+/* The count still matters under do-not-disturb, but it is not something the user
+   is being asked to act on. */
+.swaync--dnd-notification .swaync__count,
+.swaync--dnd-none .swaync__count,
+.swaync--dnd-inhibited-notification .swaync__count,
+.swaync--dnd-inhibited-none .swaync__count {
+  color: $neron-pink;
 }
 #+end_src
 

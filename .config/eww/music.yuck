@@ -1,82 +1,61 @@
-(deflisten music-current-json-1st-instance
-           :initial '{"player":{},"playback":{"duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
+(deflisten music-data
+           :initial '{"player":{},"playback":{"state":"stopped","duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
            "music-current-json --follow --player=muzaiten")
 
-(defwidget seconds-to-length-format-hours [secs]
-           (label :text { secs >= 3600 ? "${round(secs / 3600, 0)}:" : "" }))
+;; One step per 400ms: enough to read as movement, slow enough not to pull the
+;; eye away from whatever the user is actually doing.
+(deflisten music-tick
+           :initial "0"
+           `i=0; while :; do printf '%s\\n' "$i"; i=$((i + 1)); sleep 0.4; done`)
 
-(defwidget seconds-to-length-format-minutes [secs]
-           (label :text { (secs / 60) < 10 ?
-                          "0${round(secs / 60, 0)}" :
-                          "${round(secs / 60, 0)}" }))
+;; The window is cut from the text, a gap, and the text again, so it wraps around
+;; instead of snapping back when it reaches the end. Every field shares the one
+;; tick, so a scrolling line costs no more than a still one.
+(defwidget music-marquee [text limit class]
+           (label :class "music__field ${class}"
+                  :limit-width limit
+                  :tooltip text
+                  :text {music-data.playback.state != "playing" || strlength(text) <= limit
+                         ? text
+                         : substring("${text}  ·  ${text}",
+                                     music-tick % (strlength(text) + 5),
+                                     limit)}))
 
-(defwidget seconds-to-length-format-seconds [secs]
-           (label :text { (secs % 60) < 10 ?
-                          "0${round(secs % 60, 0)}" :
-                          "${round(secs % 60, 0)}" }))
+;; Its separator belongs to the field, so a track naming no album leaves no
+;; dangling dot behind. mpris reports a missing tag as the string "null".
+(defwidget music-field [text class limit]
+           (box :space-evenly false
+                :spacing 8
+                :visible {text != "" && text != "null"}
+                (label :class "music__sep" :text "·")
+                (music-marquee :text text :class class :limit limit)))
 
-(defwidget seconds-to-length [secs]
-           (box
-            :space-evenly false
-            (seconds-to-length-format-hours :secs secs)
-            (seconds-to-length-format-minutes :secs secs)
-            ":"
-            (seconds-to-length-format-seconds :secs secs)))
+;; Paused is the state worth seeing: without it, a line that has stopped moving
+;; is indistinguishable from one that simply is not being redrawn.
+(defwidget music-state []
+           (label :class "music__state music__state--${music-data.playback.state}"
+                  :text {music-data.playback.state == "playing" ? "󰐊"
+                         : music-data.playback.state == "paused" ? "󰏤"
+                         : "󰓛"}))
 
-(defwidget music-current-nth-instance [curr-json ?icon]
-           (box
-            :space-evenly false
-
-            (label :class "music-current-icon" :text icon)
-            ;; Title
-            (label :class "music-current-meta-field music-current-meta-field-title"
-                   :limit-width 50
-                   :text {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""}
-                   :tooltip {"${curr-json.track.title}" != "null" ? "${curr-json.track.title}" : ""})
-
-            ;; Title Artist separator
-            (label :class "music-current-artist-separator" :text "·")
-
-            ;; Artist: if album_artist is empty, use Artist
-            (label :class "music-current-meta-field music-current-meta-field-albumartist"
-                   :limit-width 50
-                   :text {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
-                                    curr-json.track.artist != "null" ? curr-json.track.artist : ""}
-                   :tooltip {curr-json.track.album_artist != "null" ? curr-json.track.album_artist :
-                                       curr-json.track.artist != "null" ? curr-json.track.artist : ""})
-
-            ;; Title Artist separator
-            (label :class "music-current-artist-separator" :text "·")
-
-            ;; Album
-            (label :class "music-current-meta-field music-current-meta-field-album"
-                   :limit-width 50
-                   :text {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""}
-                   :tooltip {curr-json.track.album != "null" ? "${curr-json.track.album}" : ""})
-
-            ;; Elapsed/Duration
-            (box :spacing 2
-                 :class "music-current-meta-field music-current-meta-field-elapsed"
-                 :space-evenly false
-                 (seconds-to-length :secs {curr-json.playback.elapsed})
-                 (label :text "/" :class "music-time-sep")
-                 (seconds-to-length :secs {curr-json.playback.duration})
-                 (circular-progress :class "music-circular-progress"
-                                    :width 20
-                                    :height 20
-                                    :value {curr-json.playback.elapsed_percent}
-                                    :thickness 4
-                                    :start-at 70
-                                    :valign "center"
-                                    :tooltip "${curr-json.playback.elapsed_percent}%"))))
-
-(defwidget music-current-1st-wrap []
-           (music-current-nth-instance :curr-json {music-current-json-1st-instance}))
-
-(defvar music-expand-bool true)
 (defwidget music-current []
-           (box :class "music-current-box"
+           (box :class "music"
                 :space-evenly false
-                :orientation "h"
+                :spacing 8
                 :valign "center"
-                (music-current-1st-wrap)))
+                :visible {music-data.track.title != "" && music-data.track.title != "null"}
+                (music-state)
+                (music-marquee :text {music-data.track.title}
+                               :class "music__field--title"
+                               :limit 45)
+                (music-field :class "music__field--artist"
+                             :limit 30
+                             :text {music-data.track.album_artist != "null" ? music-data.track.album_artist
+                                    : music-data.track.artist})
+                (music-field :class "music__field--album"
+                             :limit 30
+                             :text {music-data.track.album})
+                (progress :class "music__progress"
+                          :valign "center"
+                          :value {music-data.playback.elapsed_percent}
+                          :tooltip "${round(music-data.playback.elapsed_percent, 0)}% played")))
