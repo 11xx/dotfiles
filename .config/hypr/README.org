@@ -1483,7 +1483,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :spacing 14
                 (active-monitor-indicator :focused {bar.monitors.DP-1.focused})
                 (workspaces-bar :here {bar.monitors.DP-1.workspace}
-                                :elsewhere {bar.monitors.DP-2.workspace})
+                                :elsewhere {bar.monitors.DP-2.workspace}
+                                :monitor "DP-1")
                 (window-title :text {bar.monitors.DP-1.title} :limit 50)))
 
 (defwidget bar-middle-modules []
@@ -1527,7 +1528,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 :spacing 14
                 (window-title :text {bar.monitors.DP-2.title} :limit 70)
                 (workspaces-bar :here {bar.monitors.DP-2.workspace}
-                                :elsewhere {bar.monitors.DP-1.workspace})
+                                :elsewhere {bar.monitors.DP-1.workspace}
+                                :monitor "DP-2")
                 (active-monitor-indicator :focused {bar.monitors.DP-2.focused})))
 
 (defwidget active-monitor-indicator [focused]
@@ -1555,12 +1557,17 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 (label :class "clock__date" :text {clock.date})
                 (label :class "clock__time" :text {clock.time})))
 
-(defwidget workspace-entry [id windows here elsewhere]
+(defwidget workspace-entry [id windows here elsewhere monitor]
   (eventbox
+    ;; Its own monitor is focused first: the bar that was clicked names the
+    ;; monitor the workspace should appear on, which is not necessarily the one
+    ;; that had focus. Dispatchers go through the config's Lua API, since a raw
+    ;; dispatcher string is intercepted by it and does nothing.
+    :onclick "hyprctl dispatch \"hl.dsp.focus({ monitor = '${monitor}' })\" && hyprctl dispatch \"hl.dsp.focus({ workspace = ${id}, on_current_monitor = true })\""
     (box :class "workspace-entry ${id == here ? 'current' : ''} ${windows > 0 ? 'occupied' : 'empty'} ${id == elsewhere ? 'active-unfocused' : ''}"
          (label :text id))))
 
-(defwidget workspaces-bar [here elsewhere]
+(defwidget workspaces-bar [here elsewhere monitor]
   (eventbox
     :class "workspaces-widget-eventbox"
     (box
@@ -1570,7 +1577,8 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
           :id {workspace.id}
           :windows {workspace.windows}
           :here here
-          :elsewhere elsewhere)))))
+          :elsewhere elsewhere
+          :monitor monitor)))))
 
 (defwidget window-title [text limit]
            (label :class "window-title-label"
