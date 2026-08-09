@@ -155,7 +155,7 @@ exec_once("/usr/lib/polkit-kde-authentication-agent-1")
 exec_once("lightordark-wallpaper") -- script
 exec_once("kdeconnectd") -- KDE connect daemon
 exec_once("sleep 2 && hypr-eww-open")
-exec_once("sleep 10 && hypr-eww-restart-on-monitor-change")
+exec_once("hypr-eww-restart-on-monitor-change")
 exec_once("xsettingsd") -- GTK2-3 theme live changes
 -- exec_once("gammastep -P")
 exec_once("hypridle -c \"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hypridle.conf\"")
@@ -2381,12 +2381,77 @@ feed_forever
 :PROPERTIES:
 :header-args:shell: :tangle (tdir "hypr-eww-open") :shebang #!/usr/bin/env sh
 :END:
+Opening is serialised, because two openers at once are how a second daemon
+appears: =eww open-many= starts a daemon when it cannot reach one, and two of
+them can each decide that at the same moment.
+
+The lock is closed for the =eww= call itself. A daemon inherits the file
+descriptors of whatever started it, and every script it spawns inherits them in
+turn -- so a lock still open across that call is held for the daemon's entire
+life, and the next wake blocks on it forever. Measured: it is indistinguishable
+from working until the second open never returns.
+
+An eww daemon reachable through its socket is the only one any =eww= command can
+address. If the socket goes missing while the daemon lives -- which is what
+leaves two stacked bars on every monitor -- the survivor keeps drawing, =eww
+kill= ends a different process, and the pid is the only handle left. So the
+socket is what gets trusted: a failed ping with an eww process still running
+means an orphan, and orphans are killed by name. That is deliberately blunt,
+because an unreachable daemon cannot be identified any more precisely.
+
+A bar is opened only when its own monitor is connected. A window whose monitor is
+absent does not merely fail to open -- eww closes the window of that name that
+was already open -- so naming both monitors unconditionally is what turns a wake
+with one monitor into a wake with no second bar at all.
+
 #+begin_src shell :noweb yes
-eww open-many mainbar mainbar2 \
-    --arg mainbar:monitor='DP-1' \
-    --arg mainbar2:monitor='DP-2' \
-    --arg height-px="${1:-26}"
+«hyprland-scripts-check-alias-jaq-or-jq»
+
+set -eu
+
+height="${1:-26}"
+runtime="${XDG_RUNTIME_DIR:-/tmp}"
+
+exec 9>"${runtime}/hypr-eww-open.lock"
+flock 9
+
+if ! eww ping >/dev/null 2>&1 && pgrep -x eww >/dev/null; then
+    pkill -x eww || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        pgrep -x eww >/dev/null || break
+        sleep 0.2
+    done
+    pkill -KILL -x eww || true
+    rm -f -- "${runtime}"/eww-server_*
+fi
+
+connected() {
+    hyprctl monitors -j | jq -r '.[].name' | grep -Fxq "$1"
+}
+
+windows=""
+args=""
+
+if connected DP-1; then
+    windows="${windows} mainbar"
+    args="${args} --arg mainbar:monitor=DP-1"
+fi
+
+if connected DP-2; then
+    windows="${windows} mainbar2"
+    args="${args} --arg mainbar2:monitor=DP-2"
+fi
+
+[ -n "${windows}" ] || exit 0
+
+# shellcheck disable=SC2086
+eww open-many ${windows} ${args} --arg height-px="${height}" 9>&-
 #+end_src
+
+Both monitor names appear here and again in =eww.yuck=, which names them in the
+workspace bars, the focus feed, and the second monitor's window title. eww offers
+no way to pass a variable into a =deflisten= command, so the names stay written
+where they are used; changing a connector means changing both files.
 
 
 * Hyprland-specific file mime associations
