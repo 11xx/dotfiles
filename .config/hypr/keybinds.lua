@@ -156,12 +156,13 @@ keymap_exec("s-a r", "rm -f ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
 bind_exec("SUPER + XF86AudioNext", "playerctl next")
 bind_exec("SUPER + XF86AudioPrev", "playerctl previous")
 bind_exec("SUPER + XF86AudioPlay", "playerctl play-pause")
+bind_exec("SUPER + XF86AudioStop", "playerctl play-pause")
 
 -- Muzaiten
 bind_exec("XF86AudioNext", "playerctl --player=muzaiten next")
 bind_exec("XF86AudioPrev", "playerctl --player=muzaiten previous")
 bind_exec("XF86AudioPlay", "playerctl --player=muzaiten play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop")
+bind_exec("XF86AudioStop", "playerctl --player=muzaiten play-pause")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")

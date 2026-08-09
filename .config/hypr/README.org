@@ -682,6 +682,16 @@ keymap_exec("s-a r", "rm -f ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
 #+end_src
 
 **** media/volume
+The bare media keys drive muzaiten and the =SUPER= ones drive whichever player
+=playerctl= picks, so the same four keys serve both without a mode.
+
+Stop is bound to play/pause rather than to stopping, because this keyboard's
+play/pause key is dead: pressed ten times it produces no HID report at all --
+no key event and no scancode -- while the other three keys still report
+normally, and the firmware still declares the usage. Stopping is the action
+worth giving up for it. The play/pause bindings stay as they are, so a working
+keyboard behaves the way its keycaps read.
+
 #+begin_src lua
 -- Media keys
 -- the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode
@@ -689,12 +699,13 @@ keymap_exec("s-a r", "rm -f ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
 bind_exec("SUPER + XF86AudioNext", "playerctl next")
 bind_exec("SUPER + XF86AudioPrev", "playerctl previous")
 bind_exec("SUPER + XF86AudioPlay", "playerctl play-pause")
+bind_exec("SUPER + XF86AudioStop", "playerctl play-pause")
 
 -- Muzaiten
 bind_exec("XF86AudioNext", "playerctl --player=muzaiten next")
 bind_exec("XF86AudioPrev", "playerctl --player=muzaiten previous")
 bind_exec("XF86AudioPlay", "playerctl --player=muzaiten play-pause")
-bind_exec("SUPER + XF86AudioStop", "playerctl --player=muzaiten stop")
+bind_exec("XF86AudioStop", "playerctl --player=muzaiten play-pause")
 
 exec_once("wob-volume-pw")
 exec_once("wob-volume-pw-extras")
