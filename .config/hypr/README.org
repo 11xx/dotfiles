@@ -660,6 +660,21 @@ Select a region with =slurp= and record it.
 bind_exec("SUPER + ALT + S", "gsr region")
 #+end_src
 
+**** agents driving this desktop
+=cu= refuses every keystroke and click while its abort flag exists, and it is
+the one interlock an agent may never clear — so setting and releasing it are
+keybinds rather than a command. The bar's =cu= indicator shows the flag the
+moment it is set, and disappears once it is released and nothing is driving,
+which is the whole feedback these two need.
+
+The flag lives in the runtime dir, so it cannot survive a reboot; =mkdir= covers
+the case of stopping agents before any =cu= command has run this session.
+
+#+begin_src lua
+keymap_exec("s-a s-a", "mkdir -p ${XDG_RUNTIME_DIR:-/tmp}/cu && touch ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
+keymap_exec("s-a r", "rm -f ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
+#+end_src
+
 **** media/volume
 #+begin_src lua
 -- Media keys

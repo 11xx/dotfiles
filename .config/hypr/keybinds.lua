@@ -147,6 +147,9 @@ bind_exec("SUPER + ALT + end", "gsr stop")
 
 bind_exec("SUPER + ALT + S", "gsr region")
 
+keymap_exec("s-a s-a", "mkdir -p ${XDG_RUNTIME_DIR:-/tmp}/cu && touch ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
+keymap_exec("s-a r", "rm -f ${XDG_RUNTIME_DIR:-/tmp}/cu/abort")
+
 -- Media keys
 -- the recommended in http://wiki.hyprland.org/Configuring/Binds/#uncommon-syms--binding-with-a-keycode
 -- is to use lower case for keysyms, it it stops working capitalized y'know
