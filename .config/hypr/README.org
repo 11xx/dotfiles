@@ -1384,6 +1384,24 @@ long-lived process at the end of a feed's pipeline rather than a call per title,
 so titles cost nothing to sanitize. Unicode categories are the whole job here,
 which is why this is Python and not =sed=.
 
+A feed that ends leaves its widget frozen at whatever it last printed: eww does
+not restart a =deflisten= command, and a frozen widget looks exactly like a
+correct one. =socat= ending -- because the compositor was reloaded, or its socket
+blinked -- is enough to cause it. So every feed runs under this, which reprints
+the current value and reconnects. The cost of a restart is one repeated line,
+which is the value the widget is already showing.
+
+#+NAME: hyprland-scripts-feed-forever
+#+begin_src shell
+# Each feed defines feed(): print the current value, then stream changes.
+feed_forever() {
+    while :; do
+        feed
+        sleep 1
+    done
+}
+#+end_src
+
 #+NAME: hyprland-scripts-sanitize-bar-text
 #+begin_src shell
 sanitize_bar_text() {
@@ -2158,10 +2176,16 @@ Scripts from [[https://wiki.hyprland.org/Useful-Utilities/Status-Bars/#eww][Stat
   + jaq or jq
   + coreutils: provides stdbuf
 
-*** =hypr-get-active-workspace=
+*** =hypr-get-active-workspace= (superseded)
 :PROPERTIES:
-:header-args:shell+: :tangle (tdir "hypr-get-active-workspace")
+:header-args:shell+: :tangle no
 :END:
+
+Superseded by =hypr-get-current-monitor-workspace=, which answers the same
+question from the event socket rather than by shelling out to =hyprctl= twice per
+event, and which nothing else here reproduces. Nothing consumes this feed any
+more, so it no longer tangles; the source stays as the record of what the bar
+used to read. An older tangled copy may still sit in the bin directory.
 
 #+begin_src shell
 # tested on a dual-monitor setup, may not work with different ones
@@ -2198,15 +2222,20 @@ that can resize it.
 #+begin_src shell :noweb yes
 «hyprland-scripts-check-alias-jaq-or-jq»
 «hyprland-scripts-sanitize-bar-text»
+«hyprland-scripts-feed-forever»
 
-{
-    hyprctl activewindow -j | jq --raw-output .title
+feed() {
+    {
+        hyprctl activewindow -j | jq --raw-output .title
 
-    # shellcheck disable=SC2016
-    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-        stdbuf -o0 grep '^activewindow>>' |
-        stdbuf -o0 awk -F '>>|,' '{print $3}'
-} | sanitize_bar_text
+        # shellcheck disable=SC2016
+        socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+            stdbuf -o0 grep '^activewindow>>' |
+            stdbuf -o0 awk -F '>>|,' '{print $3}'
+    } | sanitize_bar_text
+}
+
+feed_forever
 #+end_src
 
 *** =hypr-get-workspaces=
@@ -2214,8 +2243,14 @@ that can resize it.
 :header-args:shell+: :tangle (tdir "hypr-get-workspaces")
 :END:
 
+This is the workspace list with its window counts, which is what decides whether
+a number is drawn as occupied or empty. The Haskell feed below answers a
+different question -- which workspace each monitor is showing -- so the two are
+not alternatives.
+
 #+begin_src shell :noweb yes
 «hyprland-scripts-check-alias-jaq-or-jq»
+«hyprland-scripts-feed-forever»
 
 spacesJq (){
     WORKSPACE_WINDOWS=$(hyprctl workspaces -j | jq 'map({key: .id | tostring, value: .windows}) | from_entries')
@@ -2233,12 +2268,16 @@ else
     alias spaces=spacesJq
 fi
 
-spaces
+feed() {
+    spaces
 
-socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    while read -r _; do
-        spaces
-    done
+    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+        while read -r _; do
+            spaces
+        done
+}
+
+feed_forever
 #+end_src
 
 
@@ -2249,6 +2288,7 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 #+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :noweb yes
 «hyprland-scripts-check-alias-jaq-or-jq»
 «hyprland-scripts-sanitize-bar-text»
+«hyprland-scripts-feed-forever»
 
 MONITOR_PORT=${MONITOR_PORT:-$1}
 MONITOR_PORT=${MONITOR_PORT:-"DP-2"}
@@ -2258,44 +2298,55 @@ get_window_title_workspace_mon() {
     hyprctl workspaces -j | jq --arg idActiveWorkspaceOnMon "$idActiveWorkspaceOnMon" -r '.[] | select(.id == ($idActiveWorkspaceOnMon | tonumber)).lastwindowtitle'
 }
 
-{
-    get_window_title_workspace_mon
+feed() {
+    {
+        get_window_title_workspace_mon
 
-    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-        stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
-        while read -r _; do
-            get_window_title_workspace_mon
-        done
-} | sanitize_bar_text
+        socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+            stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
+            while read -r _; do
+                get_window_title_workspace_mon
+            done
+    } | sanitize_bar_text
+}
+
+feed_forever
 #+end_src
 
 *** =hypr-eww-restart-on-monitor-change=: Restart eww on monitor on/off/reconnect
 :PROPERTIES:
 :header-args:shell+: :tangle (tdir "hypr-eww-restart-on-monitor-change")
 :END:
+Waking an output destroys its layer surfaces, so the bars are reopened rather
+than trusted to survive. Removal is watched too: eww keeps a window for a monitor
+it can no longer draw on, and reopening is what clears it.
+
+=socat= exits when the compositor's socket goes away, and a watcher that ends
+silently is indistinguishable from one that is working -- so it reconnects
+instead, with a pause that keeps a permanent failure from becoming a hot loop.
+Only the unversioned event names are matched: Hyprland emits =monitoraddedv2=
+alongside =monitoradded= for the same event, and matching both would reopen
+twice. Reopening is idempotent, so a burst of events costs a redundant reopen
+rather than a wrong state.
+
 #+begin_src shell :noweb yes
-while :
-do case $1 in
-       -v|--verbose)
-           set -x
-           ;;
-       --) # End of all options.
-           shift; break
-           ;;
-       ,*) break
-   esac; shift; done
+set -eu
 
-eww_restart() {
+case "${1:-}" in
+    -v|--verbose) set -x ;;
+esac
+
+event_socket="${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock"
+
+while :; do
+    socat -u UNIX-CONNECT:"${event_socket}" - |
+        stdbuf -o0 grep -E '^monitor(added|removed)>>' |
+        while read -r _; do
+            sleep 2
+            hypr-eww-open
+        done
     sleep 2
-
-    hypr-eww-open
-}
-
-socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 grep '^monitoradded>>' |
-    while read -r event; do
-        eww_restart
-    done
+done
 #+end_src
 
 *** =hypr-active-monitor=: Get current monitor information
@@ -2304,11 +2355,25 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 :END:
 
 # [2026-01-07 Wed 20:29:11 -03] @ak
+Without a monitor name the comparison can only ever be false, which reads on the
+bar as a monitor that is never focused rather than as a mistake, so the argument
+is required.
+
 #+begin_src shell :noweb yes
+«hyprland-scripts-feed-forever»
+
 # - jaq doesn't have --unbuffered
 # - needs to be single line or eww's (deflisten) won't work
-hypr-get-current-monitor-workspace |
-    jq -c -M --unbuffered --arg mon "$*" '{focused: (.focused_monitor.name == $mon)}'
+[ $# -eq 1 ] || { printf 'usage: hypr-active-monitor <monitor-name>\n' >&2; exit 64; }
+
+monitor="$1"
+
+feed() {
+    hypr-get-current-monitor-workspace |
+        jq -c -M --unbuffered --arg mon "${monitor}" '{focused: (.focused_monitor.name == $mon)}'
+}
+
+feed_forever
 #+end_src
 
 
