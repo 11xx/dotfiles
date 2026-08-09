@@ -1367,6 +1367,43 @@ command -v jaq > /dev/null &&
     exit 1
 #+end_src
 
+A window title is text an application chose, so a status bar must treat it as
+hostile input. A carriage return or a =U+2028= line separator survives a
+line-oriented reader and then makes Pango lay the label out over two lines,
+which grows the bar's layer surface and shifts every widget on it; zero-width
+and format characters change width without showing anything; and a stack of
+combining marks renders as a smear over its neighbours.
+
+This filter reduces each line to one line of printable text. It composes to NFC
+first, so real accents survive as single characters. Characters that were a break
+in the original -- controls, line and paragraph separators -- become a space,
+because deleting one glues the words either side of it together; format,
+surrogate, private-use and leftover combining characters carry no width and are
+simply dropped. Collapsing the remaining whitespace finishes the job. It is a
+long-lived process at the end of a feed's pipeline rather than a call per title,
+so titles cost nothing to sanitize. Unicode categories are the whole job here,
+which is why this is Python and not =sed=.
+
+#+NAME: hyprland-scripts-sanitize-bar-text
+#+begin_src shell
+sanitize_bar_text() {
+    python3 -u -c '
+import sys, unicodedata as ud
+
+BREAK = {"Cc", "Zl", "Zp"}
+DROP = {"Cf", "Cs", "Co", "Cn", "Mn", "Me"}
+
+def clean(c):
+    kind = ud.category(c)
+    return "" if kind in DROP else " " if kind in BREAK else c
+
+for line in sys.stdin:
+    text = ud.normalize("NFC", line)
+    print(" ".join("".join(clean(c) for c in text).split()))
+'
+}
+#+end_src
+
 ** DONE =hypr-workspace=: Workspace switching like xmonad/qtile
 :PROPERTIES:
 :header-args:shell: :tangle (tdir "/hypr-workspace") :shebang #!/usr/bin/env sh :mkdirp yes
@@ -2180,18 +2217,26 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 
 *** =hypr-get-window-title=
 :PROPERTIES:
+:CUSTOM_ID: window-title-sanitizing
 :header-args:shell+: :tangle (tdir "hypr-get-window-title")
 :END:
 
-#+begin_src shell
+The current title comes from =hyprctl= and every later one from the event
+socket; both leave through [[#window-title-sanitizing][the same sanitizer]], so the bar never receives a title
+that can resize it.
+
+#+begin_src shell :noweb yes
 «hyprland-scripts-check-alias-jaq-or-jq»
+«hyprland-scripts-sanitize-bar-text»
 
-hyprctl activewindow -j | jq --raw-output .title
+{
+    hyprctl activewindow -j | jq --raw-output .title
 
-# shellcheck disable=SC2016
-socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 grep '^activewindow>>' |
-    stdbuf -o0 awk -F '>>|,' '{print $3}'
+    # shellcheck disable=SC2016
+    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+        stdbuf -o0 grep '^activewindow>>' |
+        stdbuf -o0 awk -F '>>|,' '{print $3}'
+} | sanitize_bar_text
 #+end_src
 
 *** =hypr-get-workspaces=
@@ -2233,6 +2278,7 @@ socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"
 :END:
 #+begin_src shell :dir (expand-file-name "hypr" (xdg-config-home)) :noweb yes
 «hyprland-scripts-check-alias-jaq-or-jq»
+«hyprland-scripts-sanitize-bar-text»
 
 MONITOR_PORT=${MONITOR_PORT:-$1}
 MONITOR_PORT=${MONITOR_PORT:-"DP-2"}
@@ -2242,13 +2288,15 @@ get_window_title_workspace_mon() {
     hyprctl workspaces -j | jq --arg idActiveWorkspaceOnMon "$idActiveWorkspaceOnMon" -r '.[] | select(.id == ($idActiveWorkspaceOnMon | tonumber)).lastwindowtitle'
 }
 
-get_window_title_workspace_mon
+{
+    get_window_title_workspace_mon
 
-socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
-    stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
-    while read -r _; do
-        get_window_title_workspace_mon
-    done
+    socat -u UNIX-CONNECT:"${XDG_RUNTIME_DIR}"/hypr/"${HYPRLAND_INSTANCE_SIGNATURE}"/.socket2.sock - |
+        stdbuf -o0 grep '^\(activewindow\|focusedmon\)>>' |
+        while read -r _; do
+            get_window_title_workspace_mon
+        done
+} | sanitize_bar_text
 #+end_src
 
 *** =hypr-eww-restart-on-monitor-change=: Restart eww on monitor on/off/reconnect
