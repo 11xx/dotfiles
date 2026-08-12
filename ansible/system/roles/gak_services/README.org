@@ -123,10 +123,27 @@ Guix upstream packages Tailscale's Go dependencies but not Tailscale itself, so
 
 ** Authenticating the machine
 
-Tailscale requires an account. It stores no password of its own — sign-in goes
-through an identity provider (Google, Microsoft, GitHub, Apple, passkey, email),
-which is how it holds so little about you. The free Personal tier covers up to
-six users and unlimited devices.
+Tailscale requires an account, created at https://login.tailscale.com/start.
+
+It is deliberately not an identity provider and has no passwords of its own, so
+there is **no e-mail or magic-link sign-up**. The only options are Google,
+Microsoft, GitHub, Apple, and custom OIDC. Passkeys exist, but for
+authenticating to a tailnet already joined — not for creating the account. The
+free Personal tier covers up to six users and unlimited devices.
+
+The choice is stickier than the sign-up page suggests, and worth making once:
+
+- A tailnet cannot be migrated *to or from* GitHub or Apple at all.
+- One created from a Gmail address is a "shared domain" tailnet and can change
+  provider only through Tailscale support.
+- Custom OIDC is the escape hatch, but it wants a domain of its own and
+  WebFinger configuration.
+
+Whichever identity is used becomes the root of trust for every device on the
+tailnet, so it wants a passkey or hardware key on it and real recovery options.
+A seldom-used account is the wrong choice here for a reason that has nothing to
+do with security: Google deletes accounts left inactive for two years, and it
+would take tailnet ownership with it.
 
 The daemon runs with no identity until it is authenticated once by hand:
 
