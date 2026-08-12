@@ -15,6 +15,11 @@
              (gnu packages shells)
              (gnu services nfs)
              (gnu system accounts)
+             ;; Guix upstream packages Tailscale's Go dependencies but not
+             ;; Tailscale, so `tailscaled` comes from the rosenthal channel
+             ;; already listed in channels.scm. Not a `use-service-modules`
+             ;; entry: that form prefixes `gnu services`.
+             (rosenthal services networking)
              )
 
 (use-service-modules base          ; hosts-service-type, for the static LAN entries
@@ -104,6 +109,22 @@
                                 ("/media" "{{ ak_fqdn }}(rw,no_all_squash,root_squash)")
                                 ("/marak" "{{ ak_fqdn }}(rw,no_all_squash,root_squash)")))))
 
+
+           ;; Reaches gak's services from outside the house without forwarding a
+           ;; port or exposing anything to the internet. The daemon runs with no
+           ;; identity of its own until it is authenticated once, by hand, on
+           ;; the host:
+           ;;
+           ;;   sudo tailscale up
+           ;;
+           ;; That prints a URL to approve the machine, and the resulting node
+           ;; key is kept under /var/lib/tailscale. It survives reconfigures, so
+           ;; this is a first-boot step rather than a recurring one.
+           ;;
+           ;; `-no-logs-no-support` is the default here: it stops the daemon
+           ;; uploading logs to Tailscale, and gives up their technical support
+           ;; in exchange, which is the trade this machine wants.
+           (service tailscale-service-type)
 
            (service elogind-service-type)
            ;; [[https://www.reddit.com/r/GUIX/comments/15vb7la/xdg_runtime_dir/][XDG_RUNTIME_DIR : r/GUIX]]
