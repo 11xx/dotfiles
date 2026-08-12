@@ -47,3 +47,4 @@
     - { role: guix_config, tags: ['guix'] }
     - { role: shell, tags: ['shell'] }
     - { role: gak_media, tags: ['gak-media'] }
+    - { role: gak_services, tags: ['gak-services'] }

@@ -1,0 +1,12 @@
+# Managed by Ansible (role: gak_services) — edit the role, not this file.
+# Read by koito through env_file; the password comes from host_vars/gak/vault.
+#
+# Both credentials are read only while the database is empty, to create the
+# first account. Changing them afterwards does nothing — change the password in
+# the web UI instead, and update the vault to match so a rebuild agrees.
+KOITO_DEFAULT_USERNAME={{ gak_services_koito_admin_user }}
+KOITO_DEFAULT_PASSWORD={{ koito_admin_password }}
+
+# Without this every timestamp renders in whatever the client asks for, and the
+# host itself runs UTC.
+KOITO_FORCE_TZ={{ gak_services_timezone }}

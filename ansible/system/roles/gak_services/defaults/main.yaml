@@ -1,0 +1,23 @@
+---
+# The general services stack lives under $HOME rather than on the media
+# filesystem. Nothing in it touches the media tree, and its state is hundreds of
+# megabytes rather than the gigabytes that put the starrs stack on the array.
+gak_services_dir: "{{ ansible_facts['user_dir'] }}/services"
+
+# Koito stamps every listen with a wall-clock time and renders the statistics
+# against it, so it wants the household's timezone rather than the host's UTC.
+gak_services_timezone: America/Sao_Paulo
+
+# Pinned rather than floating. `pull_policy: missing` fetches an image once and
+# then never again, so a `latest` tag would quietly let the moment a host is
+# rebuilt decide which version it gets. Koito is young enough for that to
+# matter: it replaced its database engine outright between v0.1.10 and v0.2.1.
+gak_services_koito_version: v0.3.2
+
+# 4110 is Koito's own default and is free on gak, where the starrs stack holds
+# 8787, 8888, 8989, 9090, 9191, 9292 and 12671.
+gak_services_koito_port: 4110
+
+# Seeds the first account, once, on an empty database. The password beside it is
+# in host_vars/gak/vault.
+gak_services_koito_admin_user: lobo

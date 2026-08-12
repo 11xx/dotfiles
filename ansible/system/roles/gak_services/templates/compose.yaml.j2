@@ -1,0 +1,38 @@
+---
+# Managed by Ansible (role: gak_services) — edit the role, not this file.
+#
+# gak's general services: everything that is not the media pipeline. One service
+# today. The stack exists so that the second one is an entry in this file rather
+# than a second unit, a second directory and a second role.
+name: services
+services:
+  # Koito receives scrobbles over the ListenBrainz submission API and keeps the
+  # listening history in a SQLite file under /etc/koito. That is the whole
+  # deployment: no Postgres, no Redis, no message broker.
+  #
+  # A scrobbler that sends only an artist and a title — which is all Pano
+  # Scrobbler has — is resolved by querying the public MusicBrainz API at
+  # request time, not from a local replica. KOITO_MUSICBRAINZ_URL would point it
+  # at a mirror if one ever existed here.
+  koito:
+    image: gabehf/koito:{{ gak_services_koito_version }}
+    container_name: koito
+    env_file:
+      - koito.env
+    volumes:
+      - ./koito:/etc/koito
+    ports:
+      - {{ gak_services_koito_port }}:4110
+    restart: unless-stopped
+    pull_policy: missing
+    networks:
+      - services_net
+
+# No x-podman idmaps, unlike the starrs stack. Those exist there so containers
+# writing into the NFS-exported media tree land in group 134. Koito writes only
+# its own state, into a directory the login user already owns, and rootless
+# podman maps container root to that user.
+networks:
+  services_net:
+    driver: bridge
+    name: services_net

@@ -1,0 +1,102 @@
+#+TITLE: gak's general services
+#+options: toc:nil num:nil
+
+One rootless podman container on gak: Koito, a private listening history that
+receives scrobbles over the ListenBrainz submission API. The stack is named for
+what it will hold rather than what it holds today — anything on gak that is not
+the media pipeline belongs in =compose.yaml= beside it.
+
+This file is documentation, not a source. Nothing tangles out of it; the role
+beside it is the source of truth. It records the reasoning that the
+configuration cannot state on its own.
+
+* Why not ListenBrainz itself
+
+The obvious reading of "a private ListenBrainz" is to run the ListenBrainz
+server. That was investigated and rejected.
+
+MetaBrainz publishes no supported production deployment. =docker/docker-compose.yml=
+in the server repository is a development environment: it bind-mounts the source
+tree into the containers and builds the application image locally. A minimum
+viable instance is eight containers — web, api_compat, timescale_writer,
+background_tasks, websockets, TimescaleDB, Redis and RabbitMQ — and signing in
+requires registering an OAuth application on musicbrainz.org, so authentication
+depends on MetaBrainz even though the listens do not.
+
+That instance still cannot resolve a scrobble to a MusicBrainz recording. There
+is no small mapping dataset to fetch periodically: MetaBrainz generates the
+mapping tables from their own MusicBrainz database replica, and reaching feature
+parity means running that replica, Typesense and =mbid_mapper= as well. For a
+single user's listening history, the mapping infrastructure would be by a wide
+margin the largest thing on the machine.
+
+Koito reaches the same goal from the other end. It speaks the ListenBrainz
+submission API, so every scrobbler that can be pointed at a custom ListenBrainz
+URL works unchanged, and it resolves loose metadata by querying the *public*
+MusicBrainz API at request time rather than from a replica. One Go binary, one
+SQLite file. If a local mirror ever exists here, =KOITO_MUSICBRAINZ_URL= points
+it at that instead.
+
+* What Ansible owns, and what it does not
+
+The role deploys =compose.yaml=, =koito.env= and the systemd user unit.
+Everything under =~/services/koito= is Koito's own state — the SQLite database,
+the image cache, the import staging directory — written at runtime and not
+templated.
+
+=koito.env= carries the credentials that seed the first account, which Koito
+reads only while the database is empty. Changing the password in the web UI
+afterwards leaves the vault stale; update =koito_admin_password= in
+=host_vars/gak/vault= to match, or a rebuilt instance will disagree with the one
+that already exists.
+
+* Starting it
+
+Unlike the starrs stack, the unit is enabled at deploy. Nothing here goes on the
+network in a way that wants a human's decision first, and a scrobble receiver
+that is down when a phone flushes its queued listens is a receiver that loses
+them.
+
+#+begin_src sh
+systemctl --user status services
+#+end_src
+
+* Pointing a scrobbler at it
+
+Koito is reachable on port 4110. In Pano Scrobbler, choose *Custom
+ListenBrainz*, give it =http://gak:4110/apis/listenbrainz/= and the API token
+from Koito's own settings page. Any client that accepts a custom ListenBrainz
+URL — Navidrome, Music Assistant, web-scrobbler — configures the same way.
+
+Koito can also relay what it receives on to another ListenBrainz-compatible
+server, so running it alongside an existing setup rather than in place of one is
+a configuration change, not a migration.
+
+* Reaching it from outside the house
+
+Through Tailscale, added to gak in =guix_config='s =system.scm=. The port is not
+forwarded and nothing is exposed to the internet. The daemon has no identity
+until it is authenticated once by hand on the host:
+
+#+begin_src sh
+sudo tailscale up
+#+end_src
+
+Guix upstream packages Tailscale's Go dependencies but not Tailscale itself, so
+=tailscaled= and =tailscale-service-type= come from the rosenthal channel, which
+=channels.scm= already lists for other reasons.
+
+* Version pinning
+
+=gak_services_koito_version= is an explicit tag, not =latest=. The compose file
+sets =pull_policy: missing=, which fetches an image once and never again, so a
+floating tag would let the moment a host happens to be rebuilt decide which
+version it receives. Koito is young enough for that to matter: it replaced
+PostgreSQL with SQLite outright between v0.1.10 and v0.2.1, migrating data on
+the way. Bumping the pin is therefore a deliberate act — read the release notes
+first, and take a copy of =~/services/koito= before restarting.
+
+* Not done yet
+
+There is no backup of the listening history. The database is a single SQLite
+file under =~/services/koito=, so a copy is cheap, but nothing schedules one.

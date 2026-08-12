@@ -1,0 +1,24 @@
+[Unit]
+# Managed by Ansible (role: gak_services) — edit the role, not this file.
+Description=General services: koito
+After=network-online.target
+Wants=network-online.target
+Requires=podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ gak_services_dir }}
+Environment=PODMAN_SYSTEMD_UNIT=%n
+# `down` first so a unit restart after a config change recreates the containers
+# instead of finding them already up and doing nothing.
+ExecStart=podman-compose down
+ExecStart=podman-compose up -d
+ExecStop=podman-compose down
+# No `pull` step, unlike the pak stack: the image tag is pinned and
+# `pull_policy: missing` fetches it on first start, so a restart needs no
+# network. The timeout covers that first fetch.
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target
