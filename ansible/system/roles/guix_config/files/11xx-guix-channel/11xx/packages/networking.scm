@@ -1,6 +1,8 @@
 ;;; Managed by Ansible (role: guix_config) — edit the role, not this file.
 ;;;
 ;;; Network packages whose release cadence cannot wait for another channel.
+;;; .guix-channel declares Rosenthal as a dependency so its modules are present
+;;; when Guix compiles this channel in isolation.
 
 (define-module (11xx packages networking)
   #:use-module (guix base32)
