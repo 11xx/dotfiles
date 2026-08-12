@@ -20,6 +20,7 @@
              ;; already listed in channels.scm. Not a `use-service-modules`
              ;; entry: that form prefixes `gnu services`.
              (rosenthal services networking)
+             ((11xx packages networking) #:prefix local:)
              )
 
 (use-service-modules base          ; hosts-service-type, for the static LAN entries
@@ -124,7 +125,9 @@
            ;; `-no-logs-no-support` is the default here: it stops the daemon
            ;; uploading logs to Tailscale, and gives up their technical support
            ;; in exchange, which is the trade this machine wants.
-           (service tailscale-service-type)
+           (service tailscale-service-type
+                    (tailscale-configuration
+                     (tailscale local:tailscale)))
 
            (service elogind-service-type)
            ;; [[https://www.reddit.com/r/GUIX/comments/15vb7la/xdg_runtime_dir/][XDG_RUNTIME_DIR : r/GUIX]]
@@ -379,7 +382,7 @@
                         (provision "koito")
                         (image "gabehf/koito:{{ gak_koito_version }}")
                         (network "services_net")
-                        (ports (list '("{{ gak_koito_port }}" . "4110")))
+                        (ports (list '("127.0.0.1:{{ gak_koito_port }}" . "4110")))
                         (volumes
                          (list '("/home/lobo/services/koito" . "/etc/koito")
                                '("/home/lobo/services/koito/secrets" . "/secrets")))

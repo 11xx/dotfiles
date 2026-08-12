@@ -47,8 +47,8 @@ gak_subid_count: 65536
 # recyclarr reaches it on have to agree.
 gak_sonarr_port: 8989
 
-# Koito's port. 4110 is its own default and is free here: the media stack holds
-# 8787, 8888, 8989, 9090, 9191, 9292 and 12671.
+# Koito's loopback port behind Tailscale Serve. 4110 is its own default and is
+# free here: the media stack holds 8787, 8888, 8989, 9090, 9191, 9292 and 12671.
 gak_koito_port: 4110
 
 # Pinned rather than floating, unlike the media images. Koito replaced
@@ -61,4 +61,3 @@ gak_koito_version: v0.3.2
 # Seeds Koito's first account, once, on an empty database. The password beside
 # it is koito_admin_password in the vault.
 gak_koito_admin_user: lobo
-

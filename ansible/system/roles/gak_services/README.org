@@ -103,10 +103,11 @@ sudo herd restart koito
 
 * Pointing a scrobbler at it
 
-Koito is reachable on port 4110. In Pano Scrobbler, choose *Custom
-ListenBrainz*, give it =http://gak:4110/apis/listenbrainz/= and the API token
-from Koito's own settings page. Any client that accepts a custom ListenBrainz
-URL — Navidrome, Music Assistant, web-scrobbler — configures the same way.
+Koito listens only on gak's loopback interface. Tailscale Serve terminates HTTPS
+and proxies to that listener, so in Pano Scrobbler choose *Custom ListenBrainz*,
+give it =https://gak.<tailnet>.ts.net/apis/listenbrainz/= and the API token from
+Koito's own settings page. Any client that accepts a custom ListenBrainz URL —
+Navidrome, Music Assistant, web-scrobbler — configures the same way.
 
 Koito can also relay what it receives on to another ListenBrainz-compatible
 server, so running it alongside an existing setup rather than in place of one is
@@ -121,12 +122,19 @@ Guix upstream packages Tailscale's Go dependencies but not Tailscale itself, so
 =tailscaled= and =tailscale-service-type= come from the rosenthal channel, which
 =channels.scm= already lists for other reasons.
 
+Rosenthal's service remains the integration point, but the Tailscale package is
+overridden in the local =11xx= channel. Tailscale Serve has had remotely
+reachable security defects, so waiting for a secondary channel to publish a
+fixed client is not an acceptable update path. The override pins a reviewed
+release and its source and vendor hashes; bump it deliberately when the admin
+console or Tailscale's security bulletins require a newer version.
+
 ** Authenticating the machine
 
 Tailscale requires an account, created at https://login.tailscale.com/start.
 
 It is deliberately not an identity provider and has no passwords of its own, so
-there is **no e-mail or magic-link sign-up**. The only options are Google,
+there is *no e-mail or magic-link sign-up*. The only options are Google,
 Microsoft, GitHub, Apple, and custom OIDC. Passkeys exist, but for
 authenticating to a tailnet already joined — not for creating the account. The
 free Personal tier covers up to six users and unlimited devices.
@@ -157,17 +165,23 @@ a standing credential, and it is not what secures the machine afterwards.
 
 ** What secures it afterwards
 
-- The **node key** under =/var/lib/tailscale=, generated here and never sent
+- The *node key* under =/var/lib/tailscale=, generated here and never sent
   anywhere. That is the credential from then on.
-- The **admin console**, which is the control point. Every machine is listed;
+- The *admin console*, which is the control point. Every machine is listed;
   removing or disabling one cuts it off immediately.
-- **Key expiry**, 180 days by default, after which the node must re-authenticate.
+- *Key expiry*, 180 days by default, after which the node must re-authenticate.
   For a headless server that is a scheduled outage nobody will remember the
   cause of — turn expiry off on gak's row.
-- **ACLs**, which decide who may reach what. A personal tailnet defaults to
+- *ACLs*, which decide who may reach what. A personal tailnet defaults to
   every device reaching every other device.
-- **Device approval**, optional, which holds a newly added machine pending until
+- *Device approval*, optional, which holds a newly added machine pending until
   it is approved by hand.
+
+An *admin* is a user account role, not a device that happens to be logged in.
+The first user is normally the sole *Owner*, which includes every admin
+permission. Owners, Admins and IT admins can approve devices. A new device can
+authenticate as an ordinary member and still remain unable to send or receive
+tailnet traffic until one of those roles approves it in the admin console.
 
 ** What Tailscale can and cannot see
 
@@ -180,12 +194,69 @@ DERP relays, still encrypted end to end.
 
 The residual risk is authorisation, not confidentiality: the control plane
 distributes the key list, so a compromised one could hand these nodes a key for
-a machine that was never approved. **Tailnet lock** closes that — existing
+a machine that was never approved. *Tailnet lock* closes that — existing
 devices sign new ones, so the control plane cannot inject a node on its own.
 
-If that trust is unwanted altogether, **Headscale** is an open-source
+If that trust is unwanted altogether, *Headscale* is an open-source
 reimplementation of the coordination server that can be self-hosted, using the
 same clients.
+
+** HTTPS and Tailscale Serve
+
+#+begin_src sh
+sudo tailscale serve --bg 4110
+#+end_src
+
+The background Serve configuration lives in tailscaled's state and resumes
+after a reboot or a =tailscale down= / =tailscale up=. It is private to the
+tailnet; =tailscale funnel= is the distinct command that publishes a service to
+the internet.
+
+Serve obtains and renews a public certificate from Let's Encrypt. Tailscale
+answers the DNS-01 validation challenge for the =*.ts.net= name, while the
+certificate private key and ACME account key stay on gak. This is not a private
+Tailscale certificate authority.
+
+Like every publicly trusted web certificate, the certificate is recorded in
+append-only Certificate Transparency logs. Those logs let certificate
+authorities, browsers and observers detect mistaken or malicious issuance; they
+also reveal the exact name =gak.<tailnet>.ts.net=. They reveal neither the
+service contents nor a route around Tailscale. The name is public, but the
+address remains reachable only by peers allowed into this tailnet.
+
+The backend port is published as =127.0.0.1:4110= rather than =0.0.0.0:4110=.
+That makes Serve the only network path to Koito: LAN clients cannot bypass its
+tailnet access controls or forge the identity headers Serve adds.
+
+** Updating Tailscale
+
+Tailscale publishes a stable client about every four weeks and additional patch
+releases when needed. Do not chase release candidates or the odd-numbered
+unstable track. Review the stable changelog monthly; subscribe to the security
+bulletin RSS feed and handle those releases immediately.
+
+An update changes two fixed-output hashes in
+=11xx/packages/networking.scm=. Obtain the source hash from a checkout of the
+new stable tag:
+
+#+begin_src sh
+git clone --depth=1 --branch vVERSION https://github.com/tailscale/tailscale
+guix hash -rx tailscale
+#+end_src
+
+Set the vendor hash temporarily to 52 zeroes and build the package on gak. The
+fixed-output mismatch prints the correct vendor hash; replace the zeroes with
+it and build again:
+
+#+begin_src sh
+guix build -L ~/11xx-guix-channel \
+  -e '(@ (11xx packages networking) tailscale)' --no-grafts
+#+end_src
+
+Deploy both the package and system expression, commit the local channel, update
+the Guix profile, and reconfigure. The running node key, Serve configuration and
+certificate state remain under =/var/lib/tailscale= and survive the package
+replacement.
 
 * Version pinning
 
