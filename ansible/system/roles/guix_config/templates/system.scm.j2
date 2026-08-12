@@ -138,12 +138,255 @@
            ;; > iptables v1.8.8 (legacy): can't initialize iptables table `nat': Table does not exist (do you need to insmod?)
            ;; > Perhaps iptables or your kernel needs to be upgraded.
 
+           ;; This declares lobo's subuid and subgid ranges, and puts podman in
+           ;; the system profile. The containers below rely on both.
+           ;;
+           ;; Do not move these numbers. /marak/podman-storage holds image
+           ;; layers owned by uids inside this range; shifting it makes every
+           ;; one of them unreadable.
            (service rootless-podman-service-type
                     (rootless-podman-configuration
                      (subgids
-                      (list (subid-range (name "lobo") (start 100000) (count 65536))))
+                      (list (subid-range (name "lobo")
+                                         (start {{ gak_subid_start }})
+                                         (count {{ gak_subid_count }}))))
                      (subuids
-                      (list (subid-range (name "lobo") (start 100000) (count 65536)))))))
+                      (list (subid-range (name "lobo")
+                                         (start {{ gak_subid_start }})
+                                         (count {{ gak_subid_count }}))))))
+
+           ;; Every container on gak.
+           ;;
+           ;; They are declared here rather than in a compose file because this
+           ;; machine has no systemd. A `.service` unit under ~/.config/systemd
+           ;; is a file nothing reads, and a Guix Home Shepherd service would
+           ;; not start until someone logged in — no good for a headless server
+           ;; that should come back by itself after a power cut. oci-service-type
+           ;; provisions system Shepherd services, so `herd status` lists them
+           ;; and they start at boot.
+           ;;
+           ;; They still run rootless, as lobo: the runtime is podman and the
+           ;; user field says so. Ansible owns what these containers read and
+           ;; write — service state, secrets, recyclarr's configuration — and
+           ;; this file owns the containers themselves.
+           ;;
+           ;; Nothing secret belongs below. This file is built into /gnu/store,
+           ;; which is world-readable, so a password written here is published
+           ;; to every user on the machine. Where a container needs one, Ansible
+           ;; deploys it to a 0600 file and the container reads it through an
+           ;; image-specific *_FILE variable.
+           ;; Built by calling oci-configuration->shepherd-services directly,
+           ;; rather than by adding oci-service-type to this list.
+           ;;
+           ;; That service type also extends account-service-type with a
+           ;; user-account for whatever its `user` field names. lobo already has
+           ;; an account above, so the result is two lobo records — the second
+           ;; one in group "users" with /sbin/nologin — and /etc/passwd is
+           ;; written from that list without deduplication. Calling the builder
+           ;; takes the Shepherd services and leaves the account alone.
+           ;;
+           ;; Its other extensions are already covered:
+           ;; rootless-podman-service-type above puts podman in the system
+           ;; profile and declares lobo's subuid and subgid ranges.
+           ;;
+           ;; These start at boot without anyone logging in, which rootless
+           ;; podman needs /run/user/1000 for. elogind creates it because lobo
+           ;; is a lingering user. That is host state, not configuration:
+           ;;
+           ;;   sudo loginctl enable-linger lobo
+           (simple-service
+            'gak-containers
+            shepherd-root-service-type
+            (oci-configuration->shepherd-services
+             (oci-configuration
+                     (runtime 'podman)
+                     (user "lobo")
+
+                     (networks
+                      (list (oci-network-configuration (name "starrs_net"))
+                            (oci-network-configuration (name "services_net"))))
+
+                     (containers
+                      (list
+                       ;; --- The media stack ------------------------------
+                       ;;
+                       ;; Written out one container at a time rather than
+                       ;; folded together. These differ in small ways that a
+                       ;; shared abstraction would hide, and the cost of
+                       ;; repetition here is lower than the cost of reading
+                       ;; around it.
+                       ;;
+                       ;; The idmaps below map container root to the first
+                       ;; subuid and pass the media group through to itself, so
+                       ;; what the containers write into /media stays readable
+                       ;; over NFS. They are carried over unchanged from the
+                       ;; compose file this replaces, which ran on a different
+                       ;; host; they have never run on gak, so this is the part
+                       ;; of the media stack most likely to want adjusting the
+                       ;; first time it starts.
+                       (oci-container-configuration
+                        (provision "sabnzbd")
+                        (image "lscr.io/linuxserver/sabnzbd:latest")
+                        (network "starrs_net")
+                        (ports (list '("9090" . "8080")))
+                        (volumes
+                         (list '("/media/.config/sabnzbd/config" . "/config")
+                               '("/media/Media" . "/Media")))
+                        (environment
+                         (list '("PUID" . "{{ gak_media_uid }}")
+                               '("PGID" . "{{ gak_media_gid }}")
+                               '("UMASK" . "002")
+                               '("TZ" . "{{ gak_timezone }}")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       (oci-container-configuration
+                        (provision "prowlarr")
+                        (image "lscr.io/linuxserver/prowlarr:latest")
+                        (network "starrs_net")
+                        (ports (list '("8888" . "9696")))
+                        (volumes
+                         (list '("/media/.config/prowlarr/config" . "/config")))
+                        (environment
+                         (list '("PUID" . "{{ gak_media_uid }}")
+                               '("PGID" . "{{ gak_media_gid }}")
+                               '("UMASK" . "002")
+                               '("TZ" . "{{ gak_timezone }}")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       (oci-container-configuration
+                        (provision "sonarr")
+                        (image "ghcr.io/hotio/sonarr")
+                        (network "starrs_net")
+                        (ports (list '("{{ gak_sonarr_port }}" . "8989")))
+                        (volumes
+                         (list '("/media/.config/sonarr/config" . "/config")
+                               '("/media/Media" . "/Media")))
+                        (environment
+                         (list '("PUID" . "{{ gak_media_uid }}")
+                               '("PGID" . "{{ gak_media_gid }}")
+                               '("UMASK" . "002")
+                               '("TZ" . "{{ gak_timezone }}")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       (oci-container-configuration
+                        (provision "radarr")
+                        (image "ghcr.io/hotio/radarr")
+                        (network "starrs_net")
+                        (ports (list '("8787" . "7878")))
+                        (volumes
+                         (list '("/media/.config/radarr/config" . "/config")
+                               '("/media/Media" . "/Media")))
+                        (environment
+                         (list '("PUID" . "{{ gak_media_uid }}")
+                               '("PGID" . "{{ gak_media_gid }}")
+                               '("UMASK" . "002")
+                               '("TZ" . "{{ gak_timezone }}")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       ;; No PUID/PGID: this image runs as whoever starts it,
+                       ;; so the idmaps alone decide what it writes as.
+                       (oci-container-configuration
+                        (provision "jellyfin")
+                        (image "jellyfin/jellyfin")
+                        (network "starrs_net")
+                        (ports (list '("9292" . "8096")))
+                        (volumes
+                         (list '("/media/.config/jellyfin/config" . "/config")
+                               '("/media/.config/jellyfin/cache" . "/cache")
+                               '("/media/Media" . "/Media")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       ;; The web UI is told its own port because it is
+                       ;; published unmapped; the torrenting port is mapped and
+                       ;; so differs inside and out.
+                       (oci-container-configuration
+                        (provision "qbittorrent")
+                        (image "lscr.io/linuxserver/qbittorrent:latest")
+                        (network "starrs_net")
+                        (ports (list '("9191" . "9191")
+                                     '("12671" . "6881")
+                                     "12671:6881/udp"))
+                        (volumes
+                         (list '("/media/.config/qbittorrent/config" . "/config")
+                               '("/media/Media" . "/Media")))
+                        (environment
+                         (list '("PUID" . "{{ gak_media_uid }}")
+                               '("PGID" . "{{ gak_media_gid }}")
+                               '("UMASK" . "002")
+                               '("TZ" . "{{ gak_timezone }}")
+                               '("WEBUI_PORT" . "9191")
+                               '("TORRENTING_PORT" . "6881")))
+                        (extra-arguments
+                         (list "--uidmap" "0:1:1"
+                               "--gidmap" "0:1:1"
+                               "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+
+                       ;; recyclarr is a batch job, not a server: it syncs Trash
+                       ;; Guides custom formats into sonarr and exits. Hence no
+                       ;; ports, no idmaps, and `auto-start? #f` — a container
+                       ;; that exits on purpose would otherwise read as a
+                       ;; service that failed at every boot. Run it when wanted:
+                       ;;
+                       ;;   sudo herd start recyclarr
+                       ;;
+                       ;; https://recyclarr.dev/wiki/installation/docker/
+                       (oci-container-configuration
+                        (provision "recyclarr")
+                        (image "ghcr.io/recyclarr/recyclarr")
+                        (network "starrs_net")
+                        (container-user "{{ gak_media_uid }}:{{ gak_media_gid }}")
+                        (volumes
+                         (list '("/media/.config/recyclarr" . "/config")))
+                        (environment
+                         (list '("TZ" . "{{ gak_timezone }}")))
+                        (auto-start? #f))
+
+                       ;; --- General services -----------------------------
+                       ;;
+                       ;; Koito receives scrobbles over the ListenBrainz
+                       ;; submission API and keeps the listening history in a
+                       ;; SQLite file under /etc/koito. No database service, no
+                       ;; cache, no broker.
+                       ;;
+                       ;; A scrobbler that sends only an artist and a title is
+                       ;; resolved against the public MusicBrainz API at request
+                       ;; time rather than from a local replica.
+                       ;;
+                       ;; No idmaps: nothing here writes into the NFS-exported
+                       ;; media tree, so the only thing that matters is that the
+                       ;; files stay readable by lobo, which they are.
+                       ;;
+                       ;; The admin password is not here. Ansible writes it to a
+                       ;; 0600 file that Koito reads through the *_FILE
+                       ;; convention, because this file is world-readable in the
+                       ;; store.
+                       (oci-container-configuration
+                        (provision "koito")
+                        (image "gabehf/koito:{{ gak_koito_version }}")
+                        (network "services_net")
+                        (ports (list '("{{ gak_koito_port }}" . "4110")))
+                        (volumes
+                         (list '("/home/lobo/services/koito" . "/etc/koito")
+                               '("/home/lobo/services/koito/secrets" . "/secrets")))
+                        (environment
+                         (list '("KOITO_DEFAULT_USERNAME" . "{{ gak_koito_admin_user }}")
+                               '("KOITO_DEFAULT_PASSWORD_FILE" . "/secrets/default-password")
+                               '("KOITO_FORCE_TZ" . "{{ gak_timezone }}"))))))))))
           ;; This is the default list of services we are appending to.
           (modify-services %base-services
                            (guix-service-type config =>

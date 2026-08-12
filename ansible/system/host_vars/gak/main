@@ -11,3 +11,54 @@ ansible_group: lobo
 # the path is the user profile: it must not depend on `guix home reconfigure`,
 # a step deliberately left to a human.
 ansible_python_interpreter: "/home/lobo/.guix-profile/bin/python3"
+
+# --- Containers -------------------------------------------------------------
+#
+# gak's containers are declared in system.scm through Guix's oci-service-type,
+# not in a compose file, because gak runs Shepherd and has no systemd: a user
+# unit is a file nothing reads, and a user Shepherd service would not start
+# until someone logged in. The Guix form produces system Shepherd services that
+# start at boot.
+#
+# These values therefore have two consumers — the roles that deploy the service
+# state, and guix_config's system.scm template — so they are host facts rather
+# than defaults belonging to either role.
+
+# Everything in the media stack writes as this pair. 1000 is the login user; 134
+# is the shared `media` group declared below in system.scm, which is also what
+# the NFS exports are keyed on. 134 spells M-D: the 13th and 4th letters.
+gak_media_uid: 1000
+gak_media_gid: 134
+
+# The services stamp their logs, schedules and statistics with this, so they
+# want the household's timezone rather than the host's UTC.
+gak_timezone: America/Sao_Paulo
+
+# Rootless podman's subuid and subgid range for lobo. Declared once, by
+# oci-service-type, because two services extending subids-service-type with the
+# same user name is a duplicate range and fails the reconfigure.
+#
+# Do not move these numbers. /marak/podman-storage holds image layers owned by
+# uids inside this range; shifting it makes every one of them unreadable.
+gak_subid_start: 100000
+gak_subid_count: 65536
+
+# Sonarr's port, named because both the container's port mapping and the URL
+# recyclarr reaches it on have to agree.
+gak_sonarr_port: 8989
+
+# Koito's port. 4110 is its own default and is free here: the media stack holds
+# 8787, 8888, 8989, 9090, 9191, 9292 and 12671.
+gak_koito_port: 4110
+
+# Pinned rather than floating, unlike the media images. Koito replaced
+# PostgreSQL with SQLite outright between v0.1.10 and v0.2.1, migrating data on
+# the way, so which version arrives is not a detail to leave to whenever the
+# image happens to be pulled. Read the release notes and take a copy of
+# ~/services/koito before moving this.
+gak_koito_version: v0.3.2
+
+# Seeds Koito's first account, once, on an empty database. The password beside
+# it is koito_admin_password in the vault.
+gak_koito_admin_user: lobo
+

@@ -15,8 +15,27 @@ second source to keep in step; everything worth keeping from it is here.
 
 * What Ansible owns, and what it does not
 
-The role deploys the compose file, Recyclarr's configuration, and the systemd
-user unit. Everything else under =/media/.config= is service state: each one
+The role deploys Recyclarr's configuration and its secrets, and nothing else.
+
+The containers themselves are declared in =guix_config='s =system.scm=, because
+gak runs GNU Shepherd and has no systemd: the =starrs.service= unit this role
+used to install was a file nothing ever read. The stack ran anyway, started by
+hand from the compose file:
+
+#+begin_src sh
+cd /media && podman compose down && podman compose pull && podman compose up -d
+#+end_src
+
+What that never gave it was a way to come back on its own. Declaring the
+containers means they start at boot instead of when someone remembers to log in
+and run the command. See =gak_services='s README for why =system.scm= calls
+=oci-configuration->shepherd-services= rather than adding =oci-service-type=,
+and for the lingering-user requirement that lets the containers start at boot.
+
+The uid, gid, timezone and ports the containers need are host facts in
+=host_vars/gak/main=, shared between that template and this role.
+
+Everything else under =/media/.config= is service state: each one
 reads its configuration at start and writes it back at runtime, so a templated
 copy is overwritten as soon as the container comes up.
 
@@ -38,11 +57,34 @@ host can read.
 
 * Starting it
 
-The unit is installed but not enabled, so a deploy never starts the stack:
+The containers are system Shepherd services and start at boot:
 
 #+begin_src sh
-systemctl --user enable --now starrs
+sudo herd status sonarr
+sudo herd restart jellyfin
 #+end_src
+
+recyclarr is a batch job, not a server: it syncs custom formats into Sonarr and
+exits. It is declared =auto-start? #f=, because a container that exits on
+purpose would otherwise read as a service that failed at every boot. Run it when
+wanted:
+
+#+begin_src sh
+sudo herd start recyclarr
+#+end_src
+
+** What changed about the uid mapping, and what did not
+
+The mappings themselves are unchanged and are known to work on this host: the
+compose file they come from ran here, by hand, writing files =ak= could read
+over NFS.
+
+What changed is how they are delivered. Compose carried them as =x-podman.uidmap=
+and =x-podman.gidmap= extension fields, which the compose implementation
+translated into podman arguments; =system.scm= passes =--uidmap= and =--gidmap=
+to podman directly. Same values, one less translation. If files start landing
+owned by something =ak= cannot read, that translation is the thing to check
+first, not the numbers.
 
 * Troubleshooting
 
@@ -88,8 +130,11 @@ under Docker's mapping is not readable under Podman's. See
 
 * Moving the stack
 
-=compose.yaml= binds =shared_volume= to a path relative to itself. Moving the
-directory does not update a volume that already exists — remove the volume
-first, or the containers keep binding the old path. The volume's real name is
-prefixed with the project name, which =name: starrs= at the top of the compose
-file pins rather than leaving to the directory name.
+The containers bind absolute host paths under =/media=. Moving the tree means
+editing those paths in =system.scm= and reconfiguring; there is no intermediate
+named volume to fall out of step with them.
+
+The compose file this replaces bound a named volume to a path relative to
+itself, and moving the directory did not update a volume that already existed —
+the containers kept binding the old path until the volume was removed. That
+failure is not reachable from here.

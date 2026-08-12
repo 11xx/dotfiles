@@ -4,11 +4,53 @@
 One rootless podman container on gak: Koito, a private listening history that
 receives scrobbles over the ListenBrainz submission API. The stack is named for
 what it will hold rather than what it holds today — anything on gak that is not
-the media pipeline belongs in =compose.yaml= beside it.
+the media pipeline belongs beside it.
 
 This file is documentation, not a source. Nothing tangles out of it; the role
 beside it is the source of truth. It records the reasoning that the
 configuration cannot state on its own.
+
+* Where the container is declared
+
+Not here. gak runs GNU Shepherd and has no systemd at all, so a =.service= unit
+under =~/.config/systemd/user= is a file nothing reads. The containers are
+declared in =guix_config='s =system.scm=, and the values they need — uid, gid,
+timezone, ports, image version — are host facts in =host_vars/gak/main=, shared
+between that template and this role.
+
+This role owns only what the container reads and writes.
+
+A Guix Home Shepherd service would have been the smaller change, but Guix Home
+starts the user Shepherd from =~/.guix-home/on-first-login=: after a power cut,
+nothing would come up until someone logged in. System Shepherd services start at
+boot.
+
+** Why not oci-service-type directly
+
+=system.scm= builds the services by calling =oci-configuration->shepherd-services=
+rather than by adding =oci-service-type= to its service list.
+
+That service type also extends =account-service-type= with a =user-account= for
+whatever its =user= field names. lobo already has an account, and =/etc/passwd=
+is written from that list without deduplication, so the result is two lobo
+records — the second in group =users= with =/sbin/nologin=. Guix only warns.
+Calling the builder takes the Shepherd services and leaves the account alone;
+=rootless-podman-service-type= already covers the rest of what the service type
+would have contributed, namely podman in the system profile and lobo's subuid
+and subgid ranges.
+
+** Why it starts without a login
+
+Rootless podman puts its runroot under =/run/user/1000=, which lobo cannot
+create. elogind creates it at boot because lobo is a lingering user. That is
+host state rather than configuration, set once:
+
+#+begin_src sh
+sudo loginctl enable-linger lobo
+#+end_src
+
+Without it the containers fail at boot with =RunRoot is pointing to a path which
+is not writable=.
 
 * Why not ListenBrainz itself
 
@@ -37,28 +79,26 @@ MusicBrainz API at request time rather than from a replica. One Go binary, one
 SQLite file. If a local mirror ever exists here, =KOITO_MUSICBRAINZ_URL= points
 it at that instead.
 
-* What Ansible owns, and what it does not
+* Secrets
 
-The role deploys =compose.yaml=, =koito.env= and the systemd user unit.
-Everything under =~/services/koito= is Koito's own state — the SQLite database,
-the image cache, the import staging directory — written at runtime and not
-templated.
+Nothing secret may go into =system.scm=. That file is built into =/gnu/store=,
+which is world-readable, so a password written there is published to every user
+on the machine.
 
-=koito.env= carries the credentials that seed the first account, which Koito
-reads only while the database is empty. Changing the password in the web UI
-afterwards leaves the vault stale; update =koito_admin_password= in
-=host_vars/gak/vault= to match, or a rebuilt instance will disagree with the one
-that already exists.
+Koito reads any setting from a file when the variable is given a =_FILE= suffix.
+The role writes the admin password to =~/services/koito/secrets/default-password=
+at 0600 and =system.scm= names only the path.
 
-* Starting it
+That password seeds the first account and is read only while the database is
+empty. Changing it in the web UI afterwards leaves the vault stale; update
+=koito_admin_password= in =host_vars/gak/vault= to match, or a rebuilt instance
+will disagree with the one that already exists.
 
-Unlike the starrs stack, the unit is enabled at deploy. Nothing here goes on the
-network in a way that wants a human's decision first, and a scrobble receiver
-that is down when a phone flushes its queued listens is a receiver that loses
-them.
+* Driving it
 
 #+begin_src sh
-systemctl --user status services
+sudo herd status koito
+sudo herd restart koito
 #+end_src
 
 * Pointing a scrobbler at it
@@ -74,27 +114,69 @@ a configuration change, not a migration.
 
 * Reaching it from outside the house
 
-Through Tailscale, added to gak in =guix_config='s =system.scm=. The port is not
-forwarded and nothing is exposed to the internet. The daemon has no identity
-until it is authenticated once by hand on the host:
-
-#+begin_src sh
-sudo tailscale up
-#+end_src
+Through Tailscale, added to gak in =system.scm=. No port is forwarded and
+nothing is exposed to the internet.
 
 Guix upstream packages Tailscale's Go dependencies but not Tailscale itself, so
 =tailscaled= and =tailscale-service-type= come from the rosenthal channel, which
 =channels.scm= already lists for other reasons.
 
+** Authenticating the machine
+
+Tailscale requires an account. It stores no password of its own — sign-in goes
+through an identity provider (Google, Microsoft, GitHub, Apple, passkey, email),
+which is how it holds so little about you. The free Personal tier covers up to
+six users and unlimited devices.
+
+The daemon runs with no identity until it is authenticated once by hand:
+
+#+begin_src sh
+sudo tailscale up
+#+end_src
+
+That prints a URL. It is a one-time registration nonce bound to this machine's
+public key: it authorises exactly one pending node and is then spent. It is not
+a standing credential, and it is not what secures the machine afterwards.
+
+** What secures it afterwards
+
+- The **node key** under =/var/lib/tailscale=, generated here and never sent
+  anywhere. That is the credential from then on.
+- The **admin console**, which is the control point. Every machine is listed;
+  removing or disabling one cuts it off immediately.
+- **Key expiry**, 180 days by default, after which the node must re-authenticate.
+  For a headless server that is a scheduled outage nobody will remember the
+  cause of — turn expiry off on gak's row.
+- **ACLs**, which decide who may reach what. A personal tailnet defaults to
+  every device reaching every other device.
+- **Device approval**, optional, which holds a newly added machine pending until
+  it is approved by hand.
+
+** What Tailscale can and cannot see
+
+The coordination server is a drop box for *public* keys plus metadata about
+where each node currently is. Each node generates its own WireGuard keypair
+locally and the private half never leaves it, so only the two endpoints can
+encrypt or decrypt. Tailscale carries no user traffic and cannot read it. When
+two nodes cannot connect directly the traffic falls back through Tailscale's
+DERP relays, still encrypted end to end.
+
+The residual risk is authorisation, not confidentiality: the control plane
+distributes the key list, so a compromised one could hand these nodes a key for
+a machine that was never approved. **Tailnet lock** closes that — existing
+devices sign new ones, so the control plane cannot inject a node on its own.
+
+If that trust is unwanted altogether, **Headscale** is an open-source
+reimplementation of the coordination server that can be self-hosted, using the
+same clients.
+
 * Version pinning
 
-=gak_services_koito_version= is an explicit tag, not =latest=. The compose file
-sets =pull_policy: missing=, which fetches an image once and never again, so a
-floating tag would let the moment a host happens to be rebuilt decide which
-version it receives. Koito is young enough for that to matter: it replaced
-PostgreSQL with SQLite outright between v0.1.10 and v0.2.1, migrating data on
-the way. Bumping the pin is therefore a deliberate act — read the release notes
-first, and take a copy of =~/services/koito= before restarting.
+=gak_koito_version= is an explicit tag, not =latest=. Koito is young enough for
+that to matter: it replaced PostgreSQL with SQLite outright between v0.1.10 and
+v0.2.1, migrating data on the way. Bumping the pin is a deliberate act — read
+the release notes first, and take a copy of =~/services/koito= before
+reconfiguring.
 
 * Not done yet
 

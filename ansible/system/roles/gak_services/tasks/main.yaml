@@ -1,63 +1,54 @@
 ---
-# gak's general services stack — everything that is not the media pipeline.
+# gak's general services — everything that is not the media pipeline.
 #
-# Ansible owns the declarative half: the compose file, the environment file and
-# the systemd user unit. It does not own what the containers write under the
-# stack directory, because that is service state rewritten at runtime.
+# The containers are declared in system.scm, because gak runs Shepherd and has
+# no systemd. This role deploys what they read and write: the state directory
+# and the one secret that must not go into the world-readable store.
 #
-# Nothing here escalates. The stack runs rootless as the login user, under that
-# user's home.
+# Nothing here escalates. The containers run rootless as the login user, under
+# that user's home.
 
 - name: 'gak_services: Create the stack directory tree'
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     state: directory
-    mode: "0755"
+    mode: "{{ item.mode }}"
   loop:
-    - "{{ gak_services_dir }}"
-    # Created here rather than left to podman: a bind mount whose source is
-    # missing is a class of failure that reports itself from inside the
-    # container, far from the cause.
-    - "{{ gak_services_dir }}/koito"
-    - "{{ xdg_config_home }}/systemd/user"
-  tags: ['gak-services-config', 'gak-services-unit']
-
-- name: 'gak_services: Deploy the compose file'
-  ansible.builtin.template:
-    src: compose.yaml.j2
-    dest: "{{ gak_services_dir }}/compose.yaml"
-    mode: "0644"
-  notify: Restart services
-  tags: ['gak-services-config']
-
-# 0600: this seeds Koito's admin account, and the instance is reachable over
-# the tailnet.
-- name: 'gak_services: Deploy the koito environment file'
-  ansible.builtin.template:
-    # Named without the .env infix so the repository's "never commit a .env"
-    # ignore rule keeps applying to real ones.
-    src: koito-env.j2
-    dest: "{{ gak_services_dir }}/koito.env"
-    mode: "0600"
-  notify: Restart services
+    # Koito's own state: the SQLite database, the image cache, the import
+    # staging directory. Created here rather than left to podman, which would
+    # make a missing bind mount report itself from inside the container, far
+    # from the cause.
+    - { path: "{{ gak_services_dir }}", mode: "0755" }
+    - { path: "{{ gak_services_dir }}/koito", mode: "0755" }
+    # 0700: the directory below holds the admin password.
+    - { path: "{{ gak_services_dir }}/koito/secrets", mode: "0700" }
+  loop_control:
+    label: "{{ item.path }}"
   tags: ['gak-services-config', 'gak-services-secrets']
 
-- name: 'gak_services: Install the stack systemd user unit'
-  ansible.builtin.template:
-    src: services.service.j2
-    dest: "{{ xdg_config_home }}/systemd/user/services.service"
-    mode: "0644"
-  notify: Restart services
-  tags: ['gak-services-unit']
+# Koito reads any setting from a file when given the `_FILE` suffix, which is
+# what keeps this out of system.scm: that file is built into /gnu/store and is
+# world-readable, so a password written there is published to every user on the
+# machine.
+#
+# Read only while the database is empty, to create the first account. Changing
+# it afterwards does nothing — change the password in the web UI, and update the
+# vault to match so a rebuilt instance agrees with the one that exists.
+- name: 'gak_services: Deploy the koito admin password'
+  ansible.builtin.copy:
+    content: "{{ koito_admin_password }}"
+    dest: "{{ gak_services_dir }}/koito/secrets/default-password"
+    mode: "0600"
+  no_log: true
+  tags: ['gak-services-config', 'gak-services-secrets']
 
-# Enabled, unlike the starrs stack. Nothing here puts a torrent client on the
-# network, and a scrobble receiver that is down when the phone flushes its queue
-# is a receiver that loses listens.
-- name: 'gak_services: Enable the stack at boot'
-  ansible.builtin.systemd_service:
-    name: services.service
-    enabled: true
-    daemon_reload: true
-    scope: user
-  when: not ansible_check_mode
-  tags: ['gak-services-unit']
+# Starting and stopping is Shepherd's, and Shepherd's configuration is
+# system.scm, which is applied by hand. Ansible has no lever here, so it says so
+# rather than pretending otherwise.
+- name: 'gak_services: Report how to drive the stack'
+  ansible.builtin.debug:
+    msg: >-
+      Koito is a system Shepherd service declared in system.scm. It starts at
+      boot once `sudo guix system reconfigure` has been run on gak. Check it
+      with `sudo herd status koito`, and reach it on port {{ gak_koito_port }}.
+  tags: ['gak-services-config']
