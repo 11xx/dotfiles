@@ -6,6 +6,7 @@
 
 (define-module (11xx packages networking)
   #:use-module (guix base32)
+  #:use-module (guix gexp)
   #:use-module (guix git-download)
   #:use-module (guix packages)
   #:use-module (guix utils)
@@ -31,6 +32,14 @@
     (arguments
      (substitute-keyword-arguments
          (package-arguments rosenthal:tailscale)
+       ((#:build-flags _)
+        #~(list "-tags" "ts_include_cli"
+                (string-append
+                 "-ldflags="
+                 " -X tailscale.com/version.longStamp="
+                 #$(package-version this-package)
+                 " -X tailscale.com/version.shortStamp="
+                 #$(package-version this-package))))
        ((#:vendor-hash _)
         (base32
          "01wvidvld4749f9bdsmvi84l005k6lfsqvcn6yw13jikzd8a8qka"))))))

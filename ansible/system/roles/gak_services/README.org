@@ -253,6 +253,10 @@ guix build -L ~/11xx-guix-channel \
   -e '(@ (11xx packages networking) tailscale)' --no-grafts
 #+end_src
 
+Run the built =bin/tailscale version= as part of the package gate. Rosenthal's
+build flags stamp its package version into the binaries, so an override must
+replace those flags as well as its source and vendor hashes.
+
 Deploy both the package and system expression, commit the local channel, update
 the Guix profile, and reconfigure. The running node key, Serve configuration and
 certificate state remain under =/var/lib/tailscale= and survive the package
