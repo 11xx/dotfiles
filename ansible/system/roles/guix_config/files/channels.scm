@@ -33,6 +33,6 @@
        ;;     "ACF7 CA25 C886 9B8A 1669 67D7 7350 3372 E2C6 3BCF"))))
        (channel
         (name '11xx)
-        (url (string-append "file://" (getenv "HOME") "/11xx-guix-channel")))
+        (url "file:///home/lobo/11xx-guix-channel"))
 
        %default-channels)
