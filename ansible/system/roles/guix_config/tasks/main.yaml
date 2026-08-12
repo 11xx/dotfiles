@@ -134,7 +134,7 @@
     _system_changed: "{{ guix_system_config.changed | default(false) }}"
     _home_changed: "{{ guix_home_config.changed | default(false) }}"
     guix_pending_steps: >-
-      {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' commit -am "update zsh plugins"']
+      {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' add -A && git -C ' ~ guix_channel_dir ~ ' commit -m "packages: update local packages"']
               if guix_channel_status.stdout | default('') | length > 0 else [])
          + (['guix pull   (channels changed)']
               if _channels_changed or _channel_changed else [])
