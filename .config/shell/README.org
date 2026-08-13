@@ -1634,6 +1634,50 @@ alias wget='wget --hsts-file=${XDG_DATA_HOME}/wget-hsts'
 alias podman-compose-update='podman compose down && podman compose pull && podman compose up -d'
 #+end_src
 
+** Dev
+:PROPERTIES:
+:header-args:shell+: :tangle setup-modules/dev.sh
+:END:
+
+*** Domain availability
+
+=check_domain= answers whether a domain is registered by querying RDAP, the registry
+protocol that replaced WHOIS. It reaches the authoritative registry directly,
+so no registrar sees the candidate names — the reason to prefer it over a
+registrar's search box is that a shortlist typed into one is a shortlist
+disclosed to a party with an interest in it.
+
+The status is carried by the HTTP code alone: =404= means no registration
+exists, =200= means one does. Anything else is reported as unknown rather than
+guessed at, since a timeout and a free domain are indistinguishable otherwise.
+
+RDAP is authoritative for gTLDs. Several ccTLDs — =.br= among them — either
+serve no RDAP or serve it incompletely, and answer =unknown=; fall back to
+=whois= there. Never infer availability from a name failing to resolve, as a
+registered domain with no records resolves to nothing.
+
+#+begin_src shell
+check_domain() {
+    [ "$#" -gt 0 ] || { echo 'usage: check_domain <domain>...' >&2; return 2; }
+    __ckdom_ok='' __ckdom_warn='' __ckdom_off=''
+    if [ -t 1 ]; then
+        __ckdom_ok=$(printf '\033[32m')
+        __ckdom_warn=$(printf '\033[33m')
+        __ckdom_off=$(printf '\033[0m')
+    fi
+    for __ckdom_d in "$@"; do
+        case $(curl -sL -o /dev/null -w '%{http_code}' -m 20 \
+                    "https://rdap.org/domain/${__ckdom_d}") in
+            404) __ckdom_msg="${__ckdom_ok}AVAILABLE${__ckdom_off}" ;;
+            200) __ckdom_msg='registered' ;;
+            *)   __ckdom_msg="${__ckdom_warn}unknown${__ckdom_off}" ;;
+        esac
+        printf '%-28s %s\n' "$__ckdom_d" "$__ckdom_msg"
+    done
+    unset __ckdom_d __ckdom_msg __ckdom_ok __ckdom_warn __ckdom_off
+}
+#+end_src
+
 * Local file variables                                             :noexport:
 # Local Variables:
 # org-confirm-babel-evaluate: nil
