@@ -203,3 +203,4 @@ out/
 *.jar
 *.war
 *.ear
+.config/environment.d/z.conf
