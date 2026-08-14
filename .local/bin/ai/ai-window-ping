@@ -3,10 +3,9 @@ set -u
 
 PATH="${PATH:-/usr/local/bin:/usr/bin}:${HOME}/.local/bin:${HOME}/.local/bin/ai:${HOME}/.local/share/npm/bin"
 
-prompt="${AI_WINDOW_PING_PROMPT:-Reply with OK only.}"
-claude_model="${AI_WINDOW_PING_CLAUDE_MODEL:-haiku}"
-codex_workdir="${AI_WINDOW_PING_CODEX_WORKDIR:-${HOME}/code/muzaiten}"
-codex_prompt="${AI_WINDOW_PING_CODEX_PROMPT:-Inspect this repository read-only. Run git status --short, git ls-files | sed -n '1,220p', sed -n '1,220p' README.md, sed -n '1,200p' CMakeLists.txt, and find src -maxdepth 2 -type f | sort | sed -n '1,80p'. Then summarize the repo in 5 concise bullets and end with OK. Do not modify files.}"
+prompt="hi"
+claude_model="haiku"
+claude_effort="low"
 timeout_duration="${AI_WINDOW_PING_TIMEOUT:-180s}"
 state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/ai-window-ping"
 
@@ -16,56 +15,33 @@ log() {
     printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
 }
 
-run_codex() {
-    timeout "$timeout_duration" \
-        codex exec \
-        --ephemeral \
-        --skip-git-repo-check \
-        --sandbox read-only \
-        --ignore-rules \
-        --cd "$codex_workdir" \
-        "$codex_prompt"
-}
-
 run_claude() {
     timeout "$timeout_duration" \
         claude -p \
         --model "$claude_model" \
+        --effort "$claude_effort" \
+        --disable-slash-commands \
         --no-session-persistence \
         "$prompt"
 }
 
-run_target() {
-    case "$1" in
-        codex) run_codex ;;
-        claude) run_claude ;;
-        *)
-            log "ERROR: unknown target '$1'"
-            return 64
-            ;;
-    esac
-}
-
-if (( $# > 0 )); then
-    targets="$*"
-else
-    targets="${AI_WINDOW_PING_TARGETS:-codex claude}"
+if (( $# > 0 )) && [[ "$1" != claude || $# -gt 1 ]]; then
+    log "ERROR: only the Claude instance is supported"
+    exit 64
 fi
 
-status=0
-for target in $targets; do
-    output_log="$(mktemp "${TMPDIR:-/tmp}/ai-window-ping.${target}.XXXXXX")"
-    log "Pinging ${target}..."
-    if run_target "$target" >"$output_log" 2>&1; then
-        date '+%Y-%m-%dT%H:%M:%S%z' > "${state_dir}/${target}.last-success"
-        log "${target} ping succeeded."
-    else
-        rc=$?
-        status=1
-        log "ERROR: ${target} ping failed with exit status ${rc}."
-        sed -n '1,80p' "$output_log" >&2
-    fi
+output_log="$(mktemp "${TMPDIR:-/tmp}/ai-window-ping.claude.XXXXXX")"
+log "Pinging Claude..."
+if run_claude >"$output_log" 2>&1; then
+    date '+%Y-%m-%dT%H:%M:%S%z' > "${state_dir}/claude.last-success"
+    log "Claude ping succeeded."
+else
+    rc=$?
+    log "ERROR: Claude ping failed with exit status ${rc}."
+    sed -n '1,80p' "$output_log" >&2
     rm -f "$output_log"
-done
+    exit "$rc"
+fi
+rm -f "$output_log"
 
-exit "$status"
+exit 0
