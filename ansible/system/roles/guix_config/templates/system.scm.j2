@@ -30,6 +30,7 @@
                      ssh
                      shepherd
                      containers
+                     mcron
                      avahi)
 
 (define %plain-nonguix-signing-key-pub
@@ -68,7 +69,8 @@
                               "fd"
                               "bat"
                               "ripgrep"
-                              "rsync"))
+                              "rsync"
+                              "restic"))
                    %base-packages))
 
  ;; To search for available services, run 'guix system search KEYWORD'
@@ -158,6 +160,17 @@
                                          (start {{ gak_subid_start }})
                                          (count {{ gak_subid_count }}))))))
 
+           ;; A database dump and the application files enter one encrypted
+           ;; Restic snapshot every day. The command acquires its own lock,
+           ;; places Nextcloud in maintenance mode, enforces retention and
+           ;; checks the repository before returning.
+           (service mcron-service-type
+                    (mcron-configuration
+                     (jobs
+                      (list #~(job "30 3 * * *"
+                                   "/home/lobo/.local/bin/gak-nextcloud-backup"
+                                   #:user "lobo")))))
+
            ;; Every container on gak.
            ;;
            ;; They are declared here rather than in a compose file because this
@@ -207,7 +220,8 @@
 
                      (networks
                       (list (oci-network-configuration (name "starrs_net"))
-                            (oci-network-configuration (name "services_net"))))
+                            (oci-network-configuration (name "services_net"))
+                            (oci-network-configuration (name "nextcloud_net"))))
 
                      (containers
                       (list
@@ -389,7 +403,73 @@
                         (environment
                          (list '("KOITO_DEFAULT_USERNAME" . "{{ gak_koito_admin_user }}")
                                '("KOITO_DEFAULT_PASSWORD_FILE" . "/secrets/default-password")
-                               '("KOITO_FORCE_TZ" . "{{ gak_timezone }}"))))))))))
+                               '("KOITO_FORCE_TZ" . "{{ gak_timezone }}")))
+                        (respawn? #t))
+
+                       ;; Nextcloud keeps the whole application tree on the
+                       ;; NVMe, with PostgreSQL as its durable database and
+                       ;; Redis for distributed cache and file locking. Only
+                       ;; Apache reaches the host, on loopback; named Tailscale
+                       ;; Services are the sole ingress.
+                       (oci-container-configuration
+                        (provision "nextcloud-db")
+                        (image "docker.io/library/postgres:{{ gak_nextcloud_postgres_version }}@{{ gak_nextcloud_postgres_image_digest }}")
+                        (network "nextcloud_net")
+                        (volumes
+                         (list '("/home/lobo/services/nextcloud/postgres" . "/var/lib/postgresql/data")
+                               '("/home/lobo/services/nextcloud/secrets" . "/run/secrets/nextcloud:ro")))
+                        (environment
+                         (list '("POSTGRES_DB" . "nextcloud")
+                               '("POSTGRES_USER" . "nextcloud")
+                               '("POSTGRES_PASSWORD_FILE" . "/run/secrets/nextcloud/postgres-password")))
+                        (respawn? #t))
+
+                       (oci-container-configuration
+                        (provision "nextcloud-redis")
+                        (image "docker.io/library/redis:{{ gak_nextcloud_redis_version }}@{{ gak_nextcloud_redis_image_digest }}")
+                        (network "nextcloud_net")
+                        (command (list "redis-server" "/usr/local/etc/redis/redis.conf"))
+                        (volumes
+                         (list '("/home/lobo/services/nextcloud/secrets/redis.conf" . "/usr/local/etc/redis/redis.conf:ro")))
+                        (respawn? #t))
+
+                       (oci-container-configuration
+                        (provision "nextcloud")
+                        (image "docker.io/library/nextcloud:{{ gak_nextcloud_version }}-apache@{{ gak_nextcloud_image_digest }}")
+                        (requirement '(nextcloud-db nextcloud-redis))
+                        (network "nextcloud_net")
+                        (ports (list '("127.0.0.1:{{ gak_nextcloud_port }}" . "80")))
+                        (volumes
+                         (list '("/home/lobo/services/nextcloud/html" . "/var/www/html")
+                               '("/home/lobo/services/nextcloud/secrets" . "/run/secrets/nextcloud:ro")))
+                        (environment
+                         (list '("POSTGRES_HOST" . "nextcloud-db")
+                               '("POSTGRES_DB" . "nextcloud")
+                               '("POSTGRES_USER" . "nextcloud")
+                               '("POSTGRES_PASSWORD_FILE" . "/run/secrets/nextcloud/postgres-password")
+                               '("REDIS_HOST" . "nextcloud-redis")
+                               '("REDIS_HOST_PASSWORD_FILE" . "/run/secrets/nextcloud/redis-password")
+                               '("NEXTCLOUD_ADMIN_USER" . "{{ gak_nextcloud_admin_user }}")
+                               '("NEXTCLOUD_ADMIN_PASSWORD_FILE" . "/run/secrets/nextcloud/admin-password")
+                               '("NEXTCLOUD_TRUSTED_DOMAINS" . "{{ gak_nextcloud_hostname }}")
+                               '("TRUSTED_PROXIES" . "127.0.0.1")
+                               '("APACHE_DISABLE_REWRITE_IP" . "1")
+                               '("OVERWRITEHOST" . "{{ gak_nextcloud_hostname }}")
+                               '("OVERWRITEPROTOCOL" . "https")
+                               '("OVERWRITECLIURL" . "https://{{ gak_nextcloud_hostname }}")
+                               '("PHP_MEMORY_LIMIT" . "1G")
+                               '("PHP_UPLOAD_LIMIT" . "10G")))
+                        (respawn? #t))
+
+                       (oci-container-configuration
+                        (provision "nextcloud-cron")
+                        (image "docker.io/library/nextcloud:{{ gak_nextcloud_version }}-apache@{{ gak_nextcloud_image_digest }}")
+                        (requirement '(nextcloud nextcloud-db nextcloud-redis))
+                        (network "nextcloud_net")
+                        (entrypoint "/cron.sh")
+                        (volumes
+                         (list '("/home/lobo/services/nextcloud/html" . "/var/www/html")))
+                        (respawn? #t))))))))
           ;; This is the default list of services we are appending to.
           (modify-services %base-services
                            (guix-service-type config =>

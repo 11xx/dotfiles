@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+
+nextcloud_root={{ (gak_services_dir ~ '/nextcloud') | quote }}
+nextcloud_dump="$nextcloud_root/backup-staging/database.dump"
+export RESTIC_REPOSITORY={{ (gak_nextcloud_backup_dir ~ '/restic') | quote }}
+export RESTIC_PASSWORD_FILE="$nextcloud_root/secrets/restic-password"
+
+exec 9>"$nextcloud_root/backup.lock"
+if ! flock -n 9; then
+    printf '%s\n' 'A Nextcloud backup is already running.' >&2
+    exit 0
+fi
+
+for nextcloud_container in nextcloud nextcloud-db; do
+    if ! podman container exists "$nextcloud_container"; then
+        printf 'Required container is absent: %s\n' "$nextcloud_container" >&2
+        exit 1
+    fi
+done
+
+if [[ ! -f "$RESTIC_REPOSITORY/config" ]]; then
+    podman unshare restic init
+fi
+
+nextcloud_maintenance=0
+nextcloud_cleanup() {
+    nextcloud_status=$?
+    set +e
+    rm -f -- "$nextcloud_dump"
+    if (( nextcloud_maintenance )); then
+        podman exec --user 33 nextcloud php occ maintenance:mode --off
+    fi
+    exit "$nextcloud_status"
+}
+trap nextcloud_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+podman exec --user 33 nextcloud php occ maintenance:mode --on
+nextcloud_maintenance=1
+podman exec --user 70 nextcloud-db \
+    pg_dump --username=nextcloud --dbname=nextcloud --format=custom >"$nextcloud_dump"
+
+podman unshare restic backup \
+    --host gak \
+    --tag nextcloud \
+    "$nextcloud_root/html" \
+    "$nextcloud_dump"
+
+podman exec --user 33 nextcloud php occ maintenance:mode --off
+nextcloud_maintenance=0
+rm -f -- "$nextcloud_dump"
+
+podman unshare restic forget \
+    --host gak \
+    --tag nextcloud \
+    --keep-daily 7 \
+    --keep-weekly 5 \
+    --keep-monthly 12 \
+    --prune
+podman unshare restic check

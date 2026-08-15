@@ -14,11 +14,11 @@ ansible_python_interpreter: "/home/lobo/.guix-profile/bin/python3"
 
 # --- Containers -------------------------------------------------------------
 #
-# gak's containers are declared in system.scm through Guix's oci-service-type,
-# not in a compose file, because gak runs Shepherd and has no systemd: a user
-# unit is a file nothing reads, and a user Shepherd service would not start
-# until someone logged in. The Guix form produces system Shepherd services that
-# start at boot.
+# gak's containers are declared in system.scm through Guix's OCI-to-Shepherd
+# builder, not in a compose file, because gak runs Shepherd and has no systemd:
+# a user unit is a file nothing reads, and a user Shepherd service would not
+# start until someone logged in. The Guix form produces system Shepherd services
+# that start at boot without duplicating the existing login account.
 #
 # These values therefore have two consumers — the roles that deploy the service
 # state, and guix_config's system.scm template — so they are host facts rather
@@ -35,8 +35,9 @@ gak_media_gid: 134
 gak_timezone: America/Sao_Paulo
 
 # Rootless podman's subuid and subgid range for lobo. Declared once, by
-# oci-service-type, because two services extending subids-service-type with the
-# same user name is a duplicate range and fails the reconfigure.
+# rootless-podman-service-type, because two services extending
+# subids-service-type with the same user name is a duplicate range and fails the
+# reconfigure.
 #
 # Do not move these numbers. /marak/podman-storage holds image layers owned by
 # uids inside this range; shifting it makes every one of them unreadable.
@@ -61,3 +62,34 @@ gak_koito_version: v0.3.2
 # Seeds Koito's first account, once, on an empty database. The password beside
 # it is koito_admin_password in the vault.
 gak_koito_admin_user: lobo
+
+# Stable application identities inside the tailnet. A named Tailscale Service
+# can move to another host without changing its URL, and WebDAV/CalDAV clients
+# retain one canonical origin. Gak must carry tag:server before it can advertise
+# either service.
+gak_koito_service_name: koito
+gak_nextcloud_service_name: nextcloud
+gak_nextcloud_hostname: "{{ gak_nextcloud_service_name }}.{{ gak_tailnet_dns_suffix }}"
+
+# Nextcloud's Apache frontend is reachable only through Tailscale Serve on this
+# loopback port. PostgreSQL and Redis have no host ports at all.
+gak_nextcloud_port: 8080
+gak_nextcloud_admin_user: nextcloud-admin
+gak_nextcloud_user: lobo
+gak_nextcloud_user_display_name: Lobo
+
+# Every image is pinned to both a human-readable release and the multi-platform
+# manifest reviewed for this deployment. A version bump is an explicit database
+# and application migration, preceded by a checked backup and followed by a
+# restore drill.
+gak_nextcloud_version: 34.0.2
+gak_nextcloud_image_digest: sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329
+gak_nextcloud_postgres_version: 17.11-alpine
+gak_nextcloud_postgres_image_digest: sha256:5d61573b31c206ae538c85893edeb6e320e1a9ffd838c0f9dca927fb6f765fa4
+gak_nextcloud_redis_version: 8.2.8-alpine
+gak_nextcloud_redis_image_digest: sha256:a7859ed111db3c1f5404a973a4747505d559fb5ca32d37e447afc0ef845a2103
+
+# Primary state stays on the NVMe. The first backup copy lives on the separate
+# marak disk; it is encrypted, deduplicated and retained locally, but is not an
+# off-site backup.
+gak_nextcloud_backup_dir: /marak/backups/nextcloud

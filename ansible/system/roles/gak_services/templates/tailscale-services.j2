@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+if (( EUID != 0 )); then
+    exec sudo -- "$0" "$@"
+fi
+
+tailscale serve \
+    --service=svc:{{ gak_koito_service_name }} \
+    --https=443 \
+    --yes \
+    http://127.0.0.1:{{ gak_koito_port }}
+
+tailscale serve \
+    --service=svc:{{ gak_nextcloud_service_name }} \
+    --https=443 \
+    --yes \
+    http://127.0.0.1:{{ gak_nextcloud_port }}
+
+tailscale serve status

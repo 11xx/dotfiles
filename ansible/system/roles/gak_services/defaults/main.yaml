@@ -4,7 +4,8 @@
 # megabytes rather than the gigabytes that put the media stack on the array.
 #
 # The containers themselves are not here. gak has no systemd, so they are
-# declared in system.scm through Guix's oci-service-type; the values they need
-# are host facts in host_vars/gak/main, shared with that template. This role
-# owns only what the containers read and write.
+# declared in system.scm through Guix's OCI-to-Shepherd builder; the values they
+# need are host facts in host_vars/gak/main, shared with that template. This
+# role owns only what the containers read and write.
 gak_services_dir: "{{ ansible_facts['user_dir'] }}/services"
+gak_services_bin_dir: "{{ ansible_facts['user_dir'] }}/.local/bin"

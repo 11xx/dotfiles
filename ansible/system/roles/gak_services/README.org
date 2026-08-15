@@ -1,10 +1,10 @@
 #+TITLE: gak's general services
 #+options: toc:nil num:nil
 
-One rootless podman container on gak: Koito, a private listening history that
-receives scrobbles over the ListenBrainz submission API. The stack is named for
-what it will hold rather than what it holds today — anything on gak that is not
-the media pipeline belongs beside it.
+Gak's private application stack: Koito for listening history and Nextcloud for
+calendar, DAV and the other groupware and file features that can be enabled as
+they become useful. Guix System declares the rootless podman containers and GNU
+Shepherd lifecycle; Ansible declares their state, secrets and operator commands.
 
 This file is documentation, not a source. Nothing tangles out of it; the role
 beside it is the source of truth. It records the reasoning that the
@@ -18,7 +18,7 @@ declared in =guix_config='s =system.scm=, and the values they need — uid, gid,
 timezone, ports, image version — are host facts in =host_vars/gak/main=, shared
 between that template and this role.
 
-This role owns only what the container reads and writes.
+This role owns only what the containers read and write.
 
 A Guix Home Shepherd service would have been the smaller change, but Guix Home
 starts the user Shepherd from =~/.guix-home/on-first-login=: after a power cut,
@@ -101,13 +101,124 @@ sudo herd status koito
 sudo herd restart koito
 #+end_src
 
-* Pointing a scrobbler at it
+* Nextcloud
 
-Koito listens only on gak's loopback interface. Tailscale Serve terminates HTTPS
-and proxies to that listener, so in Pano Scrobbler choose *Custom ListenBrainz*,
-give it =https://gak.<tailnet>.ts.net/apis/listenbrainz/= and the API token from
-Koito's own settings page. Any client that accepts a custom ListenBrainz URL —
-Navidrome, Music Assistant, web-scrobbler — configures the same way.
+The Nextcloud stack uses four containers on its own =nextcloud_net= network:
+
+- =nextcloud= is the Apache frontend, bound only to =127.0.0.1:8080=.
+- =nextcloud-db= is PostgreSQL and has no host port.
+- =nextcloud-redis= provides memory cache and transactional file locking and
+  has no host port.
+- =nextcloud-cron= runs the upstream five-minute background-work loop against
+  the same application tree.
+
+The community =nextcloud:apache= image is used rather than Nextcloud AIO. AIO
+expects to create and supervise child containers through a container socket;
+that duplicates the ownership Guix and Shepherd already provide here. The
+application, PostgreSQL and Redis images are pinned by release and manifest
+digest in =host_vars/gak/main=.
+
+Primary state is under =~/services/nextcloud= on the NVMe:
+
+- =html= contains the application, configuration, installed apps and user data.
+- =postgres= contains the database cluster.
+- =secrets= contains the database, Redis, account and Restic credentials.
+- =backup-staging= holds a database dump only while a backup is running.
+
+The initial =nextcloud-admin= account is reserved for administration. Daily
+clients use the separate =lobo= account. Ansible creates that account after the
+containers are running, installs Calendar, selects cron background jobs, and
+sets the Brazilian phone-region default:
+
+#+begin_src sh
+ansible-playbook gak.yaml --tags gak-services-bootstrap
+#+end_src
+
+The bootstrap is idempotent. The daily password is kept in the encrypted Gak
+vault and deployed in a private environment file. =podman exec --env-file=
+loads it only for account creation; it is not part of the long-running
+container environment.
+
+** Applying and inspecting the stack
+
+Ship the Ansible-owned files, build the generated Guix expression, then apply
+it while watching the host:
+
+#+begin_src sh
+ansible-playbook gak.yaml --tags guix,gak-services
+ssh gak guix system build ~/.config/guix/system.scm
+ssh -t gak sudo guix system reconfigure ~/.config/guix/system.scm
+#+end_src
+
+Then inspect the actual services and their isolated listener:
+
+#+begin_src sh
+sudo herd status nextcloud nextcloud-db nextcloud-redis nextcloud-cron mcron
+podman ps -a
+podman network inspect nextcloud_net
+ss -ltnp | grep 127.0.0.1:8080
+podman exec --user 33 nextcloud php occ status
+podman exec --user 33 nextcloud php occ setupchecks
+#+end_src
+
+** Calendar clients
+
+The canonical origin is the named Nextcloud Service URL derived from the
+private =gak_tailnet_dns_suffix= vault value. Log in as =lobo=, not
+=nextcloud-admin=. Calendar clients that ask for a DAV server can discover
+collections by appending this path to that origin:
+
+#+begin_example
+/remote.php/dav
+#+end_example
+
+On Android, DAVx⁵ can use its Nextcloud login flow and then exposes calendars
+to the system calendar database; any calendar application can render them. The
+Nextcloud Android app is useful for files and sharing but does not replace the
+DAV calendar adapter. Desktop clients can use the same CalDAV discovery URL.
+
+** Backup and restore
+
+At 03:30 local time, system mcron runs =~/.local/bin/gak-nextcloud-backup= as
+=lobo=. The command prevents overlap, initializes an encrypted Restic
+repository when needed, enters maintenance mode, creates a native PostgreSQL
+dump, snapshots that dump with the complete =html= tree, clears maintenance
+mode even after failure, applies retention, prunes, and checks the repository.
+Restic runs inside podman's user namespace so it can read files owned by the
+container's mapped =www-data= identity without relaxing their host permissions.
+
+The repository is =/marak/backups/nextcloud/restic= on a physical disk separate
+from the NVMe primary state. Retention keeps seven daily, five weekly and twelve
+monthly snapshots. This protects against local state loss and mistakes; it is
+not an off-site copy and does not protect against loss of both disks or the
+host.
+
+Run the caller-visible recovery gate after first deployment and before an
+upgrade:
+
+#+begin_src sh
+gak-nextcloud-backup
+gak-nextcloud-restore-check
+#+end_src
+
+The restore check decrypts the latest snapshot into a private scratch
+directory, verifies the application/data markers, restores the dump into an
+ephemeral isolated PostgreSQL container, requires real application tables, and
+removes the scratch state. A full recovery uses the same snapshot, restores
+=html= to an empty bind-mount root, initializes an empty PostgreSQL cluster, and
+applies the database dump before starting the application containers.
+
+Redis contains rebuildable cache and lock state and is deliberately excluded
+from backup.
+
+* Pointing a scrobbler at Koito
+
+Koito listens only on gak's loopback interface. Its named Tailscale Service
+terminates HTTPS and proxies to that listener, so in Pano Scrobbler choose
+*Custom ListenBrainz*, append =/apis/listenbrainz/= to the named Koito Service
+origin, and use the API token from Koito's own settings page. Any client that
+accepts a custom ListenBrainz URL — Navidrome, Music Assistant,
+web-scrobbler — configures the same way.
 
 Koito can also relay what it receives on to another ListenBrainz-compatible
 server, so running it alongside an existing setup rather than in place of one is
@@ -201,28 +312,53 @@ If that trust is unwanted altogether, *Headscale* is an open-source
 reimplementation of the coordination server that can be self-hosted, using the
 same clients.
 
-** HTTPS and Tailscale Serve
+** Tagged host and named Tailscale Services
+
+The stable service identities are =svc:koito= and =svc:nextcloud=. Named
+Services require a tag-based host. The tailnet policy must first make
+=autogroup:admin= the owner of =tag:server= and grant the intended members
+access to the tagged host's SSH port and both Services' HTTPS port. Apply the
+policy before changing Gak's identity; tagging removes its user ownership.
+
+Request the tag and verify SSH from another node before touching ingress:
 
 #+begin_src sh
-sudo tailscale serve --bg 4110
+sudo tailscale up --advertise-tags=tag:server
+tailscale status
+ssh gak true
 #+end_src
 
-The background Serve configuration lives in tailscaled's state and resumes
-after a reboot or a =tailscale down= / =tailscale up=. It is private to the
-tailnet; =tailscale funnel= is the distinct command that publishes a service to
-the internet.
+Then reconcile both service handlers and approve their advertisements in the
+Tailscale admin console:
+
+#+begin_src sh
+gak-tailscale-services
+sudo tailscale serve get-config --all -
+#+end_src
+
+Only after both named Service origins work from another tailnet node should the
+legacy node handler be removed with =sudo tailscale serve reset=. Re-run the
+named-service command and inspect =tailscale serve status --json= afterwards;
+the reset operates on node Serve state, while the named configurations remain
+separate.
+
+Named Serve configuration lives in tailscaled's state and resumes after a
+reboot or a =tailscale down= / =tailscale up=. It is private to the tailnet;
+=tailscale funnel= is the distinct command that publishes a service to the
+internet and is not used here.
 
 Serve obtains and renews a public certificate from Let's Encrypt. Tailscale
-answers the DNS-01 validation challenge for the =*.ts.net= name, while the
+answers the DNS-01 validation challenge for the private service name, while the
 certificate private key and ACME account key stay on gak. This is not a private
 Tailscale certificate authority.
 
 Like every publicly trusted web certificate, the certificate is recorded in
 append-only Certificate Transparency logs. Those logs let certificate
 authorities, browsers and observers detect mistaken or malicious issuance; they
-also reveal the exact name =gak.<tailnet>.ts.net=. They reveal neither the
-service contents nor a route around Tailscale. The name is public, but the
-address remains reachable only by peers allowed into this tailnet.
+also reveal the exact service names. They reveal neither the service contents
+nor a route around Tailscale. The names are public, but the addresses remain
+reachable only by peers allowed into this tailnet. For that reason the concrete
+tailnet suffix belongs in the encrypted vault, not this publishable document.
 
 The backend port is published as =127.0.0.1:4110= rather than =0.0.0.0:4110=.
 That makes Serve the only network path to Koito: LAN clients cannot bypass its
@@ -270,7 +406,12 @@ v0.2.1, migrating data on the way. Bumping the pin is a deliberate act — read
 the release notes first, and take a copy of =~/services/koito= before
 reconfiguring.
 
-* Not done yet
+Nextcloud, PostgreSQL and Redis are pinned to a release tag and manifest digest.
+Changing a digest without changing the documented tag is appropriate only for
+an upstream base-image rebuild that has been reviewed. Before any application
+or database upgrade, run the backup and restore check, read the supported
+upgrade path, build the generated system expression, and verify the running
+image plus =occ status= after reconfiguration.
 
-There is no backup of the listening history. The database is a single SQLite
-file under =~/services/koito=, so a copy is cheap, but nothing schedules one.
+Koito's SQLite history is not yet included in the Nextcloud backup command; it
+remains a separate, small follow-up recovery surface.

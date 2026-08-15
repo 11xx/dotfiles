@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+
+nextcloud_root={{ (gak_services_dir ~ '/nextcloud') | quote }}
+nextcloud_scratch=$(mktemp -d "$nextcloud_root/restore-check.XXXXXXXX")
+nextcloud_test_container="nextcloud-restore-check-$$"
+nextcloud_postgres_image={{ ('docker.io/library/postgres:' ~ gak_nextcloud_postgres_version ~ '@' ~ gak_nextcloud_postgres_image_digest) | quote }}
+export RESTIC_REPOSITORY={{ (gak_nextcloud_backup_dir ~ '/restic') | quote }}
+export RESTIC_PASSWORD_FILE="$nextcloud_root/secrets/restic-password"
+
+nextcloud_cleanup() {
+    nextcloud_status=$?
+    set +e
+    if podman container exists "$nextcloud_test_container"; then
+        podman rm --force "$nextcloud_test_container" >/dev/null
+    fi
+    case "$nextcloud_scratch" in
+        "$nextcloud_root"/restore-check.*)
+            podman unshare find "$nextcloud_scratch" -depth -mindepth 1 -delete
+            rmdir "$nextcloud_scratch"
+            ;;
+        *)
+            printf 'Refusing to remove unexpected scratch path: %s\n' "$nextcloud_scratch" >&2
+            ;;
+    esac
+    exit "$nextcloud_status"
+}
+trap nextcloud_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+podman unshare restic check
+podman unshare restic restore latest --host gak --tag nextcloud --target "$nextcloud_scratch"
+
+nextcloud_restored_root="$nextcloud_scratch$nextcloud_root"
+podman unshare test -f "$nextcloud_restored_root/html/config/config.php"
+podman unshare test -f "$nextcloud_restored_root/html/data/.ocdata"
+test -s "$nextcloud_restored_root/backup-staging/database.dump"
+
+podman run --detach --rm \
+    --name "$nextcloud_test_container" \
+    --network none \
+    --env POSTGRES_DB=nextcloud \
+    --env POSTGRES_USER=nextcloud \
+    --env POSTGRES_HOST_AUTH_METHOD=trust \
+    "$nextcloud_postgres_image" >/dev/null
+
+for nextcloud_attempt in $(seq 1 60); do
+    if podman exec --user 70 "$nextcloud_test_container" \
+        pg_isready --username=nextcloud --dbname=nextcloud >/dev/null 2>&1; then
+        break
+    fi
+    if (( nextcloud_attempt == 60 )); then
+        printf '%s\n' 'The scratch PostgreSQL instance did not become ready.' >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+podman exec --interactive --user 70 "$nextcloud_test_container" \
+    pg_restore --username=nextcloud --dbname=nextcloud --exit-on-error --no-owner \
+    <"$nextcloud_restored_root/backup-staging/database.dump"
+
+nextcloud_table_count=$(podman exec --user 70 "$nextcloud_test_container" \
+    psql --username=nextcloud --dbname=nextcloud --tuples-only --no-align \
+    --command="select count(*) from pg_catalog.pg_tables where schemaname = 'public';")
+
+if (( nextcloud_table_count < 1 )); then
+    printf '%s\n' 'The restored database contains no application tables.' >&2
+    exit 1
+fi
+
+printf 'Restore check passed with %s public database tables.\n' "$nextcloud_table_count"
