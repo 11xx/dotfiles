@@ -344,10 +344,11 @@ sudo tailscale serve get-config --all -
 #+end_src
 
 Only after both named Service origins work from another tailnet node should the
-legacy node handler be removed with =sudo tailscale serve reset=. Re-run the
-named-service command and inspect =tailscale serve status --json= afterwards;
-the reset operates on node Serve state, while the named configurations remain
-separate.
+legacy node HTTPS handler be removed with =sudo tailscale serve --https=443
+off=. This targets the node endpoint while preserving the named configurations.
+Do not use =tailscale serve reset= for this migration: reset clears every
+configured Service endpoint on the host. Inspect =tailscale serve status
+--json= afterwards.
 
 Named Serve configuration lives in tailscaled's state and resumes after a
 reboot or a =tailscale down= / =tailscale up=. It is private to the tailnet;
