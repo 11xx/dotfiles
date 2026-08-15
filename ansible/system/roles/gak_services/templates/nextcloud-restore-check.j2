@@ -14,6 +14,9 @@ nextcloud_cleanup() {
     nextcloud_status=$?
     set +e
     if podman container exists "$nextcloud_test_container"; then
+        podman stop --time 30 "$nextcloud_test_container" >/dev/null
+    fi
+    if podman container exists "$nextcloud_test_container"; then
         podman rm --force "$nextcloud_test_container" >/dev/null
     fi
     case "$nextcloud_scratch" in
@@ -36,7 +39,11 @@ podman unshare restic restore latest --host gak --tag nextcloud --target "$nextc
 
 nextcloud_restored_root="$nextcloud_scratch$nextcloud_root"
 podman unshare test -f "$nextcloud_restored_root/html/config/config.php"
-podman unshare test -f "$nextcloud_restored_root/html/data/.ocdata"
+if ! podman unshare test -f "$nextcloud_restored_root/html/data/.ncdata" &&
+   ! podman unshare test -f "$nextcloud_restored_root/html/data/.ocdata"; then
+    printf '%s\n' 'The restored Nextcloud data directory has no instance marker.' >&2
+    exit 1
+fi
 test -s "$nextcloud_restored_root/backup-staging/database.dump"
 
 podman run --detach --rm \
@@ -60,7 +67,8 @@ for nextcloud_attempt in $(seq 1 60); do
 done
 
 podman exec --interactive --user 70 "$nextcloud_test_container" \
-    pg_restore --username=nextcloud --dbname=nextcloud --exit-on-error --no-owner \
+    pg_restore --username=nextcloud --dbname=nextcloud --exit-on-error \
+    --no-owner --no-acl \
     <"$nextcloud_restored_root/backup-staging/database.dump"
 
 nextcloud_table_count=$(podman exec --user 70 "$nextcloud_test_container" \
