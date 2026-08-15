@@ -468,7 +468,8 @@
                         (network "nextcloud_net")
                         (entrypoint "/cron.sh")
                         (volumes
-                         (list '("/home/lobo/services/nextcloud/html" . "/var/www/html")))
+                         (list '("/home/lobo/services/nextcloud/html" . "/var/www/html")
+                               '("/home/lobo/services/nextcloud/secrets" . "/run/secrets/nextcloud:ro")))
                         (respawn? #t))))))))
           ;; This is the default list of services we are appending to.
           (modify-services %base-services

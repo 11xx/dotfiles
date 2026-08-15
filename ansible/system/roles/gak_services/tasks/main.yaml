@@ -16,7 +16,7 @@
     - { path: "{{ gak_services_dir }}/nextcloud", mode: "0750" }
     - { path: "{{ gak_services_dir }}/nextcloud/html", mode: "0750" }
     - { path: "{{ gak_services_dir }}/nextcloud/postgres", mode: "0700" }
-    - { path: "{{ gak_services_dir }}/nextcloud/secrets", mode: "0700" }
+    - { path: "{{ gak_services_dir }}/nextcloud/secrets", mode: "0710" }
     - { path: "{{ gak_services_dir }}/nextcloud/backup-staging", mode: "0700" }
     - { path: "{{ gak_nextcloud_backup_dir }}", mode: "0700" }
     - { path: "{{ gak_nextcloud_backup_dir }}/restic", mode: "0700" }
@@ -44,12 +44,12 @@
   ansible.builtin.copy:
     content: "{{ item.content }}"
     dest: "{{ gak_services_dir }}/nextcloud/secrets/{{ item.name }}"
-    mode: "0600"
+    mode: "{{ item.mode }}"
   loop:
-    - { name: postgres-password, content: "{{ nextcloud_postgres_password }}" }
-    - { name: admin-password, content: "{{ nextcloud_admin_password }}" }
-    - { name: redis-password, content: "{{ nextcloud_redis_password }}" }
-    - { name: restic-password, content: "{{ nextcloud_restic_password }}" }
+    - { name: postgres-password, content: "{{ nextcloud_postgres_password }}", mode: "0600" }
+    - { name: admin-password, content: "{{ nextcloud_admin_password }}", mode: "0600" }
+    - { name: redis-password, content: "{{ nextcloud_redis_password }}", mode: "0640" }
+    - { name: restic-password, content: "{{ nextcloud_restic_password }}", mode: "0600" }
   loop_control:
     label: "{{ item.name }}"
   no_log: true
@@ -67,13 +67,37 @@
   ansible.builtin.template:
     src: redis.conf.j2
     dest: "{{ gak_services_dir }}/nextcloud/secrets/redis.conf"
-    mode: "0600"
+    mode: "0640"
   no_log: true
   tags: ['gak-services-config', 'gak-services-secrets']
 
 # PostgreSQL and Redis drop privileges inside their containers. Translate their
 # image UIDs through rootless podman's user namespace so the bind mounts remain
 # private and writable without granting access to other host users.
+- name: 'gak_services: Let nextcloud traverse its secret directory'
+  ansible.builtin.command:
+    argv:
+      - podman
+      - unshare
+      - chown
+      - '0:33'
+      - "{{ gak_services_dir }}/nextcloud/secrets"
+  changed_when: false
+  when: not ansible_check_mode
+  tags: ['gak-services-config', 'gak-services-secrets']
+
+- name: 'gak_services: Let nextcloud read its redis password'
+  ansible.builtin.command:
+    argv:
+      - podman
+      - unshare
+      - chown
+      - '0:33'
+      - "{{ gak_services_dir }}/nextcloud/secrets/redis-password"
+  changed_when: false
+  when: not ansible_check_mode
+  tags: ['gak-services-config', 'gak-services-secrets']
+
 - name: 'gak_services: Give postgres its state directory'
   ansible.builtin.command:
     argv:
@@ -86,13 +110,13 @@
   when: not ansible_check_mode
   tags: ['gak-services-config']
 
-- name: 'gak_services: Give redis its private configuration'
+- name: 'gak_services: Let redis read its private configuration'
   ansible.builtin.command:
     argv:
       - podman
       - unshare
       - chown
-      - '999:1000'
+      - '0:1000'
       - "{{ gak_services_dir }}/nextcloud/secrets/redis.conf"
   changed_when: false
   when: not ansible_check_mode

@@ -139,6 +139,13 @@ vault and deployed in a private environment file. =podman exec --env-file=
 loads it only for account creation; it is not part of the long-running
 container environment.
 
+The secret directory is not listable by application processes. Its mapped
+=www-data= group may traverse it and read only =redis-password=, which the
+upstream PHP Redis configuration loads for both web requests and cron. The
+Redis process receives its group-readable configuration through an individual
+read-only bind mount. The remaining credentials stay readable only by root in
+the container namespace.
+
 ** Applying and inspecting the stack
 
 Ship the Ansible-owned files, build the generated Guix expression, then apply
