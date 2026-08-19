@@ -110,6 +110,11 @@ keymap_exec("s-print w", "screenshot-jxl --window")
 keymap_exec("s-print t t", "tts-region single")
 keymap_exec("s-print t s", "tts-region scroll")
 
+-- scrollshot: the first press selects the region and starts recording, the
+-- second stitches everything scrolled since into one tall image
+keymap_exec("s-C-M-s", "scrollshot scroll")
+keymap_exec("s-C-M-c", "scrollshot cancel")
+
 -- color picker: grim -g "$(slurp -p)" -t ppm - | magick - -format '%[pixel:p{0,0}]' txt:-
 keymap_exec("s-C-M-o c", "hyprpicker -dbra -u 100")
 
@@ -120,7 +125,7 @@ bind("SUPER + SHIFT + O", hl.dsp.window.move({ monitor = "+1" }))
 -- exec, hyprctl dispatch movewindow mon:"$(hyprctl monitors -j | jq -r '.[] | select(.focused == false).id')"
 
 -- Notification controls
-bind_exec("SUPER + CTRL + ALT + S", "swaync-client --open-panel")
+bind_exec("SUPER + CTRL + ALT + A", "swaync-client --open-panel")
 
 -- Switch keyboard layouts, find names with `hyprctl devices'
 -- bind_exec("control_r", "hyprctl switchxkblayout \"$(pgrep kmonad && printf 'kmonad-uinput-sink' || printf 'sino-wealth-usb-keyboard')\" next")
