@@ -1513,6 +1513,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 ;; instead of rules: three unlike things in a row read as three
                 ;; things without being fenced off from each other.
                 :spacing 14
+                (harness-usage :assets "../../code/harness-status/eww/assets")
                 (systray :orientation "h" :spacing 9 :icon-size 17)
                 (swaync_icon)
                 (clock :edge "right")))
@@ -1628,6 +1629,9 @@ Harness lifecycle widgets and their listeners are imported directly from the
 =harness-status= repository checkout. The desktop config only places the
 widgets and supplies the shared working, completion, and attention colors,
 keeping the reusable module's behavior and presentation source in one place.
+The account-usage widget sits immediately left of the primary bar's systray and
+reads the module's single shared 30-minute poll, so Codex and Claude windows
+remain global even if the widget is placed in another bar later.
 
 =gsr-indicator= sits beside the date on the second bar and reports whether a
 screen recording is running. =gsr status= is the single source of that answer:

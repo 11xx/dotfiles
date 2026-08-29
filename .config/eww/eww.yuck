@@ -77,6 +77,7 @@
                 ;; instead of rules: three unlike things in a row read as three
                 ;; things without being fenced off from each other.
                 :spacing 14
+                (harness-usage :assets "../../code/harness-status/eww/assets")
                 (systray :orientation "h" :spacing 9 :icon-size 17)
                 (swaync_icon)
                 (clock :edge "right")))
