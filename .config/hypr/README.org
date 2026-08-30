@@ -1513,6 +1513,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
                 ;; instead of rules: three unlike things in a row read as three
                 ;; things without being fenced off from each other.
                 :spacing 14
+                (codex-reset-indicator :icon "../../code/tibo-reset-monitor/eww/assets/codex-resets.png")
                 (harness-usage :assets "../../code/harness-status/eww/assets")
                 (systray :orientation "h" :spacing 9 :icon-size 17)
                 (swaync_icon)
@@ -1594,6 +1595,7 @@ Though the setting =misc:key_press_enables_dpms= may needed to be set to
 
 (include "music.yuck")
 (include "../../code/harness-status/eww/harness-status.yuck")
+(include "../../code/tibo-reset-monitor/eww/codex-reset.yuck")
 (include "../../code/ai-agent-computer-use/eww/cu.yuck")
 (include "swaync.yuck")
 #+end_src
@@ -1836,6 +1838,7 @@ Based on the variables, customize the widgets:
 #+begin_src scss
 @import "swaync.scss";
 @import "../../code/harness-status/eww/harness-status.scss";
+@import "../../code/tibo-reset-monitor/eww/codex-reset.scss";
 @import "../../code/ai-agent-computer-use/eww/cu.scss";
 
 $current-bb-t: .15em;
@@ -1944,6 +1947,21 @@ $focused-monitor-pad: 0 0 0 3px;
 
 .cu__aborted {
   color: $neron-red;
+}
+
+/* One small coloured number, shown only when a reset is worth acting on: warm
+   for a forecast worth spending some quota against, amber for one worth
+   spending now, green for the hours right after a reset has actually landed. */
+.codex-reset--use-some .codex-reset__chance {
+  color: $neron-comment;
+}
+
+.codex-reset--spend-now .codex-reset__chance {
+  color: $neron-warning;
+}
+
+.codex-reset--landed .codex-reset__chance {
+  color: $neron-green;
 }
 
 $music-dim: darken($middle-gray, 22%);
