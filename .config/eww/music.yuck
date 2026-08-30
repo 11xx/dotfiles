@@ -1,3 +1,7 @@
+;; The player exposes the current track through MPRIS, so this is a long-lived
+;; listener rather than a one-second poller. The helper emits the canonical
+;; normalised shape and advances elapsed time from its own monotonic clock while
+;; playback is active.
 (deflisten music-data
            :initial '{"player":{},"playback":{"state":"stopped","duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
            "music-current-json --follow --player=muzaiten")

@@ -1,3 +1,6 @@
+/* The two themes define the same variable names, and `colors.scss` is a symlink
+   pointing at whichever is current. Darkman flips it and reloads, so nothing
+   here names a theme. */
 @import "colors.scss";
 
 @import "swaync.scss";
@@ -128,6 +131,9 @@ $focused-monitor-pad: 0 0 0 3px;
   color: $neron-green;
 }
 
+/* The line is one voice: the title carries it and the fields qualifying it sit
+   a step back, because three saturated colours competed with each other and
+   with every other thing on the bar. */
 $music-dim: darken($middle-gray, 22%);
 
 .music__field--title {
@@ -153,6 +159,8 @@ $music-dim: darken($middle-gray, 22%);
   color: $middle-gray;
 }
 
+/* A filled length rather than two timestamps to compare, or a ring that would
+   be a speck at this height. The exact figure is a hover away. */
 .music__progress {
   margin: 0 0 0 6px;
 

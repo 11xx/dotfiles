@@ -1,0 +1,82 @@
+#+title: eww — the desktop's status bars
+#+options: toc:nil
+
+Two bars, one per monitor, drawn by [[https://elkowar.github.io/eww/][eww]].
+
+Hyprland starts and reloads the bars — see =hypr-eww-open= and
+=hypr-eww-restart-on-monitor-change= in [[file:../hypr/README.org][hypr/README.org]], which also owns
+=hypr-bar-feed=, the one process this config reads for workspaces, window titles
+and monitor focus.
+
+* What is here
+
+| File                 | What it holds                                                       |
+|----------------------+---------------------------------------------------------------------|
+| =eww.yuck=           | Both bar windows, their modules, and the widgets defined here        |
+| =eww.scss=           | Styling for everything on the bars, and the imports that reach it    |
+| =music.yuck=         | The now-playing line: marquee fields, transport state, progress      |
+| =swaync.yuck=        | The notification bell and its count                                  |
+| =swaync.scss=        | Styling for that bell                                                |
+| =dark-colors.scss=   | Palette variables, dark                                              |
+| =light-colors.scss=  | Palette variables, light                                             |
+| =colors.scss=        | Symlink to whichever of those two is current                         |
+
+Why a widget looks or behaves the way it does is a comment beside it, in the
+file that draws it.
+
+* Widgets imported from other projects
+
+Each of these lives with the program it reports on, so its behaviour and its
+presentation stay in one place. This config includes them, places them on a bar,
+and supplies the colours from the palette above — it does not copy them.
+
+| Project                 | Included                       | Placed as                                              |
+|-------------------------+--------------------------------+--------------------------------------------------------|
+| =harness-status=        | =harness-status.yuck/.scss=    | Per-harness thread indicators, and the usage percentages |
+| =tibo-reset-monitor=    | =codex-reset.yuck/.scss=       | The Codex reset chance, when it is worth acting on     |
+| =ai-agent-computer-use= | =cu.yuck/.scss=                | A mark while an agent is driving this desktop          |
+
+The include and import paths are relative — =../../code/<project>/eww/= — so eww
+resolves them against this directory and the checkouts have to be present there.
+Two of them also take an asset path for their icons.
+
+* What feeds the bars
+
+Every value on a bar comes from one of these. None of them is configured here.
+
+| Source                 | Reaches the bar as                              |
+|------------------------+-------------------------------------------------|
+| =hypr-bar-feed=        | Workspaces, window titles, monitor focus        |
+| =harness-status=       | Harness threads and account usage windows       |
+| =tibo-codex-reset-monitor= | The Codex reset forecast                    |
+| =cu=                   | Agents driving this desktop                     |
+| =gsr=                  | Whether a screen recording is running           |
+| =swaync-client=        | Notification count and do-not-disturb state     |
+| =music-current-json=   | The current track over MPRIS                    |
+| =date=                 | The clock                                       |
+
+* Theme
+
+Darkman flips =colors.scss= between the two palettes and reloads the bars; the
+hook that does it is =eww-mainbar.sh= in [[file:../darkman/README.org][darkman/README.org]]. Nothing in these
+files names a theme — they name variables, and both palettes define the same
+ones.
+
+* Working on it
+
+#+begin_example
+eww reload                 apply an edit to the running daemon
+eww logs                   follow what the daemon reports (it does not exit)
+eww get <variable>         read one variable's current value
+eww update <var>='<json>'  force a value; the next poll overwrites it
+#+end_example
+
+* Installing eww
+
+=eww-git= from the AUR fails its signature check until the upstream keys are
+imported:
+
+#+begin_example
+curl -sS https://github.com/elkowar.gpg | gpg --import -i -
+curl -sS https://github.com/web-flow.gpg | gpg --import -i -
+#+end_example

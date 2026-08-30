@@ -1,3 +1,18 @@
+;; The bars.
+;;
+;; Both bars are one widget set parameterised by which monitor they describe,
+;; not two near-copies: one window title, one monitor indicator asking whether
+;; the focused monitor is its own, one workspace entry that receives the two
+;; workspace ids it needs to compare against rather than deriving them once per
+;; class. The clusters are spaced rather than ruled, so no separator widget
+;; exists.
+;;
+;; Widgets that belong to another project are included from its checkout rather
+;; than copied, so behaviour and presentation stay with the thing they describe
+;; and this file only places them and supplies the palette. The includes at the
+;; bottom of this file name every one; README.org lists them with what feeds
+;; them.
+
 (deflisten bar
            :initial '{"monitors":{"DP-1":{"focused":true,"workspace":"0","title":""},"DP-2":{"focused":false,"workspace":"0","title":""}},"workspaces":[]}'
            "hypr-bar-feed")
@@ -106,10 +121,19 @@
 (defwidget active-monitor-indicator [focused]
            (box :class {focused ? "focused-monitor" : "unfocused-monitor"}))
 
+;; Polled because there is no event to listen to: the state is derived from
+;; whether a recorder process exists, and a process starting is not something
+;; the compositor or the recorder announces. `gsr status` is the single source
+;; of that answer, so the indicator is right even when the recording was started
+;; from a terminal or ended without telling anyone.
 (defpoll gsr-state :interval "2s"
                    :initial "idle"
                    "gsr status")
 
+;; Hidden entirely while nothing is recording -- an always-present idle icon
+;; would be noise on a bar this dense. Every state `gsr` can print is named, and
+;; an unknown one is shown verbatim, so a state added later appears as itself
+;; instead of silently reading as a buffer.
 (defwidget gsr-indicator []
            (box :visible {gsr-state != "idle"}
                 :class "gsr-indicator gsr-indicator--${gsr-state}"
@@ -117,6 +141,12 @@
                               : gsr-state == "buffer" ? "● BUF"
                               : "● ${gsr-state}"})))
 
+;; `2026-08-09 Sun 12:41`: ISO order, so it sorts the way dates are written
+;; everywhere else here, with the weekday appended for the question a date alone
+;; does not answer. One `date` call emits both fields as JSON, which lets the
+;; stylesheet hold the reference part and the glanced-at part apart without a
+;; second process. `edge` names the screen edge the clock sits against on its
+;; own bar, since the padding belongs on the side facing that edge.
 (defpoll clock :interval "20s"
                :initial '{"date":"--------- ---","time":"--:--"}'
                `date +'{"date":"%Y-%m-%d %a","time":"%H:%M"}'`)

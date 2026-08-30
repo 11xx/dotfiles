@@ -1,3 +1,7 @@
+/* A filled pill announced itself whether or not anything had arrived, so the
+   state lives entirely in colour: grey while quiet, warning while something
+   waits, pink while do-not-disturb is swallowing them. */
+
 .swaync {
   &:hover .swaync__bell {
     color: $neron-fg;

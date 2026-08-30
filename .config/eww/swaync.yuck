@@ -1,3 +1,9 @@
+;; Nothing else on this bar draws a container, so neither does this: a bell, a
+;; count when there is one, and colour for the state. `alt` distinguishes six
+;; states, but only one of them changes what a notification means to the user --
+;; whether do-not-disturb is swallowing them -- so only that splits the glyph.
+;; The rest reach the stylesheet as a class.
+
 (deflisten swaync_data :initial '{"text": "0", "alt": "none", "tooltip": "", "class": "none"}'
            "swaync-client -swb")
 
