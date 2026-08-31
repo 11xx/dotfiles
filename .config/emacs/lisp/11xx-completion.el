@@ -117,12 +117,6 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
-
-(use-package corfu-terminal
-  :after corfu
-  :config
-  (unless (display-graphic-p)
-    (corfu-terminal-mode 1)))
 (use-package prescient
   :after corfu
   :config

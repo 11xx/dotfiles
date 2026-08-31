@@ -2731,13 +2731,10 @@ yoinked [[https://github.com/daviwil/dotfiles/blob/master/Emacs.org#completions-
                   corfu-popupinfo-delay nil)
       (corfu-mode 1)))
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer))
-
-(use-package corfu-terminal
-  :after corfu
-  :config
-  (unless (display-graphic-p)
-    (corfu-terminal-mode 1)))
 #+end_src
+
+Corfu draws its popup with child frames, which work on TTY frames as well as
+graphical ones, so the same configuration covers both.
 
 #+begin_src emacs-lisp
 (use-package prescient
