@@ -4,6 +4,7 @@
 ;; started once first.
 (use-package eshell
   :ensure nil
+  :defer t
   :init
   (setq eshell-hist-ignoredups t
         eshell-scroll-to-bottom-on-input t
@@ -22,7 +23,8 @@
   :init
   (setq explicit-shell-file-name "bash"))
 
-(use-package multi-vterm)
+(use-package multi-vterm
+  :defer t)
 
 (provide '11xx-modes-terminal)
 ;;; 11xx-modes-terminal.el ends here

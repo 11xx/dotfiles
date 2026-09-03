@@ -192,13 +192,16 @@ Like `kill-line' but doesn't add deleted characters to kill ring."
          (text-mode . tempel-setup-capf)))
 (setq lsp-use-plists t)
 
-(use-package lsp-ui)
 (use-package lsp-mode
+  :commands (lsp lsp-deferred)
   :init
   (setq lsp-idle-delay 0.1
         lsp-keymap-prefix "C-c l"
         lsp-log-io nil))
-(use-package flycheck)
+(use-package lsp-ui
+  :after lsp-mode)
+(use-package flycheck
+  :defer t)
 (use-package eldoc-box
   :init
   (setq eldoc-box-doc-separator (concat "\n\n" (make-string 3 ?-) "\n\n")

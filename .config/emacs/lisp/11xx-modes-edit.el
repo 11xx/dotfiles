@@ -3,7 +3,8 @@
 (use-package systemd
   :vc (:url "https://github.com/pdbrown/systemd-mode"))
 
-(use-package yaml-mode)
+(use-package yaml-mode
+  :defer t)
 
 ;; considering `yaml-ts-mode' is already provided by Emacs
 ;; use `yaml-indent-line' with it.
@@ -51,13 +52,18 @@
 (use-package pkgbuild-mode
   :hook (pkgbuild-mode . (lambda () (flymake-mode -1))))
 
-(use-package powershell)
+(use-package powershell
+  :defer t)
 
-(use-package ansible)
-(use-package ansible-vault)
-(use-package ansible-doc)
+(use-package ansible
+  :defer t)
+(use-package ansible-vault
+  :defer t)
+(use-package ansible-doc
+  :defer t)
 
-(use-package yuck-mode)
+(use-package yuck-mode
+  :defer t)
 
 (use-package hyprlang-ts-mode
   :mode "*hyprland.conf")

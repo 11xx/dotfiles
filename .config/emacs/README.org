@@ -249,9 +249,16 @@ Native compilation settings
   Increase Garbage Collection threshold:
   + [[https://github.com/mnewt/dotemacs/blob/master/early-init.el#L19-L22][mnewt/dotemacs/early-init.el#L19-L22]].
   + [[https://emacs-lsp.github.io/lsp-mode/page/performance/#adjust-gc-cons-threshold][Performance - LSP Mode - LSP support for Emacs]]
+
+  The 500 MiB threshold only spans startup, where allocation is heavy and
+  short-lived. Once init is done it drops to the 100 MiB the LSP performance
+  page recommends, so a collection stays short while still being rare.
 #+begin_src emacs-lisp
 (setq gc-cons-threshold (* 500 1024 1024))
-(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
+(add-hook 'after-init-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 100 1024 1024)
+                  gc-cons-percentage 0.6)))
 #+end_src
 
 ** Clean Emacs directory
@@ -760,7 +767,8 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 
 *** YAML
 #+begin_src emacs-lisp
-(use-package yaml-mode)
+(use-package yaml-mode
+  :defer t)
 
 ;; considering `yaml-ts-mode' is already provided by Emacs
 ;; use `yaml-indent-line' with it.
@@ -815,19 +823,24 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 *** PowerShell
 # [2024-01-14 Sun 13:58:20 -03:00] @winr58
 #+begin_src emacs-lisp
-(use-package powershell)
+(use-package powershell
+  :defer t)
 #+end_src
 
 *** Ansible
 #+begin_src emacs-lisp
-(use-package ansible)
-(use-package ansible-vault)
-(use-package ansible-doc)
+(use-package ansible
+  :defer t)
+(use-package ansible-vault
+  :defer t)
+(use-package ansible-doc
+  :defer t)
 #+end_src
 
 *** =yuck-mode=: Specifically for EWW's (bar) config file
 #+begin_src emacs-lisp
-(use-package yuck-mode)
+(use-package yuck-mode
+  :defer t)
 #+end_src
 
 *** hyprlang/hyprland config language
@@ -947,6 +960,7 @@ or use a list:
 ;; started once first.
 (use-package eshell
   :ensure nil
+  :defer t
   :init
   (setq eshell-hist-ignoredups t
         eshell-scroll-to-bottom-on-input t
@@ -972,7 +986,8 @@ or use a list:
 
 *** vterm
 #+begin_src emacs-lisp
-(use-package multi-vterm)
+(use-package multi-vterm
+  :defer t)
 #+end_src
 
 *** provide footer
@@ -992,13 +1007,15 @@ or use a list:
 
 *** Haskell
 #+begin_src emacs-lisp
-(use-package haskell-mode)
+(use-package haskell-mode
+  :defer t)
 #+end_src
 
 *** C
 #+begin_src emacs-lisp
 (use-package cc-mode
   :ensure nil
+  :defer t
   :init
   (setq c-default-style '((java-mode . "java")
                           (awk-mode  . "awk")
@@ -1140,7 +1157,8 @@ Install Org Babel rust library:
 
 *** Lua
 #+begin_src emacs-lisp
-(use-package lua-mode)
+(use-package lua-mode
+  :defer t)
 #+end_src
 
 *** provide footer
@@ -1170,6 +1188,7 @@ Install Org Babel rust library:
 #+begin_src emacs-lisp
 (use-package css-mode
   :ensure nil
+  :defer t
   :init
   (setq css-indent-offset 2))
 #+end_src
@@ -1181,6 +1200,7 @@ Install Org Babel rust library:
 
 #+begin_src emacs-lisp
 (use-package web-mode
+  :defer t
   :init
   (setq web-mode-markup-indent-offset 2
         web-mode-css-indent-offset 2
@@ -1634,8 +1654,15 @@ The timestamp contains no spaces."
   + [[https://emacs.stackexchange.com/questions/50216/org-mode-code-block-parentheses-mismatch/68321#68321][org babel - org-mode code block parentheses mismatch - Emacs Stack Exchange]]
     # [2022-05-14 Sat 20:54:33]
 
+Org loads the link libraries in ~org-modules~ the first time a buffer enters
+~org-mode~. The default set pulls in Gnus, BBDB, IRC, MH-E, Rmail, w3m and
+EWW support that nothing here uses, and Gnus alone is a noticeable share of
+the first Org buffer's load time, with EWW's link support pulling it in through
+the MIME helpers, so the list is trimmed to the link types in use.
+This module is loaded right after =org.el= and before any buffer enters
+~org-mode~, so the value is in place when the modules load.
 #+begin_src emacs-lisp
-;; (setq org-modules '(ol-info ol-docview ol-doi))
+(setq org-modules '(ol-doi ol-bibtex ol-docview ol-info))
 
 (require '11xx-org-functions)
 
@@ -2416,10 +2443,14 @@ NOTE: =dired-async= is provided by the =async= package.
   + [[https://gitlab.com/dwt1/dotfiles/-/commit/125f9d2630994911ad15425ff1cad69474bead7e][Merge branch 'emacs' into 'master' (125f9d26) · Commits · Derek Taylor / Dotfiles · GitLab]]
     # #wizard
 
+Magit itself loads on first use. The bindings, the bare-repository helpers and
+the Dired staging command do not need it, so they are installed up front.
 #+begin_src emacs-lisp
+(require 'magit-status-bare)
+
 (use-package magit
+  :defer t
   :init
-  (require 'magit-status-bare)
   (keymap-global-unset "C-x g")
   (keymap-global-set "C-x g g" #'magit-status-default)
   (magit-status-bare :git-dir "~/.local/dotfiles.git/"
@@ -2427,24 +2458,24 @@ NOTE: =dired-async= is provided by the =async= package.
                      :key-bind "C-x g d")
   (dired-git-add-bare :git-dir "~/.local/dotfiles.git/"
                       :work-tree (getenv "HOME")
-                      :key-bind "C-c g d a")
-  :config
-  (with-eval-after-load 'dired
-    (defun dired-git-add (&optional arg)
-      "Execute 'git add' command for current or marked files in Dired mode.
-With prefix ARG, prompt for additional arguments to pass to the command."
-      (interactive "P")
-      (let* ((files (dired-get-marked-files nil arg))
-             (git-cmd "git")
-             (output (mapconcat (lambda (file)
-                                  (shell-command-to-string
-                                   (concat git-cmd " add --verbose " (shell-quote-argument file))))
-                                files
-                                "\n")))
-        (message "Git add command completed:\n%s" output)))
-    (keymap-set dired-mode-map "C-c g g a" #'dired-git-add))
+                      :key-bind "C-c g d a"))
 
-  (require '11xx-vot))
+(with-eval-after-load 'dired
+  (defun dired-git-add (&optional arg)
+    "Execute 'git add' command for current or marked files in Dired mode.
+With prefix ARG, prompt for additional arguments to pass to the command."
+    (interactive "P")
+    (let* ((files (dired-get-marked-files nil arg))
+           (git-cmd "git")
+           (output (mapconcat (lambda (file)
+                                (shell-command-to-string
+                                 (concat git-cmd " add --verbose " (shell-quote-argument file))))
+                              files
+                              "\n")))
+      (message "Git add command completed:\n%s" output)))
+  (keymap-set dired-mode-map "C-c g g a" #'dired-git-add))
+
+(require '11xx-vot)
 
 (provide '11xx-magit)
 #+end_src
@@ -2860,16 +2891,23 @@ See the example template file: [[https://github.com/minad/tempel#template-file-f
     /(remove echo to make real changes)/
   + Set =(setq lsp-use-plists t)= /before/ installing =lsp-mode= packages
   + [[https://github.com/emacs-lsp/lsp-mode/issues/837][Moving cursor is very slow · Issue #837 · emacs-lsp/lsp-mode]]
+
+Both clients load on demand: ~lsp~ is the entry point, and ~lsp-mode~ turns on
+~lsp-ui-mode~ itself whenever ~lsp-ui~ is installed, so ~lsp-ui~ only has to
+follow it. Flycheck loads when a mode asks for it.
 #+begin_src emacs-lisp
 (setq lsp-use-plists t)
 
-(use-package lsp-ui)
 (use-package lsp-mode
+  :commands (lsp lsp-deferred)
   :init
   (setq lsp-idle-delay 0.1
         lsp-keymap-prefix "C-c l"
         lsp-log-io nil))
-(use-package flycheck)
+(use-package lsp-ui
+  :after lsp-mode)
+(use-package flycheck
+  :defer t)
 #+end_src
 
 **** Eglot
@@ -3586,13 +3624,30 @@ mcp
 * 11xx-pdf-viewer.el
 - [[https://www.reddit.com/r/emacs/comments/opkzxm/view_pdf_in_dark_mode_with_pdftools/][View PDF in dark mode with pdf-tools : r/emacs]]
 - [[https://github.com/vedang/pdf-tools][vedang/pdf-tools: Emacs support library for PDF files.]]
+
+Nothing here loads until a PDF is opened. ~pdf-loader-install~ registers the
+file associations and installs pdf-tools on first use, which also keeps the
+=epdfinfo= server from starting with the daemon. The =pdf:= Org link type is
+registered from the autoloaded ~org-pdftools~ commands, so following, storing
+or exporting such a link loads the package while merely opening an Org buffer
+does not.
 #+begin_src emacs-lisp :noweb-ref dummy :tangle lisp/11xx-pdf-viewer.el
-(use-package org-pdftools)
 (use-package pdf-tools
+  :init (pdf-loader-install)
   :bind (:map pdf-view-mode-map
               ("j" . pdf-view-next-line-or-next-page)
               ("k" . pdf-view-previous-line-or-previous-page))
   :hook (pdf-view-mode . pdf-view-themed-minor-mode))
+
+(use-package org-pdftools
+  :defer t
+  :init
+  (with-eval-after-load 'org
+    (org-link-set-parameters "pdf"
+                             :follow #'org-pdftools-open
+                             :complete #'org-pdftools-complete-link
+                             :store #'org-pdftools-store-link
+                             :export #'org-pdftools-export)))
 
 (provide '11xx-pdf-viewer)
 #+end_src

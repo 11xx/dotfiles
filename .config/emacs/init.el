@@ -25,7 +25,10 @@
         package-native-compile t)
 
 (setq gc-cons-threshold (* 500 1024 1024))
-(add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
+(add-hook 'after-init-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 100 1024 1024)
+                  gc-cons-percentage 0.6)))
 
 (use-package no-littering)
 

@@ -5,10 +5,12 @@
 
 (use-package css-mode
   :ensure nil
+  :defer t
   :init
   (setq css-indent-offset 2))
 
 (use-package web-mode
+  :defer t
   :init
   (setq web-mode-markup-indent-offset 2
         web-mode-css-indent-offset 2

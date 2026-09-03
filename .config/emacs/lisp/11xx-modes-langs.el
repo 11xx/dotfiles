@@ -1,9 +1,11 @@
 ;; -*- lexical-binding: t; -*-
 
-(use-package haskell-mode)
+(use-package haskell-mode
+  :defer t)
 
 (use-package cc-mode
   :ensure nil
+  :defer t
   :init
   (setq c-default-style '((java-mode . "java")
                           (awk-mode  . "awk")
@@ -20,7 +22,8 @@
 (use-package ron-mode
   :mode "*.ron")
 
-(use-package lua-mode)
+(use-package lua-mode
+  :defer t)
 
 (provide '11xx-modes-langs)
 ;;; 11xx-modes-langs.el ends here
