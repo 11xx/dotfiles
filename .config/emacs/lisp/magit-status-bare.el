@@ -1,6 +1,8 @@
 ;; NOTE: This requires lexical-binding = t  -*- lexical-binding: t; -*-
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
+(declare-function magit-status "magit")
+(defvar magit-git-global-arguments)
 
 ;;;###autoload
 (defun magit-status-default ()

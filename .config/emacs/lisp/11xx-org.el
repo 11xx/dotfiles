@@ -23,7 +23,7 @@
   (keymap-global-set "C-c o l" #'org-store-link)
   (keymap-global-set "C-c o a" #'org-agenda)
   (keymap-global-set "C-c o c" #'org-capture)
-  (setq org-edit-src-content-indentation 0
+  (setq org-src-content-indentation 0
         org-adapt-indentation nil
         org-ellipsis " ▾"
         org-babel-default-header-args:emacs-lisp '((:lexical . yes))

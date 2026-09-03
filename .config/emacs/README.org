@@ -1647,7 +1647,7 @@ The timestamp contains no spaces."
   (keymap-global-set "C-c o l" #'org-store-link)
   (keymap-global-set "C-c o a" #'org-agenda)
   (keymap-global-set "C-c o c" #'org-capture)
-  (setq org-edit-src-content-indentation 0
+  (setq org-src-content-indentation 0
         org-adapt-indentation nil
         org-ellipsis " ▾"
         org-babel-default-header-args:emacs-lisp '((:lexical . yes))
@@ -2445,6 +2445,8 @@ With prefix ARG, prompt for additional arguments to pass to the command."
 ;; NOTE: This requires lexical-binding = t
 (require 'dired)
 (require '11xx-functions) ; filter-list-any-string-prefix
+(declare-function magit-status "magit")
+(defvar magit-git-global-arguments)
 
 ;;;###autoload
 (defun magit-status-default ()
