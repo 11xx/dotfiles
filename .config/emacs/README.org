@@ -44,10 +44,62 @@ Enable lexical binding default.
 (setq-default lexical-binding t)
 #+end_src
 
-** Disable automatic package init
-Manual bootstrap now happens in `init.el`.
+** Local Lisp modules
+Emacs activates a user Lisp directory during startup: every file below it is
+byte-compiled, scraped for autoload cookies and added to =load-path=, all
+before =init.el= runs. The [[#load-config][pseudo-packages]] live in =lisp/= rather than the
+default =user-lisp/=, which is where the Org blocks in this file tangle them.
+
+Startup reads this variable between loading =early-init.el= and activating the
+directory, so it only takes effect here.
 #+begin_src emacs-lisp
-(setq package-enable-at-startup nil)
+(setq user-lisp-directory (locate-user-emacs-file "lisp/"))
+#+end_src
+
+** Activate packages before the Lisp modules compile
+:PROPERTIES:
+:CUSTOM_ID: activate-packages-early
+:END:
+Startup activates the installed packages, then byte-compiles the user Lisp
+directory, and only then loads =init.el=. Byte-compiling a ~use-package~ form
+needs the package on =load-path= to expand its macros, reads the ~use-package~
+defaults at expansion time, and installs a missing package right then rather
+than at run time. Everything that shapes that compilation therefore has to be
+in place here: package activation stays enabled, the archives are registered,
+and the ~use-package~ defaults are set before any module compiles.
+#+begin_src emacs-lisp
+(setq package-enable-at-startup t)
+
+(require 'package)
+(add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
+(add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+
+(setopt use-package-always-ensure t)
+#+end_src
+
+The modules compile one by one, and a module that requires a sibling whose
+source changed would load the sibling's stale byte-code into this very
+session. Preferring the newer of source and byte-code prevents that.
+#+begin_src emacs-lisp
+(setq load-prefer-newer t)
+#+end_src
+
+Compiling the modules also queues their native compilation before =init.el=
+gets a chance to quieten it, so the reporting level is set here.
+#+begin_src emacs-lisp
+(setopt native-comp-async-report-warnings-errors 'silent)
+#+end_src
+
+That native compilation writes into the first directory of the eln load path,
+so the cache is redirected here as well. The location is the =var/= directory
+that [[#no-littering][no-littering]] manages once =init.el= loads it; naming it here keeps every
+compiler writing to the one cache the running session reads from.
+#+begin_src emacs-lisp
+(when (and (fboundp 'startup-redirect-eln-cache) (native-comp-available-p))
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name "var/eln-cache/" user-emacs-directory))))
 #+end_src
 
 ** Startup time report
@@ -190,8 +242,7 @@ Little safety-net for internal deletion functions
 Native compilation settings
 #+begin_src emacs-lisp
 (setopt native-comp-jit-compilation t
-        package-native-compile t
-        native-comp-async-report-warnings-errors 'silent)
+        package-native-compile t)
 #+end_src
 
 - Garbage colletion \\
@@ -203,43 +254,16 @@ Native compilation settings
 (add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 #+end_src
 
-** Package bootstrap
-#+begin_src emacs-lisp
-(require 'package)
-
-(add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
-(add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-
-(package-initialize)
-
-(setopt use-package-always-ensure t)
-#+end_src
-
-** Additional load-path directories
-Add subdirectory to load path containing custom modules.
-#+begin_src emacs-lisp :padline yes
-(defvar config-lisp-directory
-  (expand-file-name "lisp/" user-emacs-directory)
-  "Directory containing local configuration Lisp source files.")
-
-(add-to-list 'load-path config-lisp-directory)
-#+end_src
-
 ** Clean Emacs directory
 
 *** no-littering
+:PROPERTIES:
+:CUSTOM_ID: no-littering
+:END:
+Package activation and the native-compilation cache are already arranged in
+[[#activate-packages-early][early-init]], so the package only needs loading.
 #+begin_src emacs-lisp
-(use-package no-littering
-  :config
-  (when (fboundp 'startup-redirect-eln-cache)
-    (startup-redirect-eln-cache
-     (convert-standard-filename
-      (expand-file-name "eln-cache" no-littering-var-directory))))
-
-  (add-to-list 'native-comp-eln-load-path
-               (convert-standard-filename
-                (expand-file-name "eln-cache" no-littering-var-directory))))
+(use-package no-littering)
 #+end_src
 
 *** Move back-up and auto-save files
@@ -301,24 +325,13 @@ Backup & auto-save
   +Is this legacy stuff from the ancient times of shared terminals?+
   # [2024-02-14 Wed 11:00:23 -03] @ak
 
-** Load autoloads
-#+begin_src emacs-lisp
-(defun loaddefs-setup (&optional lisp-dir)
-  "Generate and load autoloads for Lisp files in LISP-DIR.
-
-Scans LISP-DIR (defaults to `config-lisp-directory') for autoload
-cookies and writes the result to config-loaddefs.el in
-`no-littering-var-directory', adding LISP-DIR to `load-path'."
-  (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
-         (out (expand-file-name "config-loaddefs.el" no-littering-var-directory)))
-    (loaddefs-generate dir out)
-    (load out nil :nomessage)))
-
-(loaddefs-setup config-lisp-directory)
-#+end_src
-
 ** Load config
-Personal config modularized into "pseudo-packages"
+:PROPERTIES:
+:CUSTOM_ID: load-config
+:END:
+Personal config modularized into "pseudo-packages". The [[*Local Lisp modules][user Lisp directory]]
+already put =lisp/= on =load-path= and loaded its autoloads, so these resolve
+without further setup.
 #+begin_src emacs-lisp
 (require '11xx-functions)
 (require 'utf-8-default)

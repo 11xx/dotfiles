@@ -2,7 +2,25 @@
 
 (setq-default lexical-binding t)
 
-(setq package-enable-at-startup nil)
+(setq user-lisp-directory (locate-user-emacs-file "lisp/"))
+
+(setq package-enable-at-startup t)
+
+(require 'package)
+(add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
+(add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+
+(setopt use-package-always-ensure t)
+
+(setq load-prefer-newer t)
+
+(setopt native-comp-async-report-warnings-errors 'silent)
+
+(when (and (fboundp 'startup-redirect-eln-cache) (native-comp-available-p))
+  (startup-redirect-eln-cache
+   (convert-standard-filename
+    (expand-file-name "var/eln-cache/" user-emacs-directory))))
 
 (add-hook 'emacs-startup-hook
   (lambda ()

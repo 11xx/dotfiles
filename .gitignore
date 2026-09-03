@@ -79,6 +79,7 @@ Icon?
 *.org.roam.db*
 /org-roam.db*
 *.elc
+.user-lisp-autoloads.el
 
 # VSCode
 .vscode/

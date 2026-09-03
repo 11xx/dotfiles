@@ -22,38 +22,12 @@
 (setopt delete-by-moving-to-trash t)
 
 (setopt native-comp-jit-compilation t
-        package-native-compile t
-        native-comp-async-report-warnings-errors 'silent)
+        package-native-compile t)
 
 (setq gc-cons-threshold (* 500 1024 1024))
 (add-hook 'after-init-hook (lambda() (setq gc-cons-percentage 0.6)))
 
-(require 'package)
-
-(add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
-(add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-
-(package-initialize)
-
-(setopt use-package-always-ensure t)
-
-(defvar config-lisp-directory
-  (expand-file-name "lisp/" user-emacs-directory)
-  "Directory containing local configuration Lisp source files.")
-
-(add-to-list 'load-path config-lisp-directory)
-
-(use-package no-littering
-  :config
-  (when (fboundp 'startup-redirect-eln-cache)
-    (startup-redirect-eln-cache
-     (convert-standard-filename
-      (expand-file-name "eln-cache" no-littering-var-directory))))
-
-  (add-to-list 'native-comp-eln-load-path
-               (convert-standard-filename
-                (expand-file-name "eln-cache" no-littering-var-directory))))
+(use-package no-littering)
 
 (require '11xx-functions)
 
@@ -92,19 +66,6 @@
       (apply orig-fn args))))
 
 (setopt create-lockfiles nil)
-
-(defun loaddefs-setup (&optional lisp-dir)
-  "Generate and load autoloads for Lisp files in LISP-DIR.
-
-Scans LISP-DIR (defaults to `config-lisp-directory') for autoload
-cookies and writes the result to config-loaddefs.el in
-`no-littering-var-directory', adding LISP-DIR to `load-path'."
-  (let* ((dir (file-truename (or lisp-dir config-lisp-directory)))
-         (out (expand-file-name "config-loaddefs.el" no-littering-var-directory)))
-    (loaddefs-generate dir out)
-    (load out nil :nomessage)))
-
-(loaddefs-setup config-lisp-directory)
 
 (require '11xx-functions)
 (require 'utf-8-default)
