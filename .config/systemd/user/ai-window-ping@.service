@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 TimeoutStartSec=6min
-ExecStart=%h/.local/bin/ai/ai-window-ping %i
+ExecStart=/bin/sh -c 'exec ai-window-ping %i'
 
 [Install]
 WantedBy=default.target

@@ -32,57 +32,8 @@ This timer sends Claude a minimal =hi= prompt every five hours so its
 subscription window is active before an interactive session needs it.  The
 invocation pins Haiku, low effort, and non-persistent sessions; slash commands
 are disabled because the ping never needs tools or skills.  Claude is the only
-enabled instance.
-
-*** helper script
-#+begin_src bash :tangle (concat (xdg-bin-home) "/ai/ai-window-ping") :shebang "#!/usr/bin/env bash" :tangle-mode o755
-set -u
-
-PATH="${PATH:-/usr/local/bin:/usr/bin}:${HOME}/.local/bin:${HOME}/.local/bin/ai:${HOME}/.local/share/npm/bin"
-
-prompt="hi"
-claude_model="haiku"
-claude_effort="low"
-timeout_duration="${AI_WINDOW_PING_TIMEOUT:-180s}"
-state_dir="${XDG_STATE_HOME:-${HOME}/.local/state}/ai-window-ping"
-
-mkdir -p "$state_dir"
-
-log() {
-    printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
-}
-
-run_claude() {
-    timeout "$timeout_duration" \
-        claude -p \
-        --model "$claude_model" \
-        --effort "$claude_effort" \
-        --disable-slash-commands \
-        --no-session-persistence \
-        "$prompt"
-}
-
-if (( $# > 0 )) && [[ "$1" != claude || $# -gt 1 ]]; then
-    log "ERROR: only the Claude instance is supported"
-    exit 64
-fi
-
-output_log="$(mktemp "${TMPDIR:-/tmp}/ai-window-ping.claude.XXXXXX")"
-log "Pinging Claude..."
-if run_claude >"$output_log" 2>&1; then
-    date '+%Y-%m-%dT%H:%M:%S%z' > "${state_dir}/claude.last-success"
-    log "Claude ping succeeded."
-else
-    rc=$?
-    log "ERROR: Claude ping failed with exit status ${rc}."
-    sed -n '1,80p' "$output_log" >&2
-    rm -f "$output_log"
-    exit "$rc"
-fi
-rm -f "$output_log"
-
-exit 0
-#+end_src
+enabled instance.  The helper is installed by the harness-status repository's
+=make install= target and is resolved through the user manager's =PATH=.
 
 *** service template
 :PROPERTIES:
@@ -98,7 +49,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 TimeoutStartSec=6min
-ExecStart=%h/.local/bin/ai/ai-window-ping %i
+ExecStart=/bin/sh -c 'exec ai-window-ping %i'
 
 [Install]
 WantedBy=default.target
