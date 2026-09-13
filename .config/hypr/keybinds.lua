@@ -180,3 +180,16 @@ keymap_exec("s-M-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-g
 keymap_exec("s-XF86AudioLowerVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-browser-sink.pipe pw-volume browser-sink 5-", { repeating = true })
 keymap_exec("s-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-browser-sink.pipe pw-volume browser-sink 5+", { repeating = true })
 keymap_exec("s-M-C-XF86AudioRaiseVolume", "audio-compressor")
+
+-- Caps Lock: hold to dictate
+hl.bind(
+   "code:66",
+   hl.dsp.exec_cmd([[echo start > "$XDG_RUNTIME_DIR/hyprwhspr/recording_control"]])
+)
+
+-- Caps Lock release: stop + transcribe
+hl.bind(
+   "code:66",
+   hl.dsp.exec_cmd([[echo stop > "$XDG_RUNTIME_DIR/hyprwhspr/recording_control"]]),
+   { release = true }
+)

@@ -24,9 +24,14 @@ hl.config({
     },
 })
 
+local kb_options = {
+   "fkeys:basic_13-24",
+   "caps:none",
+}
+
 hl.config({
       input = {
-         kb_options = "fkeys:basic_13-24",
+         kb_options = table.concat(kb_options, ","),
       }
 })
 

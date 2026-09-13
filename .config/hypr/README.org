@@ -256,9 +256,14 @@ hl.config({
 
 Fix F13+ keys being bound to XF86* keysyms
 #+begin_src lua
+local kb_options = {
+   "fkeys:basic_13-24",
+   "caps:none",
+}
+
 hl.config({
       input = {
-         kb_options = "fkeys:basic_13-24",
+         kb_options = table.concat(kb_options, ","),
       }
 })
 #+end_src
@@ -724,6 +729,23 @@ keymap_exec("s-XF86AudioLowerVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-bro
 keymap_exec("s-XF86AudioRaiseVolume", "WOB_PIPE=${XDG_RUNTIME_DIR:-/tmp}/wob-browser-sink.pipe pw-volume browser-sink 5+", { repeating = true })
 keymap_exec("s-M-C-XF86AudioRaiseVolume", "audio-compressor")
 #+end_src
+
+**** hyprwhspr
+#+begin_src lua
+-- Caps Lock: hold to dictate
+hl.bind(
+   "code:66",
+   hl.dsp.exec_cmd([[echo start > "$XDG_RUNTIME_DIR/hyprwhspr/recording_control"]])
+)
+
+-- Caps Lock release: stop + transcribe
+hl.bind(
+   "code:66",
+   hl.dsp.exec_cmd([[echo stop > "$XDG_RUNTIME_DIR/hyprwhspr/recording_control"]]),
+   { release = true }
+)
+#+end_src
+
 
 ** Theming
 :PROPERTIES:
@@ -1701,11 +1723,11 @@ where they are used; changing a connector means changing both files.
 :PROPERTIES:
 :header-args:shell: :tangle no
 :END:
-# Local Variables:
-# org-confirm-babel-evaluate: nil
-# End:
-
 #+NAME: lightordark
 #+begin_src shell
 lightordark
 #+end_src
+# Local Variables:
+# org-confirm-babel-evaluate: nil
+# End:
+
