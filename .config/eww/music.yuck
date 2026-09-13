@@ -4,7 +4,7 @@
 ;; playback is active.
 (deflisten music-data
            :initial '{"player":{},"playback":{"state":"stopped","duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
-           "music-current-json --follow --player=muzaiten")
+           "music-current-json --follow --player=muzaiten,youtube-music")
 
 ;; One step per 400ms: enough to read as movement, slow enough not to pull the
 ;; eye away from whatever the user is actually doing.
