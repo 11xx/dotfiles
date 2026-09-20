@@ -38,11 +38,16 @@ ansible-playbook gak.yaml --tags guix-system,gak-media,gak-services
 Build and activate separately on Gak:
 
 #+begin_src sh
+umask 022
 guix system build ~/.config/guix/system.scm
 sudo guix system reconfigure ~/.config/guix/system.scm
 sudo herd status
 podman ps -a
 #+end_src
+
+Use umask 022 for system activation so generated host files remain readable
+by unprivileged services. A backup process's restrictive umask must not carry
+into reconfiguration. Check that the service user can read =/etc/hosts=.
 
 =gak-APPLICATION= selects that application's Ansible files. Include
 =guix-system= when changing a container or image. =gak-media= and =gak-services=

@@ -13,5 +13,9 @@
         '("TZ" . "{{ gak_timezone }}")))
  (extra-arguments
   (list "--uidmap" "0:1:1"
+        "--uidmap" "1:0:1"
+        "--uidmap" "2:2:{{ gak_subid_count - 1 }}"
         "--gidmap" "0:1:1"
-        "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))
+        "--gidmap" "1:0:1"
+        "--gidmap" "2:2:{{ gak_subid_count - 1 }}"))
+ (respawn? #t))

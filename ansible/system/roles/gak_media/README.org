@@ -15,6 +15,14 @@ depends on the complete rootless UID/GID maps; matching numbers do not imply
 matching identities. Inspect the maps and existing directory owners before
 changing them. Shared media permissions must also work for NFS clients.
 
+The media container maps swap intermediate IDs 0 and 1 and map the remaining
+subordinate range identically. Container root retains intermediate ID 1;
+application UID 1000 and GID 134 retain intermediate IDs 1000 and 134. Supplying
+the complete range allows init processes to set application and supplementary
+groups. With the host's subordinate range, application files appear as host
+UID 100999 and GID 100133. This does not map the host's media group 134 into
+the container; NFS access also depends on existing directory ownership and modes.
+
 An =s6-applyuidgid= failure with =Invalid argument= can mean the requested
 UID or supplementary group is absent from the container map. A container may
 remain running while its application never starts. Check the HTTP endpoint,
@@ -23,7 +31,8 @@ scratch bind mount before changing production ownership or mappings.
 
 * Starting it
 
-The containers are system Shepherd services and start at boot:
+The web services start at boot and Shepherd respawns them after unexpected
+process exits. Explicit stops remain stopped until started by the operator:
 
 #+begin_src sh
 sudo herd status sonarr
