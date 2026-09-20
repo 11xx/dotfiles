@@ -1,0 +1,41 @@
+---
+- name: 'gak_compose: Create the shared services directory'
+  ansible.builtin.file:
+    path: '{{ gak_compose_services_root }}'
+    state: directory
+    mode: '0755'
+  tags: ['gak-compose-config']
+
+- name: 'gak_compose: Create the operator command directory'
+  ansible.builtin.file:
+    path: '{{ gak_services_bin_dir }}'
+    state: directory
+    mode: '0755'
+  tags: ['gak-compose-config']
+
+- name: 'gak_compose: Deploy the declared application list'
+  ansible.builtin.copy:
+    content: |
+      {% for application in gak_applications %}
+      {{ application }}
+      {% endfor %}
+    dest: '{{ gak_compose_declared_file }}'
+    mode: '0644'
+  tags: ['gak-compose-config']
+
+- name: 'gak_compose: Deploy the enabled application list'
+  ansible.builtin.copy:
+    content: |
+      {% for application in gak_compose_autostart %}
+      {{ application }}
+      {% endfor %}
+    dest: '{{ gak_compose_autostart_file }}'
+    mode: '0644'
+  tags: ['gak-compose-config']
+
+- name: 'gak_compose: Deploy the lifecycle helper'
+  ansible.builtin.copy:
+    src: gak-compose-lifecycle
+    dest: '{{ gak_services_bin_dir }}/gak-compose-lifecycle'
+    mode: '0755'
+  tags: ['gak-compose-config']

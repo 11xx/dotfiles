@@ -1,6 +1,6 @@
 #+TITLE: Koito
 
-This role owns Koito's container, version, state directory and initial-account
+This role owns Koito's Compose project, stable image channel, state directory and initial-account
 secret. SQLite state lives under =~/services/koito=. The backend binds loopback;
 =gak_ingress= supplies its named Tailscale HTTPS origin.
 
@@ -8,9 +8,11 @@ The password file seeds an empty database. Changing it does not change an
 existing account; keep the vault consistent with account changes. Scrobblers
 use the service origin followed by =/apis/listenbrainz/= and a Koito API token.
 
-Use =sudo herd status koito= and =sudo herd restart koito=. Before upgrading,
-stop Koito and copy its complete state, including SQLite and secrets. Restart
-after copying. Validate the restored history in isolation before replacing
+Use =podman compose -f ~/services/koito/compose.yaml ps= and =podman logs
+koito=. Update explicitly with =podman compose -f
+~/services/koito/compose.yaml pull= followed by =up -d --force-recreate
+--pull never=. Copy complete state, including SQLite and secrets, before an
+image change. Validate restored history in isolation before replacing
 production state. Koito is not included in Nextcloud's backup job.
 
 See [[file:../../GAK-SERVICES.org][service maintenance]] for deployment and ownership.

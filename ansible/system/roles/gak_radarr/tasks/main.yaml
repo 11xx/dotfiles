@@ -7,3 +7,10 @@
     - '{{ gak_radarr_dir }}'
     - '{{ gak_radarr_dir }}/config'
   tags: ['gak-radarr-config']
+
+- name: 'gak_radarr: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_radarr_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-radarr-config', 'gak-compose-config']

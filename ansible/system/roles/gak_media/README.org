@@ -1,7 +1,7 @@
 #+TITLE: Shared media storage
 
 This role owns the shared /media directory on the HDD.
-Application roles own container declarations and supporting configuration.
+Application roles own Compose projects and supporting configuration.
 The media tree lives at /media/Media. Application state lives on the NVMe at
 ~/services/APPLICATION; applications own their mutable configuration and
 directory permissions. Container-side mount paths stay stable across host
@@ -31,21 +31,22 @@ remain running while its application never starts. Check the HTTP endpoint,
 not only =podman ps=. Test candidate maps with disposable containers and a
 scratch bind mount before changing production ownership or mappings.
 
-* Starting it
+* Starting projects
 
-The web services start at boot and Shepherd respawns them after unexpected
-process exits. Explicit stops remain stopped until started by the operator:
+The =gak-compose= Shepherd service starts only the explicit
+=gak_compose_autostart= list. Podman restart policies supervise web containers;
+there is no per-container Shepherd supervision. Explicit project stops remain
+stopped until the lifecycle service or an operator starts them:
 
 #+begin_src sh
-sudo herd status sonarr
-sudo herd restart jellyfin
+sudo herd status gak-compose
+podman compose -f ~/services/sonarr/compose.yaml up -d --pull never
+podman compose -f ~/services/jellyfin/compose.yaml up -d --pull never
 #+end_src
 
-recyclarr is a batch job, not a server: it syncs custom formats into Sonarr and
-exits. It is declared =auto-start? #f=, because a container that exits on
-purpose would otherwise read as a service that failed at every boot. Run it when
-wanted:
+Recyclarr is a batch job, not a server: it syncs custom formats into Sonarr and
+exits. It is deliberately absent from the autostart list. Run it when wanted:
 
 #+begin_src sh
-sudo herd start recyclarr
+podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr
 #+end_src

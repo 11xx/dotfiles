@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 022
+
+: "${HOME:?HOME is required}"
+
+services_root=${GAK_COMPOSE_SERVICES_ROOT:-"$HOME/services"}
+runtime_dir=${GAK_COMPOSE_RUNTIME_DIR:-"${XDG_RUNTIME_DIR:-$HOME/.local/state}/gak-compose"}
+declared_file=${GAK_COMPOSE_DECLARED_FILE:-"$services_root/.compose-applications"}
+autostart_file=${GAK_COMPOSE_AUTOSTART_FILE:-"$services_root/.compose-autostart"}
+started_file=${GAK_COMPOSE_STARTED_FILE:-"$runtime_dir/started"}
+ready_file=${GAK_COMPOSE_READY_FILE:-"$runtime_dir/ready"}
+lock_file=${GAK_COMPOSE_LOCK_FILE:-"$runtime_dir/lock"}
+podman_command=${GAK_COMPOSE_PODMAN:-podman}
+
+supported_applications=(
+    sabnzbd prowlarr sonarr radarr jellyfin qbittorrent recyclarr koito nextcloud
+)
+external_networks=(starrs_net services_net nextcloud_net)
+
+die() {
+    printf 'gak-compose-lifecycle: %s\n' "$*" >&2
+    exit 1
+}
+
+contains() {
+    local needle=$1
+    shift
+    local candidate
+    for candidate in "$@"; do
+        [[ $candidate == "$needle" ]] && return 0
+    done
+    return 1
+}
+
+read_strict_list() {
+    local path=$1
+    local output_name=$2
+    local line
+    local -n output=$output_name
+
+    [[ -f $path ]] || die "required list is missing: $path"
+    output=()
+    while IFS= read -r line || [[ -n $line ]]; do
+        case $line in
+            ''|*[!a-z0-9-]*)
+                die "invalid application entry in $path: $line"
+                ;;
+        esac
+        output+=("$line")
+    done <"$path"
+}
+
+assert_unique() {
+    local path=$1
+    shift
+    local seen=()
+    local entry
+    for entry in "$@"; do
+        if contains "$entry" "${seen[@]}"; then
+            die "duplicate application entry in $path: $entry"
+        fi
+        seen+=("$entry")
+    done
+}
+
+prepare_runtime() {
+    mkdir -p "$runtime_dir"
+    chmod 0700 "$runtime_dir"
+}
+
+atomic_write_list() {
+    local path=$1
+    shift
+    local temporary="${path}.tmp.$$"
+
+    : >"$temporary"
+    if (($# > 0)); then
+        printf '%s\n' "$@" >"$temporary"
+    fi
+    mv -f -- "$temporary" "$path"
+}
+
+validate_configuration() {
+    local declared=()
+    local enabled=()
+    local application
+
+    read_strict_list "$declared_file" declared
+    read_strict_list "$autostart_file" enabled
+    assert_unique "$declared_file" "${declared[@]}"
+    assert_unique "$autostart_file" "${enabled[@]}"
+
+    for application in "${declared[@]}"; do
+        contains "$application" "${supported_applications[@]}" ||
+            die "application is not supported: $application"
+        [[ -f "$services_root/$application/compose.yaml" ]] ||
+            die "Compose file is missing for declared application: $application"
+    done
+
+    for application in "${enabled[@]}"; do
+        contains "$application" "${declared[@]}" ||
+            die "autostart application is not declared: $application"
+        [[ $application != recyclarr ]] ||
+            die 'recyclarr is a batch project and cannot be autostarted'
+        [[ -f "$services_root/$application/compose.yaml" ]] ||
+            die "Compose file is missing for enabled application: $application"
+    done
+}
+
+validate_started_state() {
+    local started=()
+    local application
+
+    [[ -e $started_file ]] || return 0
+    read_strict_list "$started_file" started
+    assert_unique "$started_file" "${started[@]}"
+    for application in "${started[@]}"; do
+        contains "$application" "${supported_applications[@]}" ||
+            die "started state contains an unsupported application: $application"
+        [[ -f "$services_root/$application/compose.yaml" ]] ||
+            die "Compose file is missing for started application: $application"
+    done
+}
+
+ensure_networks() {
+    local network
+    for network in "${external_networks[@]}"; do
+        if ! "$podman_command" network exists "$network" >/dev/null 2>&1; then
+            "$podman_command" network create --driver bridge "$network"
+        fi
+    done
+}
+
+container_exists() {
+    local container=$1
+    local result
+
+    "$podman_command" container exists "$container" >/dev/null 2>&1
+    result=$?
+    case $result in
+        0) return 0 ;;
+        1) return 1 ;;
+        *) return "$result" ;;
+    esac
+}
+
+compose_up() {
+    local application=$1
+    (
+        cd "$services_root/$application"
+        "$podman_command" compose -f compose.yaml up -d --pull never
+    )
+}
+
+compose_stop() {
+    local application=$1
+    local service
+    local status=0
+
+    cd "$services_root/$application"
+    if [[ $application == nextcloud ]]; then
+        # Stop dependents before the database and cache, one command at a time.
+        for service in nextcloud-cron nextcloud nextcloud-redis nextcloud-db; do
+            if container_exists "$service"; then
+                if ! "$podman_command" compose -f compose.yaml stop --timeout 30 "$service"; then
+                    status=1
+                fi
+            else
+                case $? in
+                    1) ;;
+                    *) status=1 ;;
+                esac
+            fi
+        done
+    elif container_exists "$application"; then
+        if ! "$podman_command" compose -f compose.yaml stop --timeout 30; then
+            status=1
+        fi
+    else
+        case $? in
+            1) ;;
+            *) status=1 ;;
+        esac
+    fi
+    return "$status"
+}
+
+stop_started() {
+    local started=()
+    local failed=()
+    local application
+    local index
+    local status=0
+
+    validate_started_state
+    [[ -e $started_file ]] || return 0
+    read_strict_list "$started_file" started
+
+    for ((index = ${#started[@]} - 1; index >= 0; index--)); do
+        application=${started[index]}
+        if ! compose_stop "$application"; then
+            printf 'gak-compose-lifecycle: failed to stop %s\n' "$application" >&2
+            failed=("$application" "${failed[@]}")
+            status=1
+        fi
+    done
+
+    if ((status == 0)); then
+        rm -f -- "$started_file"
+    else
+        atomic_write_list "$started_file" "${failed[@]}"
+    fi
+    return "$status"
+}
+
+reconcile_stale_state() {
+    [[ -e $started_file ]] || return 0
+    validate_started_state
+    if ! stop_started; then
+        die "could not reconcile recorded Compose ownership: $started_file"
+    fi
+}
+
+start_selected() {
+    local enabled=()
+    local started=()
+    local application
+
+    [[ ! -e $started_file ]] ||
+        die "Compose ownership remains after reconciliation: $started_file"
+    rm -f -- "$ready_file"
+    read_strict_list "$autostart_file" enabled
+
+    if ((${#enabled[@]} == 0)); then
+        printf '%s\n' ready >"$ready_file"
+        return 0
+    fi
+    ensure_networks
+
+    for application in "${enabled[@]}"; do
+        started+=("$application")
+        atomic_write_list "$started_file" "${started[@]}"
+        if ! compose_up "$application"; then
+            printf 'gak-compose-lifecycle: failed to start %s\n' "$application" >&2
+            stop_started || true
+            return 1
+        fi
+    done
+    printf '%s\n' ready >"$ready_file"
+}
+
+acquire_lock() {
+    exec 9>"$lock_file"
+    flock -n 9 || die 'another lifecycle operation is already running'
+}
+
+run_service() {
+    local status=0
+    local wait_pid=
+
+    prepare_runtime
+    acquire_lock
+    validate_configuration
+    reconcile_stale_state
+
+    stop_once() {
+        trap - TERM INT
+        if [[ -n $wait_pid ]]; then
+            kill "$wait_pid" 2>/dev/null || true
+            wait "$wait_pid" 2>/dev/null || true
+            wait_pid=
+        fi
+        if stop_started; then
+            :
+        else
+            status=$?
+        fi
+        rm -f -- "$ready_file"
+        exit "$status"
+    }
+    trap stop_once TERM INT
+
+    start_selected
+
+    while :; do
+        (exec 9>&-; sleep 3600) &
+        wait_pid=$!
+        wait "$wait_pid" || true
+        wait_pid=
+    done
+}
+
+case ${1:-run} in
+    run)
+        run_service
+        ;;
+    stop)
+        prepare_runtime
+        acquire_lock
+        stop_started
+        rm -f -- "$ready_file"
+        ;;
+    *)
+        die "usage: $0 [run|stop]"
+        ;;
+esac

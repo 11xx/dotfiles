@@ -1,0 +1,88 @@
+name: nextcloud
+x-podman:
+  in_pod: false
+
+services:
+  nextcloud-db:
+    image: '{{ gak_nextcloud_postgres_image }}'
+    container_name: nextcloud-db
+    volumes:
+      - '{{ gak_nextcloud_dir }}/postgres:/var/lib/postgresql/data'
+      - '{{ gak_nextcloud_dir }}/secrets:/run/secrets/nextcloud:ro'
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/nextcloud/postgres-password
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - nextcloud_net
+
+  nextcloud-redis:
+    image: '{{ gak_nextcloud_redis_image }}'
+    container_name: nextcloud-redis
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+    volumes:
+      - '{{ gak_nextcloud_dir }}/secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - nextcloud_net
+
+  nextcloud:
+    image: '{{ gak_nextcloud_image }}'
+    container_name: nextcloud
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    ports:
+      - '127.0.0.1:{{ gak_nextcloud_port }}:80'
+    volumes:
+      - '{{ gak_nextcloud_dir }}/html:/var/www/html'
+      - '{{ gak_nextcloud_dir }}/secrets:/run/secrets/nextcloud:ro'
+    environment:
+      POSTGRES_HOST: nextcloud-db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/nextcloud/postgres-password
+      REDIS_HOST: nextcloud-redis
+      REDIS_HOST_PASSWORD_FILE: /run/secrets/nextcloud/redis-password
+      NEXTCLOUD_ADMIN_USER: '{{ gak_nextcloud_admin_user }}'
+      NEXTCLOUD_ADMIN_PASSWORD_FILE: /run/secrets/nextcloud/admin-password
+      NEXTCLOUD_TRUSTED_DOMAINS: '{{ gak_nextcloud_hostname }}'
+      TRUSTED_PROXIES: 127.0.0.1
+      APACHE_DISABLE_REWRITE_IP: '1'
+      OVERWRITEHOST: '{{ gak_nextcloud_hostname }}'
+      OVERWRITEPROTOCOL: https
+      OVERWRITECLIURL: 'https://{{ gak_nextcloud_hostname }}'
+      PHP_MEMORY_LIMIT: 1G
+      PHP_UPLOAD_LIMIT: 10G
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - nextcloud_net
+
+  nextcloud-cron:
+    image: '{{ gak_nextcloud_image }}'
+    container_name: nextcloud-cron
+    depends_on:
+      - nextcloud
+    entrypoint: /cron.sh
+    volumes:
+      - '{{ gak_nextcloud_dir }}/html:/var/www/html'
+      - '{{ gak_nextcloud_dir }}/secrets:/run/secrets/nextcloud:ro'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - nextcloud_net
+
+networks:
+  nextcloud_net:
+    name: nextcloud_net
+    external: true

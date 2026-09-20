@@ -34,3 +34,10 @@
   changed_when: false
   when: not ansible_check_mode
   tags: ['gak-recyclarr-config', 'gak-recyclarr-secrets']
+
+- name: 'gak_recyclarr: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_recyclarr_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-recyclarr-config', 'gak-compose-config']

@@ -1,5 +1,5 @@
 ---
 gak_jellyfin_dir: "{{ ansible_facts['user_dir'] }}/services/jellyfin"
-# Image release metadata: 10.11.8
-gak_jellyfin_image: docker.io/jellyfin/jellyfin@sha256:1ebca12ee68116ddc6bd38ea01af2db50d6e4cee64a5076981ef75c35709d5e8
+# Jellyfin's stable channel; pulls are explicit operator actions.
+gak_jellyfin_image: docker.io/jellyfin/jellyfin:latest
 gak_jellyfin_port: 9292

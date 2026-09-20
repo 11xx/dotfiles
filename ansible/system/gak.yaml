@@ -2,13 +2,13 @@
 # gak — the Guix System home server: NFS for the media trees, rootless podman,
 # and an offload build machine for ak.
 #
-# Guix is declarative and applies its own configuration, so this playbook ships
-# files and stops there. It never runs `guix system reconfigure` or `guix home
-# reconfigure`; the role prints whichever of those the change now needs.
+# Guix is declarative and this playbook normally only ships files. System
+# activation is available through the explicit `gak_activate_system` setting
+# and `guix-activate` tag; it is disabled by default.
 #
-# Nothing here escalates. Every path is either under the user's home or on the
-# media filesystem, which that user owns, so gak needs no become password. It
-# does have a vault: the media stack's Sonarr API key is in it.
+# Normal application deployment is unprivileged. The optional system
+# activation task is the only privileged path. The play does have a vault: the
+# media stack's Sonarr API key is in it.
 
 # Guix System ships no Python, and Ansible needs one on the target before it can
 # run a single module. Without this play, reaching a rebuilt gak means logging in
@@ -53,6 +53,18 @@
         fail_msg: gak_applications must contain unique supported application names.
       tags: ['always']
 
+    - name: Validate the explicit Compose autostart list
+      ansible.builtin.assert:
+        that:
+          - gak_compose_autostart | type_debug == 'list'
+          - gak_compose_autostart | unique | length == gak_compose_autostart | length
+          - gak_compose_autostart | difference(gak_applications) | length == 0
+          - "'recyclarr' not in gak_compose_autostart"
+        fail_msg: >-
+          gak_compose_autostart must contain unique declared applications and
+          must not select recyclarr.
+      tags: ['always']
+
   roles:
     - { role: guix_config, tags: ['guix'] }
     - { role: shell, tags: ['shell'] }
@@ -66,4 +78,29 @@
     - { role: gak_recyclarr, tags: ['gak-media', 'gak-recyclarr'], when: "'recyclarr' in gak_applications" }
     - { role: gak_koito, tags: ['gak-services', 'gak-koito'], when: "'koito' in gak_applications" }
     - { role: gak_nextcloud, tags: ['gak-services', 'gak-nextcloud'], when: "'nextcloud' in gak_applications" }
+    - { role: gak_compose, tags: ['gak-services', 'gak-compose'] }
     - { role: gak_ingress, tags: ['gak-services', 'gak-ingress'] }
+
+  post_tasks:
+    - name: 'guix: Activate the system configuration when explicitly requested'
+      ansible.builtin.command:
+        argv:
+          - /bin/sh
+          - -c
+          - umask 022 && exec guix system reconfigure {{ guix_config_dir }}/system.scm
+      become: true
+      when:
+        - gak_activate_system | bool
+        - not ansible_check_mode
+      tags: ['guix-activate']
+
+    - name: 'guix: Report the skipped activation in check mode'
+      ansible.builtin.debug:
+        msg: >-
+          Check mode skipped privileged activation. Apply with
+          `--tags guix,gak-media,gak-services,gak-compose,guix-activate
+          -e gak_activate_system=true` after review.
+      when:
+        - gak_activate_system | bool
+        - ansible_check_mode
+      tags: ['guix-activate']

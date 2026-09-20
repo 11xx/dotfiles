@@ -1,17 +1,22 @@
 #+TITLE: recyclarr
 
-This role owns the container declaration in =templates/containers.scm.j2=.
+This role owns the Compose project in =templates/compose.yaml.j2=.
 Its persistent state is under =~/services/recyclarr= on the NVMe.
-This is a batch service with automatic startup disabled. Run sudo herd start
-recyclarr explicitly. Ansible owns its YAML configuration and deploys the
-Sonarr API key with =no_log= and mode 0640. The file remains owned by the
-runtime user, with its group mapped to the application's container GID so the
-non-root process can read it. Verify Sonarr configuration after synchronization.
+This is a batch project and is excluded from =gak_compose_autostart=. Run it
+explicitly as the login user:
 
-Use =sudo herd status recyclarr= to inspect Shepherd and =podman logs recyclarr=
-for application diagnostics. Before an image upgrade, stop the application,
-copy its complete state with ownership preserved to a separate backup disk,
-and restart it. Protect copies containing credentials. Restore into an isolated
-state directory and verify the application before replacing production state.
+#+begin_src sh
+podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr
+#+end_src
+
+Ansible owns its YAML configuration and deploys the Sonarr API key with
+=no_log= and mode 0640. The file remains owned by the runtime user, with its
+group mapped to the application's container GID so the non-root process can
+read it. Verify Sonarr configuration after synchronization.
+
+Use =podman compose -f ~/services/recyclarr/compose.yaml config= to inspect
+the rendered project without printing the secret file. Pull the major-8 image
+only when an explicit update is intended, and retain the previous image until
+a synchronization check passes.
 
 See [[file:../../GAK-SERVICES.org][service maintenance]] for deployment and image updates.

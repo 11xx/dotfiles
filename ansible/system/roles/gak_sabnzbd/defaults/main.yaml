@@ -1,5 +1,5 @@
 ---
 gak_sabnzbd_dir: "{{ ansible_facts['user_dir'] }}/services/sabnzbd"
-# Image release metadata: 5.0.1-ls251
-gak_sabnzbd_image: lscr.io/linuxserver/sabnzbd@sha256:87c97fa81966adb5cf511ae62b6681a37136c32f1ad7190b0b8b4d12d766ea9f
+# LinuxServer's moving stable channel; pulls are explicit operator actions.
+gak_sabnzbd_image: lscr.io/linuxserver/sabnzbd:latest
 gak_sabnzbd_port: 9090

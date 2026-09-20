@@ -27,3 +27,10 @@
   tags:
   - gak-koito-config
   - gak-koito-secrets
+
+- name: 'gak_koito: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_koito_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-koito-config', 'gak-compose-config']

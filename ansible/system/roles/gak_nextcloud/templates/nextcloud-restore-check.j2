@@ -6,7 +6,6 @@ umask 077
 nextcloud_root={{ gak_nextcloud_dir | quote }}
 nextcloud_scratch=$(mktemp -d "$nextcloud_root/restore-check.XXXXXXXX")
 nextcloud_test_container="nextcloud-restore-check-$$"
-nextcloud_postgres_image={{ ('docker.io/library/postgres:' ~ gak_nextcloud_postgres_version ~ '@' ~ gak_nextcloud_postgres_image_digest) | quote }}
 export RESTIC_REPOSITORY={{ (gak_nextcloud_backup_dir ~ '/restic') | quote }}
 export RESTIC_PASSWORD_FILE="$nextcloud_root/secrets/restic-password"
 
@@ -45,6 +44,15 @@ if ! podman unshare test -f "$nextcloud_restored_root/html/data/.ncdata" &&
     exit 1
 fi
 test -s "$nextcloud_restored_root/backup-staging/database.dump"
+
+if ! nextcloud_postgres_image=$(podman inspect --format '{{ '{{' }}.Image{{ '}}' }}' nextcloud-db); then
+    printf '%s\n' 'The running nextcloud-db image identity could not be read.' >&2
+    exit 1
+fi
+if [[ -z "$nextcloud_postgres_image" ]]; then
+    printf '%s\n' 'The running nextcloud-db image identity is empty.' >&2
+    exit 1
+fi
 
 podman run --detach --rm \
     --name "$nextcloud_test_container" \

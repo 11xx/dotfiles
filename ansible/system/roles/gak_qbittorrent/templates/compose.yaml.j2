@@ -1,0 +1,40 @@
+name: qbittorrent
+x-podman:
+  in_pod: false
+
+services:
+  qbittorrent:
+    image: '{{ gak_qbittorrent_image }}'
+    container_name: qbittorrent
+    environment:
+      PUID: '{{ gak_media_uid }}'
+      PGID: '{{ gak_media_gid }}'
+      UMASK: '002'
+      TZ: '{{ gak_timezone }}'
+      WEBUI_PORT: '{{ gak_qbittorrent_port }}'
+      TORRENTING_PORT: '6881'
+    x-podman.uidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    x-podman.gidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    volumes:
+      - '{{ gak_qbittorrent_dir }}/config:/config'
+      - '{{ gak_media_dir }}/Media:/Media'
+    ports:
+      - '{{ gak_qbittorrent_port }}:{{ gak_qbittorrent_port }}'
+      - '{{ gak_qbittorrent_peer_port }}:6881'
+      - '{{ gak_qbittorrent_peer_port }}:6881/udp'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - starrs_net
+
+networks:
+  starrs_net:
+    name: starrs_net
+    external: true

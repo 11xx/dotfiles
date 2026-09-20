@@ -1,13 +1,14 @@
 #+TITLE: radarr
 
-This role owns the container declaration in =templates/containers.scm.j2=.
+This role owns the Compose project in =templates/compose.yaml.j2=.
 Its persistent state is under =~/services/radarr= on the NVMe.
 The web backend uses host port 8787. Verify database access, download-client connectivity and library paths.
 
-Use =sudo herd status radarr= to inspect Shepherd and =podman logs radarr=
-for application diagnostics. Before an image upgrade, stop the application,
-copy its complete state with ownership preserved to a separate backup disk,
-and restart it. Protect copies containing credentials. Restore into an isolated
-state directory and verify the application before replacing production state.
+Use =podman compose -f ~/services/radarr/compose.yaml ps= and =podman logs
+radarr= for diagnostics. Update explicitly with =podman compose -f
+~/services/radarr/compose.yaml pull= followed by =up -d --force-recreate
+--pull never=. Copy complete state with ownership preserved before an image
+change, and retain the previous image until database, download-client and
+library checks pass.
 
 See [[file:../../GAK-SERVICES.org][service maintenance]] for deployment and image updates.

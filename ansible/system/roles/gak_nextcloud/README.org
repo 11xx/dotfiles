@@ -13,9 +13,10 @@ The Nextcloud stack uses four containers on its own =nextcloud_net= network:
 
 The community =nextcloud:apache= image is used rather than Nextcloud AIO. AIO
 expects to create and supervise child containers through a container socket;
-that duplicates the ownership Guix and Shepherd already provide here. The
-application, PostgreSQL and Redis images are pinned by release and manifest
-digest in this role's =defaults/main.yaml=.
+that would duplicate the ownership boundary here. The application stays on
+the publisher's =34-apache= channel, PostgreSQL on =17-alpine= and Redis on
+=8.2-alpine=. Pulling a newer tag is explicit and is followed by the native
+upgrade checks.
 
 Primary state is under =~/services/nextcloud= on the NVMe:
 
@@ -47,21 +48,19 @@ the container namespace.
 
 ** Applying and inspecting the stack
 
-Ship the Ansible-owned files, build the generated Guix expression, then apply
-it while watching the host:
+Ship the Ansible-owned files. A Compose file or enabled-list change does not
+need Guix reconfiguration; only a change to the stable host integration does:
 
 #+begin_src sh
-ansible-playbook gak.yaml --tags guix-system,gak-nextcloud
-ssh gak 'guix system build ~/.config/guix/system.scm'
-ssh -t gak 'sudo guix system reconfigure ~/.config/guix/system.scm'
+ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose
+podman compose -f ~/services/nextcloud/compose.yaml config -q
+podman compose -f ~/services/nextcloud/compose.yaml up -d --pull never
 #+end_src
 
 Then inspect the actual services and their isolated listener:
 
 #+begin_src sh
-for service in nextcloud nextcloud-db nextcloud-redis nextcloud-cron mcron; do
-    sudo herd status "$service"
-done
+sudo herd status gak-compose
 podman ps -a
 podman network inspect nextcloud_net
 ss -ltnp | grep 127.0.0.1:8080
@@ -109,10 +108,11 @@ gak-nextcloud-backup
 gak-nextcloud-restore-check
 #+end_src
 
-The restore check decrypts the latest snapshot into a private scratch
-directory, verifies the application/data markers, restores the dump into an
-ephemeral isolated PostgreSQL container, requires real application tables, and
-removes the scratch state. A full recovery uses the same snapshot, restores
+The restore check reads the image ID of the running =nextcloud-db= container,
+then decrypts the latest snapshot into a private scratch directory, verifies
+the application/data markers, restores the dump into an ephemeral isolated
+PostgreSQL container, requires real application tables, and removes the scratch
+state. A full recovery uses the same snapshot, restores
 =html= to an empty bind-mount root, initializes an empty PostgreSQL cluster, and
 applies the database dump before starting the application containers.
 

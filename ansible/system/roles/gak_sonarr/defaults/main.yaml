@@ -1,5 +1,5 @@
 ---
 gak_sonarr_dir: "{{ ansible_facts['user_dir'] }}/services/sonarr"
-# Image release metadata: 4.0.17.2952
-gak_sonarr_image: ghcr.io/hotio/sonarr@sha256:707f353942df71909db21180cdb33eb50e95c2a743ceca77c689000e9b859db3
+# Hotio's moving stable channel; pulls are explicit operator actions.
+gak_sonarr_image: ghcr.io/hotio/sonarr:latest
 gak_sonarr_port: 8989

@@ -17,4 +17,17 @@ gak_applications:
 - recyclarr
 - koito
 - nextcloud
+# Compose starts these projects during the stable boot integration. Recyclarr
+# is a manually invoked batch project and is intentionally absent.
+gak_compose_autostart:
+- sabnzbd
+- prowlarr
+- sonarr
+- radarr
+- jellyfin
+- qbittorrent
+- koito
+- nextcloud
+# System activation changes the privileged Guix integration and is opt-in.
+gak_activate_system: false
 gak_services_bin_dir: '{{ ansible_facts[''user_dir''] }}/.local/bin'

@@ -1,0 +1,27 @@
+name: koito
+x-podman:
+  in_pod: false
+
+services:
+  koito:
+    image: '{{ gak_koito_image }}'
+    container_name: koito
+    ports:
+      - '127.0.0.1:{{ gak_koito_port }}:4110'
+    volumes:
+      - '{{ gak_koito_dir }}:/etc/koito'
+      - '{{ gak_koito_dir }}/secrets:/secrets:ro'
+    environment:
+      KOITO_DEFAULT_USERNAME: '{{ gak_koito_admin_user }}'
+      KOITO_DEFAULT_PASSWORD_FILE: /secrets/default-password
+      KOITO_FORCE_TZ: '{{ gak_timezone }}'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - services_net
+
+networks:
+  services_net:
+    name: services_net
+    external: true

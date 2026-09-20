@@ -7,3 +7,10 @@
     - '{{ gak_sabnzbd_dir }}'
     - '{{ gak_sabnzbd_dir }}/config'
   tags: ['gak-sabnzbd-config']
+
+- name: 'gak_sabnzbd: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_sabnzbd_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-sabnzbd-config', 'gak-compose-config']

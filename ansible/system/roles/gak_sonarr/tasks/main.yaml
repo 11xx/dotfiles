@@ -7,3 +7,10 @@
     - '{{ gak_sonarr_dir }}'
     - '{{ gak_sonarr_dir }}/config'
   tags: ['gak-sonarr-config']
+
+- name: 'gak_sonarr: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_sonarr_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-sonarr-config', 'gak-compose-config']

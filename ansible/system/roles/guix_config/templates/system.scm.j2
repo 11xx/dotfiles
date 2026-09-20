@@ -1,8 +1,10 @@
 ;;; Managed by Ansible (role: guix_config) — edit the role, not this file.
 ;;;
-;;; Ansible ships this file; it never reconfigures gak. A bad expression here
-;;; can leave the host unbootable, and a reconfigure is slow enough to want a
-;;; human watching it. Apply by hand, on the host:
+;;; Ansible ships this file. Normal runs only deploy it; the explicit
+;;; guix-activate post-task may apply it after all Ansible-owned files are
+;;; present. A bad expression here can leave the host unbootable, and a
+;;; reconfigure is slow enough to want a human watching it. Apply by hand, on
+;;; the host when that post-task is not used:
 ;;;
 ;;;   sudo guix system reconfigure ~/.config/guix/system.scm
 ;;;
@@ -160,29 +162,43 @@
                                          (start {{ gak_subid_start }})
                                          (count {{ gak_subid_count }}))))))
 
-{% for application in gak_applications %}
-{% if application == 'nextcloud' %}
+{% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
-{% endfor %}
-           ;; One runtime owns the rootless account and all container services.
+           ;; Compose owns application containers and networks as the login user.
+           ;; Shepherd keeps one long-lived process so its stop destructor waits
+           ;; for the helper's graceful Compose stop sequence.
            (simple-service
-            'gak-containers
+            'gak-compose
             shepherd-root-service-type
-            (oci-configuration->shepherd-services
-             (oci-configuration
-              (runtime 'podman)
-              (user "lobo")
-              (networks
-               (list (oci-network-configuration (name "starrs_net"))
-                     (oci-network-configuration (name "services_net"))
-                     (oci-network-configuration (name "nextcloud_net"))))
-              (containers
-               (list
-{% for application in gak_applications %}
-{{ lookup('ansible.builtin.template', role_path ~ '/../gak_' ~ application ~ '/templates/containers.scm.j2') }}
-{% endfor %}
-                ))))))
+            (list
+             (shepherd-service
+              (provision '(gak-compose))
+              (requirement '(user-processes
+                             cgroups2-fs-owner
+                             cgroups2-limits
+                             rootless-podman-shared-root-fs
+                             elogind
+                             networking
+                             file-system-/marak
+                             file-system-/media))
+              (documentation
+               "Start the user-owned Compose projects selected for boot.")
+              (start
+               #~(make-forkexec-constructor
+                (list "{{ gak_services_bin_dir }}/gak-compose-lifecycle" "run")
+                #:user "lobo"
+                #:group "lobo"
+                #:supplementary-groups '("wheel" "netdev" "cgroup" "users" "media")
+                #:directory "{{ ansible_facts['user_dir'] }}"
+                #:file-creation-mask #o022
+                #:environment-variables
+                '("HOME={{ ansible_facts['user_dir'] }}"
+                  "XDG_RUNTIME_DIR=/run/user/1000"
+                  "PATH=/run/privileged/bin:{{ ansible_facts['user_dir'] }}/.guix-home/profile/bin:{{ ansible_facts['user_dir'] }}/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+                ))
+              (stop #~(make-kill-destructor #:grace-period 1800))
+              (respawn? #f)))))
           ;; This is the default list of services we are appending to.
           (modify-services %base-services
                            (guix-service-type config =>

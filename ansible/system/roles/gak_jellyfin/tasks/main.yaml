@@ -8,3 +8,10 @@
     - '{{ gak_jellyfin_dir }}/config'
     - '{{ gak_jellyfin_dir }}/cache'
   tags: ['gak-jellyfin-config']
+
+- name: 'gak_jellyfin: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_jellyfin_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-jellyfin-config', 'gak-compose-config']

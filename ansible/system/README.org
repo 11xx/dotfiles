@@ -40,12 +40,14 @@ does not reinstall fonts. =--list-tags= prints the current set.
 
 * Two things worth knowing before changing anything
 
-** Guix is shipped, never applied
+** Guix is normally shipped, explicitly applied when requested
 
-Ansible writes gak's Scheme configuration and stops there. Guix already knows
-how to turn those files into a running system, a reconfigure is slow enough to
-want a human watching it, and a bad expression can leave the host unbootable.
-The role prints the commands the change now needs; running them is deliberate.
+Ansible normally writes gak's Scheme configuration and stops there. Guix
+already knows how to turn those files into a running system, a reconfigure is
+slow enough to want a human watching it, and a bad expression can leave the
+host unbootable. The explicit default-off =guix-activate= post-task may apply
+the reviewed configuration after all Ansible-owned files are deployed; normal
+application and Compose-list changes remain unprivileged.
 
 Guix System ships no Python, so gak needs one installed by hand before Ansible
 can reach it at all. After that its own configuration keeps the interpreter

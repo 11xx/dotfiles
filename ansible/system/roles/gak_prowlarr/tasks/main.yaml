@@ -7,3 +7,10 @@
     - '{{ gak_prowlarr_dir }}'
     - '{{ gak_prowlarr_dir }}/config'
   tags: ['gak-prowlarr-config']
+
+- name: 'gak_prowlarr: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_prowlarr_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-prowlarr-config', 'gak-compose-config']

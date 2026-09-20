@@ -7,3 +7,10 @@
     - '{{ gak_qbittorrent_dir }}'
     - '{{ gak_qbittorrent_dir }}/config'
   tags: ['gak-qbittorrent-config']
+
+- name: 'gak_qbittorrent: Deploy the Compose project'
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: '{{ gak_qbittorrent_dir }}/compose.yaml'
+    mode: '0644'
+  tags: ['gak-qbittorrent-config', 'gak-compose-config']

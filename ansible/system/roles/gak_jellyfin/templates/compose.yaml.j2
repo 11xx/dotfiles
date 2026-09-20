@@ -1,0 +1,34 @@
+name: jellyfin
+x-podman:
+  in_pod: false
+
+services:
+  jellyfin:
+    image: '{{ gak_jellyfin_image }}'
+    container_name: jellyfin
+    # The official image runs as its own container user; the complete map
+    # preserves the host ownership contract used by its current state.
+    x-podman.uidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    x-podman.gidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    volumes:
+      - '{{ gak_jellyfin_dir }}/config:/config'
+      - '{{ gak_jellyfin_dir }}/cache:/cache'
+      - '{{ gak_media_dir }}/Media:/Media'
+    ports:
+      - '{{ gak_jellyfin_port }}:8096'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - starrs_net
+
+networks:
+  starrs_net:
+    name: starrs_net
+    external: true

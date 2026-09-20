@@ -1,0 +1,21 @@
+name: recyclarr
+x-podman:
+  in_pod: false
+
+services:
+  recyclarr:
+    image: '{{ gak_recyclarr_image }}'
+    container_name: recyclarr
+    user: '{{ gak_media_uid }}:{{ gak_media_gid }}'
+    volumes:
+      - '{{ gak_recyclarr_dir }}:/config'
+    environment:
+      TZ: '{{ gak_timezone }}'
+    pull_policy: never
+    networks:
+      - starrs_net
+
+networks:
+  starrs_net:
+    name: starrs_net
+    external: true

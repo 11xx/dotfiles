@@ -5,11 +5,11 @@ gak_nextcloud_port: 8080
 gak_nextcloud_admin_user: nextcloud-admin
 gak_nextcloud_user: lobo
 gak_nextcloud_user_display_name: Lobo
-gak_nextcloud_version: 34.0.2
-gak_nextcloud_image_digest: sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329
-gak_nextcloud_postgres_version: 17.11-alpine
-gak_nextcloud_postgres_image_digest: sha256:5d61573b31c206ae538c85893edeb6e320e1a9ffd838c0f9dca927fb6f765fa4
-gak_nextcloud_redis_version: 8.2.8-alpine
-gak_nextcloud_redis_image_digest: sha256:a7859ed111db3c1f5404a973a4747505d559fb5ca32d37e447afc0ef845a2103
+# Keep the application on major 34 and the companion services on their
+# declared major/series channels. Pulling a newer tag is an explicit operator
+# action followed by Compose recreation and application checks.
+gak_nextcloud_image: docker.io/library/nextcloud:34-apache
+gak_nextcloud_postgres_image: docker.io/library/postgres:17-alpine
+gak_nextcloud_redis_image: docker.io/library/redis:8.2-alpine
 gak_nextcloud_backup_dir: /marak/backups/nextcloud
 gak_nextcloud_dir: '{{ ansible_facts[''user_dir''] }}/services/nextcloud'

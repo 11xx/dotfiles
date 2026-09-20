@@ -1,0 +1,35 @@
+name: prowlarr
+x-podman:
+  in_pod: false
+
+services:
+  prowlarr:
+    image: '{{ gak_prowlarr_image }}'
+    container_name: prowlarr
+    environment:
+      PUID: '{{ gak_media_uid }}'
+      PGID: '{{ gak_media_gid }}'
+      UMASK: '002'
+      TZ: '{{ gak_timezone }}'
+    x-podman.uidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    x-podman.gidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    volumes:
+      - '{{ gak_prowlarr_dir }}/config:/config'
+    ports:
+      - '{{ gak_prowlarr_port }}:9696'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - starrs_net
+
+networks:
+  starrs_net:
+    name: starrs_net
+    external: true

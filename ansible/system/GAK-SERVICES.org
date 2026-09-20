@@ -3,96 +3,253 @@
 
 * Ownership
 
-Each =roles/gak_APPLICATION= owns its =templates/containers.scm.j2=, defaults,
-configuration tasks, secret files and operating instructions. Nextcloud owns
-its database, cache, cron and backup schedule as one application.
+Each =roles/gak_APPLICATION= owns its =templates/compose.yaml.j2=, image
+channel, configuration tasks, secret files and operating instructions.
+Nextcloud owns its database, cache, cron and backup schedule as one Compose
+project. The resulting files live at =~/services/APPLICATION/compose.yaml= and
+are owned by the login user.
 
-=host_vars/gak/main= selects =gak_applications= and holds host-wide identity,
-timezone and rootless UID ranges. Explicit roles in =gak.yaml= load application
-defaults before =guix_config= composes their templates using Ansible's template
-lookup. Missing templates fail rendering. The shared OCI builder creates
-Shepherd services without adding another login account. The host owns networks,
-mounts and Podman. =gak_media= owns shared storage; =gak_ingress= owns ingress.
+=host_vars/gak/main= selects =gak_applications= and the explicit
+=gak_compose_autostart= list. The latter may select declared web applications
+and Nextcloud, but never the Recyclarr batch job. Ansible writes both lists and
+the lifecycle helper under the login user's home. The helper validates every
+declared project and fails if a selected Compose file is missing; it does not
+discover projects from a directory listing.
 
-* Storage
+Ansible owns service directories, Compose files, operator commands and secret
+files. Guix System owns only stable host integration: rootless Podman,
+subordinate ID ranges, linger/cgroup prerequisites, filesystem and networking
+requirements, mcron and one Shepherd service. Tailscale owns ingress.
+
+* Storage and namespaces
 
 =/media= is the HDD mount and holds =/media/Media=. Application state lives on
-the NVMe under =~/services/APPLICATION=: most media applications use a =config=
+the NVMe under =~/services/APPLICATION=: media applications use a =config=
 subdirectory, Jellyfin also uses =cache=, and Recyclarr uses its application
-directory directly. Each role's =gak_APPLICATION_dir= is the host path contract.
-Container-side =/config=, =/cache= and =/Media= paths stay stable.
+directory directly. Container-side =/config=, =/cache= and =/Media= paths stay
+stable. No data is moved by the Compose cutover.
 
-Application tasks create missing state directories and preserve permissions
-owned by running applications. When migrating state, stop the application,
-wait for its container to exit, copy with numeric owners, modes, ACLs, xattrs and links preserved, compare
-checksums, then switch bind mounts and verify the client protocol. Do not
-replace service-owned permissions with the login user's ownership.
+The media containers use the complete rootless map:
 
-Guix's OCI stop action launches container removal asynchronously. A successful
-=herd stop= does not establish that the database is quiescent. For a graceful
-state transfer, disable the service's restart policy with =herd disable=,
-stop its container as the Podman runtime user, and wait for the actual container
-to exit. Enable the service again for startup after the transfer.
+#+begin_example
+--uidmap 0:1:1 --uidmap 1:0:1 --uidmap 2:2:65535
+--gidmap 0:1:1 --gidmap 1:0:1 --gidmap 2:2:65535
+#+end_example
 
-Mutable state lives outside source control. Secrets come from the private vault
-and are deployed as restrictive files. Guix store expressions contain paths,
-not credentials.
+This keeps the LinuxServer and Hotio application identity at container
+1000:134, which appears on the host as the mapped ownership already used by
+the state and media tree. Jellyfin retains the same full root map without
+PUID/PGID variables. Recyclarr retains its default rootless namespace and
+runs as container 1000:134; its secret file remains mode 0640 with the mapped
+group ownership. Nextcloud keeps its tested namespace-aware secret and
+database ownership operations.
 
-* Deployment
+The three shared networks are named =starrs_net=, =services_net= and
+=nextcloud_net=. The login-user lifecycle helper creates them when a selected
+stack needs them. Every Compose file declares its network as external, so a
+project's =compose down= cannot remove a shared network. Compose projects do
+not share application state or networks across those boundaries.
+
+* Boot and ordinary operations
+
+The stable Shepherd service is =gak-compose=. It runs the helper as =lobo=,
+with the user's home, runtime directory, profile PATH and supplementary groups
+already set. The PATH puts =/run/privileged/bin= first so rootless
+=newuidmap= and =newgidmap= resolve through the privileged wrappers. It waits
+for =/marak=, =/media=, rootless Podman cgroup services, elogind and networking.
+The helper keeps ownership state, its lock and its readiness marker under
+=${XDG_RUNTIME_DIR}/gak-compose=, reconciles stale recorded stacks after a
+crash, records ownership before each Compose start so partial projects are
+recoverable, and stops that recorded set in reverse order. An empty list starts
+no projects. Web containers use Podman restart policies; there are no per-container
+Shepherd respawns. Recyclarr is never booted.
+
+The helper's long-lived process is intentional: Shepherd's stop destructor
+sends SIGTERM to it and waits while the helper runs Compose's graceful stop
+commands. Nextcloud stops cron and the frontend before Redis and PostgreSQL.
+The helper never pulls images during boot and never calls sudo.
+
+Inspect the integration and containers as follows:
+
+#+begin_src sh
+sudo herd status gak-compose
+podman ps -a
+podman network ls
+podman logs CONTAINER
+#+end_src
+
+Run an individual project with the ordinary Compose interface:
+
+#+begin_src sh
+podman compose -f ~/services/sonarr/compose.yaml pull
+podman compose -f ~/services/sonarr/compose.yaml up -d --force-recreate --pull never
+#+end_src
+
+The explicit pull is the update boundary. =pull_policy: never= prevents an
+ordinary =up= from fetching a missing or changed image. Use the same two
+commands for a selected project after reading its upstream migration notes.
+Use =podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr=
+for the manual batch job.
+
+* Deployment and activation
 
 Run from this directory:
 
 #+begin_src sh
 ansible-playbook gak.yaml --syntax-check
-ansible-playbook gak.yaml --tags guix-system,gak-media,gak-services --check
-ansible-playbook gak.yaml --tags guix-system,gak-media,gak-services
+ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose --check
+ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose
 #+end_src
 
-Build and activate separately on Gak:
+Application deployments and enabled-list edits are unprivileged. When the
+Guix host integration itself changes, the play reports the pending activation.
+Review the rendered expression, then opt in explicitly:
 
 #+begin_src sh
 umask 022
+ansible-playbook gak.yaml --tags guix-activate \
+  -e gak_activate_system=true
+#+end_src
+
+For a first cutover, include the deployment tags before the activation tag so
+the post-task runs after the Compose files, lists, helper and Guix expression
+are deployed:
+
+#+begin_src sh
+ansible-playbook gak.yaml \
+  --tags guix,gak-media,gak-services,gak-compose,guix-activate \
+  -e gak_activate_system=true
+#+end_src
+
+The activation task is skipped in check mode and is the only task in this play
+that uses privilege escalation. A host reconfiguration is not needed for a
+Compose image pull or for a change to =gak_compose_autostart=.
+
+Build and inspect the generated system expression before activation:
+
+#+begin_src sh
 guix system build ~/.config/guix/system.scm
-sudo guix system reconfigure ~/.config/guix/system.scm
-sudo herd status
+sudo herd status gak-compose
 podman ps -a
 #+end_src
 
-Use umask 022 for system activation so generated host files remain readable
-by unprivileged services. A backup process's restrictive umask must not carry
-into reconfiguration. Check that the service user can read =/etc/hosts=.
+Use =umask 022= for activation so generated host files remain readable by
+unprivileged services. A backup process's restrictive umask must not carry
+into reconfiguration. Check that =lobo= can read =/etc/hosts= afterwards.
 
-=gak-APPLICATION= selects that application's Ansible files. Include
-=guix-system= when changing a container or image. =gak-media= and =gak-services=
-group related roles. Rendered configuration, image presence, running containers
-and application health are separate checks.
+* Image channels and rollback references
+
+The source names publisher-supported moving channels rather than deployment
+digests:
+
+| project | image channel |
+|---------+---------------|
+| sabnzbd | =lscr.io/linuxserver/sabnzbd:latest= |
+| prowlarr | =lscr.io/linuxserver/prowlarr:latest= |
+| sonarr | =ghcr.io/hotio/sonarr:latest= |
+| radarr | =ghcr.io/hotio/radarr:latest= |
+| jellyfin | =docker.io/jellyfin/jellyfin:latest= |
+| qbittorrent | =lscr.io/linuxserver/qbittorrent:latest= |
+| recyclarr | =ghcr.io/recyclarr/recyclarr:8= |
+| koito | =gabehf/koito:latest= |
+| nextcloud | =docker.io/library/nextcloud:34-apache= |
+| PostgreSQL | =docker.io/library/postgres:17-alpine= |
+| Redis | =docker.io/library/redis:8.2-alpine= |
+
+Before the first Compose recreation, the operator records the running image
+IDs and tags each existing image with the corresponding alias. This seeds the
+aliases without pulling or changing software. Keep the observed IDs and the
+last working Compose files as the rollback record; do not put those digests in
+the Guix expression. A later update is explicit: pull the selected alias,
+recreate the project, run its native version and caller-visible checks, and
+retain the previous image until verification passes. Do not advance the
+Nextcloud major, PostgreSQL major or Redis 8.2 series silently.
+
+* One-time ownership handover
+
+The old generation's OCI services must be quiet before Compose creates the
+same stable names. Save the old generated configuration before activation, and
+separate long-running services from the manual batch job. On Gak, with the
+current generation still running:
+
+#+begin_src sh
+cp --reflink=auto ~/.config/guix/system.scm ~/.config/guix/system.scm.before-compose
+old_web_services=(sabnzbd prowlarr sonarr radarr jellyfin qbittorrent koito)
+old_nextcloud_frontend=(nextcloud-cron nextcloud)
+old_nextcloud_backend=(nextcloud-redis nextcloud-db)
+old_batch_services=(recyclarr)
+for service in "${old_web_services[@]}" "${old_nextcloud_frontend[@]}" \
+               "${old_nextcloud_backend[@]}" "${old_batch_services[@]}"; do
+    sudo herd disable "$service"
+done
+
+for container in "${old_web_services[@]}" "${old_nextcloud_frontend[@]}" \
+                 "${old_nextcloud_backend[@]}"; do
+    if podman container exists "$container"; then
+        podman stop --time 30 "$container"
+        while :; do
+            if podman container exists "$container"; then
+                sleep 1
+            else
+                exists_status=$?
+                [[ $exists_status == 1 ]] || exit "$exists_status"
+                break
+            fi
+        done
+    fi
+done
+podman ps -a --format '{{.Names}}|{{.Status}}'
+#+end_src
+
+The loop checks both graceful exit and the asynchronous removal race. Confirm
+the state directories, secrets, media mount and image IDs before activating
+the generation containing =gak-compose=. Start =gak-compose= and inspect its
+recorded projects, container names, networks, ports and mounts. No project
+should be started merely because its directory exists.
+
+If startup fails, stop the recorded Compose projects and preserve the error
+and state file. For a rollback, stop and disable =gak-compose=, explicitly
+reconfigure the retained old generated configuration, re-enable only the old
+web services and wait for their containers to settle before starting them:
+
+#+begin_src sh
+old_web_services=(sabnzbd prowlarr sonarr radarr jellyfin qbittorrent koito)
+old_nextcloud_frontend=(nextcloud nextcloud-cron)
+old_nextcloud_backend=(nextcloud-db nextcloud-redis)
+sudo herd stop gak-compose
+sudo herd disable gak-compose
+sudo guix system reconfigure ~/.config/guix/system.scm.before-compose
+for service in "${old_web_services[@]}" "${old_nextcloud_backend[@]}" \
+               "${old_nextcloud_frontend[@]}"; do
+    sudo herd enable "$service"
+done
+for service in "${old_web_services[@]}" "${old_nextcloud_backend[@]}" \
+               "${old_nextcloud_frontend[@]}"; do
+    sudo herd start "$service"
+done
+#+end_src
+
+The state paths do not change, so a rollback does not move or copy data.
+The manual Recyclarr batch service is not started by the rollback. Recheck
+application health and the Nextcloud backup/restore path after either direction.
 
 * Updates and recovery
 
 Record the running image and application version, read upstream migration
-requirements, and make a consistent backup before changing an image pin.
-Media image digests and backend ports live in each application's defaults.
-The release comment records image metadata; verify the application's own
-version when upgrading. Media containers require =file-system-/media= so
-startup waits for their HDD mount when they consume the media tree. Prowlarr
-and Recyclarr use only their NVMe state and do not require the media mount.
-Exercise recovery, build the system expression, activate one application at a
-time, and test its client protocol and dependent services. Retain the previous
-image and backup until verification passes. A Guix rollback does not undo a
-database migration.
-
-Nextcloud documents its encrypted backup and scratch restore in its role.
+requirements, and make a consistent backup before changing an image channel.
 Media applications need stopped or application-consistent copies of complete
 state, including databases and torrent resume metadata. Selected configuration
-files in private Git are not a complete restore. A backup target should be on a
-different physical disk; document whether an off-host copy exists.
+files in private Git are not a complete restore. A backup target should be on
+a different physical disk; document whether an off-host copy exists.
 
-* Application selection
+Nextcloud's mcron job runs =~/.local/bin/gak-nextcloud-backup= as =lobo=. It
+uses maintenance mode, a native PostgreSQL dump, the complete =html= tree,
+encrypted Restic storage at =/marak/backups/nextcloud/restic=, retention and a
+repository check. =gak-nextcloud-restore-check= uses the image identity of the
+running =nextcloud-db= container for its isolated scratch database, validates
+real application tables and removes only its own scratch state.
 
-Add a role to =gak.yaml= and its name to =gak_applications=. Keep version pins,
-configuration and recovery instructions together. Verify filesystem availability
-at startup and preserve the rootless subuid/subgid ranges.
-
-Removing an application from the list controls rendered declarations and role
-execution. It does not erase state or revoke existing Tailscale endpoints.
-Drain ingress, stop services and retain a verified backup before separate removal.
+Removing an application from =gak_applications= controls role execution and
+the generated declared list. It does not erase state, remove a network or
+revoke an existing Tailscale endpoint. Drain ingress, stop the selected
+project and retain a verified backup before separate removal.

@@ -1,0 +1,36 @@
+name: radarr
+x-podman:
+  in_pod: false
+
+services:
+  radarr:
+    image: '{{ gak_radarr_image }}'
+    container_name: radarr
+    environment:
+      PUID: '{{ gak_media_uid }}'
+      PGID: '{{ gak_media_gid }}'
+      UMASK: '002'
+      TZ: '{{ gak_timezone }}'
+    x-podman.uidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    x-podman.gidmaps:
+      - '0:1:1'
+      - '1:0:1'
+      - '2:2:{{ gak_subid_count - 1 }}'
+    volumes:
+      - '{{ gak_radarr_dir }}/config:/config'
+      - '{{ gak_media_dir }}/Media:/Media'
+    ports:
+      - '{{ gak_radarr_port }}:7878'
+    restart: unless-stopped
+    pull_policy: never
+    stop_grace_period: 30s
+    networks:
+      - starrs_net
+
+networks:
+  starrs_net:
+    name: starrs_net
+    external: true
