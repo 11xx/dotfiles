@@ -10,14 +10,16 @@ database or download-state backups. See [[file:../../GAK-SERVICES.org][service m
 
 * Users and groups
 
-Everything runs as uid 1000 and gid 134, a shared group called =media=. 134 is
-=M= and =D=: the 13th and 4th letters. The group is declared in =guix_config='s
-=system.scm=, and the NFS exports are keyed on it, so a container writing as
-anything else produces files ak cannot read over the share.
+Application UID/GID values are container identities. Host file ownership
+depends on the complete rootless UID/GID maps; matching numbers do not imply
+matching identities. Inspect the maps and existing directory owners before
+changing them. Shared media permissions must also work for NFS clients.
 
-Rootless podman maps the login user to root inside the container. Without the
-=x-podman= idmaps, files land owned by an unmapped subuid that nothing on the
-host can read.
+An =s6-applyuidgid= failure with =Invalid argument= can mean the requested
+UID or supplementary group is absent from the container map. A container may
+remain running while its application never starts. Check the HTTP endpoint,
+not only =podman ps=. Test candidate maps with disposable containers and a
+scratch bind mount before changing production ownership or mappings.
 
 * Starting it
 

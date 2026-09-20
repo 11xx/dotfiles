@@ -15,7 +15,7 @@ The community =nextcloud:apache= image is used rather than Nextcloud AIO. AIO
 expects to create and supervise child containers through a container socket;
 that duplicates the ownership Guix and Shepherd already provide here. The
 application, PostgreSQL and Redis images are pinned by release and manifest
-digest in =host_vars/gak/main=.
+digest in this role's =defaults/main.yaml=.
 
 Primary state is under =~/services/nextcloud= on the NVMe:
 
@@ -52,14 +52,16 @@ it while watching the host:
 
 #+begin_src sh
 ansible-playbook gak.yaml --tags guix-system,gak-nextcloud
-ssh gak guix system build ~/.config/guix/system.scm
-ssh -t gak sudo guix system reconfigure ~/.config/guix/system.scm
+ssh gak 'guix system build ~/.config/guix/system.scm'
+ssh -t gak 'sudo guix system reconfigure ~/.config/guix/system.scm'
 #+end_src
 
 Then inspect the actual services and their isolated listener:
 
 #+begin_src sh
-sudo herd status nextcloud nextcloud-db nextcloud-redis nextcloud-cron mcron
+for service in nextcloud nextcloud-db nextcloud-redis nextcloud-cron mcron; do
+    sudo herd status "$service"
+done
 podman ps -a
 podman network inspect nextcloud_net
 ss -ltnp | grep 127.0.0.1:8080

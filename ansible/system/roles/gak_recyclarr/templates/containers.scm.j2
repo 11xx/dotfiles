@@ -1,6 +1,7 @@
 (oci-container-configuration
  (provision "recyclarr")
- (image "ghcr.io/recyclarr/recyclarr")
+ (image "{{ gak_recyclarr_image }}")
+ (requirement '(file-system-/media))
  (network "starrs_net")
  (container-user "{{ gak_media_uid }}:{{ gak_media_gid }}")
  (volumes

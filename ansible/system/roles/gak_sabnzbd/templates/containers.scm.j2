@@ -1,8 +1,9 @@
 (oci-container-configuration
  (provision "sabnzbd")
- (image "lscr.io/linuxserver/sabnzbd:latest")
+ (image "{{ gak_sabnzbd_image }}")
+ (requirement '(file-system-/media))
  (network "starrs_net")
- (ports (list '("9090" . "8080")))
+ (ports (list '("{{ gak_sabnzbd_port }}" . "8080")))
  (volumes
   (list '("{{ gak_media_dir }}/.config/sabnzbd/config" . "/config")
         '("{{ gak_media_dir }}/Media" . "/Media")))

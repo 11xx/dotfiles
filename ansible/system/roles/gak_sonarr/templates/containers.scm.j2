@@ -1,6 +1,7 @@
 (oci-container-configuration
  (provision "sonarr")
- (image "ghcr.io/hotio/sonarr")
+ (image "{{ gak_sonarr_image }}")
+ (requirement '(file-system-/media))
  (network "starrs_net")
  (ports (list '("{{ gak_sonarr_port }}" . "8989")))
  (volumes

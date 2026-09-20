@@ -53,6 +53,10 @@ and application health are separate checks.
 
 Record the running image and application version, read upstream migration
 requirements, and make a consistent backup before changing an image pin.
+Media image digests and backend ports live in each application's defaults.
+The release comment records image metadata; verify the application's own
+version when upgrading. Media containers require =file-system-/media= so
+startup waits for their HDD mount.
 Exercise recovery, build the system expression, activate one application at a
 time, and test its client protocol and dependent services. Retain the previous
 image and backup until verification passes. A Guix rollback does not undo a
