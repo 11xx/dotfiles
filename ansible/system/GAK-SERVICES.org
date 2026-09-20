@@ -16,10 +16,23 @@ mounts and Podman. =gak_media= owns shared storage; =gak_ingress= owns ingress.
 
 * Storage
 
-=/media= is the HDD mount. Media stays in =/media/Media= and application state
-in =/media/.config/APPLICATION=. Preserve bind paths and media UID/GID mappings
-so NFS clients retain access. Source organization and image updates do not
-require relocating the tree. Koito and Nextcloud use =~/services=.
+=/media= is the HDD mount and holds =/media/Media=. Application state lives on
+the NVMe under =~/services/APPLICATION=: most media applications use a =config=
+subdirectory, Jellyfin also uses =cache=, and Recyclarr uses its application
+directory directly. Each role's =gak_APPLICATION_dir= is the host path contract.
+Container-side =/config=, =/cache= and =/Media= paths stay stable.
+
+Application tasks create missing state directories and preserve permissions
+owned by running applications. When migrating state, stop the application,
+wait for its container to exit, copy with numeric owners, modes, ACLs, xattrs and links preserved, compare
+checksums, then switch bind mounts and verify the client protocol. Do not
+replace service-owned permissions with the login user's ownership.
+
+Guix's OCI stop action launches container removal asynchronously. A successful
+=herd stop= does not establish that the database is quiescent. For a graceful
+state transfer, disable the service's restart policy with =herd disable=,
+stop its container as the Podman runtime user, and wait for the actual container
+to exit. Enable the service again for startup after the transfer.
 
 Mutable state lives outside source control. Secrets come from the private vault
 and are deployed as restrictive files. Guix store expressions contain paths,
@@ -61,7 +74,8 @@ requirements, and make a consistent backup before changing an image pin.
 Media image digests and backend ports live in each application's defaults.
 The release comment records image metadata; verify the application's own
 version when upgrading. Media containers require =file-system-/media= so
-startup waits for their HDD mount.
+startup waits for their HDD mount when they consume the media tree. Prowlarr
+and Recyclarr use only their NVMe state and do not require the media mount.
 Exercise recovery, build the system expression, activate one application at a
 time, and test its client protocol and dependent services. Retain the previous
 image and backup until verification passes. A Guix rollback does not undo a

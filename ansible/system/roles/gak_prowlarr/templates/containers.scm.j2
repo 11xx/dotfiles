@@ -1,11 +1,10 @@
 (oci-container-configuration
  (provision "prowlarr")
  (image "{{ gak_prowlarr_image }}")
- (requirement '(file-system-/media))
  (network "starrs_net")
  (ports (list '("{{ gak_prowlarr_port }}" . "9696")))
  (volumes
-  (list '("{{ gak_media_dir }}/.config/prowlarr/config" . "/config")))
+  (list '("{{ gak_prowlarr_dir }}/config" . "/config")))
  (environment
   (list '("PUID" . "{{ gak_media_uid }}")
         '("PGID" . "{{ gak_media_gid }}")

@@ -1,0 +1,9 @@
+---
+- name: 'gak_qbittorrent: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_qbittorrent_dir }}'
+    - '{{ gak_qbittorrent_dir }}/config'
+  tags: ['gak-qbittorrent-config']

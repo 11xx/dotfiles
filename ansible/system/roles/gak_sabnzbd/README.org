@@ -1,7 +1,7 @@
 #+TITLE: sabnzbd
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/sabnzbd= on the HDD.
+Its persistent state is under =~/services/sabnzbd= on the NVMe.
 The web backend uses host port 9090. Verify queue state and a completed download after an update.
 
 Use =sudo herd status sabnzbd= to inspect Shepherd and =podman logs sabnzbd=

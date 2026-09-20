@@ -1,7 +1,7 @@
 #+TITLE: prowlarr
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/prowlarr= on the HDD.
+Its persistent state is under =~/services/prowlarr= on the NVMe.
 The web backend uses host port 8888. Verify indexer tests and synchronization with its applications.
 
 Use =sudo herd status prowlarr= to inspect Shepherd and =podman logs prowlarr=

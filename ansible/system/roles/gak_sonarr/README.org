@@ -1,7 +1,7 @@
 #+TITLE: sonarr
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/sonarr= on the HDD.
+Its persistent state is under =~/services/sonarr= on the NVMe.
 The web backend uses gak_sonarr_port. Recyclarr consumes the same port. Verify database access, download-client connectivity and library paths.
 
 Use =sudo herd status sonarr= to inspect Shepherd and =podman logs sonarr=

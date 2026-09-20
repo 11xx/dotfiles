@@ -1,4 +1,5 @@
 ---
+gak_radarr_dir: "{{ ansible_facts['user_dir'] }}/services/radarr"
 # Image release metadata: 6.1.1.10360
 gak_radarr_image: ghcr.io/hotio/radarr@sha256:774d4eae37cac16ffaa52cec7fee94ad26f8ac1b92b59d531da62c351cec71a9
 gak_radarr_port: 8787

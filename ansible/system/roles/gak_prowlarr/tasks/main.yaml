@@ -1,0 +1,9 @@
+---
+- name: 'gak_prowlarr: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_prowlarr_dir }}'
+    - '{{ gak_prowlarr_dir }}/config'
+  tags: ['gak-prowlarr-config']

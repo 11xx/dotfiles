@@ -1,13 +1,13 @@
 ---
 - name: 'gak_recyclarr: Create the configuration directory'
   ansible.builtin.file:
-    path: '{{ gak_media_dir }}/.config/recyclarr'
+    path: '{{ gak_recyclarr_dir }}'
     state: directory
     mode: '0755'
 - name: 'gak_recyclarr: Deploy the recyclarr configuration'
   ansible.builtin.copy:
     src: recyclarr/{{ item }}
-    dest: '{{ gak_media_dir }}/.config/recyclarr/{{ item }}'
+    dest: '{{ gak_recyclarr_dir }}/{{ item }}'
     mode: '0644'
   loop:
   - recyclarr.yml
@@ -17,9 +17,20 @@
 - name: 'gak_recyclarr: Deploy the recyclarr secrets'
   ansible.builtin.template:
     src: recyclarr-secrets.yml.j2
-    dest: '{{ gak_media_dir }}/.config/recyclarr/secrets.yml'
-    mode: '0600'
+    dest: '{{ gak_recyclarr_dir }}/secrets.yml'
+    mode: '0640'
   no_log: true
   tags:
   - gak-recyclarr-config
   - gak-recyclarr-secrets
+- name: 'gak_recyclarr: Grant its mapped group access to the secret file'
+  ansible.builtin.command:
+    argv:
+      - podman
+      - unshare
+      - chown
+      - '0:{{ gak_media_gid }}'
+      - '{{ gak_recyclarr_dir }}/secrets.yml'
+  changed_when: false
+  when: not ansible_check_mode
+  tags: ['gak-recyclarr-config', 'gak-recyclarr-secrets']

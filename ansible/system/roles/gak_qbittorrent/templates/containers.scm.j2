@@ -7,7 +7,7 @@
               '("{{ gak_qbittorrent_peer_port }}" . "6881")
               "{{ gak_qbittorrent_peer_port }}:6881/udp"))
  (volumes
-  (list '("{{ gak_media_dir }}/.config/qbittorrent/config" . "/config")
+  (list '("{{ gak_qbittorrent_dir }}/config" . "/config")
         '("{{ gak_media_dir }}/Media" . "/Media")))
  (environment
   (list '("PUID" . "{{ gak_media_uid }}")

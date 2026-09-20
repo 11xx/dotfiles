@@ -1,0 +1,9 @@
+---
+- name: 'gak_sonarr: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_sonarr_dir }}'
+    - '{{ gak_sonarr_dir }}/config'
+  tags: ['gak-sonarr-config']

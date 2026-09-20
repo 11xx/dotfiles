@@ -1,8 +1,12 @@
 #+TITLE: recyclarr
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/recyclarr= on the HDD.
-This is a batch service with automatic startup disabled. Run sudo herd start recyclarr explicitly. Ansible owns its YAML configuration and deploys its Sonarr API key with no_log and mode 0600. Verify the target Sonarr configuration after synchronization.
+Its persistent state is under =~/services/recyclarr= on the NVMe.
+This is a batch service with automatic startup disabled. Run sudo herd start
+recyclarr explicitly. Ansible owns its YAML configuration and deploys the
+Sonarr API key with =no_log= and mode 0640. The file remains owned by the
+runtime user, with its group mapped to the application's container GID so the
+non-root process can read it. Verify Sonarr configuration after synchronization.
 
 Use =sudo herd status recyclarr= to inspect Shepherd and =podman logs recyclarr=
 for application diagnostics. Before an image upgrade, stop the application,

@@ -1,0 +1,9 @@
+---
+- name: 'gak_radarr: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_radarr_dir }}'
+    - '{{ gak_radarr_dir }}/config'
+  tags: ['gak-radarr-config']

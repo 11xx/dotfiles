@@ -1,0 +1,9 @@
+---
+- name: 'gak_sabnzbd: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_sabnzbd_dir }}'
+    - '{{ gak_sabnzbd_dir }}/config'
+  tags: ['gak-sabnzbd-config']

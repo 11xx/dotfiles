@@ -6,6 +6,5 @@
     mode: '0755'
   loop:
   - '{{ gak_media_dir }}'
-  - '{{ gak_media_dir }}/.config'
   tags:
   - gak-media-config

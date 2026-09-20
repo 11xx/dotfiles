@@ -1,9 +1,11 @@
 #+TITLE: Shared media storage
 
-This role owns the shared /media and /media/.config directories on the HDD.
+This role owns the shared /media directory on the HDD.
 Application roles own container declarations and supporting configuration.
-The media tree remains at /media/Media. Runtime state stays under
-/media/.config/APPLICATION; applications own their mutable configuration.
+The media tree lives at /media/Media. Application state lives on the NVMe at
+~/services/APPLICATION; applications own their mutable configuration and
+directory permissions. Container-side mount paths stay stable across host
+storage changes.
 
 Selected configuration snapshots in the private vault are not complete
 database or download-state backups. See [[file:../../GAK-SERVICES.org][service maintenance]].

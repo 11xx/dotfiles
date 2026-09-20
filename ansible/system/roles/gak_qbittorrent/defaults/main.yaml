@@ -1,4 +1,5 @@
 ---
+gak_qbittorrent_dir: "{{ ansible_facts['user_dir'] }}/services/qbittorrent"
 # Image release metadata: 5.1.4-r3-ls453
 gak_qbittorrent_image: lscr.io/linuxserver/qbittorrent@sha256:c9990949e968e99333f47f49da7d16e81ba6e1469c8c46807a65b984c9e8b6ff
 gak_qbittorrent_port: 9191

@@ -1,11 +1,10 @@
 (oci-container-configuration
  (provision "recyclarr")
  (image "{{ gak_recyclarr_image }}")
- (requirement '(file-system-/media))
  (network "starrs_net")
  (container-user "{{ gak_media_uid }}:{{ gak_media_gid }}")
  (volumes
-  (list '("{{ gak_media_dir }}/.config/recyclarr" . "/config")))
+  (list '("{{ gak_recyclarr_dir }}" . "/config")))
  (environment
   (list '("TZ" . "{{ gak_timezone }}")))
  (auto-start? #f))

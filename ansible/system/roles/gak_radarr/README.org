@@ -1,7 +1,7 @@
 #+TITLE: radarr
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/radarr= on the HDD.
+Its persistent state is under =~/services/radarr= on the NVMe.
 The web backend uses host port 8787. Verify database access, download-client connectivity and library paths.
 
 Use =sudo herd status radarr= to inspect Shepherd and =podman logs radarr=

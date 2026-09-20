@@ -1,0 +1,10 @@
+---
+- name: 'gak_jellyfin: Ensure application state mount directories exist'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ gak_jellyfin_dir }}'
+    - '{{ gak_jellyfin_dir }}/config'
+    - '{{ gak_jellyfin_dir }}/cache'
+  tags: ['gak-jellyfin-config']

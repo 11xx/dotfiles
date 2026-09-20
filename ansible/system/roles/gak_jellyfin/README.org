@@ -1,7 +1,7 @@
 #+TITLE: jellyfin
 
 This role owns the container declaration in =templates/containers.scm.j2=.
-Its persistent state is under =/media/.config/jellyfin= on the HDD.
+Its persistent state is under =~/services/jellyfin= on the NVMe.
 The web backend uses host port 9292. State includes config and cache directories. Verify real playback and any configured transcoding.
 
 Use =sudo herd status jellyfin= to inspect Shepherd and =podman logs jellyfin=

@@ -5,7 +5,7 @@
  (network "starrs_net")
  (ports (list '("{{ gak_sabnzbd_port }}" . "8080")))
  (volumes
-  (list '("{{ gak_media_dir }}/.config/sabnzbd/config" . "/config")
+  (list '("{{ gak_sabnzbd_dir }}/config" . "/config")
         '("{{ gak_media_dir }}/Media" . "/Media")))
  (environment
   (list '("PUID" . "{{ gak_media_uid }}")
