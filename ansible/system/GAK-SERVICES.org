@@ -1,0 +1,75 @@
+#+TITLE: Gak service maintenance
+#+options: toc:nil num:nil
+
+* Ownership
+
+Each =roles/gak_APPLICATION= owns its =templates/containers.scm.j2=, defaults,
+configuration tasks, secret files and operating instructions. Nextcloud owns
+its database, cache, cron and backup schedule as one application.
+
+=host_vars/gak/main= selects =gak_applications= and holds host-wide identity,
+timezone and rootless UID ranges. Explicit roles in =gak.yaml= load application
+defaults before =guix_config= composes their templates using Ansible's template
+lookup. Missing templates fail rendering. The shared OCI builder creates
+Shepherd services without adding another login account. The host owns networks,
+mounts and Podman. =gak_media= owns shared storage; =gak_ingress= owns ingress.
+
+* Storage
+
+=/media= is the HDD mount. Media stays in =/media/Media= and application state
+in =/media/.config/APPLICATION=. Preserve bind paths and media UID/GID mappings
+so NFS clients retain access. Source organization and image updates do not
+require relocating the tree. Koito and Nextcloud use =~/services=.
+
+Mutable state lives outside source control. Secrets come from the private vault
+and are deployed as restrictive files. Guix store expressions contain paths,
+not credentials.
+
+* Deployment
+
+Run from this directory:
+
+#+begin_src sh
+ansible-playbook gak.yaml --syntax-check
+ansible-playbook gak.yaml --tags guix-system,gak-media,gak-services --check
+ansible-playbook gak.yaml --tags guix-system,gak-media,gak-services
+#+end_src
+
+Build and activate separately on Gak:
+
+#+begin_src sh
+guix system build ~/.config/guix/system.scm
+sudo guix system reconfigure ~/.config/guix/system.scm
+sudo herd status
+podman ps -a
+#+end_src
+
+=gak-APPLICATION= selects that application's Ansible files. Include
+=guix-system= when changing a container or image. =gak-media= and =gak-services=
+group related roles. Rendered configuration, image presence, running containers
+and application health are separate checks.
+
+* Updates and recovery
+
+Record the running image and application version, read upstream migration
+requirements, and make a consistent backup before changing an image pin.
+Exercise recovery, build the system expression, activate one application at a
+time, and test its client protocol and dependent services. Retain the previous
+image and backup until verification passes. A Guix rollback does not undo a
+database migration.
+
+Nextcloud documents its encrypted backup and scratch restore in its role.
+Media applications need stopped or application-consistent copies of complete
+state, including databases and torrent resume metadata. Selected configuration
+files in private Git are not a complete restore. A backup target should be on a
+different physical disk; document whether an off-host copy exists.
+
+* Application selection
+
+Add a role to =gak.yaml= and its name to =gak_applications=. Keep version pins,
+configuration and recovery instructions together. Verify filesystem availability
+at startup and preserve the rootless subuid/subgid ranges.
+
+Removing an application from the list controls rendered declarations and role
+execution. It does not erase state or revoke existing Tailscale endpoints.
+Drain ingress, stop services and retain a verified backup before separate removal.

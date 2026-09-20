@@ -1,0 +1,13 @@
+(oci-container-configuration
+ (provision "jellyfin")
+ (image "jellyfin/jellyfin")
+ (network "starrs_net")
+ (ports (list '("9292" . "8096")))
+ (volumes
+  (list '("{{ gak_media_dir }}/.config/jellyfin/config" . "/config")
+        '("{{ gak_media_dir }}/.config/jellyfin/cache" . "/cache")
+        '("{{ gak_media_dir }}/Media" . "/Media")))
+ (extra-arguments
+  (list "--uidmap" "0:1:1"
+        "--gidmap" "0:1:1"
+        "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))

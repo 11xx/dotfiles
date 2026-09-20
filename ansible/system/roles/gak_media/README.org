@@ -1,48 +1,12 @@
-#+TITLE: The starrs media stack
-#+options: toc:nil num:nil
+#+TITLE: Shared media storage
 
-Seven rootless podman containers on gak: SABnzbd and qBittorrent fetch,
-Prowlarr indexes, Sonarr and Radarr organise, Recyclarr keeps Sonarr's custom
-formats in step with the Trash Guides, and Jellyfin serves the result.
+This role owns the shared /media and /media/.config directories on the HDD.
+Application roles own container declarations and supporting configuration.
+The media tree remains at /media/Media. Runtime state stays under
+/media/.config/APPLICATION; applications own their mutable configuration.
 
-This file is documentation, not a source. Nothing tangles out of it — the role
-beside it is the source of truth. It exists because the operational knowledge
-below was learned the hard way and is not derivable from the configuration.
-
-The literate Org file the compose file used to be tangled from is retired, in
-=~/org/.cemetary= on ak and =~/starrs-bkp/org-sources= on gak. It is not a
-second source to keep in step; everything worth keeping from it is here.
-
-* What Ansible owns, and what it does not
-
-The role deploys Recyclarr's configuration and its secrets, and nothing else.
-
-The containers themselves are declared in =guix_config='s =system.scm=, because
-gak runs GNU Shepherd and has no systemd: the =starrs.service= unit this role
-used to install was a file nothing ever read. The stack ran anyway, started by
-hand from the compose file:
-
-#+begin_src sh
-cd /media && podman compose down && podman compose pull && podman compose up -d
-#+end_src
-
-What that never gave it was a way to come back on its own. Declaring the
-containers means they start at boot instead of when someone remembers to log in
-and run the command. See =gak_services='s README for why =system.scm= calls
-=oci-configuration->shepherd-services= rather than adding =oci-service-type=,
-and for the lingering-user requirement that lets the containers start at boot.
-
-The uid, gid, timezone and ports the containers need are host facts in
-=host_vars/gak/main=, shared between that template and this role.
-
-Everything else under =/media/.config= is service state: each one
-reads its configuration at start and writes it back at runtime, so a templated
-copy is overwritten as soon as the container comes up.
-
-Those state files carry credentials — the Usenet provider account, qBittorrent's
-proxy account, and an API key for each service — so they are backed up in the
-private vault repository, under =.local/share/gak-media-config=, rather than
-here. This repository is public.
+Selected configuration snapshots in the private vault are not complete
+database or download-state backups. See [[file:../../GAK-SERVICES.org][service maintenance]].
 
 * Users and groups
 
@@ -72,69 +36,3 @@ wanted:
 #+begin_src sh
 sudo herd start recyclarr
 #+end_src
-
-** What changed about the uid mapping, and what did not
-
-The mappings themselves are unchanged and are known to work on this host: the
-compose file they come from ran here, by hand, writing files =ak= could read
-over NFS.
-
-What changed is how they are delivered. Compose carried them as =x-podman.uidmap=
-and =x-podman.gidmap= extension fields, which the compose implementation
-translated into podman arguments; =system.scm= passes =--uidmap= and =--gidmap=
-to podman directly. Same values, one less translation. If files start landing
-owned by something =ak= cannot read, that translation is the thing to check
-first, not the numbers.
-
-* Troubleshooting
-
-** Recyclarr: "did not find expected key" while parsing a block mapping
-
-Recyclarr resolves secrets implicitly — an instance named =sonarrv4= takes its
-URL and key from =sonarrv4_base_url= and =sonarrv4_api_key=. If =secrets.yml=
-carries a key no instance claims, parsing fails for the whole document, and the
-error points at the block mapping rather than the unused line. Keep that file to
-exactly the keys in use.
-
-** Sonarr/Radarr: folder not writable by user abc
-
-If a container binds an NTFS volume, the mount needs =uid=, =gid= and =umask=
-options that give the target host user permission; NTFS carries no Unix
-ownership of its own. See =~/org/arch-linux.org=, "Permissions when binding to
-an NTFS drive on Linux".
-
-** Jellyfin: UI works, playback fails on =/config/transcodes=
-
-: Error processing request: Invalid argument : '/config/transcodes'
-
-A failed transcode can corrupt that directory, after which any shell operation
-on it returns =Invalid argument (os error 22)=. Delete it and restart; Jellyfin
-recreates it. The path is set under Dashboard > Playback > Transcode path.
-
-Seen after an attempt to use NVENC under Docker on Linux. On a filesystem that
-survived a bad shutdown, =ntfsfix= or =chkdsk= may be the actual repair.
-
-** Sonarr: unable to open database file
-
-: EPIC FAIL! code = CantOpen (14) ... unable to open database file
-
-Ownership, in every case seen so far: the config directory is not writable as
-uid 1000 / gid 134. The remains of one of these, two generations deep, are kept
-at =~/starrs-bkp/sonarr-old-corrupt= on gak.
-
-** Permission denied after migrating from Docker to Podman
-
-Rootless containers share one user namespace, so a volume written by a container
-under Docker's mapping is not readable under Podman's. See
-[[https://www.tutorialworks.com/podman-rootless-volumes/#rootless-containers-share-the-same-user-namespace][Using volumes with rootless podman]].
-
-* Moving the stack
-
-The containers bind absolute host paths under =/media=. Moving the tree means
-editing those paths in =system.scm= and reconfiguring; there is no intermediate
-named volume to fall out of step with them.
-
-The compose file this replaces bound a named volume to a path relative to
-itself, and moving the directory did not update a volume that already existed —
-the containers kept binding the old path until the volume was removed. That
-failure is not reachable from here.

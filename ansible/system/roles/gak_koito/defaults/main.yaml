@@ -1,0 +1,6 @@
+---
+gak_koito_port: 4110
+gak_koito_version: v0.3.2
+gak_koito_admin_user: lobo
+gak_koito_service_name: koito
+gak_koito_dir: '{{ ansible_facts[''user_dir''] }}/services/koito'

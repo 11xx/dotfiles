@@ -1,0 +1,13 @@
+(oci-container-configuration
+ (provision "koito")
+ (image "gabehf/koito:{{ gak_koito_version }}")
+ (network "services_net")
+ (ports (list '("127.0.0.1:{{ gak_koito_port }}" . "4110")))
+ (volumes
+  (list '("{{ gak_koito_dir }}" . "/etc/koito")
+        '("{{ gak_koito_dir }}/secrets" . "/secrets")))
+ (environment
+  (list '("KOITO_DEFAULT_USERNAME" . "{{ gak_koito_admin_user }}")
+        '("KOITO_DEFAULT_PASSWORD_FILE" . "/secrets/default-password")
+        '("KOITO_FORCE_TZ" . "{{ gak_timezone }}")))
+ (respawn? #t))

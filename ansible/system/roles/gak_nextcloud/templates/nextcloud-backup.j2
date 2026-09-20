@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 umask 077
 
-nextcloud_root={{ (gak_services_dir ~ '/nextcloud') | quote }}
+nextcloud_root={{ gak_nextcloud_dir | quote }}
 nextcloud_dump="$nextcloud_root/backup-staging/database.dump"
 export RESTIC_REPOSITORY={{ (gak_nextcloud_backup_dir ~ '/restic') | quote }}
 export RESTIC_PASSWORD_FILE="$nextcloud_root/secrets/restic-password"

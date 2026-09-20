@@ -1,0 +1,60 @@
+(oci-container-configuration
+ (provision "nextcloud-db")
+ (image "docker.io/library/postgres:{{ gak_nextcloud_postgres_version }}@{{ gak_nextcloud_postgres_image_digest }}")
+ (network "nextcloud_net")
+ (volumes
+  (list '("{{ gak_nextcloud_dir }}/postgres" . "/var/lib/postgresql/data")
+        '("{{ gak_nextcloud_dir }}/secrets" . "/run/secrets/nextcloud:ro")))
+ (environment
+  (list '("POSTGRES_DB" . "nextcloud")
+        '("POSTGRES_USER" . "nextcloud")
+        '("POSTGRES_PASSWORD_FILE" . "/run/secrets/nextcloud/postgres-password")))
+ (respawn? #t))
+
+(oci-container-configuration
+ (provision "nextcloud-redis")
+ (image "docker.io/library/redis:{{ gak_nextcloud_redis_version }}@{{ gak_nextcloud_redis_image_digest }}")
+ (network "nextcloud_net")
+ (command (list "redis-server" "/usr/local/etc/redis/redis.conf"))
+ (volumes
+  (list '("{{ gak_nextcloud_dir }}/secrets/redis.conf" . "/usr/local/etc/redis/redis.conf:ro")))
+ (respawn? #t))
+
+(oci-container-configuration
+ (provision "nextcloud")
+ (image "docker.io/library/nextcloud:{{ gak_nextcloud_version }}-apache@{{ gak_nextcloud_image_digest }}")
+ (requirement '(nextcloud-db nextcloud-redis))
+ (network "nextcloud_net")
+ (ports (list '("127.0.0.1:{{ gak_nextcloud_port }}" . "80")))
+ (volumes
+  (list '("{{ gak_nextcloud_dir }}/html" . "/var/www/html")
+        '("{{ gak_nextcloud_dir }}/secrets" . "/run/secrets/nextcloud:ro")))
+ (environment
+  (list '("POSTGRES_HOST" . "nextcloud-db")
+        '("POSTGRES_DB" . "nextcloud")
+        '("POSTGRES_USER" . "nextcloud")
+        '("POSTGRES_PASSWORD_FILE" . "/run/secrets/nextcloud/postgres-password")
+        '("REDIS_HOST" . "nextcloud-redis")
+        '("REDIS_HOST_PASSWORD_FILE" . "/run/secrets/nextcloud/redis-password")
+        '("NEXTCLOUD_ADMIN_USER" . "{{ gak_nextcloud_admin_user }}")
+        '("NEXTCLOUD_ADMIN_PASSWORD_FILE" . "/run/secrets/nextcloud/admin-password")
+        '("NEXTCLOUD_TRUSTED_DOMAINS" . "{{ gak_nextcloud_hostname }}")
+        '("TRUSTED_PROXIES" . "127.0.0.1")
+        '("APACHE_DISABLE_REWRITE_IP" . "1")
+        '("OVERWRITEHOST" . "{{ gak_nextcloud_hostname }}")
+        '("OVERWRITEPROTOCOL" . "https")
+        '("OVERWRITECLIURL" . "https://{{ gak_nextcloud_hostname }}")
+        '("PHP_MEMORY_LIMIT" . "1G")
+        '("PHP_UPLOAD_LIMIT" . "10G")))
+ (respawn? #t))
+
+(oci-container-configuration
+ (provision "nextcloud-cron")
+ (image "docker.io/library/nextcloud:{{ gak_nextcloud_version }}-apache@{{ gak_nextcloud_image_digest }}")
+ (requirement '(nextcloud nextcloud-db nextcloud-redis))
+ (network "nextcloud_net")
+ (entrypoint "/cron.sh")
+ (volumes
+  (list '("{{ gak_nextcloud_dir }}/html" . "/var/www/html")
+        '("{{ gak_nextcloud_dir }}/secrets" . "/run/secrets/nextcloud:ro")))
+ (respawn? #t))

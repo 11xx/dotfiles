@@ -1,10 +1,2 @@
 ---
-# The stack's state lives on the media filesystem rather than under $HOME,
-# because the service state directories run to several gigabytes and belong on
-# the 16 TB array, not the 500 GB root NVMe.
-#
-# The containers themselves are not here. gak has no systemd, so they are
-# declared in system.scm through Guix's oci-service-type; the uid, gid,
-# timezone and ports they need are host facts in host_vars/gak/main, shared with
-# that template. This role owns only what the containers read and write.
 gak_media_dir: /media

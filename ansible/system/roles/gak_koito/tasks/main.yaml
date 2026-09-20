@@ -1,0 +1,29 @@
+---
+- ansible.builtin.file:
+    mode: '{{ item.mode }}'
+    path: '{{ item.path }}'
+    state: directory
+  loop:
+  - path: '{{ ansible_facts.user_dir }}/services'
+    mode: '0755'
+  - path: '{{ gak_services_bin_dir }}'
+    mode: '0755'
+  - path: '{{ gak_koito_dir }}'
+    mode: '0755'
+  - path: '{{ gak_koito_dir }}/secrets'
+    mode: '0700'
+  loop_control:
+    label: '{{ item.path }}'
+  name: 'gak_koito: Create the stack directory tree'
+  tags:
+  - gak-koito-config
+  - gak-koito-secrets
+- name: 'gak_koito: Deploy the koito admin password'
+  ansible.builtin.copy:
+    content: '{{ koito_admin_password }}'
+    dest: '{{ gak_koito_dir }}/secrets/default-password'
+    mode: '0600'
+  no_log: true
+  tags:
+  - gak-koito-config
+  - gak-koito-secrets

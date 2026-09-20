@@ -1,95 +1,20 @@
-# No become password: everything Ansible touches on gak is owned by this user,
-# whether under $HOME or on the media filesystem, so no task escalates. The
-# vault beside this file holds credentials only. Reconfiguring the Guix system
-# itself is a manual step run on the host.
+---
 ansible_user: lobo
 ansible_group: lobo
-
-# Guix System has no /usr/bin/python3 — no /usr/bin at all beyond `env` — so
-# interpreter discovery finds nothing and every module fails before it runs.
-# gak.yaml's first play installs this with `raw` if it is missing, which is why
-# the path is the user profile: it must not depend on `guix home reconfigure`,
-# a step deliberately left to a human.
-ansible_python_interpreter: "/home/lobo/.guix-profile/bin/python3"
-
-# --- Containers -------------------------------------------------------------
-#
-# gak's containers are declared in system.scm through Guix's OCI-to-Shepherd
-# builder, not in a compose file, because gak runs Shepherd and has no systemd:
-# a user unit is a file nothing reads, and a user Shepherd service would not
-# start until someone logged in. The Guix form produces system Shepherd services
-# that start at boot without duplicating the existing login account.
-#
-# These values therefore have two consumers — the roles that deploy the service
-# state, and guix_config's system.scm template — so they are host facts rather
-# than defaults belonging to either role.
-
-# Everything in the media stack writes as this pair. 1000 is the login user; 134
-# is the shared `media` group declared below in system.scm, which is also what
-# the NFS exports are keyed on. 134 spells M-D: the 13th and 4th letters.
+ansible_python_interpreter: /home/lobo/.guix-profile/bin/python3
 gak_media_uid: 1000
 gak_media_gid: 134
-
-# The services stamp their logs, schedules and statistics with this, so they
-# want the household's timezone rather than the host's UTC.
 gak_timezone: America/Sao_Paulo
-
-# Rootless podman's subuid and subgid range for lobo. Declared once, by
-# rootless-podman-service-type, because two services extending
-# subids-service-type with the same user name is a duplicate range and fails the
-# reconfigure.
-#
-# Do not move these numbers. /marak/podman-storage holds image layers owned by
-# uids inside this range; shifting it makes every one of them unreadable.
 gak_subid_start: 100000
 gak_subid_count: 65536
-
-# Sonarr's port, named because both the container's port mapping and the URL
-# recyclarr reaches it on have to agree.
-gak_sonarr_port: 8989
-
-# Koito's loopback port behind Tailscale Serve. 4110 is its own default and is
-# free here: the media stack holds 8787, 8888, 8989, 9090, 9191, 9292 and 12671.
-gak_koito_port: 4110
-
-# Pinned rather than floating, unlike the media images. Koito replaced
-# PostgreSQL with SQLite outright between v0.1.10 and v0.2.1, migrating data on
-# the way, so which version arrives is not a detail to leave to whenever the
-# image happens to be pulled. Read the release notes and take a copy of
-# ~/services/koito before moving this.
-gak_koito_version: v0.3.2
-
-# Seeds Koito's first account, once, on an empty database. The password beside
-# it is koito_admin_password in the vault.
-gak_koito_admin_user: lobo
-
-# Stable application identities inside the tailnet. A named Tailscale Service
-# can move to another host without changing its URL, and WebDAV/CalDAV clients
-# retain one canonical origin. Gak must carry tag:server before it can advertise
-# either service.
-gak_koito_service_name: koito
-gak_nextcloud_service_name: nextcloud
-gak_nextcloud_hostname: "{{ gak_nextcloud_service_name }}.{{ gak_tailnet_dns_suffix }}"
-
-# Nextcloud's Apache frontend is reachable only through Tailscale Serve on this
-# loopback port. PostgreSQL and Redis have no host ports at all.
-gak_nextcloud_port: 8080
-gak_nextcloud_admin_user: nextcloud-admin
-gak_nextcloud_user: lobo
-gak_nextcloud_user_display_name: Lobo
-
-# Every image is pinned to both a human-readable release and the multi-platform
-# manifest reviewed for this deployment. A version bump is an explicit database
-# and application migration, preceded by a checked backup and followed by a
-# restore drill.
-gak_nextcloud_version: 34.0.2
-gak_nextcloud_image_digest: sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329
-gak_nextcloud_postgres_version: 17.11-alpine
-gak_nextcloud_postgres_image_digest: sha256:5d61573b31c206ae538c85893edeb6e320e1a9ffd838c0f9dca927fb6f765fa4
-gak_nextcloud_redis_version: 8.2.8-alpine
-gak_nextcloud_redis_image_digest: sha256:a7859ed111db3c1f5404a973a4747505d559fb5ca32d37e447afc0ef845a2103
-
-# Primary state stays on the NVMe. The first backup copy lives on the separate
-# marak disk; it is encrypted, deduplicated and retained locally, but is not an
-# off-site backup.
-gak_nextcloud_backup_dir: /marak/backups/nextcloud
+gak_applications:
+- sabnzbd
+- prowlarr
+- sonarr
+- radarr
+- jellyfin
+- qbittorrent
+- recyclarr
+- koito
+- nextcloud
+gak_services_bin_dir: '{{ ansible_facts[''user_dir''] }}/.local/bin'

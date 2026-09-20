@@ -1,0 +1,10 @@
+(oci-container-configuration
+ (provision "recyclarr")
+ (image "ghcr.io/recyclarr/recyclarr")
+ (network "starrs_net")
+ (container-user "{{ gak_media_uid }}:{{ gak_media_gid }}")
+ (volumes
+  (list '("{{ gak_media_dir }}/.config/recyclarr" . "/config")))
+ (environment
+  (list '("TZ" . "{{ gak_timezone }}")))
+ (auto-start? #f))

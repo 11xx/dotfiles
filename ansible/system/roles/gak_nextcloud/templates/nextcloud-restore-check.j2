@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 umask 077
 
-nextcloud_root={{ (gak_services_dir ~ '/nextcloud') | quote }}
+nextcloud_root={{ gak_nextcloud_dir | quote }}
 nextcloud_scratch=$(mktemp -d "$nextcloud_root/restore-check.XXXXXXXX")
 nextcloud_test_container="nextcloud-restore-check-$$"
 nextcloud_postgres_image={{ ('docker.io/library/postgres:' ~ gak_nextcloud_postgres_version ~ '@' ~ gak_nextcloud_postgres_image_digest) | quote }}

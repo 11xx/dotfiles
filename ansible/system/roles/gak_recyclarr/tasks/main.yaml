@@ -1,0 +1,25 @@
+---
+- name: 'gak_recyclarr: Create the configuration directory'
+  ansible.builtin.file:
+    path: '{{ gak_media_dir }}/.config/recyclarr'
+    state: directory
+    mode: '0755'
+- name: 'gak_recyclarr: Deploy the recyclarr configuration'
+  ansible.builtin.copy:
+    src: recyclarr/{{ item }}
+    dest: '{{ gak_media_dir }}/.config/recyclarr/{{ item }}'
+    mode: '0644'
+  loop:
+  - recyclarr.yml
+  - settings.yml
+  tags:
+  - gak-recyclarr-config
+- name: 'gak_recyclarr: Deploy the recyclarr secrets'
+  ansible.builtin.template:
+    src: recyclarr-secrets.yml.j2
+    dest: '{{ gak_media_dir }}/.config/recyclarr/secrets.yml'
+    mode: '0600'
+  no_log: true
+  tags:
+  - gak-recyclarr-config
+  - gak-recyclarr-secrets

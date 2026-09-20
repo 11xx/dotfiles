@@ -1,0 +1,22 @@
+#+TITLE: Private service ingress
+
+This role deploys =gak-tailscale-services=, which reconciles named HTTPS handlers
+for enabled Koito and Nextcloud applications using their role-owned names and
+loopback ports. Run it explicitly after checking backend health and grants.
+
+Gak uses =tag:server=. Verify tag ownership, grants and advertisement approval
+in the tailnet administration interface. Test each canonical origin and client
+API from another tailnet node. Removing an application from Ansible does not
+revoke its existing endpoint.
+
+Inspect =sudo tailscale serve get-config --all -= before changing handlers.
+Remove only the intended handler; =tailscale serve reset= clears unrelated
+named services. Funnel is not part of this private ingress configuration.
+
+Inventory LAN clients and internal callers before changing media web bindings.
+qBittorrent's peer TCP/UDP port is independent of its web interface.
+
+The Tailscale package lives in =roles/guix_config/files/11xx-guix-channel=.
+Build and check the binary's version before reconfiguration. The tailnet suffix
+belongs in the vault; public HTTPS certificates can expose application names
+in certificate transparency logs.

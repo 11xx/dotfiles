@@ -1,0 +1,13 @@
+#+TITLE: sabnzbd
+
+This role owns the container declaration in =templates/containers.scm.j2=.
+Its persistent state is under =/media/.config/sabnzbd= on the HDD.
+The web backend uses host port 9090. Verify queue state and a completed download after an update.
+
+Use =sudo herd status sabnzbd= to inspect Shepherd and =podman logs sabnzbd=
+for application diagnostics. Before an image upgrade, stop the application,
+copy its complete state with ownership preserved to a separate backup disk,
+and restart it. Protect copies containing credentials. Restore into an isolated
+state directory and verify the application before replacing production state.
+
+See [[file:../../GAK-SERVICES.org][service maintenance]] for deployment and image updates.

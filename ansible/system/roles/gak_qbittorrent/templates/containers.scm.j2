@@ -1,0 +1,21 @@
+(oci-container-configuration
+ (provision "qbittorrent")
+ (image "lscr.io/linuxserver/qbittorrent:latest")
+ (network "starrs_net")
+ (ports (list '("9191" . "9191")
+              '("12671" . "6881")
+              "12671:6881/udp"))
+ (volumes
+  (list '("{{ gak_media_dir }}/.config/qbittorrent/config" . "/config")
+        '("{{ gak_media_dir }}/Media" . "/Media")))
+ (environment
+  (list '("PUID" . "{{ gak_media_uid }}")
+        '("PGID" . "{{ gak_media_gid }}")
+        '("UMASK" . "002")
+        '("TZ" . "{{ gak_timezone }}")
+        '("WEBUI_PORT" . "9191")
+        '("TORRENTING_PORT" . "6881")))
+ (extra-arguments
+  (list "--uidmap" "0:1:1"
+        "--gidmap" "0:1:1"
+        "--gidmap" "{{ gak_media_gid }}:{{ gak_media_gid }}:1")))

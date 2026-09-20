@@ -1,0 +1,11 @@
+---
+- name: 'gak_ingress: Create the operator command directory'
+  ansible.builtin.file:
+    path: '{{ gak_services_bin_dir }}'
+    state: directory
+    mode: '0755'
+- name: 'gak_ingress: Deploy the Tailscale service command'
+  ansible.builtin.template:
+    src: tailscale-services.j2
+    dest: '{{ gak_services_bin_dir }}/gak-tailscale-services'
+    mode: '0755'

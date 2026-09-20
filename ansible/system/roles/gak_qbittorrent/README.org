@@ -1,0 +1,13 @@
+#+TITLE: qbittorrent
+
+This role owns the container declaration in =templates/containers.scm.j2=.
+Its persistent state is under =/media/.config/qbittorrent= on the HDD.
+The web backend uses host port 9191; peer traffic uses host TCP/UDP port 12671. Preserve the complete config directory, including torrent resume metadata. Verify existing torrents and download paths.
+
+Use =sudo herd status qbittorrent= to inspect Shepherd and =podman logs qbittorrent=
+for application diagnostics. Before an image upgrade, stop the application,
+copy its complete state with ownership preserved to a separate backup disk,
+and restart it. Protect copies containing credentials. Restore into an isolated
+state directory and verify the application before replacing production state.
+
+See [[file:../../GAK-SERVICES.org][service maintenance]] for deployment and image updates.

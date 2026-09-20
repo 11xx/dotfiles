@@ -1,61 +1,11 @@
 ---
-# The media stack, previously tangled onto gak from a literate Org file with no
-# record of what was deployed. That source is retired; this role replaces it.
-#
-# Ansible owns what the containers read and write: recyclarr's configuration and
-# its secrets. It does not own the per-service state under .config, because each
-# service reads its own configuration at start and writes it back at runtime; a
-# templated copy would be overwritten as soon as the container came up and
-# reported changed on every run thereafter. Those files carry credentials and
-# are backed up in the private vault repository instead, under
-# .local/share/gak-media-config.
-#
-# It does not own the containers either. gak has no systemd, so they are
-# declared in system.scm and provisioned as system Shepherd services.
-#
-# Nothing here escalates. The stack runs rootless as the login user, and the
-# whole tree is owned by that user.
-
 - name: 'gak_media: Create the stack directory tree'
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: '{{ item }}'
     state: directory
-    mode: "0755"
+    mode: '0755'
   loop:
-    - "{{ gak_media_dir }}"
-    - "{{ gak_media_dir }}/.config"
-    - "{{ gak_media_dir }}/.config/recyclarr"
-  tags: ['gak-media-config']
-
-# Public: recyclarr.yml names its instance but never its URL or key, so the only
-# thing in it is which Trash Guides format IDs to sync.
-- name: 'gak_media: Deploy the recyclarr configuration'
-  ansible.builtin.copy:
-    src: "recyclarr/{{ item }}"
-    dest: "{{ gak_media_dir }}/.config/recyclarr/{{ item }}"
-    mode: "0644"
-  loop:
-    - recyclarr.yml
-    - settings.yml
-  tags: ['gak-media-config']
-
-# 0600: this is Sonarr's API key, which is full control of the instance.
-- name: 'gak_media: Deploy the recyclarr secrets'
-  ansible.builtin.template:
-    src: recyclarr-secrets.yml.j2
-    dest: "{{ gak_media_dir }}/.config/recyclarr/secrets.yml"
-    mode: "0600"
-  no_log: true
-  tags: ['gak-media-config', 'gak-media-secrets']
-
-# Starting and stopping is Shepherd's, and Shepherd's configuration is
-# system.scm, which is applied by hand. Ansible has no lever here, so it says so
-# rather than pretending otherwise.
-- name: 'gak_media: Report how to drive the stack'
-  ansible.builtin.debug:
-    msg: >-
-      The media containers are system Shepherd services declared in system.scm,
-      and start at boot once `sudo guix system reconfigure` has been run on gak.
-      `sudo herd status` lists them. recyclarr is a batch job and does not start
-      on its own: `sudo herd start recyclarr`.
-  tags: ['gak-media-config']
+  - '{{ gak_media_dir }}'
+  - '{{ gak_media_dir }}/.config'
+  tags:
+  - gak-media-config

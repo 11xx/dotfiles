@@ -1,0 +1,121 @@
+#+TITLE: Nextcloud
+
+* Nextcloud
+
+The Nextcloud stack uses four containers on its own =nextcloud_net= network:
+
+- =nextcloud= is the Apache frontend, bound only to =127.0.0.1:8080=.
+- =nextcloud-db= is PostgreSQL and has no host port.
+- =nextcloud-redis= provides memory cache and transactional file locking and
+  has no host port.
+- =nextcloud-cron= runs the upstream five-minute background-work loop against
+  the same application tree.
+
+The community =nextcloud:apache= image is used rather than Nextcloud AIO. AIO
+expects to create and supervise child containers through a container socket;
+that duplicates the ownership Guix and Shepherd already provide here. The
+application, PostgreSQL and Redis images are pinned by release and manifest
+digest in =host_vars/gak/main=.
+
+Primary state is under =~/services/nextcloud= on the NVMe:
+
+- =html= contains the application, configuration, installed apps and user data.
+- =postgres= contains the database cluster.
+- =secrets= contains the database, Redis, account and Restic credentials.
+- =backup-staging= holds a database dump only while a backup is running.
+
+The initial =nextcloud-admin= account is reserved for administration. Daily
+clients use the separate =lobo= account. Ansible creates that account after the
+containers are running, installs Calendar, selects cron background jobs, and
+sets the Brazilian phone-region default:
+
+#+begin_src sh
+ansible-playbook gak.yaml --tags gak-nextcloud-bootstrap
+#+end_src
+
+The bootstrap is idempotent. The daily password is kept in the encrypted Gak
+vault and deployed in a private environment file. =podman exec --env-file=
+loads it only for account creation; it is not part of the long-running
+container environment.
+
+The secret directory is not listable by application processes. Its mapped
+=www-data= group may traverse it and read only =redis-password=, which the
+upstream PHP Redis configuration loads for both web requests and cron. The
+Redis process receives its group-readable configuration through an individual
+read-only bind mount. The remaining credentials stay readable only by root in
+the container namespace.
+
+** Applying and inspecting the stack
+
+Ship the Ansible-owned files, build the generated Guix expression, then apply
+it while watching the host:
+
+#+begin_src sh
+ansible-playbook gak.yaml --tags guix-system,gak-nextcloud
+ssh gak guix system build ~/.config/guix/system.scm
+ssh -t gak sudo guix system reconfigure ~/.config/guix/system.scm
+#+end_src
+
+Then inspect the actual services and their isolated listener:
+
+#+begin_src sh
+sudo herd status nextcloud nextcloud-db nextcloud-redis nextcloud-cron mcron
+podman ps -a
+podman network inspect nextcloud_net
+ss -ltnp | grep 127.0.0.1:8080
+podman exec --user 33 nextcloud php occ status
+podman exec --user 33 nextcloud php occ setupchecks
+#+end_src
+
+** Calendar clients
+
+The canonical origin is the named Nextcloud Service URL derived from the
+private =gak_tailnet_dns_suffix= vault value. Log in as =lobo=, not
+=nextcloud-admin=. Calendar clients that ask for a DAV server can discover
+collections by appending this path to that origin:
+
+#+begin_example
+/remote.php/dav
+#+end_example
+
+On Android, DAVx⁵ can use its Nextcloud login flow and then exposes calendars
+to the system calendar database; any calendar application can render them. The
+Nextcloud Android app is useful for files and sharing but does not replace the
+DAV calendar adapter. Desktop clients can use the same CalDAV discovery URL.
+
+** Backup and restore
+
+At 03:30 local time, system mcron runs =~/.local/bin/gak-nextcloud-backup= as
+=lobo=. The command prevents overlap, initializes an encrypted Restic
+repository when needed, enters maintenance mode, creates a native PostgreSQL
+dump, snapshots that dump with the complete =html= tree, clears maintenance
+mode even after failure, applies retention, prunes, and checks the repository.
+Restic runs inside podman's user namespace so it can read files owned by the
+container's mapped =www-data= identity without relaxing their host permissions.
+
+The repository is =/marak/backups/nextcloud/restic= on a physical disk separate
+from the NVMe primary state. Retention keeps seven daily, five weekly and twelve
+monthly snapshots. This protects against local state loss and mistakes; it is
+not an off-site copy and does not protect against loss of both disks or the
+host.
+
+Run the caller-visible recovery gate after first deployment and before an
+upgrade:
+
+#+begin_src sh
+gak-nextcloud-backup
+gak-nextcloud-restore-check
+#+end_src
+
+The restore check decrypts the latest snapshot into a private scratch
+directory, verifies the application/data markers, restores the dump into an
+ephemeral isolated PostgreSQL container, requires real application tables, and
+removes the scratch state. A full recovery uses the same snapshot, restores
+=html= to an empty bind-mount root, initializes an empty PostgreSQL cluster, and
+applies the database dump before starting the application containers.
+
+Redis contains rebuildable cache and lock state and is deliberately excluded
+from backup.
+
+
+See [[file:../../GAK-SERVICES.org][service maintenance]] for ownership and updates.

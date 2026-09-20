@@ -43,8 +43,27 @@
 - name: Guix home server
   hosts: gak
 
+  pre_tasks:
+    - name: Validate the explicit application list
+      ansible.builtin.assert:
+        that:
+          - gak_applications | type_debug == 'list'
+          - gak_applications | unique | length == gak_applications | length
+          - gak_applications | difference(['sabnzbd', 'prowlarr', 'sonarr', 'radarr', 'jellyfin', 'qbittorrent', 'recyclarr', 'koito', 'nextcloud']) | length == 0
+        fail_msg: gak_applications must contain unique supported application names.
+      tags: ['always']
+
   roles:
     - { role: guix_config, tags: ['guix'] }
     - { role: shell, tags: ['shell'] }
     - { role: gak_media, tags: ['gak-media'] }
-    - { role: gak_services, tags: ['gak-services'] }
+    - { role: gak_sabnzbd, tags: ['gak-media', 'gak-sabnzbd'], when: "'sabnzbd' in gak_applications" }
+    - { role: gak_prowlarr, tags: ['gak-media', 'gak-prowlarr'], when: "'prowlarr' in gak_applications" }
+    - { role: gak_sonarr, tags: ['gak-media', 'gak-sonarr'], when: "'sonarr' in gak_applications" }
+    - { role: gak_radarr, tags: ['gak-media', 'gak-radarr'], when: "'radarr' in gak_applications" }
+    - { role: gak_jellyfin, tags: ['gak-media', 'gak-jellyfin'], when: "'jellyfin' in gak_applications" }
+    - { role: gak_qbittorrent, tags: ['gak-media', 'gak-qbittorrent'], when: "'qbittorrent' in gak_applications" }
+    - { role: gak_recyclarr, tags: ['gak-media', 'gak-recyclarr'], when: "'recyclarr' in gak_applications" }
+    - { role: gak_koito, tags: ['gak-services', 'gak-koito'], when: "'koito' in gak_applications" }
+    - { role: gak_nextcloud, tags: ['gak-services', 'gak-nextcloud'], when: "'nextcloud' in gak_applications" }
+    - { role: gak_ingress, tags: ['gak-services', 'gak-ingress'] }
