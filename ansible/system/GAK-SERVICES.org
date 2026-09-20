@@ -11,15 +11,20 @@ are owned by the login user.
 
 =host_vars/gak/main= selects =gak_applications= and the explicit
 =gak_compose_autostart= list. The latter may select declared web applications
-and Nextcloud, but never the Recyclarr batch job. Ansible writes both lists and
-the lifecycle helper under the login user's home. The helper validates every
-declared project and fails if a selected Compose file is missing; it does not
-discover projects from a directory listing.
+and Nextcloud, but never the Recyclarr batch job. Ansible writes both lists, the
+lifecycle helper and the update command under the login user's home. The
+lifecycle helper validates every declared project and fails if a selected
+Compose file is missing; it does not discover projects from a directory
+listing. Boot selection and update selection are separate questions: the update
+command discovers projects from the services root and never consults either
+list.
 
 Ansible owns service directories, Compose files, operator commands and secret
 files. Guix System owns only stable host integration: rootless Podman,
 subordinate ID ranges, linger/cgroup prerequisites, filesystem and networking
-requirements, mcron and one Shepherd service. Tailscale owns ingress.
+requirements, mcron and one Shepherd service. Guix Home owns the login user's
+tooling, including the Compose provider and the interpreter its YAML support
+runs on. Tailscale owns ingress.
 
 * Storage and namespaces
 
@@ -90,10 +95,158 @@ podman compose -f ~/services/sonarr/compose.yaml up -d --force-recreate --pull n
 #+end_src
 
 The explicit pull is the update boundary. =pull_policy: never= prevents an
-ordinary =up= from fetching a missing or changed image. Use the same two
-commands for a selected project after reading its upstream migration notes.
-Use =podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr=
-for the manual batch job.
+ordinary =up= from fetching a missing or changed image. Those two commands are
+the manual form of what =gak-services update= does for a whole project; use them
+directly when working on one project in isolation. Use
+=podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr= for the
+manual batch job.
+
+* Updating images
+
+=~/.local/bin/gak-services= updates projects it discovers under =~/services=.
+Every immediate subdirectory holding a =compose.yaml= is a project, named by its
+directory. The definition is the source of truth for image channels and update
+policy; the command carries no list of applications.
+
+#+begin_src sh
+gak-services list
+gak-services update --all --dry-run
+gak-services update --all
+gak-services update sonarr jellyfin
+#+end_src
+
+=list= and =--dry-run= contact no registry, run no hook and recreate nothing.
+
+=--all= selects the discovered projects whose declared services are all running.
+A project that is not running is left alone, because a stopped project is a
+manual or batch one. Naming such a project instead fails: the update command
+never starts something the operator chose to keep down. A project that is only
+partially running is an anomaly rather than a selection, so it fails the
+preflight before anything is pulled and is never healed by an update.
+
+A project's active services are whatever the Compose provider reports for the
+definition, so a service behind an inactive profile is not expected to run, and
+a running container for a service the definition does not declare makes the
+project ambiguous and fails. Project identity is the realpath of the project
+directory, matched against the =com.docker.compose.project.working_dir= label,
+so a container that merely shares a name is never selected.
+
+Every selected project is validated first, then pulled while its containers stay
+up. If any pull fails, nothing is recreated. After the pulls, each project's
+running image IDs are compared with what its declared image references now
+resolve to locally; an unchanged project is skipped unless =--force= is given.
+Changed projects are recreated one at a time with =up -d --force-recreate --pull
+never=, so a multi-container project such as Nextcloud moves as one unit and no
+project is ever torn down globally. A project whose running images moved between
+planning and recreation fails rather than acting on a stale plan.
+
+** Update hooks
+
+A project may declare a small optional top-level =x-update= mapping:
+
+#+begin_example
+x-update:
+  before-update:
+    - /home/USER/.local/bin/APPLICATION-pre-update
+  before-update-timeout: 3600
+  readiness:
+    - /home/USER/services/APPLICATION/readiness
+  readiness-timeout: 120
+#+end_example
+
+The mapping is validated against exactly these four keys before anything is
+pulled. A policy of any other shape -- a scalar, a list, an unknown key, an
+argument that is not a string, a timeout that is a boolean -- is a refusal, not
+something to step over: a policy the operator wrote and the updater ignored is
+the failure that matters here.
+
+=before-update= runs only for a project that is about to be recreated and must
+succeed, or that project is not recreated and the run stops. =readiness= is
+retried until it succeeds or the project's deadline expires. Both are argument
+lists executed directly with the project directory as the working directory and
+=GAK_SERVICES_PROJECT= and =GAK_SERVICES_PROJECT_DIR= in the environment. There
+is no shell, so no quoting, expansion or pipeline is available, and the first
+argument must be an absolute path to an existing executable file. These commands
+run with the operator's own privileges: a Compose file under the services root
+is user-owned executable configuration and is trusted exactly as far as the
+account that deploys it.
+
+Every command the updater runs -- provider, inspection, pull, recreation and
+both hooks -- runs in its own process group under a hard time bound, and one
+that outruns its bound is stopped as a group. The two hooks are bounded
+separately because they are different work: a readiness probe is expected to
+answer in seconds and is retried, while a gate that takes a database backup
+legitimately runs for a long time and gets =before-update-timeout= to itself.
+The update lock is held until every such child has been stopped.
+Termination allows a ten-second cleanup grace before killing remaining children.
+Provider and hook output is private by default. =GAK_SERVICES_SHOW_PROVIDER_ERRORS=1
+and =GAK_SERVICES_SHOW_HOOK_OUTPUT=1 enable explicit diagnostics that may contain
+secrets; do not capture or share those diagnostics without inspection.
+
+** Readiness and its limit
+
+After recreation the updater requires every declared service to have a container
+that is running the image the plan chose and that holds still across a settle
+period. Checking the image identity is what separates a recreation from a
+recreation that quietly kept what was already there.
+
+Podman schedules container healthchecks through systemd timers, which this host
+does not run, so a healthcheck-bearing image reports =starting= indefinitely
+here. Health status is therefore never consulted. Without a declared =readiness=
+command, running the planned image is the whole assurance: it is process
+liveness on the intended image, not application readiness, and migrations,
+database connectivity and HTTP behaviour are not covered by it. A project that
+needs the stronger statement declares its own readiness command, as Nextcloud
+does. Readiness failure stops the run with a summary; the remaining projects are
+left untouched.
+
+Nextcloud's readiness command parses its loopback =status.php= response and
+requires =installed=true=, =maintenance=false= and =needsDbUpgrade=false=.
+
+** The declared runtime
+
+The command is deployed in two pieces. =gak-services= is a =/bin/sh= launcher --
+the one interpreter this host guarantees at an absolute path, so it starts from
+an empty environment. It selects the Guix Home profile explicitly, loads the
+environment generated beside that profile, and runs =gak-services.py= on the
+profile's own =python3= with =-I=. Guix Home declares =python=, =python-pyyaml=
+and =podman-compose= in one place, and that declaration is the whole of the
+command's runtime: no interpreter is searched for on PATH, and an inherited
+=PYTHONPATH=, =PYTHONHOME= or =GUIX_PYTHONPATH= cannot reach it.
+
+Podman and the Compose provider live in the privileged, Home and system
+directories, which a non-login environment does not put on PATH. The command
+therefore builds PATH itself, in that order, promoting a declared directory that
+the inherited PATH happened to list later rather than leaving it there. The
+privileged directory leads because cold rootless namespace setup resolves its
+mapping helpers from it. The Home profile's =podman-compose= is selected
+explicitly, and inherited =COMPOSE_*= scoping variables are dropped.
+
+A scheduled job and a bare remote invocation therefore behave exactly like a
+login shell. When the profile, its generated environment, its interpreter or the
+Compose provider is missing, the command says which one and stops.
+
+After Ansible deploys a changed Home declaration, activate it without sudo:
+
+#+begin_src sh
+guix home reconfigure ~/.config/guix-home/home-configuration.scm
+gak-services list
+gak-services update --all --dry-run
+#+end_src
+
+** Concurrency and recovery
+
+The update command takes its own lock under =${XDG_RUNTIME_DIR}/gak-services=,
+distinct from the boot helper's lifecycle lock, and closes that descriptor for
+every child so a detached Podman descendant cannot retain it. It excludes a
+second update run, not Compose commands typed by hand against the same project;
+that remains an operational limit rather than a guarantee.
+
+Nothing is rolled back, pruned or pinned automatically. Previous images stay in
+local storage for recovery, and the summary reports the before and after image
+ID of every selected service so the previous identity is recorded. Putting the
+previous image back is not a rollback for an application that has already
+migrated its schema; for those, the pre-update snapshot is the way back.
 
 * Deployment and activation
 
@@ -104,6 +257,37 @@ ansible-playbook gak.yaml --syntax-check
 ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose --check
 ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose
 #+end_src
+
+The =gak_compose= role carries executable fixtures for the helper and the
+update command. They use a Podman stand-in and throwaway project directories,
+and touch no container, image or backup:
+
+#+begin_src sh
+roles/gak_compose/tests/lifecycle.bash
+roles/gak_compose/tests/services-update.bash
+roles/gak_compose/tests/services-environment.bash
+roles/gak_compose/tests/services-provider.bash
+roles/gak_compose/tests/nextcloud-extension.bash
+roles/gak_compose/tests/nextcloud-readiness.bash
+roles/gak_compose/tests/autostart-validation.bash
+python3 roles/gak_compose/tests/list-render.py
+python3 roles/gak_compose/tests/services-safety.py
+#+end_src
+
+A fixture that needs a tool the machine lacks exits 77 and says so.
+
+Applying the Home environment is unprivileged and separate from the system
+generation. Ansible ships the declaration and never applies it:
+
+#+begin_src sh
+guix home reconfigure ~/.config/guix-home/home-configuration.scm
+#+end_src
+
+Run it after Ansible deploys the declaration and before the update command is
+first used, because that is what puts the Compose provider on PATH. Start a new
+login shell afterwards so the profile's search paths are exported. The command
+itself needs no reconfiguration for an image update; only a change to the
+declared tooling does.
 
 Application deployments and enabled-list edits are unprivileged. When the
 Guix host integration itself changes, the play reports the pending activation.
@@ -164,10 +348,12 @@ Before the first Compose recreation, the operator records the running image
 IDs and tags each existing image with the corresponding alias. This seeds the
 aliases without pulling or changing software. Keep the observed IDs and the
 last working Compose files as the rollback record; do not put those digests in
-the Guix expression. A later update is explicit: pull the selected alias,
-recreate the project, run its native version and caller-visible checks, and
-retain the previous image until verification passes. Do not advance the
-Nextcloud major, PostgreSQL major or Redis 8.2 series silently.
+the Guix expression. A later update is explicit: =gak-services update= pulls the
+declared channel, recreates the project and reports the before and after image
+IDs. Run the application's native version and caller-visible checks afterwards,
+and retain the previous image until they pass. Advancing the Nextcloud major,
+the PostgreSQL major or the Redis 8.2 series is a deliberate edit to the role
+defaults, never a side effect of an update run.
 
 * One-time ownership handover
 
@@ -249,9 +435,15 @@ a different physical disk; document whether an off-host copy exists.
 Nextcloud's mcron job runs =~/.local/bin/gak-nextcloud-backup= as =lobo=. It
 uses maintenance mode, a native PostgreSQL dump, the complete =html= tree,
 encrypted Restic storage at =/marak/backups/nextcloud/restic=, retention and a
-repository check. =gak-nextcloud-restore-check= uses the image identity of the
-running =nextcloud-db= container for its isolated scratch database, validates
-real application tables and removes only its own scratch state.
+repository check. Its zero exit means a fresh complete snapshot with the
+instance out of maintenance mode and nothing else: contention exits 75 and a
+maintenance mode that could not be cleared fails the run. The Nextcloud Compose
+project names it as its =before-update= gate, so an update of that project
+either snapshots first or recreates nothing.
+
+=gak-nextcloud-restore-check= uses the image identity of the running
+=nextcloud-db= container for its isolated scratch database, validates real
+application tables and removes only its own scratch state.
 
 Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or

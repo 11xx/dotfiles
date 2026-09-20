@@ -2,6 +2,21 @@ name: nextcloud
 x-podman:
   in_pod: false
 
+# The updater runs the gate before recreating the project, and refuses to
+# recreate anything when it fails. A schema upgrade is not reversible by putting
+# the previous image back, so the snapshot is the only way back. A backup of
+# this instance takes longer than an ordinary gate, hence its own bound.
+#
+# Readiness is the application's own status document rather than the liveness of
+# four containers: the entrypoint may still be migrating while they all run.
+x-update:
+  before-update:
+    - '{{ gak_services_bin_dir }}/gak-nextcloud-backup'
+  before-update-timeout: 3600
+  readiness:
+    - '{{ gak_services_bin_dir }}/gak-nextcloud-update-ready'
+  readiness-timeout: 600
+
 services:
   nextcloud-db:
     image: '{{ gak_nextcloud_postgres_image }}'

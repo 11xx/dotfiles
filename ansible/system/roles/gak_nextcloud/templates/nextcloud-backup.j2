@@ -8,10 +8,13 @@ nextcloud_dump="$nextcloud_root/backup-staging/database.dump"
 export RESTIC_REPOSITORY={{ (gak_nextcloud_backup_dir ~ '/restic') | quote }}
 export RESTIC_PASSWORD_FILE="$nextcloud_root/secrets/restic-password"
 
+# Contention means this invocation took no backup. Callers that gate an update
+# on a fresh snapshot must be able to tell that apart from success, so it is a
+# failure rather than a quiet no-op.
 exec 9>"$nextcloud_root/backup.lock"
 if ! flock -n 9; then
     printf '%s\n' 'A Nextcloud backup is already running.' >&2
-    exit 0
+    exit 75
 fi
 
 for nextcloud_container in nextcloud nextcloud-db; do
@@ -26,12 +29,17 @@ if [[ ! -f "$RESTIC_REPOSITORY/config" ]]; then
 fi
 
 nextcloud_maintenance=0
+# Leaving maintenance mode is part of the result: an instance still closed to
+# its users is a failure even when everything before it succeeded.
 nextcloud_cleanup() {
     nextcloud_status=$?
     set +e
     rm -f -- "$nextcloud_dump"
     if (( nextcloud_maintenance )); then
-        podman exec --user 33 nextcloud php occ maintenance:mode --off
+        if ! podman exec --user 33 nextcloud php occ maintenance:mode --off; then
+            printf '%s\n' 'Nextcloud remains in maintenance mode.' >&2
+            (( nextcloud_status )) || nextcloud_status=1
+        fi
     fi
     exit "$nextcloud_status"
 }

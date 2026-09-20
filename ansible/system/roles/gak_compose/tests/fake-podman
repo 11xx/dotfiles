@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# A Podman stand-in for the gak-services fixtures. It implements exactly the
+# invocations the updater makes and refuses anything else, so a change in the
+# updater's Podman contract fails the fixture instead of passing silently.
+#
+# Container state lives in a tab-separated table:
+#   name  status  restarts  image-id  service  working-dir
+set -u
+
+printf '%s|%s\n' "$PWD" "$*" >>"$FAKE_LOG"
+
+# What the updater handed down, so a fixture can assert the runtime it built.
+printf '%s\n' "$PATH" >"$FAKE_STATE/path.seen"
+printf '%s\n' "${PODMAN_COMPOSE_PROVIDER:-unset}" >"$FAKE_STATE/provider.seen"
+printf '%s\n' "${COMPOSE_PROFILES:-unset}" >"$FAKE_STATE/profiles.seen"
+
+containers="$FAKE_STATE/containers.tsv"
+images="$FAKE_STATE/images.tsv"
+
+fail() {
+    printf 'fake-podman: %s\n' "$*" >&2
+    exit 90
+}
+
+image_id() {
+    awk -F'\t' -v ref="$1" '$1 == ref { print $2; found = 1 } END { exit !found }' "$images"
+}
+
+set_image() {
+    local ref=$1 id=$2
+    awk -F'\t' -v ref="$ref" '$1 != ref' "$images" >"$images.tmp"
+    printf '%s\t%s\n' "$ref" "$id" >>"$images.tmp"
+    mv -f -- "$images.tmp" "$images"
+}
+
+set_container() {
+    awk -F'\t' -v name="$1" '$1 != name' "$containers" >"$containers.tmp"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6" >>"$containers.tmp"
+    mv -f -- "$containers.tmp" "$containers"
+}
+
+case ${1:-} in
+    ps)
+        workdir=
+        for argument in "$@"; do
+            case $argument in
+                label=com.docker.compose.project.working_dir=*)
+                    workdir=${argument#label=com.docker.compose.project.working_dir=}
+                    ;;
+            esac
+        done
+        [[ -n $workdir ]] || fail "ps without the working_dir filter: $*"
+        awk -F'\t' -v dir="$workdir" '$6 == dir { print $1 }' "$containers"
+        ;;
+    inspect)
+        [[ ${2:-} == --type && ${3:-} == container ]] || fail "unexpected inspect: $*"
+        expected='{"status":{{json .State.Status}},"restarts":{{.RestartCount}},"image":{{json .Image}},"service":{{json (index .Config.Labels "com.docker.compose.service")}}}'
+        [[ ${4:-} == --format && ${5:-} == "$expected" ]] || fail "unexpected inspect format: $*"
+        shift 5
+        (($# > 0)) || fail 'inspect without a container'
+        for name in "$@"; do
+            awk -F'\t' -v name="$name" '$1 == name { found = 1 } END { exit !found }' \
+                "$containers" || exit 125
+            if [[ -f "$FAKE_STATE/flap/$name" ]]; then
+                count=$(<"$FAKE_STATE/flap/$name")
+                printf '%s\n' "$((count + 1))" >"$FAKE_STATE/flap/$name"
+                awk -F'\t' -v name="$name" -v n="$count" \
+                    'BEGIN { OFS = "\t" } $1 == name { $3 = n } { print }' \
+                    "$containers" >"$containers.tmp"
+                mv -f -- "$containers.tmp" "$containers"
+            fi
+        done
+        {
+            separator=''
+            for name in "$@"; do
+                awk -F'\t' -v name="$name" -v sep="$separator" '
+                    $1 == name {
+                        printf "{\"status\":\"%s\",\"restarts\":%s,", $2, $3
+                        printf "\"image\":\"%s\",", $4
+                        printf "\"service\":\"%s\"}\n", $5
+                    }' "$containers"
+                separator=','
+            done
+        }
+        ;;
+    image)
+        [[ ${2:-} == inspect && ${3:-} == --format && ${4:-} == '{{.Id}}' ]] ||
+            fail "unexpected image command: $*"
+        image_id "${5:?}" || exit 125
+        ;;
+    compose)
+        if [[ ${2:-} == version ]]; then
+            [[ ! -f "$FAKE_STATE/no-provider" ]] || exit 1
+            printf 'podman-compose version 1.6.0\n'
+            exit 0
+        fi
+        [[ ${2:-} == -f && ${3:-} == compose.yaml ]] || fail "unexpected compose command: $*"
+        case ${4:-} in
+            config)
+                if [[ -f config.fail ]]; then
+                    printf 'provider error quoting the definition: %s\n' \
+                        "$(cat config.fail 2>/dev/null)" >&2
+                    exit 1
+                fi
+                if [[ -n ${FAKE_REAL_PODMAN:-} ]]; then
+                    exec "$FAKE_REAL_PODMAN" compose -f compose.yaml config 2>/dev/null
+                fi
+                cat compose.yaml
+                ;;
+            pull)
+                [[ ! -f pull.fail ]] || {
+                    printf 'provider pull error quoting the definition\n' >&2
+                    exit 1
+                }
+                [[ ! -f pull.hang ]] || sleep 120
+                if [[ -f pull.map ]]; then
+                    while IFS=$'\t' read -r ref id; do
+                        [[ -n $ref ]] && set_image "$ref" "$id"
+                    done <pull.map
+                fi
+                ;;
+            up)
+                shift 4
+                [[ $* == '-d --force-recreate --pull never' ]] || fail "unexpected up arguments: $*"
+                [[ ! -f up.fail ]] || exit 1
+                here=$(realpath .)
+                if [[ -f up.stale ]]; then
+                    # A recreation that quietly keeps what was already running.
+                    exit 0
+                fi
+                awk -F'\t' -v dir="$here" '$6 != dir' "$containers" >"$containers.tmp"
+                mv -f -- "$containers.tmp" "$containers"
+                while IFS=$'\t' read -r service ref container; do
+                    [[ -n $service ]] || continue
+                    if [[ -f up.only ]] && ! grep -Fxq "$service" up.only; then
+                        continue
+                    fi
+                    id=$(image_id "$ref") || fail "up without a local image: $ref"
+                    set_container "$container" running 0 "$id" "$service" "$here"
+                    if [[ -f up.flap ]]; then
+                        mkdir -p "$FAKE_STATE/flap"
+                        printf '0\n' >"$FAKE_STATE/flap/$container"
+                    fi
+                done <services.map
+                if [[ -f up.detach ]] && [[ ! -f "$FAKE_DETACHED_PID" ]]; then
+                    sleep 60 >/dev/null 2>&1 &
+                    printf '%s\n' "$!" >"$FAKE_DETACHED_PID"
+                fi
+                ;;
+            *)
+                fail "unexpected compose subcommand: $*"
+                ;;
+        esac
+        ;;
+    *)
+        fail "unexpected command: $*"
+        ;;
+esac

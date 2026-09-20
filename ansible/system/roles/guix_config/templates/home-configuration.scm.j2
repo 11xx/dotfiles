@@ -22,13 +22,6 @@
     (list "bash-completion"
           "zsh-completions"
 
-          ;; Python is deliberately absent here. Ansible needs an interpreter
-          ;; before it can run anything, including whatever would apply this
-          ;; file, so it lives in the user profile where gak.yaml's bootstrap
-          ;; play can install it with `raw`. Declaring it in both places would
-          ;; put two interpreters on PATH and make which one Ansible used depend
-          ;; on profile ordering.
-
           "git"
           "curl"
           "wget"
@@ -48,6 +41,11 @@
           "fzf"
           "atuin"
 
+          ;; The updater selects this profile's interpreter and YAML module.
+          ;; Ansible independently pins its bootstrap interpreter in the user
+          ;; profile so it can deploy Home configuration before activation.
+          "python"
+          "python-pyyaml"
           "podman-compose"))
 
    ;; zsh plugins come from the local 11xx channel rather than Guix upstream, so

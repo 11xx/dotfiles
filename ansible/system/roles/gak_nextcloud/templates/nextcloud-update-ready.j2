@@ -1,0 +1,36 @@
+#!/bin/sh
+# Use the declared interpreter; this probe needs only its standard library.
+exec "${GAK_SERVICES_HOME_PROFILE:-$HOME/.guix-home/profile}/bin/python3" -I - <<'PY'
+import json
+import os
+import sys
+import urllib.request
+
+
+def refuse(reason):
+    print(f"nextcloud is not ready: {reason}", file=sys.stderr)
+    sys.exit(1)
+
+
+url = os.environ.get("GAK_NEXTCLOUD_STATUS_URL", "http://127.0.0.1:{{ gak_nextcloud_port }}/status.php")
+try:
+    timeout = float(os.environ.get("GAK_NEXTCLOUD_STATUS_TIMEOUT", "10"))
+    if not 0 < timeout <= 60:
+        raise ValueError()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(url, timeout=timeout) as response:
+        body = response.read(65537)
+except (OSError, ValueError):
+    refuse("the status endpoint did not answer within the transport bound")
+try:
+    if len(body) > 65536:
+        raise ValueError()
+    status = json.loads(body)
+    if not isinstance(status, dict):
+        raise ValueError()
+except (ValueError, UnicodeError):
+    refuse("the status endpoint did not return a JSON object")
+for name, expected in (("installed", True), ("maintenance", False), ("needsDbUpgrade", False)):
+    if status.get(name) is not expected:
+        refuse(f'the status document does not report "{name}":{str(expected).lower()}')
+PY

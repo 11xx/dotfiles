@@ -132,11 +132,14 @@
     dest: gak-nextcloud-backup
   - src: nextcloud-restore-check.j2
     dest: gak-nextcloud-restore-check
+  - src: nextcloud-update-ready.j2
+    dest: gak-nextcloud-update-ready
   loop_control:
     label: '{{ item.dest }}'
   name: 'gak_nextcloud: Deploy nextcloud operator commands'
   tags:
   - gak-nextcloud-config
+  - gak-compose-config
 - name: 'gak_nextcloud: Deploy the Compose project'
   ansible.builtin.template:
     src: compose.yaml.j2

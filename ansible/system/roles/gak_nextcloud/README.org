@@ -98,6 +98,21 @@ mode even after failure, applies retention, prunes, and checks the repository.
 Restic runs inside podman's user namespace so it can read files owned by the
 container's mapped =www-data= identity without relaxing their host permissions.
 
+Its exit status is the whole result. An invocation that found the lock held took
+no backup and exits 75; an invocation that could not leave maintenance mode
+fails even when the snapshot succeeded. Nothing may read a zero exit as anything
+other than a fresh, complete snapshot with the instance open again.
+
+The Compose project names this command as its =x-update= =before-update= gate,
+so =gak-services update nextcloud= takes a snapshot before recreating the four
+containers and recreates nothing if the snapshot fails. Putting the previous
+image back does not undo a schema upgrade, so that snapshot, not the retained
+image, is the way back from one.
+
+The =gak-nextcloud-update-ready= command checks the loopback =status.php=
+endpoint. It succeeds only for an installed instance outside maintenance mode
+with no pending database upgrade, and is the Compose project's readiness hook.
+
 The repository is =/marak/backups/nextcloud/restic= on a physical disk separate
 from the NVMe primary state. Retention keeps seven daily, five weekly and twelve
 monthly snapshots. This protects against local state loss and mistakes; it is

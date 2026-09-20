@@ -37,3 +37,21 @@
     dest: '{{ gak_services_bin_dir }}/gak-compose-lifecycle'
     mode: '0755'
   tags: ['gak-compose-config']
+
+# The launcher is what an operator runs; the implementation is what the
+# launcher hands to the interpreter its Guix profile declares.
+- name: 'gak_compose: Deploy the update command'
+  ansible.builtin.copy:
+    src: '{{ item.src }}'
+    dest: '{{ gak_services_bin_dir }}/{{ item.dest }}'
+    mode: '{{ item.mode }}'
+  loop:
+  - src: gak-services
+    dest: gak-services
+    mode: '0755'
+  - src: gak-services.py
+    dest: gak-services.py
+    mode: '0644'
+  loop_control:
+    label: '{{ item.dest }}'
+  tags: ['gak-compose-config']
