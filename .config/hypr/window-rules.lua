@@ -1,5 +1,6 @@
 -- Polkit dialogs
 window_rule({ class = "^(org.kde.polkit-kde-authentication-agent-1)$" }, { float = true })
+window_rule({ class = "^qarma$" }, { float = true, pin = true })
 
 -- Picture-in-Picture (dynamic title, requires full regex match)
 window_rule({ title = "^(Picture-in-Picture)$" }, { float = true, pin = true })
