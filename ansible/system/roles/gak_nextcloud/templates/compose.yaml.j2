@@ -73,6 +73,8 @@ services:
     depends_on:
       - nextcloud
     entrypoint: /cron.sh
+    init: true
+    stop_signal: SIGTERM
     volumes:
       - '{{ gak_nextcloud_dir }}/html:/var/www/html'
       - '{{ gak_nextcloud_dir }}/secrets:/run/secrets/nextcloud:ro'

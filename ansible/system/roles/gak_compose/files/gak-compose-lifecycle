@@ -127,8 +127,8 @@ validate_started_state() {
 ensure_networks() {
     local network
     for network in "${external_networks[@]}"; do
-        if ! "$podman_command" network exists "$network" >/dev/null 2>&1; then
-            "$podman_command" network create --driver bridge "$network"
+        if ! "$podman_command" network exists "$network" 9>&- >/dev/null 2>&1; then
+            "$podman_command" network create --driver bridge "$network" 9>&-
         fi
     done
 }
@@ -137,7 +137,7 @@ container_exists() {
     local container=$1
     local result
 
-    "$podman_command" container exists "$container" >/dev/null 2>&1
+    "$podman_command" container exists "$container" 9>&- >/dev/null 2>&1
     result=$?
     case $result in
         0) return 0 ;;
@@ -150,7 +150,7 @@ compose_up() {
     local application=$1
     (
         cd "$services_root/$application"
-        "$podman_command" compose -f compose.yaml up -d --pull never
+        "$podman_command" compose -f compose.yaml up -d --pull never 9>&-
     )
 }
 
@@ -164,7 +164,7 @@ compose_stop() {
         # Stop dependents before the database and cache, one command at a time.
         for service in nextcloud-cron nextcloud nextcloud-redis nextcloud-db; do
             if container_exists "$service"; then
-                if ! "$podman_command" compose -f compose.yaml stop --timeout 30 "$service"; then
+                if ! "$podman_command" compose -f compose.yaml stop --timeout 30 "$service" 9>&-; then
                     status=1
                 fi
             else
@@ -175,7 +175,7 @@ compose_stop() {
             fi
         done
     elif container_exists "$application"; then
-        if ! "$podman_command" compose -f compose.yaml stop --timeout 30; then
+        if ! "$podman_command" compose -f compose.yaml stop --timeout 30 9>&-; then
             status=1
         fi
     else

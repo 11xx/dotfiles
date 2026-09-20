@@ -11,6 +11,10 @@ The Nextcloud stack uses four containers on its own =nextcloud_net= network:
 - =nextcloud-cron= runs the upstream five-minute background-work loop against
   the same application tree.
 
+The cron companion uses an init process and =SIGTERM= for shutdown. The init
+process forwards termination to =crond=, which has no signal handler when
+running directly as PID 1. The shared Apache image's =SIGWINCH= targets Apache.
+
 The community =nextcloud:apache= image is used rather than Nextcloud AIO. AIO
 expects to create and supervise child containers through a container socket;
 that would duplicate the ownership boundary here. The application stays on

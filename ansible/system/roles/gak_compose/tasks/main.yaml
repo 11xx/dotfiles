@@ -15,22 +15,20 @@
 
 - name: 'gak_compose: Deploy the declared application list'
   ansible.builtin.copy:
-    content: |
-      {% for application in gak_applications %}
-      {{ application }}
-      {% endfor %}
+    content: "{{ (gak_applications | join(_gak_compose_newline)) ~ (_gak_compose_newline if gak_applications | length > 0 else '') }}"
     dest: '{{ gak_compose_declared_file }}'
     mode: '0644'
+  vars:
+    _gak_compose_newline: "\n"
   tags: ['gak-compose-config']
 
 - name: 'gak_compose: Deploy the enabled application list'
   ansible.builtin.copy:
-    content: |
-      {% for application in gak_compose_autostart %}
-      {{ application }}
-      {% endfor %}
+    content: "{{ (gak_compose_autostart | join(_gak_compose_newline)) ~ (_gak_compose_newline if gak_compose_autostart | length > 0 else '') }}"
     dest: '{{ gak_compose_autostart_file }}'
     mode: '0644'
+  vars:
+    _gak_compose_newline: "\n"
   tags: ['gak-compose-config']
 
 - name: 'gak_compose: Deploy the lifecycle helper'

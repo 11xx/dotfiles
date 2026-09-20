@@ -69,6 +69,10 @@ sends SIGTERM to it and waits while the helper runs Compose's graceful stop
 commands. Nextcloud stops cron and the frontend before Redis and PostgreSQL.
 The helper never pulls images during boot and never calls sudo.
 
+The lifecycle lock stays in the helper process. Podman commands close that
+descriptor before spawning providers, networking daemons or container monitors,
+so detached descendants cannot retain the lock after the helper exits.
+
 Inspect the integration and containers as follows:
 
 #+begin_src sh

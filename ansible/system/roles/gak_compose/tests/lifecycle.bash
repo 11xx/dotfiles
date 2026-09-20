@@ -3,7 +3,13 @@ set -Eeuo pipefail
 
 : "${TMPDIR:=/tmp}"
 fixture=$(mktemp -d "$TMPDIR/gak-compose-lifecycle.XXXXXXXX")
-trap 'rm -rf -- "$fixture"' EXIT
+cleanup_fixture() {
+    if [[ -f "$fixture/detached.pid" ]]; then
+        kill "$(cat "$fixture/detached.pid")" 2>/dev/null || true
+    fi
+    rm -rf -- "$fixture"
+}
+trap cleanup_fixture EXIT
 
 helper=$(cd "$(dirname "$0")/../files" && pwd)/gak-compose-lifecycle
 services_root="$fixture/services"
@@ -65,6 +71,10 @@ set -u
 printf '%s|%s\n' "$PWD" "$*" >>"$FAKE_PODMAN_LOG"
 
 if [[ ${1:-} == network ]]; then
+    if [[ ${FAKE_DETACH:-0} == 1 && ! -f $FAKE_DETACHED_PID_FILE ]]; then
+        sleep 60 >/dev/null 2>&1 &
+        printf '%s\n' "$!" >"$FAKE_DETACHED_PID_FILE"
+    fi
     case ${2:-} in
         exists)
             [[ -e "$FAKE_NETWORK_ROOT/${3:?}" ]]
@@ -145,6 +155,7 @@ export FAKE_PODMAN_LOG="$log_file"
 export FAKE_EVENT_LOG="$event_file"
 export FAKE_NETWORK_ROOT="$network_root"
 export FAKE_RUNNING_ROOT="$running_root"
+export FAKE_DETACHED_PID_FILE="$fixture/detached.pid"
 write_fake_podman
 
 reset_fixture
@@ -245,6 +256,17 @@ elapsed=$(( $(date +%s%N) - started_at ))
 mapfile -t stop_events < <(cut -d'|' -f3 "$event_file")
 [[ ${stop_events[*]} == 'nextcloud-cron nextcloud nextcloud-redis nextcloud-db' ]] ||
     fail "wrong Nextcloud stop order: ${stop_events[*]}"
+
+reset_fixture
+declare_apps sabnzbd
+enable_apps sabnzbd
+export FAKE_DETACH=1
+run_service || fail 'detached-backend setup failed'
+stop_service
+kill -0 "$(cat "$fixture/detached.pid")" || fail 'detached backend did not survive for the lock probe'
+run_service || fail 'detached backend retained the lifecycle lock'
+stop_service
+unset FAKE_DETACH
 
 if grep -F 'sudo' "$helper" >/dev/null; then
     fail 'helper contains a hidden sudo path'
