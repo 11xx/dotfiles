@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 : "${TMPDIR:=/tmp}"
 here=$(cd "$(dirname "$0")" && pwd)
-updater="$here/../files/gak-services"
+updater=${GAK_SERVICES_TEST_COMMAND:-"$here/run-updater"}
 fixture=$(mktemp -d "$TMPDIR/gak-services-update.XXXXXXXX")
 cleanup_fixture() {
     if [[ -f "$fixture/detached.pid" ]]; then

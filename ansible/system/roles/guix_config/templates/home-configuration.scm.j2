@@ -41,17 +41,15 @@
           "fzf"
           "atuin"
 
-          ;; The updater selects this profile's interpreter and YAML module.
-          ;; Ansible independently pins its bootstrap interpreter in the user
-          ;; profile so it can deploy Home configuration before activation.
+          ;; The service-owned Nextcloud readiness command uses this interpreter.
           "python"
-          "python-pyyaml"
           "podman-compose"))
 
    ;; zsh plugins come from the local 11xx channel rather than Guix upstream, so
    ;; they land under share/zsh/plugins/<name>/ with the same names and entry
    ;; files ak and pak use. That is what lets rc.d be shared verbatim.
-   (list 11xx:zsh-powerlevel10k
+   (list (load "{{ guix_home_config_dir }}/packages/gak-services.scm")
+         11xx:zsh-powerlevel10k
          11xx:zsh-autopair
          11xx:zsh-autosuggestions
          11xx:zsh-syntax-highlighting

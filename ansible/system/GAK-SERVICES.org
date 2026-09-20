@@ -12,7 +12,8 @@ are owned by the login user.
 =host_vars/gak/main= selects =gak_applications= and the explicit
 =gak_compose_autostart= list. The latter may select declared web applications
 and Nextcloud, but never the Recyclarr batch job. Ansible writes both lists, the
-lifecycle helper and the update command under the login user's home. The
+lifecycle helper and the updater package sources under the login user's home.
+Guix Home installs the update command. The
 lifecycle helper validates every declared project and fails if a selected
 Compose file is missing; it does not discover projects from a directory
 listing. Boot selection and update selection are separate questions: the update
@@ -103,7 +104,7 @@ manual batch job.
 
 * Updating images
 
-=~/.local/bin/gak-services= updates projects it discovers under =~/services=.
+=gak-services= updates projects it discovers under =~/services=.
 Every immediate subdirectory holding a =compose.yaml= is a project, named by its
 directory. The definition is the source of truth for image channels and update
 policy; the command carries no list of applications.
@@ -205,34 +206,32 @@ requires =installed=true=, =maintenance=false= and =needsDbUpgrade=false=.
 
 ** The declared runtime
 
-The command is deployed in two pieces. =gak-services= is a =/bin/sh= launcher --
-the one interpreter this host guarantees at an absolute path, so it starts from
-an empty environment. It selects the Guix Home profile explicitly, loads the
-environment generated beside that profile, and runs =gak-services.py= on the
-profile's own =python3= with =-I=. Guix Home declares =python=, =python-pyyaml=
-and =podman-compose= in one place, and that declaration is the whole of the
-command's runtime: no interpreter is searched for on PATH, and an inherited
-=PYTHONPATH=, =PYTHONHOME= or =GUIX_PYTHONPATH= cannot reach it.
+Guix Home installs the local =gak-services= package into its profile, making the
+command available through =~/.guix-home/profile/bin=. The package owns an
+immutable launcher and implementation, with exact store references to Python and
+PyYAML. It requires no profile initialization or ambient Python module paths.
 
-Podman and the Compose provider live in the privileged, Home and system
-directories, which a non-login environment does not put on PATH. The command
-therefore builds PATH itself, in that order, promoting a declared directory that
-the inherited PATH happened to list later rather than leaving it there. The
-privileged directory leads because cold rootless namespace setup resolves its
-mapping helpers from it. The Home profile's =podman-compose= is selected
-explicitly, and inherited =COMPOSE_*= scoping variables are dropped.
-
-A scheduled job and a bare remote invocation therefore behave exactly like a
-login shell. When the profile, its generated environment, its interpreter or the
-Compose provider is missing, the command says which one and stops.
-
-After Ansible deploys a changed Home declaration, activate it without sudo:
+The maintained recipe and implementation live in =roles/gak_compose/files=.
+Ansible deploys them under =~/.config/guix-home/packages=; the Home declaration
+loads that recipe directly. This is a local package, so changing its sources
+requires no channel publication or =guix pull=. Build and activate with:
 
 #+begin_src sh
+guix build -f ~/.config/guix-home/packages/gak-services.scm
 guix home reconfigure ~/.config/guix-home/home-configuration.scm
 gak-services list
 gak-services update --all --dry-run
 #+end_src
+
+The runtime selects the Home Compose provider and the host's rootless Podman.
+Privileged mapping helpers lead PATH for cold user-namespace creation. Inherited
+Compose scoping variables cannot change the selected project or its profiles.
+The separate Nextcloud readiness command uses Home's Python standard library;
+PyYAML is a private dependency of the updater package.
+
+Home reconfiguration updates operator tooling, not application images. Image
+updates remain explicit rootless Compose operations. Ansible's bootstrap Python
+stays pinned to its independent user-profile interpreter.
 
 ** Concurrency and recovery
 

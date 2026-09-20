@@ -38,20 +38,19 @@
     mode: '0755'
   tags: ['gak-compose-config']
 
-# The launcher is what an operator runs; the implementation is what the
-# launcher hands to the interpreter its Guix profile declares.
-- name: 'gak_compose: Deploy the update command'
-  ansible.builtin.copy:
-    src: '{{ item.src }}'
-    dest: '{{ gak_services_bin_dir }}/{{ item.dest }}'
-    mode: '{{ item.mode }}'
-  loop:
-  - src: gak-services
-    dest: gak-services
+- name: 'gak_compose: Create the Home package source directory'
+  ansible.builtin.file:
+    path: '{{ guix_home_config_dir }}/packages'
+    state: directory
     mode: '0755'
-  - src: gak-services.py
-    dest: gak-services.py
+  tags: ['gak-compose-config', 'guix-home']
+
+- name: 'gak_compose: Deploy the updater package sources'
+  ansible.builtin.copy:
+    src: '{{ item }}'
+    dest: '{{ guix_home_config_dir }}/packages/{{ item }}'
     mode: '0644'
-  loop_control:
-    label: '{{ item.dest }}'
-  tags: ['gak-compose-config']
+  loop:
+  - gak-services.scm
+  - gak-services.py
+  tags: ['gak-compose-config', 'guix-home']

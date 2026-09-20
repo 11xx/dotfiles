@@ -7,7 +7,7 @@ set -Eeuo pipefail
 
 : "${TMPDIR:=/tmp}"
 here=$(cd "$(dirname "$0")" && pwd)
-updater="$here/../files/gak-services"
+updater=${GAK_SERVICES_TEST_COMMAND:-"$here/run-updater"}
 
 if ! command -v podman >/dev/null; then
     printf '%s\n' 'provider fixture: skipped (no podman)' >&2

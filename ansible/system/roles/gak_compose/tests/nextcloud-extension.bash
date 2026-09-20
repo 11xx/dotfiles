@@ -7,7 +7,7 @@ set -Eeuo pipefail
 : "${TMPDIR:=/tmp}"
 here=$(cd "$(dirname "$0")" && pwd)
 system=$(cd "$here/../../.." && pwd)
-updater="$here/../files/gak-services"
+updater=${GAK_SERVICES_TEST_COMMAND:-"$here/run-updater"}
 
 command -v ansible-playbook >/dev/null || {
     printf '%s\n' 'nextcloud extension fixture: skipped (no ansible-playbook)' >&2
@@ -86,14 +86,14 @@ cat >"$fixture/render.yaml" <<EOF
 
     - name: Deploy the update command
       ansible.builtin.copy:
-        src: $system/roles/gak_compose/files/{{ item.src }}
+        src: '{{ item.src }}'
         dest: $bin_dir/{{ item.dest }}
         mode: '{{ item.mode }}'
       loop:
-        - src: gak-services
+        - src: $updater
           dest: gak-services
           mode: '0755'
-        - src: gak-services.py
+        - src: $system/roles/gak_compose/files/gak-services.py
           dest: gak-services.py
           mode: '0644'
 EOF
@@ -128,6 +128,7 @@ export FAKE_REAL_PODMAN=podman
 export GAK_COMPOSE_PODMAN="$here/fake-podman"
 export GAK_SERVICES_RUNTIME_DIR="$fixture/runtime"
 export GAK_COMPOSE_SERVICES_ROOT="$services_root"
+export GAK_SERVICES_IMPLEMENTATION="$bin_dir/gak-services.py"
 mkdir -p "$FAKE_STATE" "$fixture/runtime"
 : >"$FAKE_STATE/containers.tsv"
 : >"$FAKE_STATE/images.tsv"
