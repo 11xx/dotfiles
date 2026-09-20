@@ -1,0 +1,255 @@
+#+TITLE: Agent resource controls
+#+OPTIONS: toc:2 num:nil
+#+PROPERTY: header-args :mkdirp yes :comments no
+
+* Operation
+This document owns the shared =agent.slice=, its launch and control commands,
+and the Hyprland binding. CPU limits apply to all managed sessions together.
+=gaming= allows eight logical CPUs worth of execution time; =normal= removes
+that cap. The policy lasts until changed or the user manager's runtime state
+is cleared, normally at reboot. It also applies to sessions launched later.
+
+Launch harnesses through =agent-run=. Existing sessions are not migrated.
+Ordinary children, including detached delegate supervisors, inherit the scope.
+External build daemons, containers and separately launched systemd services
+need their own placement. This is resource management, not a security sandbox.
+
+#+begin_src sh :tangle no
+agent-run codex
+agent-run claude
+agent-run pi
+agent-resources gaming
+agent-resources status
+agent-resources normal
+#+end_src
+
+=SUPER + SHIFT + G= toggles normal/gaming and sends a desktop notification.
+Pause and resume are explicit commands, run from an ordinary terminal outside
+the slice. Freezing suspends the entire harness, including network handling;
+remote connections and wall-clock deadlines can expire while it is paused.
+Changing a CPU profile does not thaw a paused slice.
+
+#+begin_src sh :tangle no
+agent-resources pause
+agent-resources resume
+#+end_src
+
+* Shared slice
+:PROPERTIES:
+:header-args:systemd: :tangle (concat (xdg-config-home) "/systemd/user/agent.slice")
+:END:
+The slice has no enablement target: launching a scope or selecting a profile
+starts it. CPU weights operate between sibling groups, so the gaming profile's
+weight is supplementary; the quota supplies the aggregate bound even when a
+game runs outside the user manager's subtree. Memory and I/O remain uncapped.
+
+#+begin_src systemd
+[Unit]
+Description=Agent workload resource budget
+
+[Slice]
+CPUWeight=100
+#+end_src
+
+* Launcher
+:PROPERTIES:
+:header-args:bash: :tangle (concat (xdg-bin-home) "/agent-run") :shebang "#!/usr/bin/env bash" :tangle-mode (identity #o755)
+:END:
+A scope preserves the caller's terminal, working directory and environment.
+Environment expansion by systemd is disabled so dollar signs in arguments
+remain literal. The executable and every argument are passed separately. Nested invocations
+already in the managed slice run directly, retaining their existing scope.
+
+#+begin_src bash
+set -euo pipefail
+if [[ $# == 0 || ${1:-} == --help ]]; then
+    echo 'Usage: agent-run COMMAND [ARG ...]'
+    [[ $# != 0 ]]
+    exit
+fi
+if grep -Eq '^0::/.*/agent\.slice(/|$)' /proc/self/cgroup; then
+    exec "$@"
+fi
+exec systemd-run --user --scope --collect --quiet --expand-environment=no --slice=agent.slice -- "$@"
+#+end_src
+
+* Controller
+:PROPERTIES:
+:header-args:python: :tangle (concat (xdg-bin-home) "/agent-resources") :shebang "#!/usr/bin/env python3" :tangle-mode (identity #o755)
+:END:
+The controller uses only Python's standard library and systemctl. The systemd
+runtime properties are the source of policy; there is no second mode file that
+can disagree with the active limits.
+
+#+begin_src python
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+UNIT = "agent.slice"
+
+
+def systemctl(*args):
+    return subprocess.check_output(
+        ["systemctl", "--user", *args], text=True, stderr=subprocess.PIPE
+    ).strip()
+
+
+def cgroup():
+    name = systemctl("show", UNIT, "--property=ControlGroup", "--value")
+    if not name:
+        return None
+    path = Path("/sys/fs/cgroup") / name.lstrip("/")
+    return path if path.exists() else None
+
+
+def limits(path):
+    quota, period = (path / "cpu.max").read_text().split()
+    weight = (path / "cpu.weight").read_text().strip()
+    idle = (path / "cpu.idle").read_text().strip()
+    frozen = dict(line.split() for line in (path / "cgroup.events").read_text().splitlines())["frozen"]
+    mode = "custom"
+    if quota == "max" and weight == "100" and idle == "0":
+        mode = "normal"
+    elif quota != "max" and int(quota) == 8 * int(period) and weight == "10" and idle == "0":
+        mode = "gaming"
+    return mode, quota, period, weight, frozen
+
+
+def status():
+    path = cgroup()
+    if path is None:
+        return "inactive (no active agent slice)"
+    mode, quota, period, weight, frozen = limits(path)
+    cpu = "unlimited" if quota == "max" else f"{100 * int(quota) / int(period):g}%"
+    scopes = sorted(p.name for p in path.glob("*.scope"))
+    return (f"{mode}: CPU={cpu}, weight={weight}, frozen={frozen}\n"
+            f"Scopes: {', '.join(scopes) or 'none'}")
+#+end_src
+
+A per-user lock serializes concurrent keypresses and profile changes. Mutations
+must originate outside the managed slice. Both the CPU profile and freezer
+state are read back from cgroup files before success is reported.
+
+#+begin_src python
+def main():
+    parser = argparse.ArgumentParser(description="Control the shared agent CPU budget")
+    parser.add_argument("command", choices=["normal", "gaming", "toggle", "status", "pause", "resume"])
+    parser.add_argument("--notify", action="store_true", help="also show a desktop notification")
+    args = parser.parse_args()
+    if args.command == "status":
+        print(status())
+        return
+    if "/agent.slice/" in Path("/proc/self/cgroup").read_text():
+        raise RuntimeError("run the controller from a terminal outside agent.slice")
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime:
+        raise RuntimeError("XDG_RUNTIME_DIR is not set")
+    with (Path(runtime) / "agent-resources.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        systemctl("start", UNIT)
+        path = cgroup()
+        if path is None:
+            raise RuntimeError("agent.slice has no active cgroup")
+        command = args.command
+        if command == "toggle":
+            mode = limits(path)[0]
+            if mode == "custom":
+                raise RuntimeError("custom CPU limits; select normal or gaming explicitly")
+            command = "normal" if mode == "gaming" else "gaming"
+        if command in ("normal", "gaming"):
+            quota, weight = ("800%", "10") if command == "gaming" else ("", "100")
+            systemctl("set-property", "--runtime", UNIT, f"CPUQuota={quota}", f"CPUWeight={weight}")
+            if limits(path)[0] != command:
+                raise RuntimeError("effective CPU limits do not match the requested profile")
+        else:
+            systemctl("freeze" if command == "pause" else "thaw", UNIT)
+            if limits(path)[4] != ("1" if command == "pause" else "0"):
+                raise RuntimeError("effective freezer state does not match the request")
+        message = status()
+    print(message)
+    if args.notify:
+        try:
+            subprocess.run(["notify-send", "Agent resources", message], check=True, timeout=5)
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"notification failed: {error}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else str(error)
+        print(f"agent-resources: {detail}", file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
+* Hyprland binding
+:PROPERTIES:
+:CUSTOM_ID: hyprland-binding
+:header-args:lua: :tangle (concat (xdg-config-home) "/systemd/agent-resources.lua")
+:END:
+Hyprland's module loader includes this generated fragment after its keymap
+helpers. The command runs in the desktop's cgroup, outside the managed agents.
+
+#+begin_src lua
+bind_exec("SUPER + SHIFT + G", "agent-resources toggle --notify")
+#+end_src
+
+* Installation
+Tangle this document before tangling the Hyprland loader. The =tangle= Emacs
+daemon must load the configuration defining =xdg-config-home= and =xdg-bin-home=.
+The generated helpers require their installation directory on =PATH=.
+
+#+begin_src sh :tangle no
+emacsclient -a false -s tangle --eval '(progn (require (quote ob-tangle)) (org-babel-tangle-file (expand-file-name "~/.config/systemd/agent-resources.org")))'
+systemctl --user daemon-reload
+emacsclient -a false -s tangle --eval '(org-babel-tangle-file (expand-file-name "~/.config/hypr/README.org"))'
+hyprctl reload
+#+end_src
+
+* Optional cpuset and I/O delegation
+The CPU profiles above need no administrator access. To permit user-level
+=AllowedCPUs= and I/O controls, add a persistent drop-in for this user's manager.
+Run the editor as the ordinary desktop user so =id -u= selects that account.
+
+#+begin_src sh :tangle no
+sudo systemctl edit "user@$(id -u).service"
+#+end_src
+
+Place the following in the editable section. Controller lists are additive;
+this preserves the vendor's CPU, memory and PID delegation.
+
+#+begin_src systemd :tangle no
+[Service]
+Delegate=cpuset io
+#+end_src
+
+Save, then reboot at a convenient time. This is a one-time configuration step,
+not a command to repeat for each game. A reboot recreates the user manager and
+its delegated tree without terminating user services mid-session for a live
+restart. After logging in, verify the actual delegation:
+
+#+begin_src sh :tangle no
+systemctl show "user@$(id -u).service" -p DelegateControllers
+manager_group=$(systemctl --user show -p ControlGroup --value)
+cat "/sys/fs/cgroup$manager_group/cgroup.controllers"
+#+end_src
+
+Both =cpuset= and =io= must appear in the cgroup controller list. Delegation
+only makes controls available; it neither selects a CPU set nor throttles I/O.
+Inspect =lscpu -e=CPU,CORE,SOCKET,NODE= before choosing complete SMT sibling pairs.
+=AllowedCPUs= restricts agent placement; it does not reserve cores from games.
+
+=IOWeight= also needs an effective proportional I/O controller implementation
+such as BFQ group scheduling or a configured IOCost controller. Kyber alone
+does not provide BFQ's group weights. Do not switch disk schedulers merely to
+make a configuration property appear to work. Measure contention first; explicit
+I/O bandwidth limits are a separate option after delegation. CPU profiles do
+not change manually configured CPU sets, I/O or memory limits.
+
+See [[https://github.com/systemd/systemd/blob/main/man/systemd.resource-control.xml][systemd resource control]],
+[[https://docs.kernel.org/admin-guide/cgroup-v2.html][cgroup v2]], and [[https://docs.kernel.org/block/bfq-iosched.html][BFQ group scheduling]].

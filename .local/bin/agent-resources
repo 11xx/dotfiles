@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+UNIT = "agent.slice"
+
+
+def systemctl(*args):
+    return subprocess.check_output(
+        ["systemctl", "--user", *args], text=True, stderr=subprocess.PIPE
+    ).strip()
+
+
+def cgroup():
+    name = systemctl("show", UNIT, "--property=ControlGroup", "--value")
+    if not name:
+        return None
+    path = Path("/sys/fs/cgroup") / name.lstrip("/")
+    return path if path.exists() else None
+
+
+def limits(path):
+    quota, period = (path / "cpu.max").read_text().split()
+    weight = (path / "cpu.weight").read_text().strip()
+    idle = (path / "cpu.idle").read_text().strip()
+    frozen = dict(line.split() for line in (path / "cgroup.events").read_text().splitlines())["frozen"]
+    mode = "custom"
+    if quota == "max" and weight == "100" and idle == "0":
+        mode = "normal"
+    elif quota != "max" and int(quota) == 8 * int(period) and weight == "10" and idle == "0":
+        mode = "gaming"
+    return mode, quota, period, weight, frozen
+
+
+def status():
+    path = cgroup()
+    if path is None:
+        return "inactive (no active agent slice)"
+    mode, quota, period, weight, frozen = limits(path)
+    cpu = "unlimited" if quota == "max" else f"{100 * int(quota) / int(period):g}%"
+    scopes = sorted(p.name for p in path.glob("*.scope"))
+    return (f"{mode}: CPU={cpu}, weight={weight}, frozen={frozen}\n"
+            f"Scopes: {', '.join(scopes) or 'none'}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Control the shared agent CPU budget")
+    parser.add_argument("command", choices=["normal", "gaming", "toggle", "status", "pause", "resume"])
+    parser.add_argument("--notify", action="store_true", help="also show a desktop notification")
+    args = parser.parse_args()
+    if args.command == "status":
+        print(status())
+        return
+    if "/agent.slice/" in Path("/proc/self/cgroup").read_text():
+        raise RuntimeError("run the controller from a terminal outside agent.slice")
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime:
+        raise RuntimeError("XDG_RUNTIME_DIR is not set")
+    with (Path(runtime) / "agent-resources.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        systemctl("start", UNIT)
+        path = cgroup()
+        if path is None:
+            raise RuntimeError("agent.slice has no active cgroup")
+        command = args.command
+        if command == "toggle":
+            mode = limits(path)[0]
+            if mode == "custom":
+                raise RuntimeError("custom CPU limits; select normal or gaming explicitly")
+            command = "normal" if mode == "gaming" else "gaming"
+        if command in ("normal", "gaming"):
+            quota, weight = ("800%", "10") if command == "gaming" else ("", "100")
+            systemctl("set-property", "--runtime", UNIT, f"CPUQuota={quota}", f"CPUWeight={weight}")
+            if limits(path)[0] != command:
+                raise RuntimeError("effective CPU limits do not match the requested profile")
+        else:
+            systemctl("freeze" if command == "pause" else "thaw", UNIT)
+            if limits(path)[4] != ("1" if command == "pause" else "0"):
+                raise RuntimeError("effective freezer state does not match the request")
+        message = status()
+    print(message)
+    if args.notify:
+        try:
+            subprocess.run(["notify-send", "Agent resources", message], check=True, timeout=5)
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"notification failed: {error}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        detail = error.stderr.strip() if isinstance(error, subprocess.CalledProcessError) else str(error)
+        print(f"agent-resources: {detail}", file=sys.stderr)
+        sys.exit(1)

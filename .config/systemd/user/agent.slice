@@ -1,0 +1,5 @@
+[Unit]
+Description=Agent workload resource budget
+
+[Slice]
+CPUWeight=100

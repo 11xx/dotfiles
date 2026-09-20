@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# == 0 || ${1:-} == --help ]]; then
+    echo 'Usage: agent-run COMMAND [ARG ...]'
+    [[ $# != 0 ]]
+    exit
+fi
+if grep -Eq '^0::/.*/agent\.slice(/|$)' /proc/self/cgroup; then
+    exec "$@"
+fi
+exec systemd-run --user --scope --collect --quiet --expand-environment=no --slice=agent.slice -- "$@"

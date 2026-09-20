@@ -18,6 +18,9 @@ The default example config file can be found in:
 
 ** Module loader
 
+Agent resource controls and their keybinding are defined in
+[[file:../systemd/agent-resources.org][Agent resource controls]]. The loader reads that document's generated Lua fragment.
+
 #+begin_src lua
 require("lib")
 require("displays-workspaces")
@@ -28,6 +31,7 @@ require("window-rules")
 require("layer-surface-rules")
 require("hyprmacs-keymap")
 require("keybinds")
+dofile((os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/systemd/agent-resources.lua")
 require("theme")
 require("nvidia")
 require("vrr")
