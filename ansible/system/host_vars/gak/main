@@ -7,6 +7,9 @@ gak_media_gid: 134
 gak_timezone: America/Sao_Paulo
 gak_subid_start: 100000
 gak_subid_count: 65536
+gak_aiagent_host_enabled: true
+gak_aiagent_deploy_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHFzNBtcLBf7kDJFFsWhYWlN59yoCU8CnRGHovkim3fk aiagent deploy and operator shell"
+gak_aiagent_shell_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIASfN1Wo3rg4gSq3Ew2igtzGKhZt5I5Ak/+eLbLyVZoq gak guix nas"
 gak_applications:
 - sabnzbd
 - prowlarr

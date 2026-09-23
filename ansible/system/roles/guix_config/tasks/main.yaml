@@ -66,6 +66,15 @@
   register: guix_system_config
   tags: ['guix-system']
 
+- name: 'guix: Deploy agent host modules'
+  ansible.builtin.copy:
+    src: modules/
+    dest: "{{ guix_config_dir }}/modules/"
+    mode: "0644"
+    directory_mode: "0755"
+  register: guix_system_modules
+  tags: ['guix-system']
+
 - name: 'guix: Deploy the channel list'
   ansible.builtin.copy:
     src: channels.scm
@@ -113,6 +122,7 @@
   loop:
     - "{{ guix_config_dir }}/system.scm"
     - /run/current-system
+    - "{{ guix_config_dir }}/modules/aiagent/host.scm"
     - "{{ guix_home_config_dir }}/home-configuration.scm"
     - "{{ ansible_facts['user_dir'] }}/.guix-home"
   register: guix_generations
@@ -128,18 +138,20 @@
   vars:
     _stamps: "{{ guix_generations.results | default([]) | map(attribute='stat') | list }}"
     _system_stale: "{{ _stamps[0].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _home_stale: "{{ _stamps[2].mtime | default(0) > _stamps[3].mtime | default(0) }}"
+    _module_stale: "{{ _stamps[2].mtime | default(0) > _stamps[1].mtime | default(0) }}"
+    _home_stale: "{{ _stamps[3].mtime | default(0) > _stamps[4].mtime | default(0) }}"
     _channels_changed: "{{ guix_channels_config.changed | default(false) }}"
     _channel_changed: "{{ guix_channel_source.changed | default(false) }}"
     _system_changed: "{{ guix_system_config.changed | default(false) }}"
+    _modules_changed: "{{ guix_system_modules.changed | default(false) }}"
     _home_changed: "{{ guix_home_config.changed | default(false) }}"
     guix_pending_steps: >-
       {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' add -A && git -C ' ~ guix_channel_dir ~ ' commit -m "packages: update local packages"']
               if guix_channel_status.stdout | default('') | length > 0 else [])
          + (['guix pull   (channels changed)']
               if _channels_changed or _channel_changed else [])
-         + (['sudo guix system reconfigure ' ~ guix_config_dir ~ '/system.scm']
-              if _system_changed or _system_stale else [])
+         + (['sudo guix system reconfigure -L ' ~ guix_config_dir ~ '/modules ' ~ guix_config_dir ~ '/system.scm']
+              if _system_changed or _system_stale or _modules_changed or _module_stale else [])
          + (['guix home reconfigure ' ~ guix_home_config_dir ~ '/home-configuration.scm']
               if _home_changed or _channel_changed or _home_stale else [])
          ) | default(['Nothing to apply: gak is in sync.'], true) }}
