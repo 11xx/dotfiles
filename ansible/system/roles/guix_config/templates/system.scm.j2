@@ -64,33 +64,28 @@
                  "--signal=KILL"
                  #$(number->string %gak-operator-runtime-command-seconds)
                  args)))
-       (define (ready? gid)
+       (define (ready?)
          (and (file-exists? runtime)
-              (equal? (command-exit #$(file-append util-linux "/bin/findmnt")
-                                    "-n" "-t" "tmpfs" "--mountpoint" runtime)
-                      0)
               (let ((metadata
                      (catch 'system-error (lambda () (lstat runtime))
                        (lambda _ #f))))
                 (and metadata
                      (if (and (eq? (stat:type metadata) 'directory)
                               (= (stat:uid metadata) {{ gak_media_uid }})
-                              (= (stat:gid metadata) gid)
                               (= (logand (stat:mode metadata) #o777) #o700))
                          #t
-                         (error "operator runtime tmpfs ownership or mode is wrong"))))))
+                         (error "operator runtime directory ownership or mode is wrong"))))))
        (let* ((account (getpwnam "lobo"))
               (uid (passwd:uid account))
-              (gid (passwd:gid account))
               (started (uptime-seconds))
               (deadline (+ started #$%gak-operator-runtime-deadline-seconds)))
          (unless (= uid {{ gak_media_uid }})
            (error "operator account UID does not match runtime path"))
          (let loop ((requested? #f))
            (cond
-            ((ready? gid) #t)
+            ((ready?) #t)
             ((>= (uptime-seconds) deadline)
-             (error "operator runtime tmpfs /run/user/1000 is missing; check loginctl show-user lobo -p Linger -p RuntimePath, then sudo herd enable gak-compose && sudo herd start gak-compose"))
+             (error "operator runtime directory /run/user/1000 with UID 1000 and mode 0700 is missing; check loginctl show-user lobo -p Linger -p RuntimePath, then sudo herd enable gak-compose && sudo herd start gak-compose"))
             (else
              (let ((request-now?
                     (and (not requested?)
@@ -237,8 +232,8 @@
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
-           ;; Elogind owns the lingering operator's runtime tmpfs. Compose
-           ;; starts only after its mount and ownership are ready.
+           ;; Elogind owns the lingering operator's runtime directory. Compose
+           ;; starts only after its ownership and mode are ready.
            (simple-service
             'gak-operator-runtime
             shepherd-root-service-type

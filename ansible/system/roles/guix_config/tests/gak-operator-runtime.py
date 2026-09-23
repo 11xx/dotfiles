@@ -41,10 +41,11 @@ def mount_runtime(path, uid, gid, mode):
     command(PROFILE / "mount", "-t", "tmpfs", "-o",
             f"uid={uid},gid={gid},mode={mode:o},nosuid,nodev", "tmpfs", path)
     assert mount_count(path) == 1
-    (path / "sentinel").write_text("elogind owns this mount\n")
+    (path / "sentinel").write_text("elogind owns this runtime\n")
 
 
-def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700):
+def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700,
+             plain=False):
     place = root / label
     place.mkdir()
     runtime = place / "1000"
@@ -70,7 +71,13 @@ def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700
     mounted = False
     process = None
     try:
-        if delay == 0:
+        if plain:
+            runtime.mkdir()
+            (runtime / "sentinel").write_text("elogind owns this runtime\n")
+            command(PROFILE / "chown", f"{uid}:{gid}", runtime)
+            command(PROFILE / "chmod", f"{mode:o}", runtime)
+            assert mount_count(runtime) == 0
+        elif delay == 0:
             mount_runtime(runtime, uid, gid, mode)
             mounted = True
         process = subprocess.Popen([str(executable)], stdout=subprocess.PIPE,
@@ -82,17 +89,17 @@ def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700
             mounted = True
         stdout, stderr = process.communicate(timeout=12)
         requests = request_marker.read_text().splitlines() if request_marker.exists() else []
-        if label in ("before", "during", "after"):
+        if label in ("before", "during", "after", "plain"):
             assert process.returncode == 0, (label, stderr)
-            assert (runtime / "sentinel").read_text() == "elogind owns this mount\n"
+            assert (runtime / "sentinel").read_text() == "elogind owns this runtime\n"
             assert requests == (["request"] if label == "after" else []), requests
         elif label == "never":
-            assert process.returncode != 0 and "operator runtime tmpfs " in stderr and " is missing" in stderr, stderr
+            assert process.returncode != 0 and "operator runtime directory " in stderr and " is missing" in stderr, stderr
             assert "loginctl show-user" in stderr and "sudo herd enable gak-compose && sudo herd start gak-compose" in stderr
             assert requests == ["request"], requests
         else:
             assert process.returncode != 0 and "ownership or mode is wrong" in stderr, stderr
-            assert (runtime / "sentinel").read_text() == "elogind owns this mount\n"
+            assert (runtime / "sentinel").read_text() == "elogind owns this runtime\n"
             assert requests == [], requests
         assert mount_count(runtime) == int(mounted), f"{label}: stacked or lost mount"
         print(f"{label}: {'ready' if process.returncode == 0 else 'refused'}; "
@@ -103,6 +110,8 @@ def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700
             process.wait(timeout=5)
         if mounted:
             command(PROFILE / "umount", runtime)
+        if plain:
+            command(PROFILE / "chown", "0:0", runtime)
         assert mount_count(runtime) == 0, f"{label}: mount left behind"
 
 
@@ -111,6 +120,7 @@ def inner(program, root):
     one_case(program, root, "before", delay=0, gid=account.pw_gid)
     one_case(program, root, "during", delay=0.5, gid=account.pw_gid)
     one_case(program, root, "after", delay=2.5, gid=account.pw_gid)
+    one_case(program, root, "plain", uid=1000, gid=account.pw_gid, plain=True)
     one_case(program, root, "never")
     one_case(program, root, "wrong-owner", delay=0, uid=0, gid=0)
     one_case(program, root, "wrong-mode", delay=0, gid=account.pw_gid, mode=0o755)

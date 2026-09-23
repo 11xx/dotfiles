@@ -116,16 +116,18 @@ for =/marak=, =/media=, rootless Podman cgroup services, elogind and networking.
 It also requires the synchronous root one-shot =gak-operator-runtime=.
 Elogind alone creates =/run/user/1000= for the lingering operator. The
 prerequisite polls at one-second intervals with a three-minute deadline for a
-tmpfs mount owned by UID 1000 and the operator's primary group with mode 0700.
+directory owned by UID 1000 with mode 0700. Elogind normally mounts a tmpfs
+there; when a tmpfs mount is denied, it keeps a plain directory with the same
+owner and mode. Both forms support the operator's private runtime state.
 Thirty seconds without readiness triggers one idempotent =loginctl
 enable-linger lobo= request; each check and that request have a five-second
 command bound. The wait gives elogind time to finish user initialization
-while keeping a stalled boot bounded. A mismatched mounted runtime fails
+while keeping a stalled boot bounded. A mismatched runtime fails
 immediately. The prerequisite never creates or mounts the path. If the wait
 expires, check =loginctl show-user lobo -p Linger -p RuntimePath= and the
-runtime mount, then recover with =sudo herd enable gak-compose && sudo herd
+runtime directory, then recover with =sudo herd enable gak-compose && sudo herd
 start gak-compose=. Operator linger keeps elogind's user record active across
-ordinary logouts; the runtime mount is cleared with =/run= on reboot.
+ordinary logouts; the runtime directory is cleared with =/run= on reboot.
 The helper keeps ownership state, its lock and its readiness marker under
 =${XDG_RUNTIME_DIR}/gak-compose=, reconciles stale recorded stacks after a
 crash, records ownership before each Compose start so partial projects are
