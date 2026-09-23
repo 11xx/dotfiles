@@ -14,9 +14,12 @@
              (gnu system nss)
              (nongnu packages linux)
              (nongnu system linux-initrd)
+             (gnu packages base)
+             (gnu packages linux)
              (gnu packages shells)
              (gnu services nfs)
              (gnu system accounts)
+             (guix gexp)
              (aiagent host)
              ;; Guix upstream packages Tailscale's Go dependencies but not
              ;; Tailscale, so `tailscaled` comes from the rosenthal channel
@@ -41,6 +44,58 @@
               (string-append "(public-key\n"
                              "(ecc (curve Ed25519)\n"
                              "(q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)))")))
+
+(define %gak-operator-runtime-program
+  (program-file
+   "gak-operator-runtime"
+   #~(begin
+       (use-modules (ice-9 ftw))
+       (define runtime "/run/user/{{ gak_media_uid }}")
+       (define (mounted?)
+         (let ((status (status:exit-val
+                        (system* #$(file-append util-linux "/bin/mountpoint")
+                                 "-q" runtime))))
+           (cond ((zero? status) #t)
+                 ((member status '(1 32)) #f)
+                 (else (error "cannot inspect operator runtime mount")))))
+       (define (verify)
+         (unless (zero? (system* #$(file-append util-linux "/bin/findmnt")
+                                  "-n" "-t" "tmpfs" "--mountpoint" runtime))
+           (error "operator runtime is not a tmpfs mount"))
+         (let ((metadata (lstat runtime)))
+           (unless (and (eq? (stat:type metadata) 'directory)
+                        (= (stat:uid metadata) {{ gak_media_uid }})
+                        (= (stat:gid metadata) (passwd:gid (getpwnam "lobo")))
+                        (= (logand (stat:mode metadata) #o777) #o700))
+             (error "operator runtime ownership or mode is wrong"))))
+       (let* ((account (getpwnam "lobo"))
+              (uid (passwd:uid account))
+              (gid (passwd:gid account)))
+         (unless (= uid {{ gak_media_uid }})
+           (error "operator account UID does not match runtime path"))
+         (unless (zero? (system* #$(file-append coreutils "/bin/mkdir")
+                                  "-p" "/run/user" runtime))
+           (error "cannot create operator runtime directory"))
+         (unless (mounted?)
+           (unless (eq? (stat:type (lstat runtime)) 'directory)
+             (error "operator runtime path is not a directory"))
+           (unless (null? (scandir runtime
+                                   (lambda (name)
+                                     (not (member name '("." ".."))))))
+             (error "operator runtime directory is not empty"))
+           (chown runtime uid gid)
+           (chmod runtime #o700)
+           (unless (mounted?)
+             (unless (zero? (system* #$(file-append util-linux "/bin/mount")
+                                      "-t" "tmpfs" "-o"
+                                      (string-append
+                                       "nosuid,nodev,mode=0700,uid="
+                                       (number->string uid)
+                                       ",gid=" (number->string gid)
+                                       ",size=10%")
+                                      "tmpfs" runtime))
+               (error "cannot mount operator runtime tmpfs"))))
+         (verify)))))
 
 (operating-system
  ;; kernel & microcode
@@ -174,6 +229,22 @@
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
+           ;; The login manager accepts an existing runtime tmpfs and keeps it
+           ;; for the lingering operator. The Compose helper needs it before a
+           ;; login has caused elogind to create it.
+           (simple-service
+            'gak-operator-runtime
+            shepherd-root-service-type
+            (list
+             (shepherd-service
+              (provision '(gak-operator-runtime))
+              (requirement '(user-processes elogind))
+              (one-shot? #t)
+              (start #~(lambda _
+                         (zero? (system* #$%gak-operator-runtime-program))))
+              (stop #~(const #f))
+              (respawn? #f))))
+
            ;; Compose owns application containers and networks as the login user.
            ;; Shepherd keeps one long-lived process so its stop destructor waits
            ;; for the helper's graceful Compose stop sequence.
@@ -188,6 +259,7 @@
                              cgroups2-limits
                              rootless-podman-shared-root-fs
                              elogind
+                             gak-operator-runtime
                              networking
                              file-system-/marak
                              file-system-/media))

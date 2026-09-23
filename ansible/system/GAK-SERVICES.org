@@ -109,6 +109,13 @@ with the user's home, runtime directory, profile PATH and supplementary groups
 already set. The PATH puts =/run/privileged/bin= first so rootless
 =newuidmap= and =newgidmap= resolve through the privileged wrappers. It waits
 for =/marak=, =/media=, rootless Podman cgroup services, elogind and networking.
+It also requires the synchronous root one-shot =gak-operator-runtime=.
+That service establishes a tmpfs at =/run/user/1000=, owned by the operator's
+UID and primary group with mode 0700. It accepts an existing matching tmpfs
+and refuses to cover a nonempty plain directory. Elogind accepts an existing
+runtime mount rather than mounting over the helper's files. Operator linger
+keeps elogind's user record active across ordinary logouts; the runtime
+mount is cleared with =/run= on reboot.
 The helper keeps ownership state, its lock and its readiness marker under
 =${XDG_RUNTIME_DIR}/gak-compose=, reconciles stale recorded stacks after a
 crash, records ownership before each Compose start so partial projects are
