@@ -21,13 +21,23 @@
   (program-file
    "aiagent-home"
    #~(begin
-       (use-modules (ice-9 posix) (ice-9 popen) (ice-9 rdelim))
+       (use-modules (ice-9 popen) (ice-9 rdelim))
        (define (run . command)
          (unless (zero? (apply system* command))
            (error "aiagent home command failed" command)))
        (define (directory path mode)
          (unless (file-exists? path) (mkdir path mode))
          (chmod path mode))
+       (define (validate-image)
+         (let ((metadata (stat #$%image)))
+           (unless (= (stat:size metadata) (* 256 1024 1024 1024))
+             (error "aiagent image has unexpected size"))
+           (unless (>= (* 512 (stat:blocks metadata))
+                       (* 256 1024 1024 1024))
+             (error "aiagent image is not fully allocated"))
+           (unless (= (stat:uid metadata) 0)
+             (error "aiagent image is not root-owned"))
+           (chmod #$%image #o600)))
        (directory "/var/lib/aiagent" #o700)
        (let ((mounted-status
               (status:exit-val
@@ -51,7 +61,8 @@
                                               "/loop/backing_file")
                              read-line)
                            #$%image))
-               (error "aiagent home is mounted from another source"))))
+               (error "aiagent home is mounted from another source")))
+           (validate-image))
           ((member mounted-status '(1 32))
            (directory #$%home #o000)
            (unless (file-exists? #$%image)
@@ -61,29 +72,24 @@
                     "-l" "256G" candidate)
                (chmod candidate #o600)
                (run #$(file-append e2fsprogs "/sbin/mkfs.ext4")
-                    "-F" candidate)
+                    "-F" "-E" "nodiscard" candidate)
                (rename-file candidate #$%image)))
-           (unless (= (stat:size (stat #$%image)) (* 256 1024 1024 1024))
-             (error "aiagent image has unexpected size"))
-           (unless (= (stat:uid (stat #$%image)) 0)
-             (error "aiagent image is not root-owned"))
-           (chmod #$%image #o600)
+           (validate-image)
            (let ((status (system* #$(file-append e2fsprogs "/sbin/e2fsck")
                                   "-p" #$%image)))
              (unless (member (status:exit-val status) '(0 1))
                (error "aiagent image failed fsck" status)))
            (run #$(file-append util-linux "/bin/mount")
-                "-o" "loop,nodev,nosuid" #$%image #$%home)
-           (let ((account (getpwnam "aiagent")))
-             (chown #$%home (passwd:uid account) (passwd:gid account)))
-           (chmod #$%home #o700))
-          (else (error "cannot inspect aiagent home mount")))))))
+                "-o" "loop,nodev,nosuid" #$%image #$%home))
+          (else (error "cannot inspect aiagent home mount")))
+         (let ((account (getpwnam "aiagent")))
+           (chown #$%home (passwd:uid account) (passwd:gid account)))
+         (chmod #$%home #o700)))))
 
 (define aiagent-home-stop-program
   (program-file
    "aiagent-home-stop"
    #~(begin
-       (use-modules (ice-9 posix))
        (unless (zero? (system* #$(file-append util-linux "/bin/umount")
                                 #$%home))
          (error "cannot unmount aiagent home"))
@@ -93,7 +99,6 @@
   (program-file
    "aiagent-runtime"
    #~(begin
-       (use-modules (ice-9 posix))
        (unless (file-exists? "/run/aiagent")
          (mkdir "/run/aiagent" #o700))
        (let ((account (getpwnam "aiagent")))
@@ -105,7 +110,6 @@
   (program-file
    "aiagent-cgroup"
    #~(begin
-       (use-modules (ice-9 posix))
        (define (write path value)
          (call-with-output-file path (lambda (port) (display value port))))
        (define (ensure path)
@@ -141,9 +145,10 @@
   (program-file
    "aiagent-ssh-placement"
    #~(begin
-       (use-modules (ice-9 posix))
        (when (and (string=? (or (getenv "PAM_USER") "") "aiagent")
                   (string=? (or (getenv "PAM_TYPE") "") "open_session"))
+         (unless (file-exists? #$%delegated)
+           (error "aiagent cgroup is unavailable"))
          (unless (= (geteuid) 0)
            (error "aiagent SSH placement requires root"))
          (let* ((pid (getppid))
@@ -161,7 +166,6 @@
   (program-file
    "aiagent-compose"
    #~(begin
-       (use-modules (ice-9 posix))
        (let* ((account (getpwnam "aiagent"))
               (uid (passwd:uid account))
               (gid (passwd:gid account)))
@@ -181,7 +185,7 @@
          (setenv "PODMAN_COMPOSE_PROVIDER"
                  "/home/aiagent/.guix-profile/bin/podman-compose")
          (setenv "PATH"
-                 "/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+                 "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
          (execl "/home/aiagent/.local/bin/gak-compose-lifecycle"
                 "gak-compose-lifecycle" "run")))))
 
@@ -189,7 +193,6 @@
   (program-file
    "aiagent-shell"
    #~(begin
-       (use-modules (ice-9 posix))
        (setenv "HOME" #$%home)
        (setenv "XDG_RUNTIME_DIR" "/run/aiagent")
        (setenv "TMPDIR" "/home/aiagent/tmp")
@@ -197,7 +200,7 @@
        (setenv "PODMAN_COMPOSE_PROVIDER"
                "/home/aiagent/.guix-profile/bin/podman-compose")
        (setenv "PATH"
-               "/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+               "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
        (if (null? (cdr (command-line)))
            (execl #$(file-append bash "/bin/bash") "bash" "-l")
            (apply execl #$(file-append bash "/bin/bash") "bash"
@@ -237,7 +240,6 @@
 (define (aiagent-pam-extensions _)
   (list
    (pam-extension
-    (shepherd-requirements '(aiagent-cgroup))
     (transformer
      (lambda (pam)
        (if (string=? (pam-service-name pam) "sshd")

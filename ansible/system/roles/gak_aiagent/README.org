@@ -10,6 +10,11 @@ the ext4 home image. The account's shell and Shepherd service set =TMPDIR=,
 =CONTAINERS_IMAGE_COPY_TMPDIR= and =XDG_RUNTIME_DIR=. Podman's cgroupfs manager
 uses =cgroups = "split"=, placing conmon and the payload beneath the cgroup
 of the service or SSH session that starts them.
+Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
+setuid =newuidmap= and =newgidmap= wrappers.
+The host account has tailscaled's non-operator read-only local API access;
+the Guix module leaves the socket unchanged. The agent container must omit
+host runtime paths, including that socket.
 
 The =smoke= project uses a published BusyBox image with no mounts or network.
 Its image is pulled before a cold boot, since the lifecycle helper starts with
