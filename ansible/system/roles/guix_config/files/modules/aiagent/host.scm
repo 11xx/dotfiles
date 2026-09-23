@@ -16,6 +16,15 @@
 (define %home "/home/aiagent")
 (define %image-size-bytes (* 256 1024 1024 1024))
 (define %host-free-reserve-bytes (* 128 1024 1024 1024))
+(define %home-lock-wait-seconds 300)
+(define %home-probe-seconds 30)
+(define %home-allocation-seconds 600)
+(define %home-format-seconds 300)
+(define %home-fsck-seconds 1200)
+(define %home-mount-seconds 120)
+(define %home-unmount-seconds 120)
+(define %runtime-init-seconds 60)
+(define %cgroup-init-seconds 60)
 (define %cgroup "/sys/fs/cgroup/aiagent")
 (define %delegated "/sys/fs/cgroup/aiagent/delegated")
 
@@ -24,8 +33,14 @@
    "aiagent-home"
    #~(begin
        (use-modules (ice-9 popen) (ice-9 rdelim))
-       (define (run . command)
-         (unless (zero? (apply system* command))
+       (define (timed-status seconds . command)
+         (let* ((status (apply system* #$(file-append coreutils "/bin/timeout")
+                               "--signal=KILL" (number->string seconds)
+                               command))
+                (exit (status:exit-val status)))
+           (if (number? exit) exit 137)))
+       (define (run seconds . command)
+         (unless (zero? (apply timed-status seconds command))
            (error "aiagent home command failed" command)))
        (define (directory path mode)
          (unless (file-exists? path) (mkdir path mode))
@@ -42,29 +57,35 @@
            (chmod path #o600)))
        (define (available-host-bytes)
          (let* ((port (open-pipe* OPEN_READ
+                                  #$(file-append coreutils "/bin/timeout")
+                                  "--signal=KILL"
+                                  #$(number->string %home-probe-seconds)
                                   #$(file-append coreutils "/bin/stat")
                                   "-f" "-c" "%a %S" "/var/lib/aiagent"))
                 (blocks (read port))
                 (block-size (read port))
                 (status (close-pipe port)))
-           (unless (and (zero? (status:exit-val status))
+           (unless (and (equal? (status:exit-val status) 0)
                         (integer? blocks) (>= blocks 0)
                         (integer? block-size) (> block-size 0))
              (error "cannot measure host free space"))
            (* blocks block-size)))
        (directory "/var/lib/aiagent" #o700)
        (let ((mounted-status
-              (status:exit-val
-               (system* #$(file-append util-linux "/bin/mountpoint")
-                        "-q" #$%home))))
+              (timed-status #$%home-probe-seconds
+                            #$(file-append util-linux "/bin/mountpoint")
+                            "-q" #$%home)))
          (cond
           ((zero? mounted-status)
            (let* ((port (open-pipe* OPEN_READ
+                                    #$(file-append coreutils "/bin/timeout")
+                                    "--signal=KILL"
+                                    #$(number->string %home-probe-seconds)
                                     #$(file-append util-linux "/bin/findmnt")
                                     "-n" "-o" "SOURCE" "--mountpoint" #$%home))
                   (source (read-line port))
                   (status (close-pipe port)))
-             (unless (and (zero? (status:exit-val status))
+             (unless (and (equal? (status:exit-val status) 0)
                           (string? source)
                           (> (string-length source) 9)
                           (string=? (substring source 0 9) "/dev/loop")
@@ -79,38 +100,46 @@
            (validate-image #$%image))
           ((member mounted-status '(1 32))
            (directory #$%home #o000)
-           (unless (file-exists? #$%image)
-             (let ((candidate (string-append #$%image ".new")))
-               (when (file-exists? candidate) (delete-file candidate))
-               (unless (>= (available-host-bytes)
-                           (+ #$%image-size-bytes
-                              #$%host-free-reserve-bytes))
-                 (error "insufficient host free space for aiagent image and reserve"))
-               (dynamic-wind
-                 (lambda () #t)
-                 (lambda ()
-                   (run #$(file-append util-linux "/bin/fallocate")
-                        "-l" (number->string #$%image-size-bytes) candidate)
-                   (chmod candidate #o600)
-                   (run #$(file-append e2fsprogs "/sbin/mkfs.ext4")
-                        "-F" "-E" "nodiscard" candidate)
-                   (validate-image candidate)
-                   (let ((status
-                          (system* #$(file-append e2fsprogs "/sbin/e2fsck")
-                                   "-p" candidate)))
-                     (unless (member (status:exit-val status) '(0 1))
-                       (error "aiagent candidate failed fsck" status)))
-                   (rename-file candidate #$%image))
-                 (lambda ()
-                   (when (file-exists? candidate)
-                     (delete-file candidate))))))
-           (validate-image #$%image)
-           (let ((status (system* #$(file-append e2fsprogs "/sbin/e2fsck")
-                                  "-p" #$%image)))
-             (unless (member (status:exit-val status) '(0 1))
-               (error "aiagent image failed fsck" status)))
-           (run #$(file-append util-linux "/bin/mount")
-                "-o" "loop,nodev,nosuid" #$%image #$%home))
+           (let ((created? #f))
+             (unless (file-exists? #$%image)
+               (let ((candidate (string-append #$%image ".new")))
+                 (when (file-exists? candidate) (delete-file candidate))
+                 (unless (>= (available-host-bytes)
+                             (+ #$%image-size-bytes
+                                #$%host-free-reserve-bytes))
+                   (error "insufficient host free space for aiagent image and reserve"))
+                 (dynamic-wind
+                   (lambda () #t)
+                   (lambda ()
+                     (run #$%home-allocation-seconds
+                          #$(file-append util-linux "/bin/fallocate")
+                          "-l" (number->string #$%image-size-bytes) candidate)
+                     (chmod candidate #o600)
+                     (run #$%home-format-seconds
+                          #$(file-append e2fsprogs "/sbin/mkfs.ext4")
+                          "-F" "-E" "nodiscard" candidate)
+                     (validate-image candidate)
+                     (let ((status
+                            (timed-status #$%home-fsck-seconds
+                                          #$(file-append e2fsprogs "/sbin/e2fsck")
+                                          "-p" candidate)))
+                       (unless (member status '(0 1))
+                         (error "aiagent candidate failed fsck" status)))
+                     (rename-file candidate #$%image))
+                   (lambda ()
+                     (when (file-exists? candidate)
+                       (delete-file candidate)))))
+               (set! created? #t))
+             (validate-image #$%image)
+             (unless created?
+               (let ((status (timed-status #$%home-fsck-seconds
+                                           #$(file-append e2fsprogs "/sbin/e2fsck")
+                                           "-p" #$%image)))
+                 (unless (member status '(0 1))
+                   (error "aiagent image failed fsck" status))))
+             (run #$%home-mount-seconds
+                  #$(file-append util-linux "/bin/mount")
+                  "-o" "loop,nodev,nosuid" #$%image #$%home)))
           (else (error "cannot inspect aiagent home mount")))
          (let ((account (getpwnam "aiagent")))
            (chown #$%home (passwd:uid account) (passwd:gid account)))
@@ -128,7 +157,9 @@
          (chmod "/var/lib/aiagent/home.lock" #o600)
          (close-port port))
        (unless (zero? (system* #$(file-append util-linux "/bin/flock")
-                                "--exclusive" "/var/lib/aiagent/home.lock"
+                                "--exclusive" "-w"
+                                #$(number->string %home-lock-wait-seconds)
+                                "/var/lib/aiagent/home.lock"
                                 #$aiagent-home-locked-program))
          (error "aiagent home initialization failed")))))
 
@@ -136,9 +167,12 @@
   (program-file
    "aiagent-home-stop-locked"
    #~(begin
-       (unless (zero? (system* #$(file-append util-linux "/bin/umount")
+       (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
+                                "--signal=KILL"
+                                #$(number->string %home-unmount-seconds)
+                                #$(file-append util-linux "/bin/umount")
                                 #$%home))
-         (error "cannot unmount aiagent home"))
+         (error "aiagent home may remain mounted; check findmnt"))
        (chmod #$%home #o000))))
 
 (define aiagent-home-stop-program
@@ -146,9 +180,11 @@
    "aiagent-home-stop"
    #~(begin
        (unless (zero? (system* #$(file-append util-linux "/bin/flock")
-                                "--exclusive" "/var/lib/aiagent/home.lock"
+                                "--exclusive" "-w"
+                                #$(number->string %home-lock-wait-seconds)
+                                "/var/lib/aiagent/home.lock"
                                 #$aiagent-home-stop-locked-program))
-         (error "cannot stop aiagent home")))))
+         (error "aiagent home stop failed; check findmnt")))))
 
 (define aiagent-runtime-program
   (program-file
@@ -269,25 +305,32 @@
    (shepherd-service
    (provision '(aiagent-home))
     (requirement '(user-processes))
-    (one-shot? #t)
     (start #~(lambda _ (zero? (system* #$aiagent-home-program))))
     (stop #~(lambda _
               (if (zero? (system* #$aiagent-home-stop-program))
                   #f
-                  (error "cannot stop aiagent home"))))
+                  (error "aiagent home may remain mounted; check findmnt"))))
     (respawn? #f))
    (shepherd-service
     (provision '(aiagent-runtime))
     (requirement '(user-processes))
     (one-shot? #t)
-    (start #~(lambda _ (zero? (system* #$aiagent-runtime-program))))
+    (start #~(lambda _
+               (zero? (system* #$(file-append coreutils "/bin/timeout")
+                               "--signal=KILL"
+                               #$(number->string %runtime-init-seconds)
+                               #$aiagent-runtime-program))))
     (stop #~(const #f))
     (respawn? #f))
    (shepherd-service
     (provision '(aiagent-cgroup))
     (requirement '(cgroups2-limits))
     (one-shot? #t)
-    (start #~(lambda _ (zero? (system* #$aiagent-cgroup-program))))
+    (start #~(lambda _
+               (zero? (system* #$(file-append coreutils "/bin/timeout")
+                               "--signal=KILL"
+                               #$(number->string %cgroup-init-seconds)
+                               #$aiagent-cgroup-program))))
     (stop #~(const #f))
     (respawn? #f))
    (shepherd-service
