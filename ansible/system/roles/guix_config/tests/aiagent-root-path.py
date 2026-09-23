@@ -69,20 +69,28 @@ def probe_runtime_cgroup_pam(module_dir, root, account):
     assert namespace_owner(delegated)[:2] == (account.pw_uid, account.pw_gid)
     assert (cgroup / "cpu.max").read_text() == "400000 100000"
     assert (cgroup / "memory.max").read_text() == str(12 * 1024**3)
-    print("cgroup: limit writes and delegated chown passed")
+    print("cgroup: ordinary-file writes and chown passed; kernel delegation untested")
 
     pam_root = root / "pam-delegated"
     pam_root.mkdir()
     pam_source = built(module_dir, "aiagent-ssh-placement-program").read_text()
-    pam_program = script(root / "pam.scm", pam_source.replace("/sys/fs/cgroup/aiagent/delegated", str(pam_root)))
+    header, body = pam_source.split("!#\n", 1)
+    body = body.replace("/sys/fs/cgroup/aiagent/delegated", str(pam_root))
+    mkdir_harness = '''(define actual-mkdir mkdir)
+(let ((mkdir (lambda (path mode)
+  (let ((result (actual-mkdir path mode)))
+    (call-with-output-file (string-append path "/cgroup.procs")
+      (lambda (port) #t))
+    result)))) BODY)
+'''.replace("BODY", body)
+    pam_program = script(root / "pam.scm", header + "!#\n" + mkdir_harness)
     for user in ("lobo", "root"):
         namespace(PROFILE / "env", f"PAM_USER={user}", "PAM_TYPE=open_session", pam_program)
     wrapper = root / "pam-wrapper.py"
     wrapper.write_text(
         "import os, pathlib, subprocess, sys\n"
         "program=pathlib.Path(sys.argv[1]); parent=pathlib.Path(sys.argv[2])\n"
-        "pid=os.getpid(); leaf=parent/f'ssh-{pid}'; leaf.mkdir(mode=0o700)\n"
-        "(leaf/'cgroup.procs').write_text('')\n"
+        "pid=os.getpid(); leaf=parent/f'ssh-{pid}'; assert not leaf.exists()\n"
         "env={**os.environ, 'PAM_USER':'aiagent', 'PAM_TYPE':'open_session'}\n"
         "result=subprocess.run([str(program)], env=env, capture_output=True, text=True)\n"
         "assert result.returncode==0, result.stderr\n"
@@ -93,7 +101,7 @@ def probe_runtime_cgroup_pam(module_dir, root, account):
         sys.executable, wrapper, pam_program, pam_root,
         account.pw_uid, account.pw_gid,
     )
-    print("PAM: lobo/root no-op and aiagent placement passed")
+    print("PAM: lobo/root no-op; real mkdir then ordinary cgroup.procs stand-in passed")
 
 
 def probe_launcher(module_dir, root, account):
@@ -105,13 +113,13 @@ def probe_launcher(module_dir, root, account):
     service.mkdir(parents=True)
     procs = service / "cgroup.procs"
     procs.write_text("")
+    interpreter = Path(sys.executable).resolve()
     helper = script(
-        root / "helper.sh",
-        "#!/bin/sh\n"
-        "printf 'uid='; /run/current-system/profile/bin/id -u\n"
-        "printf 'gid='; /run/current-system/profile/bin/id -g\n"
-        "printf 'groups='; /run/current-system/profile/bin/id -G\n"
-        "printf 'cwd='; pwd\n",
+        root / "helper.py",
+        f"#!{interpreter}\n"
+        "import json, os\n"
+        "print(json.dumps({'uid': os.geteuid(), 'gid': os.getegid(), "
+        "'supplementary': os.getgroups(), 'cwd': os.getcwd()}))\n",
     )
     source = built(module_dir, "aiagent-compose-program").read_text()
     header, body = source.split("!#\n", 1)
@@ -124,23 +132,28 @@ def probe_launcher(module_dir, root, account):
     body = body.replace(old_exec, '(execl (string-append "/proc/self/fd/" (number->string (fileno helper-port)))')
     body = body.replace("/home/aiagent", str(home)).replace("/run/aiagent", str(runtime))
     prefix = (
+        "(setgroups #(42))\n"
+        "(unless (equal? (getgroups) #(42)) (error \"probe group setup failed\"))\n"
         f"(let* ((home-port (open {json.dumps(str(home))} O_RDONLY)) "
         f"(helper-port (open {json.dumps(str(helper))} O_RDONLY)))\n"
     )
     probe = script(root / "launcher.scm", header + "!#\n" + prefix + body + ")\n")
     result = namespace(probe)
-    assert f"uid={account.pw_uid}" in result.stdout
-    assert f"gid={account.pw_gid}" in result.stdout
-    assert f"groups={account.pw_gid}" in result.stdout
+    identity = json.loads(result.stdout.strip())
+    assert identity == {
+        "uid": account.pw_uid,
+        "gid": account.pw_gid,
+        "supplementary": [],
+        "cwd": str(home),
+    }, identity
     assert procs.read_text().strip().isdigit()
-    print("launcher: cgroup write, setgroups, setgid, setuid, chdir and exec passed")
+    print("launcher: real setgroups/setgid/setuid cleared seeded group 42; preopened /proc/self/fd paths skip ancestor traversal")
 
 
 def probe_home(module_dir, root, account):
     backing = root / "backing"
     backing.mkdir()
     home = root / "home"
-    home.mkdir()
     loop_access = namespace(
         sys.executable, "-c",
         "import errno, os\n"
@@ -169,8 +182,9 @@ def probe_home(module_dir, root, account):
     assert attempt.returncode != 0 and "Wrong type argument" not in attempt.stderr
     assert "failed to setup loop device" in attempt.stderr
     assert (backing / "home.ext4").exists() and not (backing / "home.ext4.new").exists()
+    assert home.is_dir() and namespace_owner(home)[2] == 0
     assert (backing / "home.lock").stat().st_mode & 0o777 == 0o600
-    print(f"home: creation and fsck passed; loop setup denied in namespace (errno {loop_access})")
+    print(f"home: real mkdir/format/fsck passed; loop setup denied (errno {loop_access})")
 
     header, body = inner_source.split("!#\n", 1)
     mocked_mount = (
@@ -184,7 +198,7 @@ def probe_home(module_dir, root, account):
     mount_probe = script(root / "home-mock-mount.scm", header + "!#\n" + mocked_mount)
     namespace(mount_probe)
     assert namespace_owner(home) == (account.pw_uid, account.pw_gid, 700)
-    print("home: post-mount chown/chmod passed")
+    print("home: post-mount chown/chmod passed with mount success mocked")
 
     mounted_harness = '''(use-modules (ice-9 popen) (ice-9 rdelim) (srfi srfi-1))
 (define actual-system* system*)
@@ -221,7 +235,7 @@ def probe_home(module_dir, root, account):
     stop_mock = script(root / "home-mock-umount.scm", header + "!#\n" + "(let ((system* (lambda args 0))) " + body + ")\n")
     namespace(stop_mock)
     assert namespace_owner(home)[2] == 0
-    print("home stop: umount reached and post-unmount chmod passed")
+    print("home stop: real umount reached; post-unmount chmod passed with success mocked")
     return home
 
 
@@ -248,6 +262,7 @@ def main():
     native_mount = os.readlink("/proc/self/ns/mnt")
     agent_mount = namespace(PROFILE / "readlink", "/proc/self/ns/mnt").stdout.strip()
     assert native_mount != agent_mount, "podman unshare needs an isolated mount namespace"
+    print("namespace root is not host root; ordinary files do not test kernel cgroup delegation")
     account = pwd.getpwnam("aiagent")
     scratch = Path.home() / ".cache/gak-aiagent-host"
     scratch.mkdir(parents=True, exist_ok=True)

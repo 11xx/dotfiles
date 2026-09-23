@@ -20,13 +20,14 @@ scp roles/guix_config/tests/aiagent-root-path.py \
 ssh gak 'python3 ~/.cache/gak-aiagent-host/slice2/aiagent-root-path.py ~/.cache/gak-aiagent-host/slice2/modules'
 #+end_src
 
-The probe builds each program and uses
-=podman unshare= with scratch targets for root-only paths. It performs real
-=setgroups=, =setgid=, =setuid=, cgroup writes and ownership changes without
-touching the running agent services. A loop mount cannot be created by the
-unprivileged namespace; the probe checks that invocation reaches loop setup
-with correctly typed arguments, then checks the post-mount ownership path
-with that operation mocked.
+The probe builds each program and uses =podman unshare= with scratch targets
+for root-only paths. Namespace root is not host root. Guile performs real
+=setgroups=, =setgid=, =setuid=, =mkdir=, =chown= and =chmod= calls. Cgroup
+targets are ordinary files: they test argument types and file operations, not
+kernel placement or delegation. Preopened =/proc/self/fd= paths allow the
+post-drop =chdir= and =execl= calls without testing ancestor-directory
+traversal. The namespace denies loop-device setup; successful mount and
+unmount results are mocked to exercise the following Guile ownership calls.
 
 The =aiagent host= module is tangled from [[file:../../aiagent.org][aiagent.org]]. Its
 selection is controlled by =gak_aiagent_host_enabled=. The operator's rootless
