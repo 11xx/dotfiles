@@ -87,7 +87,7 @@
         argv:
           - /bin/sh
           - -c
-          - umask 022 && exec guix system reconfigure {{ guix_config_dir }}/system.scm
+          - umask 022 && exec guix system reconfigure -L {{ guix_config_dir }}/modules {{ guix_config_dir }}/system.scm
       become: true
       when:
         - gak_activate_system | bool
@@ -104,3 +104,45 @@
         - gak_activate_system | bool
         - ansible_check_mode
       tags: ['guix-activate']
+
+- name: Agent host workload
+  hosts: gak-aiagent
+  gather_facts: false
+
+  pre_tasks:
+    - name: 'aiagent: Check temporary directories for Guix bootstrap'
+      ansible.builtin.raw: >-
+        test -d /home/aiagent/tmp &&
+        test -d /home/aiagent/image-copy-tmp
+      register: gak_aiagent_bootstrap_dirs
+      failed_when: false
+      changed_when: false
+      tags: ['gak-aiagent']
+
+    - name: 'aiagent: Create temporary directories for Guix bootstrap'
+      ansible.builtin.raw: >-
+        mkdir -p /home/aiagent/tmp /home/aiagent/image-copy-tmp &&
+        chmod 0700 /home/aiagent/tmp /home/aiagent/image-copy-tmp
+      when:
+        - not ansible_check_mode
+        - gak_aiagent_bootstrap_dirs.rc | default(0) != 0
+      tags: ['gak-aiagent']
+
+    - name: 'aiagent: Check the private profile tools'
+      ansible.builtin.raw: >-
+        test -x /home/aiagent/.guix-profile/bin/python3 &&
+        test -x /home/aiagent/.guix-profile/bin/podman-compose
+      register: gak_aiagent_profile_tools
+      failed_when: false
+      changed_when: false
+      tags: ['gak-aiagent']
+
+    - name: 'aiagent: Install the interpreter and Compose provider'
+      ansible.builtin.raw: /run/current-system/profile/bin/guix install python podman-compose
+      when:
+        - not ansible_check_mode
+        - gak_aiagent_profile_tools.rc | default(0) != 0
+      tags: ['gak-aiagent']
+
+  roles:
+    - { role: gak_aiagent, tags: ['gak-aiagent'] }

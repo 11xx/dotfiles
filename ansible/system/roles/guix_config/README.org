@@ -1,0 +1,17 @@
+#+TITLE: Gak Guix declarations
+
+This role deploys the rendered system and Home expressions, channels and
+load-path modules to the operator's configuration directory. System activation
+is an explicit operator step. Build and reconfigure with the module directory
+on the Guix load path:
+
+#+begin_src sh
+guix system build -L ~/.config/guix/modules ~/.config/guix/system.scm
+sudo guix system reconfigure -L ~/.config/guix/modules ~/.config/guix/system.scm
+#+end_src
+
+The =aiagent host= module is tangled from [[file:../../aiagent.org][aiagent.org]]. Its
+selection is controlled by =gak_aiagent_host_enabled=. The operator's rootless
+Podman declaration remains separate, including its subordinate IDs. A change
+to a deployed module reports a pending system activation even when the main
+expression is unchanged.

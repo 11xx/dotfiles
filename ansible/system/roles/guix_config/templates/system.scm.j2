@@ -6,7 +6,7 @@
 ;;; reconfigure is slow enough to want a human watching it. Apply by hand, on
 ;;; the host when that post-task is not used:
 ;;;
-;;;   sudo guix system reconfigure ~/.config/guix/system.scm
+;;;   sudo guix system reconfigure -L ~/.config/guix/modules ~/.config/guix/system.scm
 ;;;
 ;;; /etc/config.scm is the installer's original and is not used by anything.
 
@@ -17,6 +17,7 @@
              (gnu packages shells)
              (gnu services nfs)
              (gnu system accounts)
+             (aiagent host)
              ;; Guix upstream packages Tailscale's Go dependencies but not
              ;; Tailscale, so `tailscaled` comes from the rosenthal channel
              ;; already listed in channels.scm. Not a `use-service-modules`
@@ -161,6 +162,14 @@
                       (list (subid-range (name "lobo")
                                          (start {{ gak_subid_start }})
                                          (count {{ gak_subid_count }}))))))
+
+{% if gak_aiagent_host_enabled | bool %}
+           (service aiagent-host-service-type
+                    (list (plain-file "gak-aiagent-deploy.pub"
+                                      "{{ gak_aiagent_deploy_public_key | trim }}\n")
+                          (plain-file "gak-aiagent-shell.pub"
+                                      "{{ gak_aiagent_shell_public_key | trim }}\n")))
+{% endif %}
 
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}

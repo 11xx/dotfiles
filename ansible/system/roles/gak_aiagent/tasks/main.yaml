@@ -1,0 +1,72 @@
+---
+- name: 'aiagent: Create private configuration and state directories'
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0700'
+  loop:
+    - /home/aiagent/.config
+    - /home/aiagent/.config/containers
+    - /home/aiagent/.local
+    - /home/aiagent/.local/bin
+    - /home/aiagent/podman
+    - /home/aiagent/podman/storage
+    - /home/aiagent/podman/runroot
+    - /home/aiagent/tmp
+    - /home/aiagent/image-copy-tmp
+    - /home/aiagent/services
+    - /home/aiagent/services/smoke
+
+- name: 'aiagent: Install private Podman configuration'
+  ansible.builtin.copy:
+    src: '{{ item }}'
+    dest: '/home/aiagent/.config/containers/{{ item }}'
+    mode: '0600'
+  loop:
+    - containers.conf
+    - storage.conf
+
+- name: 'aiagent: Install Compose lifecycle helper'
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/roles/gak_compose/files/gak-compose-lifecycle'
+    dest: /home/aiagent/.local/bin/gak-compose-lifecycle
+    mode: '0750'
+
+- name: 'aiagent: Install declared instance lists'
+  ansible.builtin.copy:
+    content: '{{ item.content }}'
+    dest: '/home/aiagent/services/{{ item.name }}'
+    mode: '0600'
+  loop:
+    - { name: '.compose-supported', content: "smoke\n" }
+    - { name: '.compose-applications', content: "smoke\n" }
+    - { name: '.compose-autostart', content: "smoke\n" }
+    - { name: '.compose-never-autostart', content: '' }
+    - { name: '.compose-networks', content: '' }
+
+- name: 'aiagent: Install the boot smoke project'
+  ansible.builtin.copy:
+    src: smoke-compose.yaml
+    dest: /home/aiagent/services/smoke/compose.yaml
+    mode: '0600'
+
+- name: 'aiagent: Check the boot smoke image'
+  ansible.builtin.command:
+    argv:
+      - /run/current-system/profile/bin/podman
+      - image
+      - exists
+      - docker.io/library/busybox:1.37.0
+  register: gak_aiagent_smoke_image
+  failed_when: false
+  changed_when: false
+
+- name: 'aiagent: Pull the boot smoke image'
+  ansible.builtin.command:
+    argv:
+      - /run/current-system/profile/bin/podman
+      - pull
+      - docker.io/library/busybox:1.37.0
+  when:
+    - not ansible_check_mode
+    - gak_aiagent_smoke_image.rc | default(0) != 0

@@ -1,0 +1,25 @@
+#+TITLE: Gak agent workload bootstrap
+
+The =gak-aiagent= inventory host connects as =aiagent= with its own operator-held
+SSH key. The Guix system service supplies a mounted home, a private runtime
+directory, SSH cgroup placement and a capped parent before this role runs.
+The play installs Python and =podman-compose= in the account's Guix profile.
+
+This role keeps Podman storage, its runroot and both temporary directories in
+the ext4 home image. The account's shell and Shepherd service set =TMPDIR=,
+=CONTAINERS_IMAGE_COPY_TMPDIR= and =XDG_RUNTIME_DIR=. Podman's cgroupfs manager
+uses =cgroups = "split"=, placing conmon and the payload beneath the cgroup
+of the service or SSH session that starts them.
+The image initializer reserves 256 GiB only when another 128 GiB remains free
+for the operator's services. It removes a partial candidate on failure and
+cleans up a candidate left by an interruption before retrying.
+Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
+setuid =newuidmap= and =newgidmap= wrappers.
+The host account has tailscaled's non-operator read-only local API access;
+the Guix module leaves the socket unchanged. The agent container must omit
+host runtime paths, including that socket.
+
+The =smoke= project uses a published BusyBox image with no mounts or network.
+Its image is pulled before a cold boot, since the lifecycle helper starts with
+=--pull never=. The helper reads the five instance lists from
+=/home/aiagent/services=. A second play run is idempotent.

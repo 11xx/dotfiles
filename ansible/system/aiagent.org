@@ -1,6 +1,360 @@
 #+PROPERTY: header-args :mkdirp yes
 #+PROPERTY: tangle-dir (expand-file-name "~/ansible/system/roles/aiagent_host_setup/files/")
 
+* Gak host foundation
+
+The =aiagent= account has a private group and a mounted home backed by a
+preallocated ext4 image. The backing image is root-owned. Shepherd establishes
+the mount, runtime directory and capped cgroup before starting its Compose
+helper. SSH sessions enter the delegated cgroup through PAM before launching
+the user's command. The agent owns only the delegated subtree; the limit files
+belong to root. Gak uses Podman's cgroupfs manager. Its per-user
+=containers.conf= selects =cgroups = "split"=, so conmon and each container
+payload become children of the service or SSH session cgroup that launched
+Podman. Image builds inherit that placement. No container parent is specified
+in Compose.
+Formatting preserves the image's allocated blocks, and each start validates
+the reservation. First creation requires 128 GiB of free host space beyond
+the 256 GiB image so operator services retain working room during allocation.
+Service and SSH launch paths select Guix's privileged
+UID/GID-mapping wrappers before profile binaries.
+
+The host account retains tailscaled's non-operator read-only local API access;
+the Guix module does not change its socket. The agent container must exclude
+host runtime paths, including the Tailscale socket.
+
+The module lives below the Guix configuration load path. Ansible supplies
+authorized public keys when it selects the service. Removing that service
+removes the account, sub-ID declaration and host services together.
+
+#+begin_src scheme :tangle (expand-file-name "roles/guix_config/files/modules/aiagent/host.scm" (file-name-directory (buffer-file-name))) :mkdirp yes
+(define-module (aiagent host)
+  #:use-module (gnu packages base)
+  #:use-module (gnu packages bash)
+  #:use-module (gnu packages linux)
+  #:use-module (gnu services)
+  #:use-module (gnu services shepherd)
+  #:use-module (gnu services ssh)
+  #:use-module (gnu system accounts)
+  #:use-module (gnu system pam)
+  #:use-module (gnu system shadow)
+  #:use-module (guix gexp)
+  #:use-module (ice-9 match)
+  #:export (aiagent-host-service-type))
+
+(define %image "/var/lib/aiagent/home.ext4")
+(define %home "/home/aiagent")
+(define %image-size-bytes (* 256 1024 1024 1024))
+(define %host-free-reserve-bytes (* 128 1024 1024 1024))
+(define %cgroup "/sys/fs/cgroup/aiagent")
+(define %delegated "/sys/fs/cgroup/aiagent/delegated")
+
+(define aiagent-home-program
+  (program-file
+   "aiagent-home"
+   #~(begin
+       (use-modules (ice-9 popen) (ice-9 rdelim))
+       (define (run . command)
+         (unless (zero? (apply system* command))
+           (error "aiagent home command failed" command)))
+       (define (directory path mode)
+         (unless (file-exists? path) (mkdir path mode))
+         (chmod path mode))
+       (define (validate-image path)
+         (let ((metadata (stat path)))
+           (unless (= (stat:size metadata) #$%image-size-bytes)
+             (error "aiagent image has unexpected size"))
+           (unless (>= (* 512 (stat:blocks metadata))
+                       #$%image-size-bytes)
+             (error "aiagent image is not fully allocated"))
+           (unless (= (stat:uid metadata) 0)
+             (error "aiagent image is not root-owned"))
+           (chmod path #o600)))
+       (define (available-host-bytes)
+         (let* ((port (open-pipe* OPEN_READ
+                                  #$(file-append coreutils "/bin/stat")
+                                  "-f" "-c" "%a %S" "/var/lib/aiagent"))
+                (blocks (read port))
+                (block-size (read port))
+                (status (close-pipe port)))
+           (unless (and (zero? (status:exit-val status))
+                        (integer? blocks) (>= blocks 0)
+                        (integer? block-size) (> block-size 0))
+             (error "cannot measure host free space"))
+           (* blocks block-size)))
+       (directory "/var/lib/aiagent" #o700)
+       (let ((mounted-status
+              (status:exit-val
+               (system* #$(file-append util-linux "/bin/mountpoint")
+                        "-q" #$%home))))
+         (cond
+          ((zero? mounted-status)
+           (let* ((port (open-pipe* OPEN_READ
+                                    #$(file-append util-linux "/bin/findmnt")
+                                    "-n" "-o" "SOURCE" "--mountpoint" #$%home))
+                  (source (read-line port))
+                  (status (close-pipe port)))
+             (unless (and (zero? (status:exit-val status))
+                          (string? source)
+                          (> (string-length source) 9)
+                          (string=? (substring source 0 9) "/dev/loop")
+                          (string=?
+                           (call-with-input-file
+                               (string-append "/sys/block/"
+                                              (substring source 5)
+                                              "/loop/backing_file")
+                             read-line)
+                           #$%image))
+               (error "aiagent home is mounted from another source")))
+           (validate-image #$%image))
+          ((member mounted-status '(1 32))
+           (directory #$%home #o000)
+           (unless (file-exists? #$%image)
+             (let ((candidate (string-append #$%image ".new")))
+               (when (file-exists? candidate) (delete-file candidate))
+               (unless (>= (available-host-bytes)
+                           (+ #$%image-size-bytes
+                              #$%host-free-reserve-bytes))
+                 (error "insufficient host free space for aiagent image and reserve"))
+               (dynamic-wind
+                 (lambda () #t)
+                 (lambda ()
+                   (run #$(file-append util-linux "/bin/fallocate")
+                        "-l" (number->string #$%image-size-bytes) candidate)
+                   (chmod candidate #o600)
+                   (run #$(file-append e2fsprogs "/sbin/mkfs.ext4")
+                        "-F" "-E" "nodiscard" candidate)
+                   (validate-image candidate)
+                   (let ((status
+                          (system* #$(file-append e2fsprogs "/sbin/e2fsck")
+                                   "-p" candidate)))
+                     (unless (member (status:exit-val status) '(0 1))
+                       (error "aiagent candidate failed fsck" status)))
+                   (rename-file candidate #$%image))
+                 (lambda ()
+                   (when (file-exists? candidate)
+                     (delete-file candidate))))))
+           (validate-image #$%image)
+           (let ((status (system* #$(file-append e2fsprogs "/sbin/e2fsck")
+                                  "-p" #$%image)))
+             (unless (member (status:exit-val status) '(0 1))
+               (error "aiagent image failed fsck" status)))
+           (run #$(file-append util-linux "/bin/mount")
+                "-o" "loop,nodev,nosuid" #$%image #$%home))
+          (else (error "cannot inspect aiagent home mount")))
+         (let ((account (getpwnam "aiagent")))
+           (chown #$%home (passwd:uid account) (passwd:gid account)))
+         (chmod #$%home #o700)))))
+
+(define aiagent-home-stop-program
+  (program-file
+   "aiagent-home-stop"
+   #~(begin
+       (unless (zero? (system* #$(file-append util-linux "/bin/umount")
+                                #$%home))
+         (error "cannot unmount aiagent home"))
+       (chmod #$%home #o000))))
+
+(define aiagent-runtime-program
+  (program-file
+   "aiagent-runtime"
+   #~(begin
+       (unless (file-exists? "/run/aiagent")
+         (mkdir "/run/aiagent" #o700))
+       (let ((account (getpwnam "aiagent")))
+         (chown "/run/aiagent" (passwd:uid account)
+                (passwd:gid account)))
+       (chmod "/run/aiagent" #o700))))
+
+(define aiagent-cgroup-program
+  (program-file
+   "aiagent-cgroup"
+   #~(begin
+       (define (write path value)
+         (call-with-output-file path (lambda (port) (display value port))))
+       (define (ensure path)
+         (unless (file-exists? path) (mkdir path #o755)))
+       (ensure #$%cgroup)
+       (write (string-append #$%cgroup "/cpu.max") "400000 100000")
+       (write (string-append #$%cgroup "/cpu.weight") "50")
+       (write (string-append #$%cgroup "/memory.max")
+              (number->string (* 12 1024 1024 1024)))
+       (write (string-append #$%cgroup "/memory.high")
+              (number->string (* 10 1024 1024 1024)))
+       (write (string-append #$%cgroup "/pids.max") "4096")
+       (write (string-append #$%cgroup "/cgroup.subtree_control")
+              "+cpu +memory +pids")
+       (ensure #$%delegated)
+       (write (string-append #$%delegated "/cgroup.subtree_control")
+              "+cpu +memory +pids")
+       (let* ((account (getpwnam "aiagent"))
+              (uid (passwd:uid account))
+              (gid (passwd:gid account)))
+         (chown #$%delegated uid gid)
+         (for-each (lambda (name)
+                     (chown (string-append #$%delegated "/" name)
+                            uid gid))
+                   '("cgroup.procs" "cgroup.threads"
+                     "cgroup.subtree_control"))
+         (ensure (string-append #$%delegated "/service"))
+         (chown (string-append #$%delegated "/service") uid gid)
+         (chown (string-append #$%delegated "/service/cgroup.procs")
+                uid gid)))))
+
+(define aiagent-ssh-placement-program
+  (program-file
+   "aiagent-ssh-placement"
+   #~(begin
+       (when (and (string=? (or (getenv "PAM_USER") "") "aiagent")
+                  (string=? (or (getenv "PAM_TYPE") "") "open_session"))
+         (unless (file-exists? #$%delegated)
+           (error "aiagent cgroup is unavailable"))
+         (unless (= (geteuid) 0)
+           (error "aiagent SSH placement requires root"))
+         (let* ((pid (getppid))
+                (leaf (string-append #$%delegated "/ssh-"
+                                     (number->string pid)))
+                (account (getpwnam "aiagent")))
+           (unless (file-exists? leaf) (mkdir leaf #o700))
+           (chown leaf (passwd:uid account) (passwd:gid account))
+           (chown (string-append leaf "/cgroup.procs")
+                  (passwd:uid account) (passwd:gid account))
+           (call-with-output-file (string-append leaf "/cgroup.procs")
+             (lambda (port) (display pid port))))))))
+
+(define aiagent-compose-program
+  (program-file
+   "aiagent-compose"
+   #~(begin
+       (let* ((account (getpwnam "aiagent"))
+              (uid (passwd:uid account))
+              (gid (passwd:gid account)))
+         (call-with-output-file
+             (string-append #$%delegated "/service/cgroup.procs")
+           (lambda (port) (display (getpid) port)))
+         (setgroups '())
+         (setgid gid)
+         (setuid uid)
+         (chdir #$%home)
+         (setenv "HOME" #$%home)
+         (setenv "XDG_RUNTIME_DIR" "/run/aiagent")
+         (setenv "GAK_COMPOSE_SERVICES_ROOT" "/home/aiagent/services")
+         (setenv "GAK_COMPOSE_RUNTIME_DIR" "/run/aiagent/gak-compose")
+         (setenv "TMPDIR" "/home/aiagent/tmp")
+         (setenv "CONTAINERS_IMAGE_COPY_TMPDIR" "/home/aiagent/image-copy-tmp")
+         (setenv "PODMAN_COMPOSE_PROVIDER"
+                 "/home/aiagent/.guix-profile/bin/podman-compose")
+         (setenv "PATH"
+                 "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+         (execl "/home/aiagent/.local/bin/gak-compose-lifecycle"
+                "gak-compose-lifecycle" "run")))))
+
+(define aiagent-shell-program
+  (program-file
+   "aiagent-shell"
+   #~(begin
+       (setenv "HOME" #$%home)
+       (setenv "XDG_RUNTIME_DIR" "/run/aiagent")
+       (setenv "TMPDIR" "/home/aiagent/tmp")
+       (setenv "CONTAINERS_IMAGE_COPY_TMPDIR" "/home/aiagent/image-copy-tmp")
+       (setenv "PODMAN_COMPOSE_PROVIDER"
+               "/home/aiagent/.guix-profile/bin/podman-compose")
+       (setenv "PATH"
+               "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+       (if (null? (cdr (command-line)))
+           (execl #$(file-append bash "/bin/bash") "bash" "-l")
+           (apply execl #$(file-append bash "/bin/bash") "bash"
+                  (cdr (command-line)))))))
+
+(define (aiagent-shepherd-services _)
+  (list
+   (shepherd-service
+    (provision '(aiagent-home))
+    (requirement '(user-processes))
+    (one-shot? #t)
+    (start #~(make-forkexec-constructor (list #$aiagent-home-program)))
+    (stop #~(lambda _
+              (if (zero? (system* #$aiagent-home-stop-program))
+                  #f
+                  (error "cannot stop aiagent home")))))
+   (shepherd-service
+    (provision '(aiagent-runtime))
+    (requirement '(user-processes))
+    (one-shot? #t)
+    (start #~(make-forkexec-constructor (list #$aiagent-runtime-program)))
+    (stop #~(const #f)))
+   (shepherd-service
+    (provision '(aiagent-cgroup))
+    (requirement '(cgroups2-limits))
+    (one-shot? #t)
+    (start #~(make-forkexec-constructor (list #$aiagent-cgroup-program)))
+    (stop #~(const #f)))
+   (shepherd-service
+    (provision '(aiagent-compose))
+    (requirement '(aiagent-home aiagent-runtime aiagent-cgroup
+                   networking rootless-podman-shared-root-fs))
+    (start #~(make-forkexec-constructor (list #$aiagent-compose-program)))
+    (stop #~(make-kill-destructor #:grace-period 1800))
+    (respawn? #f))))
+
+(define (aiagent-pam-extensions _)
+  (list
+   (pam-extension
+    (transformer
+     (lambda (pam)
+       (if (string=? (pam-service-name pam) "sshd")
+           (pam-service
+            (inherit pam)
+            (session
+             (append (pam-service-session pam)
+                     (list (pam-entry
+                            (control "required")
+                            (module "pam_exec.so")
+                            (arguments
+                             (list "type=open_session" "seteuid"
+                                   #~#$aiagent-ssh-placement-program)))))))
+           pam))))))
+
+(define (aiagent-account _)
+  (list (user-group (name "aiagent") (system? #t))
+        (user-account
+         (name "aiagent")
+         (group "aiagent")
+         (supplementary-groups '())
+         (home-directory %home)
+         (create-home-directory? #f)
+         (shell aiagent-shell-program))))
+
+(define (aiagent-subids _)
+  (subids-extension
+   (subuids (list (subid-range (name "aiagent")
+                                (start 231072) (count 65536))))
+   (subgids (list (subid-range (name "aiagent")
+                                (start 231072) (count 65536))))))
+
+(define (aiagent-keys keys)
+  (list (cons "aiagent" keys)))
+
+(define aiagent-host-service-type
+  (service-type
+   (name 'aiagent-host)
+   (extensions
+    (list (service-extension account-service-type aiagent-account)
+          (service-extension subids-service-type aiagent-subids)
+          (service-extension openssh-service-type aiagent-keys)
+          (service-extension pam-root-service-type aiagent-pam-extensions)
+          (service-extension shepherd-root-service-type
+                             aiagent-shepherd-services)))
+   (description "Isolated rootless coding-agent host foundation.")))
+#+end_src
+
+* Ak container reference
+
+The ak-only blocks below are excluded from tangling. Their committed outputs
+define ak's running container. Gak's account, storage and service declarations
+are in the module above; its rootless workload is deployed by
+=roles/gak_aiagent=.
+
 * Setup constants
 
 Edit these values here first. Tangled Quadlets, Ansible defaults, and shell
@@ -8,57 +362,57 @@ helpers should reference these constants instead of repeating path or port
 literals.
 
 #+NAME: aiagent-host-work-root
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "/work"
 #+end_src
 
 #+NAME: aiagent-container-work-root
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "/work"
 #+end_src
 
 #+NAME: aiagent-ai-work-subdir
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "ai"
 #+end_src
 
 #+NAME: aiagent-exposed-port-prefix
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "4522"
 #+end_src
 
 #+NAME: aiagent-t3-exposed-port-suffix
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "3"
 #+end_src
 
 #+NAME: aiagent-t3-public-port
-#+begin_src emacs-lisp :exports none :var prefix=aiagent-exposed-port-prefix() suffix=aiagent-t3-exposed-port-suffix()
+#+begin_src emacs-lisp :tangle no :exports none :var prefix=aiagent-exposed-port-prefix() suffix=aiagent-t3-exposed-port-suffix()
 (concat prefix suffix)
 #+end_src
 
 #+NAME: aiagent-t3-public-bind
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "0.0.0.0"
 #+end_src
 
 #+NAME: aiagent-t3-container-port
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 "3773"
 #+end_src
 
 #+NAME: aiagent-t3-host-url
-#+begin_src emacs-lisp :exports none :var public_port=aiagent-t3-public-port()
+#+begin_src emacs-lisp :tangle no :exports none :var public_port=aiagent-t3-public-port()
 (concat "http://127.0.0.1:" public_port "/")
 #+end_src
 
 #+NAME: aiagent-container-ai-root
-#+begin_src emacs-lisp :exports none :var root=aiagent-container-work-root() subdir=aiagent-ai-work-subdir()
+#+begin_src emacs-lisp :tangle no :exports none :var root=aiagent-container-work-root() subdir=aiagent-ai-work-subdir()
 (concat root "/" subdir)
 #+end_src
 
 #+NAME: aiagent-host-ai-root
-#+begin_src emacs-lisp :exports none :var root=aiagent-host-work-root() subdir=aiagent-ai-work-subdir()
+#+begin_src emacs-lisp :tangle no :exports none :var root=aiagent-host-work-root() subdir=aiagent-ai-work-subdir()
 (concat root "/" subdir)
 #+end_src
 
@@ -110,7 +464,7 @@ directories.
 :header-args:dockerfile: :tangle (tdir "aiagent_container/Containerfile") :noweb tangle
 :END:
 
-#+begin_src dockerfile
+#+begin_src dockerfile :tangle no
 FROM quay.io/fedora/fedora:44
 
 # Agent runtimes intentionally float so rebuilds pick up current upstream CLIs.
@@ -418,7 +772,7 @@ CMD ["sleep", "infinity"]
 #+end_src
 
 - Entrypoint ::
-#+begin_src shell :tangle (tdir "aiagent_container/init.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 INIT_DIR="${HOME}/init.d"
@@ -442,12 +796,12 @@ exec "$@"
   environment; individual harnesses are normally launched with =podman exec=
   or from an interactive shell inside the container.
 
-#+begin_src shell :tangle (tdir "aiagent_container/bin/codex-auto") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
 #+end_src
 
-#+begin_src shell :tangle (tdir "aiagent_container/bin/t3-web") :shebang #!/usr/bin/env bash :tangle-mode o750 :noweb tangle
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750 :noweb tangle
 set -euo pipefail
 
 export T3CODE_HOST="${T3CODE_HOST:-0.0.0.0}"
@@ -477,7 +831,7 @@ exec t3 serve \
   "${args[@]}"
 #+end_src
 
-#+begin_src shell :tangle (tdir "aiagent_container/bin/pi-readonly") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 exec pi --tools read,grep,find,ls "$@"
 #+end_src
@@ -493,7 +847,7 @@ exec pi --tools read,grep,find,ls "$@"
 :PROPERTIES:
 :header-args:systemd+: :tangle (tdir "aiagent.build")
 :END:
-#+begin_src systemd
+#+begin_src systemd :tangle no
 [Unit]
 Description=Build AI Agent Harness Image
 
@@ -508,7 +862,7 @@ Pull=newer
 :PROPERTIES:
 :header-args:systemd+: :tangle (tdir "aiagent.container")
 :END:
-#+begin_src systemd
+#+begin_src systemd :tangle no
 [Unit]
 Description=AI Agent Harness Container
 
@@ -548,7 +902,7 @@ WantedBy=default.target
 *** aiagent.container.d
 
 **** 50-haskell.conf
-#+begin_src systemd :tangle (tdir "aiagent.container.d/haskell.conf")
+#+begin_src systemd :tangle no
 [Container]
 # Syntax: <filename>.volume:<container-path>
 Volume=cabal-cache.volume:/home/node/.cabal
@@ -557,7 +911,7 @@ Volume=%h/aiagent_container/bashrc.d/ghcup-env.sh:/home/node/.bashrc.d/ghcup-env
 #+end_src
 
 - Cabal cache named volume ::
-#+begin_src systemd :tangle (tdir "cabal-cache.volume")
+#+begin_src systemd :tangle no
 [Unit]
 Description=Cabal cache volume
 
@@ -566,7 +920,7 @@ Description=Cabal cache volume
 #+end_src
 
 - GHCup cache named volume ::
-#+begin_src systemd :tangle (tdir "ghcup-cache.volume")
+#+begin_src systemd :tangle no
 [Unit]
 Description=GHCup cache volume
 
@@ -575,7 +929,7 @@ Description=GHCup cache volume
 #+end_src
 
 **** 60-android.conf
-#+begin_src systemd :tangle (tdir "aiagent.container.d/android.conf")
+#+begin_src systemd :tangle no
 [Container]
 Environment=JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
 Environment=ANDROID_HOME=/home/node/Android/Sdk
@@ -588,7 +942,7 @@ Volume=%h/aiagent_container/bashrc.d/android-env.sh:/home/node/.bashrc.d/android
 #+end_src
 
 - Android SDK cache named volume ::
-#+begin_src systemd :tangle (tdir "android-sdk.volume")
+#+begin_src systemd :tangle no
 [Unit]
 Description=Android SDK cache volume
 
@@ -597,7 +951,7 @@ Description=Android SDK cache volume
 #+end_src
 
 - Gradle cache named volume ::
-#+begin_src systemd :tangle (tdir "gradle-cache.volume")
+#+begin_src systemd :tangle no
 [Unit]
 Description=Gradle cache volume
 
@@ -611,7 +965,7 @@ Description=Gradle cache volume
 :END:
 
 - Git identity ::
-#+begin_src shell :tangle (tdir "init.d/git-identity.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 git config --global user.name "AI Agent"
@@ -619,7 +973,7 @@ git config --global user.email "g@11xx.org"
 #+end_src
 
 - GHCUp bootstrap ::
-#+begin_src shell :tangle (tdir "init.d/haskell-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 GHCUP_BIN="$HOME/.ghcup/bin/ghcup"
@@ -658,12 +1012,12 @@ fi
 
 - Source GHCUp env ::
   Deploy to Fedora's =~/.bashrc.d/*=
-#+begin_src shell :tangle (tdir "bashrc.d/ghcup-env.sh")
+#+begin_src shell :tangle no
 [ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env"
 #+end_src
 
 - Android SDK bootstrap ::
-#+begin_src shell :tangle (tdir "init.d/android-bootstrap.sh") :shebang #!/usr/bin/env bash :tangle-mode o750
+#+begin_src shell :tangle no :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/temurin-21-jdk}"
@@ -712,7 +1066,7 @@ echo "[init] Android SDK packages ready."
 
 - Source Android env ::
   Deploy to Fedora's =~/.bashrc.d/*=
-#+begin_src shell :tangle (tdir "bashrc.d/android-env.sh")
+#+begin_src shell :tangle no
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/temurin-21-jdk}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
@@ -733,7 +1087,7 @@ esac
 ** MCP Podman services
 
 #+NAME: searxng-port
-#+begin_src emacs-lisp :exports none
+#+begin_src emacs-lisp :tangle no :exports none
 (defun searxng-port ()
   "Return SEARXNG_PORT value from the .env file as a string."
   (with-temp-buffer
@@ -745,7 +1099,7 @@ esac
 #+end_src
 
 *** searxng-mcp.container
-#+begin_src systemd :tangle (tdir "searxng-mcp.container") :noweb tangle
+#+begin_src systemd :tangle no :noweb tangle
 [Container]
 Image=ghcr.io/sacode/searxng-simple-mcp:latest
 ContainerName=searxng-mcp
@@ -760,7 +1114,7 @@ WantedBy=default.target
 #+end_src
 
 ** shared network
-#+begin_src systemd :tangle (tdir "ai.network") :noweb tangle
+#+begin_src systemd :tangle no :noweb tangle
 [Unit]
 Description=AI Containers Bridge Network
 
@@ -776,11 +1130,11 @@ Description=AI Containers Bridge Network
 # if changing, toggle the comments, to prevent making this call when no need.
 
 #+NAME: tavily-url
-#+begin_src emacs-lisp :var u="<bitwarden-item-id>" f="mcp-api" :results none :exports none :eval never-export
+#+begin_src emacs-lisp :tangle no :var u="<bitwarden-item-id>" f="mcp-api" :results none :exports none :eval never-export
 (org-bitwarden-get u f)
 #+end_src
 
-#+begin_src json-ts
+#+begin_src json-ts :tangle no
 {
   "mcp": {
     "tavily": {
@@ -798,7 +1152,7 @@ Description=AI Containers Bridge Network
 #+end_src
 
 
-#+begin_src json-ts :tangle (tdir "aiagent_container/opencode_config/opencode.jsonc")
+#+begin_src json-ts :tangle no
 {
   "provider": {
     "openrouter": {
@@ -837,7 +1191,7 @@ It's run with =sudo machinectl shell=
 :PROPERTIES:
 :header-args:yaml-ts: :tangle (tdir "main.yaml")
 :END:
-#+begin_src yaml-ts :noweb tangle
+#+begin_src yaml-ts :tangle no :noweb tangle
 ---
 aiagent_name: aiagent
 aiagent_shell: /bin/bash
@@ -870,7 +1224,7 @@ aiagent_host_user: "{{ ansible_user }}"
 :PROPERTIES:
 :header-args:yaml-ts: :tangle (tdir "main.yaml")
 :END:
-#+begin_src yaml-ts
+#+begin_src yaml-ts :tangle no
 ---
 - name: Ensure acl package is present
   tags: [aiagent_host]
@@ -1133,7 +1487,7 @@ aiagent_host_user: "{{ ansible_user }}"
 :header-args:yaml-ts: :tangle (tdir "copy-files.yaml")
 :END:
 
-#+begin_src yaml-ts
+#+begin_src yaml-ts :tangle no
 ---
 # Quadlet directories
 - name: Ensure Quadlet systemd directory exists for aiagent
@@ -1226,7 +1580,7 @@ aiagent_host_user: "{{ ansible_user }}"
 :PROPERTIES:
 :header-args:yaml-ts: :tangle (tdir "sudoers.yaml")
 :END:
-#+begin_src yaml-ts
+#+begin_src yaml-ts :tangle no
 ---
 - name: Template aiagent sudoers drop-in
   tags: [aiagent_host]
@@ -1248,7 +1602,7 @@ aiagent_host_user: "{{ ansible_user }}"
 :END:
 
 **** t3-web.service
-#+begin_src systemd :tangle (tdir "t3-web.service") :noweb tangle
+#+begin_src systemd :tangle no :noweb tangle
 [Unit]
 Description=T3 Code web UI inside the AI agent harness container
 Requires=aiagent.service
@@ -1274,7 +1628,7 @@ WantedBy=default.target
 :header-args:yaml-ts: :tangle (tdir "main.yaml")
 :END:
 
-#+begin_src yaml-ts
+#+begin_src yaml-ts :tangle no
 ---
 - name: Reload aiagent quadlets
   tags: [aiagent_user]
@@ -1297,7 +1651,7 @@ WantedBy=default.target
 :PROPERTIES:
 :header-args:etc-sudoers: :tangle (tdir "aiagent.sudoers.j2")
 :END:
-#+begin_src etc-sudoers
+#+begin_src etc-sudoers :tangle no
 # Managed by Ansible — do not edit manually
 # Allows {{ ansible_user }} to manage the aiagent rootless Podman context without password
 
@@ -1313,7 +1667,7 @@ Cmnd_Alias AIAGENT_JOURNAL = /usr/bin/machinectl --quiet shell aiagent@ /usr/bin
 :header-args:shell: :tangle (expand-file-name "shell/setup-modules/aiagent.sh" (xdg-config-home)) :mkdirp yes :tangle-mode o644 :shebang #!/usr/bin/echo 'This is a source only file.' :noweb tangle
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 AIAGENT_WORK_ROOT="${AIAGENT_WORK_ROOT:-<<aiagent-host-work-root()>>}"
 AIAGENT_T3_PUBLIC_URL="${AIAGENT_T3_PUBLIC_URL:-<<aiagent-t3-host-url()>>}"
 
@@ -1536,7 +1890,7 @@ aiagent-redeploy() {
 #+end_src
 
 Anthropic Claude
-#+begin_src shell
+#+begin_src shell :tangle no
 aiagent-claude() {
     _aiagent exec -it aiagent \
         env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
@@ -1578,7 +1932,7 @@ See [[file:ai-helpers-workflow.org]] for implementation details.
 
 Add =ai= PATH subdirectory
 
-#+begin_src conf :tangle (expand-file-name "environment.d/ai-scripts-path.conf" (xdg-config-home))
+#+begin_src conf :tangle no
 PATH=${PATH}:${XDG_BIN_HOME}/ai
 #+end_src
 
@@ -1589,7 +1943,7 @@ PATH=${PATH}:${XDG_BIN_HOME}/ai
 
 Shared logic for the other callers
 
-#+begin_src shell :noweb tangle
+#+begin_src shell :tangle no :noweb tangle
 set -euo pipefail
 
 if [[ -z "${AI_WORK_ROOT:-}" ]]; then
@@ -3079,7 +3433,7 @@ main "$@"
 :header-args:shell+: :tangle (tdir "ai-abort")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-abort "$@"
 #+end_src
 
@@ -3088,7 +3442,7 @@ exec "$(dirname "$0")/ai-work" ai-abort "$@"
 :header-args:shell+: :tangle (tdir "ai-add")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-add "$@"
 #+end_src
 
@@ -3097,7 +3451,7 @@ exec "$(dirname "$0")/ai-work" ai-add "$@"
 :header-args:shell+: :tangle (tdir "ai-apply")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-apply "$@"
 #+end_src
 
@@ -3106,7 +3460,7 @@ exec "$(dirname "$0")/ai-work" ai-apply "$@"
 :header-args:shell+: :tangle (tdir "ai-ask")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-ask "$@"
 #+end_src
 
@@ -3115,7 +3469,7 @@ exec "$(dirname "$0")/ai-work" ai-ask "$@"
 :header-args:shell+: :tangle (tdir "ai-clean")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-clean "$@"
 #+end_src
 
@@ -3124,7 +3478,7 @@ exec "$(dirname "$0")/ai-work" ai-clean "$@"
 :header-args:shell+: :tangle (tdir "ai-copy-back")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-copy-back "$@"
 #+end_src
 
@@ -3133,7 +3487,7 @@ exec "$(dirname "$0")/ai-work" ai-copy-back "$@"
 :header-args:shell+: :tangle (tdir "ai-diff")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-diff "$@"
 #+end_src
 
@@ -3142,7 +3496,7 @@ exec "$(dirname "$0")/ai-work" ai-diff "$@"
 :header-args:shell+: :tangle (tdir "ai-done")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-done "$@"
 #+end_src
 
@@ -3151,7 +3505,7 @@ exec "$(dirname "$0")/ai-work" ai-done "$@"
 :header-args:shell+: :tangle (tdir "ai-copy")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-copy "$@"
 #+end_src
 
@@ -3160,7 +3514,7 @@ exec "$(dirname "$0")/ai-work" ai-copy "$@"
 :header-args:shell+: :tangle (tdir "ai-edit")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-edit "$@"
 #+end_src
 
@@ -3169,7 +3523,7 @@ exec "$(dirname "$0")/ai-work" ai-edit "$@"
 :header-args:shell+: :tangle (tdir "ai-edit-bare")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-edit-bare "$@"
 #+end_src
 
@@ -3178,7 +3532,7 @@ exec "$(dirname "$0")/ai-work" ai-edit-bare "$@"
 :header-args:shell+: :tangle (tdir "ai-edit-dot")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-edit-dot "$@"
 #+end_src
 
@@ -3187,7 +3541,7 @@ exec "$(dirname "$0")/ai-work" ai-edit-dot "$@"
 :header-args:shell+: :tangle (tdir "ai-list")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-list "$@"
 #+end_src
 
@@ -3196,7 +3550,7 @@ exec "$(dirname "$0")/ai-work" ai-list "$@"
 :header-args:shell+: :tangle (tdir "ai-open")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-open "$@"
 #+end_src
 
@@ -3205,7 +3559,7 @@ exec "$(dirname "$0")/ai-work" ai-open "$@"
 :header-args:shell+: :tangle (tdir "ai-pick")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-pick "$@"
 #+end_src
 
@@ -3214,7 +3568,7 @@ exec "$(dirname "$0")/ai-work" ai-pick "$@"
 :header-args:shell+: :tangle (tdir "ai-shell")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-shell "$@"
 #+end_src
 
@@ -3223,7 +3577,7 @@ exec "$(dirname "$0")/ai-work" ai-shell "$@"
 :header-args:shell+: :tangle (tdir "ai-status")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" ai-status "$@"
 #+end_src
 
@@ -3232,14 +3586,14 @@ exec "$(dirname "$0")/ai-work" ai-status "$@"
 :header-args:shell+: :tangle (tdir "aiq")
 :END:
 
-#+begin_src shell
+#+begin_src shell :tangle no
 exec "$(dirname "$0")/ai-work" aiq "$@"
 #+end_src
 
 
 
 * COMMENT machinectl aiagent aiagent.service
-#+begin_src shell
+#+begin_src shell :tangle no
 # interactive shell as aiagent
 # ======================================================================
 sudo machinectl shell aiagent@
