@@ -14,7 +14,9 @@ payload become children of the service or SSH session cgroup that launched
 Podman. Image builds inherit that placement. No container parent is specified
 in Compose.
 Formatting preserves the image's allocated blocks, and each start validates
-the reservation. Service and SSH launch paths select Guix's privileged
+the reservation. First creation requires 128 GiB of free host space beyond
+the 256 GiB image so operator services retain working room during allocation.
+Service and SSH launch paths select Guix's privileged
 UID/GID-mapping wrappers before profile binaries.
 
 The host account retains tailscaled's non-operator read-only local API access;
@@ -42,6 +44,8 @@ removes the account, sub-ID declaration and host services together.
 
 (define %image "/var/lib/aiagent/home.ext4")
 (define %home "/home/aiagent")
+(define %image-size-bytes (* 256 1024 1024 1024))
+(define %host-free-reserve-bytes (* 128 1024 1024 1024))
 (define %cgroup "/sys/fs/cgroup/aiagent")
 (define %delegated "/sys/fs/cgroup/aiagent/delegated")
 
@@ -56,16 +60,28 @@ removes the account, sub-ID declaration and host services together.
        (define (directory path mode)
          (unless (file-exists? path) (mkdir path mode))
          (chmod path mode))
-       (define (validate-image)
-         (let ((metadata (stat #$%image)))
-           (unless (= (stat:size metadata) (* 256 1024 1024 1024))
+       (define (validate-image path)
+         (let ((metadata (stat path)))
+           (unless (= (stat:size metadata) #$%image-size-bytes)
              (error "aiagent image has unexpected size"))
            (unless (>= (* 512 (stat:blocks metadata))
-                       (* 256 1024 1024 1024))
+                       #$%image-size-bytes)
              (error "aiagent image is not fully allocated"))
            (unless (= (stat:uid metadata) 0)
              (error "aiagent image is not root-owned"))
-           (chmod #$%image #o600)))
+           (chmod path #o600)))
+       (define (available-host-bytes)
+         (let* ((port (open-pipe* OPEN_READ
+                                  #$(file-append coreutils "/bin/stat")
+                                  "-f" "-c" "%a %S" "/var/lib/aiagent"))
+                (blocks (read port))
+                (block-size (read port))
+                (status (close-pipe port)))
+           (unless (and (zero? (status:exit-val status))
+                        (integer? blocks) (>= blocks 0)
+                        (integer? block-size) (> block-size 0))
+             (error "cannot measure host free space"))
+           (* blocks block-size)))
        (directory "/var/lib/aiagent" #o700)
        (let ((mounted-status
               (status:exit-val
@@ -90,19 +106,35 @@ removes the account, sub-ID declaration and host services together.
                              read-line)
                            #$%image))
                (error "aiagent home is mounted from another source")))
-           (validate-image))
+           (validate-image #$%image))
           ((member mounted-status '(1 32))
            (directory #$%home #o000)
            (unless (file-exists? #$%image)
              (let ((candidate (string-append #$%image ".new")))
                (when (file-exists? candidate) (delete-file candidate))
-               (run #$(file-append util-linux "/bin/fallocate")
-                    "-l" "256G" candidate)
-               (chmod candidate #o600)
-               (run #$(file-append e2fsprogs "/sbin/mkfs.ext4")
-                    "-F" "-E" "nodiscard" candidate)
-               (rename-file candidate #$%image)))
-           (validate-image)
+               (unless (>= (available-host-bytes)
+                           (+ #$%image-size-bytes
+                              #$%host-free-reserve-bytes))
+                 (error "insufficient host free space for aiagent image and reserve"))
+               (dynamic-wind
+                 (lambda () #t)
+                 (lambda ()
+                   (run #$(file-append util-linux "/bin/fallocate")
+                        "-l" (number->string #$%image-size-bytes) candidate)
+                   (chmod candidate #o600)
+                   (run #$(file-append e2fsprogs "/sbin/mkfs.ext4")
+                        "-F" "-E" "nodiscard" candidate)
+                   (validate-image candidate)
+                   (let ((status
+                          (system* #$(file-append e2fsprogs "/sbin/e2fsck")
+                                   "-p" candidate)))
+                     (unless (member (status:exit-val status) '(0 1))
+                       (error "aiagent candidate failed fsck" status)))
+                   (rename-file candidate #$%image))
+                 (lambda ()
+                   (when (file-exists? candidate)
+                     (delete-file candidate))))))
+           (validate-image #$%image)
            (let ((status (system* #$(file-append e2fsprogs "/sbin/e2fsck")
                                   "-p" #$%image)))
              (unless (member (status:exit-val status) '(0 1))

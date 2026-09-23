@@ -10,6 +10,9 @@ the ext4 home image. The account's shell and Shepherd service set =TMPDIR=,
 =CONTAINERS_IMAGE_COPY_TMPDIR= and =XDG_RUNTIME_DIR=. Podman's cgroupfs manager
 uses =cgroups = "split"=, placing conmon and the payload beneath the cgroup
 of the service or SSH session that starts them.
+The image initializer reserves 256 GiB only when another 128 GiB remains free
+for the operator's services. It removes a partial candidate on failure and
+cleans up a candidate left by an interruption before retrying.
 Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
 setuid =newuidmap= and =newgidmap= wrappers.
 The host account has tailscaled's non-operator read-only local API access;
