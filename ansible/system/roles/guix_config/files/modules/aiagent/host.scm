@@ -19,7 +19,7 @@
 (define %cgroup "/sys/fs/cgroup/aiagent")
 (define %delegated "/sys/fs/cgroup/aiagent/delegated")
 
-(define aiagent-home-program
+(define aiagent-home-locked-program
   (program-file
    "aiagent-home"
    #~(begin
@@ -116,21 +116,47 @@
            (chown #$%home (passwd:uid account) (passwd:gid account)))
          (chmod #$%home #o700)))))
 
-(define aiagent-home-stop-program
+(define aiagent-home-program
   (program-file
-   "aiagent-home-stop"
+   "aiagent-home"
+   #~(begin
+       (unless (zero? (system* #$(file-append coreutils "/bin/mkdir")
+                                "-p" "/var/lib/aiagent"))
+         (error "cannot create aiagent state directory"))
+       (chmod "/var/lib/aiagent" #o700)
+       (let ((port (open-file "/var/lib/aiagent/home.lock" "a")))
+         (chmod "/var/lib/aiagent/home.lock" #o600)
+         (close-port port))
+       (unless (zero? (system* #$(file-append util-linux "/bin/flock")
+                                "--exclusive" "/var/lib/aiagent/home.lock"
+                                #$aiagent-home-locked-program))
+         (error "aiagent home initialization failed")))))
+
+(define aiagent-home-stop-locked-program
+  (program-file
+   "aiagent-home-stop-locked"
    #~(begin
        (unless (zero? (system* #$(file-append util-linux "/bin/umount")
                                 #$%home))
          (error "cannot unmount aiagent home"))
        (chmod #$%home #o000))))
 
+(define aiagent-home-stop-program
+  (program-file
+   "aiagent-home-stop"
+   #~(begin
+       (unless (zero? (system* #$(file-append util-linux "/bin/flock")
+                                "--exclusive" "/var/lib/aiagent/home.lock"
+                                #$aiagent-home-stop-locked-program))
+         (error "cannot stop aiagent home")))))
+
 (define aiagent-runtime-program
   (program-file
    "aiagent-runtime"
    #~(begin
-       (unless (file-exists? "/run/aiagent")
-         (mkdir "/run/aiagent" #o700))
+       (unless (zero? (system* #$(file-append coreutils "/bin/mkdir")
+                                "-p" "/run/aiagent"))
+         (error "cannot create aiagent runtime directory"))
        (let ((account (getpwnam "aiagent")))
          (chown "/run/aiagent" (passwd:uid account)
                 (passwd:gid account)))
@@ -143,7 +169,9 @@
        (define (write path value)
          (call-with-output-file path (lambda (port) (display value port))))
        (define (ensure path)
-         (unless (file-exists? path) (mkdir path #o755)))
+         (unless (zero? (system* #$(file-append coreutils "/bin/mkdir")
+                                  "-p" path))
+           (error "cannot create aiagent cgroup" path)))
        (ensure #$%cgroup)
        (write (string-append #$%cgroup "/cpu.max") "400000 100000")
        (write (string-append #$%cgroup "/cpu.weight") "50")
@@ -239,26 +267,29 @@
 (define (aiagent-shepherd-services _)
   (list
    (shepherd-service
-    (provision '(aiagent-home))
+   (provision '(aiagent-home))
     (requirement '(user-processes))
     (one-shot? #t)
-    (start #~(make-forkexec-constructor (list #$aiagent-home-program)))
+    (start #~(lambda _ (zero? (system* #$aiagent-home-program))))
     (stop #~(lambda _
               (if (zero? (system* #$aiagent-home-stop-program))
                   #f
-                  (error "cannot stop aiagent home")))))
+                  (error "cannot stop aiagent home"))))
+    (respawn? #f))
    (shepherd-service
     (provision '(aiagent-runtime))
     (requirement '(user-processes))
     (one-shot? #t)
-    (start #~(make-forkexec-constructor (list #$aiagent-runtime-program)))
-    (stop #~(const #f)))
+    (start #~(lambda _ (zero? (system* #$aiagent-runtime-program))))
+    (stop #~(const #f))
+    (respawn? #f))
    (shepherd-service
     (provision '(aiagent-cgroup))
     (requirement '(cgroups2-limits))
     (one-shot? #t)
-    (start #~(make-forkexec-constructor (list #$aiagent-cgroup-program)))
-    (stop #~(const #f)))
+    (start #~(lambda _ (zero? (system* #$aiagent-cgroup-program))))
+    (stop #~(const #f))
+    (respawn? #f))
    (shepherd-service
     (provision '(aiagent-compose))
     (requirement '(aiagent-home aiagent-runtime aiagent-cgroup

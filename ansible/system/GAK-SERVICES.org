@@ -48,6 +48,10 @@ reserve for operator services. A failed creation removes its temporary image;
 a later start removes any candidate left by interruption before checking
 space. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
 service and SSH session cgroups determine placement for containers and builds.
+Shepherd waits for the home, runtime and cgroup one-shots to finish; a failed
+prerequisite prevents the Compose helper from starting. Home creation and
+unmount share a root-only lock. A second start waits for the first, then
+validates its mounted image.
 The host account retains tailscaled's non-operator read-only local API access.
 The Guix module does not change Tailscale. The agent container must exclude
 host runtime paths, including the Tailscale socket.
