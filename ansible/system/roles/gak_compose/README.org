@@ -16,7 +16,9 @@ Names must be unique and syntactically valid. A declared project may put a
 =.compose-stop-order= file beside =compose.yaml= to list its Compose services
 in dependent-first shutdown order. The helper validates the file before
 starting projects. It stops recorded projects in reverse start order and
-selects their containers by Compose project and working-directory labels.
+selects their containers by the realpath in the Compose working-directory
+label. A recorded project with no containers produces a logged no-op. A query
+failure keeps the ownership record for a later retry.
 It keeps ownership, readiness and the lifecycle lock under the instance's
 runtime directory. Podman descendants do not inherit the lock descriptor.
 

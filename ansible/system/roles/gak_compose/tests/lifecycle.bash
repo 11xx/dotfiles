@@ -95,15 +95,14 @@ fi
 
 if [[ ${1:-} == ps ]]; then
     [[ ${2:-} == -a && ${@: -1} == '{{.Names}} {{.Label "com.docker.compose.service"}}' ]] || exit 90
-    project=
     workdir=
     for arg in "$@"; do
         case $arg in
-            label=com.docker.compose.project=*) project=${arg#label=com.docker.compose.project=} ;;
             label=com.docker.compose.project.working_dir=*) workdir=${arg#label=com.docker.compose.project.working_dir=} ;;
         esac
     done
-    [[ -n $project && $workdir == "$FAKE_SERVICES_ROOT/$project" ]] || exit 90
+    [[ $workdir == "$FAKE_SERVICES_ROOT/"* ]] || exit 90
+    project=${workdir##*/}
     if [[ $project == nextcloud ]]; then
         for service in nextcloud-cron nextcloud nextcloud-redis nextcloud-db; do
             [[ ! -e $FAKE_RUNNING_ROOT/$service ]] || printf 'odd-%s %s\n' "$service" "$service"

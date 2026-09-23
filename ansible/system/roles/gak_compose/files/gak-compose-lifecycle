@@ -153,7 +153,6 @@ ensure_networks() {
 project_containers() {
     local application=$1
     "$podman_command" ps -a \
-        --filter "label=com.docker.compose.project=$application" \
         --filter "label=com.docker.compose.project.working_dir=$(realpath "$services_root/$application")" \
         --format '{{.Names}} {{.Label "com.docker.compose.service"}}' 9>&-
 }
@@ -176,9 +175,13 @@ compose_stop() {
 
     cd "$services_root/$application"
     if ! containers=$(project_containers "$application"); then
+        printf 'gak-compose-lifecycle: could not query project containers: %s\n' "$application" >&2
         return 1
     fi
-    [[ -n $containers ]] || return 0
+    if [[ -z $containers ]]; then
+        printf 'gak-compose-lifecycle: no containers for recorded application: %s\n' "$application" >&2
+        return 0
+    fi
     if [[ -f .compose-stop-order ]]; then
         read_strict_list .compose-stop-order stop_order '^[a-z0-9][a-z0-9-]*$'
         while read -r container service; do

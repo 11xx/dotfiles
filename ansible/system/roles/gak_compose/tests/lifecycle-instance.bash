@@ -42,6 +42,7 @@ if [[ $1 == network ]]; then
 fi
 if [[ $1 == ps ]]; then
     [[ ${2:-} == -a && ${@: -1} == '{{.Names}} {{.Label "com.docker.compose.service"}}' ]] || exit 90
+    [[ ${FAKE_PS_FAIL:-0} != 1 ]] || exit 94
     project=
     workdir=
     for arg in "$@"; do
@@ -50,8 +51,9 @@ if [[ $1 == ps ]]; then
             label=com.docker.compose.project.working_dir=*) workdir=${arg#label=com.docker.compose.project.working_dir=} ;;
         esac
     done
-    [[ -n $project && -n $workdir ]] || exit 90
-    awk -F'|' -v p="$project" -v d="$workdir" '$1 == p && $2 == d {print $4, $3}' "$FAKE_STATE"
+    [[ -n $workdir ]] || exit 90
+    awk -F'|' -v p="$project" -v d="$workdir" \
+        '$2 == d && (p == "" || $1 == p) {print $4, $3}' "$FAKE_STATE"
     exit 0
 fi
 [[ $1 == compose && $2 == -f && $3 == compose.yaml ]] || exit 91
@@ -59,7 +61,7 @@ project=${PWD##*/}
 if [[ $4 == up ]]; then
     case $project in
         lab)
-            printf 'lab|%s|alpha|unrelated-alpha\nlab|%s|beta|unrelated-beta\n' "$PWD" "$PWD" >>"$FAKE_STATE"
+            printf 'named-lab|%s|alpha|unrelated-alpha\nnamed-lab|%s|beta|unrelated-beta\n' "$PWD" "$PWD" >>"$FAKE_STATE"
             ;;
         relay) printf 'relay|%s|relay|odd-container-name\n' "$PWD" >>"$FAKE_STATE" ;;
         *) exit 92 ;;
@@ -68,8 +70,8 @@ if [[ $4 == up ]]; then
 elif [[ $4 == stop ]]; then
     service=${7:-all}
     printf 'stop|%s|%s\n' "$project" "$service" >>"$FAKE_EVENTS"
-    awk -F'|' -v p="$project" -v d="$PWD" -v s="$service" \
-        '!(($1 == p && $2 == d) && (s == "all" || $3 == s))' "$FAKE_STATE" >"$FAKE_STATE.next"
+    awk -F'|' -v d="$PWD" -v s="$service" \
+        '!($2 == d && (s == "all" || $3 == s))' "$FAKE_STATE" >"$FAKE_STATE.next"
     mv "$FAKE_STATE.next" "$FAKE_STATE"
 else
     exit 93
@@ -86,6 +88,7 @@ for project in lab relay batch; do
     mkdir "$GAK_COMPOSE_SERVICES_ROOT/$project"
     : >"$GAK_COMPOSE_SERVICES_ROOT/$project/compose.yaml"
 done
+printf 'name: named-lab\nservices: {}\n' >"$GAK_COMPOSE_SERVICES_ROOT/lab/compose.yaml"
 printf '%s\n' beta alpha >"$GAK_COMPOSE_SERVICES_ROOT/lab/.compose-stop-order"
 
 start() {
@@ -112,11 +115,11 @@ stop() {
 start
 [[ -e $FAKE_NETWORKS/agent_net ]] || fail 'external network was not created'
 [[ $(grep -c '^up|' "$FAKE_EVENTS") == 2 ]] || fail 'unexpected autostart selection'
-printf 'lab|%s|impostor|lab\n' "$fixture/elsewhere" >>"$FAKE_STATE"
+printf 'named-lab|%s|impostor|lab\n' "$fixture/elsewhere" >>"$FAKE_STATE"
 stop
 mapfile -t stops < <(grep '^stop|' "$FAKE_EVENTS")
 [[ ${stops[*]} == 'stop|relay|all stop|lab|beta stop|lab|alpha' ]] || fail "wrong stop order: ${stops[*]}"
-grep -Fq "lab|$fixture/elsewhere|impostor|lab" "$FAKE_STATE" || fail 'foreign project container was stopped'
+grep -Fq "named-lab|$fixture/elsewhere|impostor|lab" "$FAKE_STATE" || fail 'foreign project container was stopped'
 [[ $(wc -l <"$FAKE_STATE") == 1 ]] || fail 'project containers were not stopped'
 
 : >"$FAKE_EVENTS"
@@ -128,6 +131,27 @@ service_pid=
 start
 [[ $(grep -c '^stop|' "$FAKE_EVENTS") == 3 ]] || fail 'stale ownership was not reconciled'
 stop
+
+: >"$FAKE_EVENTS"
+start
+kill -KILL "$service_pid"
+wait "$service_pid" 2>/dev/null || true
+service_pid=
+export FAKE_PS_FAIL=1
+if "$helper" run >"$fixture/query.out" 2>"$fixture/query.err"; then
+    fail 'failed container query was accepted during stale recovery'
+fi
+grep -Fq 'could not query project containers' "$fixture/query.err" || fail 'query failure was not reported'
+[[ -e $GAK_COMPOSE_RUNTIME_DIR/started ]] || fail 'query failure lost ownership state'
+unset FAKE_PS_FAIL
+start
+[[ $(grep -c '^stop|' "$FAKE_EVENTS") == 3 ]] || fail 'query retry did not reconcile ownership'
+stop
+
+printf 'lab\n' >"$GAK_COMPOSE_RUNTIME_DIR/started"
+"$helper" stop >"$fixture/empty.out" 2>"$fixture/empty.err" || fail 'empty recorded project could not stop'
+grep -Fq 'no containers for recorded application: lab' "$fixture/empty.err" || fail 'empty result was silent'
+[[ ! -e $GAK_COMPOSE_RUNTIME_DIR/started ]] || fail 'empty result retained stale ownership'
 
 reject() {
     if "$helper" run >"$fixture/reject.out" 2>"$fixture/reject.err"; then

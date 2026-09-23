@@ -80,8 +80,10 @@ Shepherd respawns. Recyclarr is never booted.
 
 The helper's long-lived process is intentional: Shepherd's stop destructor
 sends SIGTERM to it and waits while the helper runs Compose's graceful stop
-commands. Shutdown selects containers by Compose project and working-directory
-labels, regardless of their container names. Nextcloud's project data stops
+commands. Shutdown selects containers by the Compose working-directory label,
+regardless of their project or container names. An empty result for a recorded
+project is logged and treated as already stopped; a failed query retains the
+ownership record. Nextcloud's project data stops
 cron and the frontend before Redis and PostgreSQL.
 The helper never pulls images during boot and never calls sudo.
 
