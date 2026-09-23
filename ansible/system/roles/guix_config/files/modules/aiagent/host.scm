@@ -266,7 +266,7 @@
          (call-with-output-file
              (string-append #$%delegated "/service/cgroup.procs")
            (lambda (port) (display (getpid) port)))
-         (setgroups '())
+         (setgroups #())
          (setgid gid)
          (setuid uid)
          (chdir #$%home)

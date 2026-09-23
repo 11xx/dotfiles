@@ -41,6 +41,8 @@ the reservation. First creation requires 128 GiB of free host space beyond
 the 256 GiB image so operator services retain working room during allocation.
 Service and SSH launch paths select Guix's privileged
 UID/GID-mapping wrappers before profile binaries.
+The root launcher clears supplementary groups with Guile's vector interface,
+then sets the private GID and UID before executing agent-owned code.
 
 The host account retains tailscaled's non-operator read-only local API access;
 the Guix module does not change its socket. The agent container must exclude
@@ -319,7 +321,7 @@ removes the account, sub-ID declaration and host services together.
          (call-with-output-file
              (string-append #$%delegated "/service/cgroup.procs")
            (lambda (port) (display (getpid) port)))
-         (setgroups '())
+         (setgroups #())
          (setgid gid)
          (setuid uid)
          (chdir #$%home)

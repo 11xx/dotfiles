@@ -371,6 +371,16 @@ sudo herd status gak-compose
 podman ps -a
 #+end_src
 
+Building Guix programs does not execute their root-only paths. With the
+=aiagent= account present, stage and run the =guix_config= role's
+=tests/aiagent-root-path.py= on gak against the staged module directory before
+reconfiguring. The role README gives the command. The probe redirects cgroup,
+home and helper targets into scratch and uses =podman unshare= for real Guile
+privilege-drop calls. Its cgroup files are ordinary scratch files, its
+post-drop paths use preopened descriptors, and successful mount and unmount
+results are mocked. It does not prove kernel delegation, production path
+traversal or host-root mount capability.
+
 Use =umask 022= for activation so generated host files remain readable by
 unprivileged services. A backup process's restrictive umask must not carry
 into reconfiguration. Check that =lobo= can read =/etc/hosts= afterwards.
