@@ -2,6 +2,7 @@
 """Exercise built aiagent programs in a rootless user namespace on gak."""
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import pwd
@@ -12,6 +13,7 @@ import tempfile
 
 
 PROFILE = Path("/run/current-system/profile/bin")
+SBIN = Path("/run/current-system/profile/sbin")
 
 
 def command(*args, check=True, **kwargs):
@@ -186,6 +188,13 @@ def probe_home(module_dir, root, account):
     assert (backing / "home.lock").stat().st_mode & 0o777 == 0o600
     print(f"home: real mkdir/format/fsck passed; loop setup denied (errno {loop_access})")
 
+    image = backing / "home.ext4"
+    groups = [line for line in command(SBIN / "dumpe2fs", image).stdout.splitlines()
+              if re.match(r"Group [0-9]+:", line)]
+    assert groups and all("ITABLE_ZEROED" in line for line in groups), groups
+    assert image.stat().st_blocks * 512 >= image.stat().st_size
+    print("home: every ext4 group has ITABLE_ZEROED; allocation survived format")
+
     header, body = inner_source.split("!#\n", 1)
     mocked_mount = (
         "(define actual-system* system*)\n"
@@ -226,6 +235,32 @@ def probe_home(module_dir, root, account):
     namespace(mounted_probe)
     assert namespace_owner(home) == (account.pw_uid, account.pw_gid, 700)
     print("home: already-mounted source and ownership validation passed")
+
+    sentinel = root / "sentinel.txt"
+    sentinel.write_text("aiagent image data must survive hole reservation\n")
+    command(SBIN / "debugfs", "-w", "-R", f"write {sentinel} /sentinel", image)
+    before = root / "before.txt"
+    after = root / "after.txt"
+    command(SBIN / "debugfs", "-R", f"dump /sentinel {before}", image)
+    expected = hashlib.sha256(before.read_bytes()).hexdigest()
+    command(PROFILE / "fallocate", "--punch-hole", "--keep-size",
+            "-o", str(60 * 1024**2), "-l", str(1024**2), image)
+    assert image.stat().st_blocks * 512 < image.stat().st_size
+    command(SBIN / "e2fsck", "-p", image)
+    assert mocked_mount.count("(* blocks block-size)))") == 1
+    short_space = script(root / "home-no-headroom.scm", header + "!#\n" +
+                         mocked_mount.replace("(* blocks block-size)))", "0))"))
+    refusal = namespace(short_space, check=False)
+    assert refusal.returncode and "insufficient host free space to restore" in refusal.stderr
+    assert image.stat().st_blocks * 512 < image.stat().st_size
+    assert not (backing / "home.ext4.new").exists()
+    print("home: existing-image headroom refusal leaves hole and no candidate")
+    namespace(mount_probe)
+    assert image.stat().st_blocks * 512 >= image.stat().st_size
+    command(SBIN / "e2fsck", "-p", image)
+    command(SBIN / "debugfs", "-R", f"dump /sentinel {after}", image)
+    assert hashlib.sha256(after.read_bytes()).hexdigest() == expected
+    print(f"home: existing-image hole restored; fsck clean; sentinel sha256 {expected}")
 
     stop_source = built(module_dir, "aiagent-home-stop-locked-program").read_text().replace("/home/aiagent", str(home))
     stop = script(root / "home-stop.scm", stop_source)

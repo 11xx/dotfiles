@@ -46,7 +46,11 @@ project. The account's Podman state and temporary data remain inside its home
 image. First image creation requires 256 GiB for the image plus a 128 GiB host
 reserve for operator services. A failed creation removes its temporary image;
 a later start removes any candidate left by interruption before checking
-space. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
+space. Formatting eagerly initializes the ext4 inode tables and journal so
+kernel initialization cannot release backing-file extents after mount. If an
+existing image has holes, ordinary =fallocate= restores their reservation
+without changing file data, provided free space covers the missing bytes plus
+the 128 GiB host reserve. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
 service and SSH session cgroups determine placement for containers and builds.
 Shepherd keeps the mounted home as a running service. Runtime and cgroup
 setup are one-shots with no teardown. Each prerequisite must finish before

@@ -70,6 +70,21 @@
                         (integer? block-size) (> block-size 0))
              (error "cannot measure host free space"))
            (* blocks block-size)))
+       (define (reserve-existing-image)
+         (let* ((metadata (stat #$%image))
+                (allocated (* 512 (stat:blocks metadata)))
+                (missing (max 0 (- #$%image-size-bytes allocated))))
+           (unless (= (stat:size metadata) #$%image-size-bytes)
+             (error "aiagent image has unexpected size"))
+           (unless (= (stat:uid metadata) 0)
+             (error "aiagent image is not root-owned"))
+           (when (> missing 0)
+             (unless (>= (available-host-bytes)
+                         (+ missing #$%host-free-reserve-bytes))
+               (error "insufficient host free space to restore aiagent image allocation"))
+             (run #$%home-allocation-seconds
+                  #$(file-append util-linux "/bin/fallocate")
+                  "-l" (number->string #$%image-size-bytes) #$%image))))
        (directory "/var/lib/aiagent" #o700)
        (let ((mounted-status
               (timed-status #$%home-probe-seconds
@@ -97,6 +112,7 @@
                              read-line)
                            #$%image))
                (error "aiagent home is mounted from another source")))
+           (reserve-existing-image)
            (validate-image #$%image))
           ((member mounted-status '(1 32))
            (directory #$%home #o000)
@@ -117,7 +133,9 @@
                      (chmod candidate #o600)
                      (run #$%home-format-seconds
                           #$(file-append e2fsprogs "/sbin/mkfs.ext4")
-                          "-F" "-E" "nodiscard" candidate)
+                          "-F" "-E"
+                          "nodiscard,lazy_itable_init=0,lazy_journal_init=0"
+                          candidate)
                      (validate-image candidate)
                      (let ((status
                             (timed-status #$%home-fsck-seconds
@@ -130,6 +148,8 @@
                      (when (file-exists? candidate)
                        (delete-file candidate)))))
                (set! created? #t))
+             (unless created?
+               (reserve-existing-image))
              (validate-image #$%image)
              (unless created?
                (let ((status (timed-status #$%home-fsck-seconds
