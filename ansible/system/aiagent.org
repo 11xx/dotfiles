@@ -39,6 +39,11 @@ retry the unmount; =findmnt= is the mount-state check.
 Formatting preserves the image's allocated blocks, and each start validates
 the reservation. First creation requires 128 GiB of free host space beyond
 the 256 GiB image so operator services retain working room during allocation.
+Ext4 inode tables and the journal are initialized during formatting, so the
+kernel has no lazy initialization work that can release backing-file extents
+after mounting. An existing image with holes is re-reserved with ordinary
+=fallocate=, which leaves existing data intact. Its headroom check covers only
+the missing allocated bytes plus the 128 GiB host reserve.
 Service and SSH launch paths select Guix's privileged
 UID/GID-mapping wrappers before profile binaries.
 The root launcher clears supplementary groups with Guile's vector interface,
@@ -125,6 +130,21 @@ removes the account, sub-ID declaration and host services together.
                         (integer? block-size) (> block-size 0))
              (error "cannot measure host free space"))
            (* blocks block-size)))
+       (define (reserve-existing-image)
+         (let* ((metadata (stat #$%image))
+                (allocated (* 512 (stat:blocks metadata)))
+                (missing (max 0 (- #$%image-size-bytes allocated))))
+           (unless (= (stat:size metadata) #$%image-size-bytes)
+             (error "aiagent image has unexpected size"))
+           (unless (= (stat:uid metadata) 0)
+             (error "aiagent image is not root-owned"))
+           (when (> missing 0)
+             (unless (>= (available-host-bytes)
+                         (+ missing #$%host-free-reserve-bytes))
+               (error "insufficient host free space to restore aiagent image allocation"))
+             (run #$%home-allocation-seconds
+                  #$(file-append util-linux "/bin/fallocate")
+                  "-l" (number->string #$%image-size-bytes) #$%image))))
        (directory "/var/lib/aiagent" #o700)
        (let ((mounted-status
               (timed-status #$%home-probe-seconds
@@ -152,6 +172,7 @@ removes the account, sub-ID declaration and host services together.
                              read-line)
                            #$%image))
                (error "aiagent home is mounted from another source")))
+           (reserve-existing-image)
            (validate-image #$%image))
           ((member mounted-status '(1 32))
            (directory #$%home #o000)
@@ -172,7 +193,9 @@ removes the account, sub-ID declaration and host services together.
                      (chmod candidate #o600)
                      (run #$%home-format-seconds
                           #$(file-append e2fsprogs "/sbin/mkfs.ext4")
-                          "-F" "-E" "nodiscard" candidate)
+                          "-F" "-E"
+                          "nodiscard,lazy_itable_init=0,lazy_journal_init=0"
+                          candidate)
                      (validate-image candidate)
                      (let ((status
                             (timed-status #$%home-fsck-seconds
@@ -185,6 +208,8 @@ removes the account, sub-ID declaration and host services together.
                      (when (file-exists? candidate)
                        (delete-file candidate)))))
                (set! created? #t))
+             (unless created?
+               (reserve-existing-image))
              (validate-image #$%image)
              (unless created?
                (let ((status (timed-status #$%home-fsck-seconds

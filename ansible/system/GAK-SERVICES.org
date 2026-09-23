@@ -46,7 +46,11 @@ project. The account's Podman state and temporary data remain inside its home
 image. First image creation requires 256 GiB for the image plus a 128 GiB host
 reserve for operator services. A failed creation removes its temporary image;
 a later start removes any candidate left by interruption before checking
-space. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
+space. Formatting eagerly initializes the ext4 inode tables and journal so
+kernel initialization cannot release backing-file extents after mount. If an
+existing image has holes, ordinary =fallocate= restores their reservation
+without changing file data, provided free space covers the missing bytes plus
+the 128 GiB host reserve. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
 service and SSH session cgroups determine placement for containers and builds.
 Shepherd keeps the mounted home as a running service. Runtime and cgroup
 setup are one-shots with no teardown. Each prerequisite must finish before
@@ -109,6 +113,23 @@ with the user's home, runtime directory, profile PATH and supplementary groups
 already set. The PATH puts =/run/privileged/bin= first so rootless
 =newuidmap= and =newgidmap= resolve through the privileged wrappers. It waits
 for =/marak=, =/media=, rootless Podman cgroup services, elogind and networking.
+It also requires the synchronous root one-shot =gak-operator-runtime=.
+Elogind alone creates =/run/user/1000= for the lingering operator. The
+prerequisite polls at one-second intervals with a three-minute deadline for a
+directory owned by UID 1000 with mode 0700. Elogind normally mounts a tmpfs
+there; when a tmpfs mount is denied, it keeps a plain directory with the same
+owner and mode. Both forms support the operator's private runtime state.
+Thirty seconds without readiness triggers one idempotent =loginctl
+enable-linger lobo= request; each check and that request have a five-second
+command bound. The wait gives elogind time to finish user initialization
+while keeping a stalled boot bounded. Missing paths and ownership or mode
+mismatches remain pending until the deadline; the failure reports the last
+observed state and whether the path was a mount or a plain directory. The
+prerequisite never creates or mounts the path. If the wait expires, check
+=loginctl show-user lobo -p Linger -p RuntimePath= and the runtime directory,
+then recover with =sudo herd enable gak-compose && sudo herd
+start gak-compose=. Operator linger keeps elogind's user record active across
+ordinary logouts; the runtime directory is cleared with =/run= on reboot.
 The helper keeps ownership state, its lock and its readiness marker under
 =${XDG_RUNTIME_DIR}/gak-compose=, reconciles stale recorded stacks after a
 crash, records ownership before each Compose start so partial projects are

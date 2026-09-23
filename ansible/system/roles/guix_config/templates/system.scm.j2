@@ -14,9 +14,13 @@
              (gnu system nss)
              (nongnu packages linux)
              (nongnu system linux-initrd)
+             (gnu packages base)
+             (gnu packages freedesktop)
+             (gnu packages linux)
              (gnu packages shells)
              (gnu services nfs)
              (gnu system accounts)
+             (guix gexp)
              (aiagent host)
              ;; Guix upstream packages Tailscale's Go dependencies but not
              ;; Tailscale, so `tailscaled` comes from the rosenthal channel
@@ -41,6 +45,73 @@
               (string-append "(public-key\n"
                              "(ecc (curve Ed25519)\n"
                              "(q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)))")))
+
+(define %gak-operator-runtime-deadline-seconds 180)
+(define %gak-operator-runtime-request-seconds 30)
+(define %gak-operator-runtime-poll-seconds 1)
+(define %gak-operator-runtime-command-seconds 5)
+
+(define %gak-operator-runtime-program
+  (program-file
+   "gak-operator-runtime"
+   #~(begin
+       (define runtime "/run/user/{{ gak_media_uid }}")
+       (define (uptime-seconds)
+         (call-with-input-file "/proc/uptime" read))
+       (define (command-exit . args)
+         (status:exit-val
+          (apply system* #$(file-append coreutils "/bin/timeout")
+                 "--signal=KILL"
+                 #$(number->string %gak-operator-runtime-command-seconds)
+                 args)))
+       (define (runtime-state)
+         (let ((metadata
+                (catch 'system-error (lambda () (lstat runtime))
+                  (lambda _ #f))))
+           (cond ((not metadata) 'missing)
+                 ((not (eq? (stat:type metadata) 'directory)) 'type)
+                 ((not (= (stat:uid metadata) {{ gak_media_uid }})) 'owner)
+                 ((not (= (logand (stat:mode metadata) #o777) #o700)) 'mode)
+                 (else 'ready))))
+       (define (describe-state state)
+         (if (eq? state 'missing)
+             "missing"
+             (let ((mount-status
+                    (command-exit #$(file-append util-linux "/bin/findmnt")
+                                  "-n" "--mountpoint" runtime)))
+               (string-append
+                (cond ((equal? mount-status 0) "mount")
+                      ((equal? mount-status 1) "plain")
+                      (else "mount status unknown"))
+                " " (symbol->string state)))))
+       (let* ((account (getpwnam "lobo"))
+              (uid (passwd:uid account))
+              (started (uptime-seconds))
+              (deadline (+ started #$%gak-operator-runtime-deadline-seconds)))
+         (unless (= uid {{ gak_media_uid }})
+           (error "operator account UID does not match runtime path"))
+         (let loop ((requested? #f))
+           (let ((state (runtime-state)))
+             (cond
+              ((eq? state 'ready) #t)
+              ((>= (uptime-seconds) deadline)
+               (error (string-append
+                       "operator runtime directory /run/user/1000 not ready; last observed state: "
+                       (describe-state state)
+                       "; expected UID 1000 and mode 0700; check loginctl show-user lobo -p Linger -p RuntimePath, then sudo herd enable gak-compose && sudo herd start gak-compose")))
+              (else
+               (let ((request-now?
+                      (and (not requested?)
+                           (>= (- (uptime-seconds) started)
+                               #$%gak-operator-runtime-request-seconds))))
+                 (when request-now?
+                   (unless (equal? (command-exit
+                                    #$(file-append elogind "/bin/loginctl")
+                                    "enable-linger" "lobo") 0)
+                     (display "elogind linger request failed; waiting for operator runtime\n"
+                              (current-error-port))))
+                 (sleep #$%gak-operator-runtime-poll-seconds)
+                 (loop (or requested? request-now?)))))))))))
 
 (operating-system
  ;; kernel & microcode
@@ -174,6 +245,21 @@
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
+           ;; Elogind owns the lingering operator's runtime directory. Compose
+           ;; starts only after its ownership and mode are ready.
+           (simple-service
+            'gak-operator-runtime
+            shepherd-root-service-type
+            (list
+             (shepherd-service
+              (provision '(gak-operator-runtime))
+              (requirement '(user-processes elogind))
+              (one-shot? #t)
+              (start #~(lambda _
+                         (zero? (system* #$%gak-operator-runtime-program))))
+              (stop #~(const #f))
+              (respawn? #f))))
+
            ;; Compose owns application containers and networks as the login user.
            ;; Shepherd keeps one long-lived process so its stop destructor waits
            ;; for the helper's graceful Compose stop sequence.
@@ -188,6 +274,7 @@
                              cgroups2-limits
                              rootless-podman-shared-root-fs
                              elogind
+                             gak-operator-runtime
                              networking
                              file-system-/marak
                              file-system-/media))
