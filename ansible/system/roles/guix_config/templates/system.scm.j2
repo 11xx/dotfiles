@@ -15,6 +15,7 @@
              (nongnu packages linux)
              (nongnu system linux-initrd)
              (gnu packages base)
+             (gnu packages freedesktop)
              (gnu packages linux)
              (gnu packages shells)
              (gnu services nfs)
@@ -45,57 +46,64 @@
                              "(ecc (curve Ed25519)\n"
                              "(q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)))")))
 
+(define %gak-operator-runtime-deadline-seconds 180)
+(define %gak-operator-runtime-request-seconds 30)
+(define %gak-operator-runtime-poll-seconds 1)
+(define %gak-operator-runtime-command-seconds 5)
+
 (define %gak-operator-runtime-program
   (program-file
    "gak-operator-runtime"
    #~(begin
-       (use-modules (ice-9 ftw))
        (define runtime "/run/user/{{ gak_media_uid }}")
-       (define (mounted?)
-         (let ((status (status:exit-val
-                        (system* #$(file-append util-linux "/bin/mountpoint")
-                                 "-q" runtime))))
-           (cond ((zero? status) #t)
-                 ((member status '(1 32)) #f)
-                 (else (error "cannot inspect operator runtime mount")))))
-       (define (verify)
-         (unless (zero? (system* #$(file-append util-linux "/bin/findmnt")
-                                  "-n" "-t" "tmpfs" "--mountpoint" runtime))
-           (error "operator runtime is not a tmpfs mount"))
-         (let ((metadata (lstat runtime)))
-           (unless (and (eq? (stat:type metadata) 'directory)
-                        (= (stat:uid metadata) {{ gak_media_uid }})
-                        (= (stat:gid metadata) (passwd:gid (getpwnam "lobo")))
-                        (= (logand (stat:mode metadata) #o777) #o700))
-             (error "operator runtime ownership or mode is wrong"))))
+       (define (uptime-seconds)
+         (call-with-input-file "/proc/uptime" read))
+       (define (command-exit . args)
+         (status:exit-val
+          (apply system* #$(file-append coreutils "/bin/timeout")
+                 "--signal=KILL"
+                 #$(number->string %gak-operator-runtime-command-seconds)
+                 args)))
+       (define (ready? gid)
+         (and (file-exists? runtime)
+              (equal? (command-exit #$(file-append util-linux "/bin/findmnt")
+                                    "-n" "-t" "tmpfs" "--mountpoint" runtime)
+                      0)
+              (let ((metadata
+                     (catch 'system-error (lambda () (lstat runtime))
+                       (lambda _ #f))))
+                (and metadata
+                     (if (and (eq? (stat:type metadata) 'directory)
+                              (= (stat:uid metadata) {{ gak_media_uid }})
+                              (= (stat:gid metadata) gid)
+                              (= (logand (stat:mode metadata) #o777) #o700))
+                         #t
+                         (error "operator runtime tmpfs ownership or mode is wrong"))))))
        (let* ((account (getpwnam "lobo"))
               (uid (passwd:uid account))
-              (gid (passwd:gid account)))
+              (gid (passwd:gid account))
+              (started (uptime-seconds))
+              (deadline (+ started #$%gak-operator-runtime-deadline-seconds)))
          (unless (= uid {{ gak_media_uid }})
            (error "operator account UID does not match runtime path"))
-         (unless (zero? (system* #$(file-append coreutils "/bin/mkdir")
-                                  "-p" "/run/user" runtime))
-           (error "cannot create operator runtime directory"))
-         (unless (mounted?)
-           (unless (eq? (stat:type (lstat runtime)) 'directory)
-             (error "operator runtime path is not a directory"))
-           (unless (null? (scandir runtime
-                                   (lambda (name)
-                                     (not (member name '("." ".."))))))
-             (error "operator runtime directory is not empty"))
-           (chown runtime uid gid)
-           (chmod runtime #o700)
-           (unless (mounted?)
-             (unless (zero? (system* #$(file-append util-linux "/bin/mount")
-                                      "-t" "tmpfs" "-o"
-                                      (string-append
-                                       "nosuid,nodev,mode=0700,uid="
-                                       (number->string uid)
-                                       ",gid=" (number->string gid)
-                                       ",size=10%")
-                                      "tmpfs" runtime))
-               (error "cannot mount operator runtime tmpfs"))))
-         (verify)))))
+         (let loop ((requested? #f))
+           (cond
+            ((ready? gid) #t)
+            ((>= (uptime-seconds) deadline)
+             (error "operator runtime tmpfs /run/user/1000 is missing; check loginctl show-user lobo -p Linger -p RuntimePath, then sudo herd enable gak-compose && sudo herd start gak-compose"))
+            (else
+             (let ((request-now?
+                    (and (not requested?)
+                         (>= (- (uptime-seconds) started)
+                             #$%gak-operator-runtime-request-seconds))))
+               (when request-now?
+                 (unless (equal? (command-exit
+                                  #$(file-append elogind "/bin/loginctl")
+                                  "enable-linger" "lobo") 0)
+                   (display "elogind linger request failed; waiting for operator runtime\n"
+                            (current-error-port))))
+               (sleep #$%gak-operator-runtime-poll-seconds)
+               (loop (or requested? request-now?))))))))))
 
 (operating-system
  ;; kernel & microcode
@@ -229,9 +237,8 @@
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
-           ;; The login manager accepts an existing runtime tmpfs and keeps it
-           ;; for the lingering operator. The Compose helper needs it before a
-           ;; login has caused elogind to create it.
+           ;; Elogind owns the lingering operator's runtime tmpfs. Compose
+           ;; starts only after its mount and ownership are ready.
            (simple-service
             'gak-operator-runtime
             shepherd-root-service-type

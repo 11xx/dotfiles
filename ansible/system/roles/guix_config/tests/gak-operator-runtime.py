@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the built media runtime initializer without touching live /run."""
+"""Exercise the built media runtime waiter with real private tmpfs mounts."""
 
 import json
 import os
@@ -8,6 +8,7 @@ import pwd
 import subprocess
 import sys
 import tempfile
+import time
 
 
 PROFILE = Path("/run/current-system/profile/bin")
@@ -18,10 +19,6 @@ def command(*args, check=True):
     if check and result.returncode:
         raise RuntimeError(f"{args[0]} exited {result.returncode}: {result.stderr[-400:]}")
     return result
-
-
-def namespace(*args, check=True):
-    return command("podman", "unshare", *map(str, args), check=check)
 
 
 def built(system, modules):
@@ -35,79 +32,106 @@ def built(system, modules):
     return Path(result.stdout.strip().splitlines()[-1])
 
 
-def probe(program, root, label, nonempty=False, mounted=False):
-    parent = root / label
-    parent.mkdir()
-    runtime = parent / "1000"
-    marker = root / f"{label}-mounted"
-    count = root / f"{label}-mount-count"
-    if nonempty or mounted:
-        runtime.mkdir()
-    if nonempty:
-        (runtime / "sentinel").write_text("keep")
-    if mounted:
-        marker.write_text("mounted")
+def mount_count(path):
+    return sum(line.split()[4] == str(path) for line in Path("/proc/self/mountinfo").read_text().splitlines())
 
-    source = program.read_text()
-    assert "/run/user" in source
-    header, body = source.replace("/run/user", str(parent)).split("!#\n", 1)
-    harness = '''(define actual-system* system*)
-(let ((system* (lambda (cmd . args)
-  (cond ((string-suffix? "/mountpoint" cmd)
-          (if (file-exists? MARKER) 0 8192))
-        ((string-suffix? "/findmnt" cmd)
-          (if (file-exists? MARKER) 0 256))
-        ((string-suffix? "/mount" cmd)
-          (let ((options (list-ref args 3)))
-            (unless (and (string? options)
-                         (string-contains options "nosuid,nodev,mode=0700,uid=1000")
-                         (string-contains options ",size=10%"))
-              (error "invalid runtime mount options")))
-          (let ((port (open-file COUNT "a")))
-            (display "mount\\n" port) (close-port port))
-          (call-with-output-file MARKER (lambda (port) (display "mounted" port)))
-          0)
-        (else (apply actual-system* cmd args)))))) BODY)
-'''.replace("MARKER", json.dumps(str(marker))).replace("COUNT", json.dumps(str(count))).replace("BODY", body)
-    wrapper = root / f"{label}.scm"
-    wrapper.write_text(header + "!#\n" + harness)
-    wrapper.chmod(0o755)
-    result = namespace(wrapper, check=False)
-    return result, runtime, marker, count
+
+def mount_runtime(path, uid, gid, mode):
+    path.mkdir()
+    command(PROFILE / "mount", "-t", "tmpfs", "-o",
+            f"uid={uid},gid={gid},mode={mode:o},nosuid,nodev", "tmpfs", path)
+    assert mount_count(path) == 1
+    (path / "sentinel").write_text("elogind owns this mount\n")
+
+
+def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700):
+    place = root / label
+    place.mkdir()
+    runtime = place / "1000"
+    source = program.read_text().replace("/run/user", str(place))
+    assert source.count("(deadline (+ started 180))") == 1
+    assert source.count("(>= (- (uptime-seconds) started) 30)") == 1
+    source = source.replace("(deadline (+ started 180))", "(deadline (+ started 5))")
+    source = source.replace("(>= (- (uptime-seconds) started) 30)",
+                            "(>= (- (uptime-seconds) started) 2)")
+    header, body = source.split("!#\n", 1)
+    request_marker = place / "linger-request"
+    wrapper = (
+        "(define real-system* system*)\n"
+        "(let ((system* (lambda (cmd . args)\n"
+        " (if (member \"enable-linger\" args)\n"
+        f"     (begin (call-with-output-file {json.dumps(str(request_marker))} "
+        "(lambda (port) (display \"request\\n\" port))) 0)\n"
+        "     (apply real-system* cmd args))))) " + body + ")\n"
+    )
+    executable = place / "runtime.scm"
+    executable.write_text(header + "!#\n" + wrapper)
+    executable.chmod(0o755)
+    mounted = False
+    process = None
+    try:
+        if delay == 0:
+            mount_runtime(runtime, uid, gid, mode)
+            mounted = True
+        process = subprocess.Popen([str(executable)], stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True)
+        if delay is not None and delay > 0:
+            time.sleep(delay)
+            assert process.poll() is None, f"{label}: waiter exited before mount"
+            mount_runtime(runtime, uid, gid, mode)
+            mounted = True
+        stdout, stderr = process.communicate(timeout=12)
+        requests = request_marker.read_text().splitlines() if request_marker.exists() else []
+        if label in ("before", "during", "after"):
+            assert process.returncode == 0, (label, stderr)
+            assert (runtime / "sentinel").read_text() == "elogind owns this mount\n"
+            assert requests == (["request"] if label == "after" else []), requests
+        elif label == "never":
+            assert process.returncode != 0 and "operator runtime tmpfs " in stderr and " is missing" in stderr, stderr
+            assert "loginctl show-user" in stderr and "sudo herd enable gak-compose && sudo herd start gak-compose" in stderr
+            assert requests == ["request"], requests
+        else:
+            assert process.returncode != 0 and "ownership or mode is wrong" in stderr, stderr
+            assert (runtime / "sentinel").read_text() == "elogind owns this mount\n"
+            assert requests == [], requests
+        assert mount_count(runtime) == int(mounted), f"{label}: stacked or lost mount"
+        print(f"{label}: {'ready' if process.returncode == 0 else 'refused'}; "
+              f"linger requests={len(requests)}; mounts={mount_count(runtime)}")
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+        if mounted:
+            command(PROFILE / "umount", runtime)
+        assert mount_count(runtime) == 0, f"{label}: mount left behind"
+
+
+def inner(program, root):
+    account = pwd.getpwuid(1000)
+    one_case(program, root, "before", delay=0, gid=account.pw_gid)
+    one_case(program, root, "during", delay=0.5, gid=account.pw_gid)
+    one_case(program, root, "after", delay=2.5, gid=account.pw_gid)
+    one_case(program, root, "never")
+    one_case(program, root, "wrong-owner", delay=0, uid=0, gid=0)
+    one_case(program, root, "wrong-mode", delay=0, gid=account.pw_gid, mode=0o755)
 
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--inner":
+        inner(Path(sys.argv[2]), Path(sys.argv[3]))
+        return
     system = Path(sys.argv[1]).resolve()
     modules = Path(sys.argv[2]).resolve()
     assert system.is_file() and (modules / "aiagent/host.scm").is_file()
-    assert os.readlink("/proc/self/ns/mnt") != namespace(PROFILE / "readlink", "/proc/self/ns/mnt").stdout.strip()
-    account = pwd.getpwuid(1000)
+    assert os.readlink("/proc/self/ns/mnt") != command(
+        "podman", "unshare", PROFILE / "readlink", "/proc/self/ns/mnt"
+    ).stdout.strip()
     scratch = Path.home() / ".cache/gak-aiagent-host"
     scratch.mkdir(parents=True, exist_ok=True)
-    program = built(system, modules)
     with tempfile.TemporaryDirectory(prefix="media-runtime-", dir=scratch) as name:
-        root = Path(name)
-        try:
-            first, runtime, marker, count = probe(program, root, "fresh")
-            assert first.returncode == 0, first.stderr[-400:]
-            owner = namespace(PROFILE / "stat", "-c", "%u %g %a", runtime).stdout.strip()
-            assert owner == f"1000 {account.pw_gid} 700", owner
-            assert count.read_text().splitlines() == ["mount"]
-            again = namespace(root / "fresh.scm")
-            assert again.returncode == 0 and count.read_text().splitlines() == ["mount"]
-            print("fresh directory: mkdir/chown/chmod/mount arguments passed; existing mount reused")
-
-            nonempty, runtime, marker, count = probe(program, root, "nonempty", nonempty=True)
-            assert nonempty.returncode != 0 and "not empty" in nonempty.stderr
-            assert (runtime / "sentinel").read_text() == "keep" and not marker.exists()
-            print("nonempty plain directory: refused without covering data")
-
-            wrong_owner, runtime, marker, count = probe(program, root, "wrong-owner", mounted=True)
-            assert wrong_owner.returncode != 0 and "ownership or mode is wrong" in wrong_owner.stderr
-            assert marker.exists() and not count.exists()
-            print("existing mount with wrong owner: refused without remount")
-        finally:
-            namespace(PROFILE / "chown", "-R", "0:0", root)
+        result = command("podman", "unshare", sys.executable, __file__,
+                         "--inner", built(system, modules), name)
+        print(result.stdout, end="")
 
 
 if __name__ == "__main__":
