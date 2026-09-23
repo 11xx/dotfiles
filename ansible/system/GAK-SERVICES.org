@@ -122,10 +122,12 @@ owner and mode. Both forms support the operator's private runtime state.
 Thirty seconds without readiness triggers one idempotent =loginctl
 enable-linger lobo= request; each check and that request have a five-second
 command bound. The wait gives elogind time to finish user initialization
-while keeping a stalled boot bounded. A mismatched runtime fails
-immediately. The prerequisite never creates or mounts the path. If the wait
-expires, check =loginctl show-user lobo -p Linger -p RuntimePath= and the
-runtime directory, then recover with =sudo herd enable gak-compose && sudo herd
+while keeping a stalled boot bounded. Missing paths and ownership or mode
+mismatches remain pending until the deadline; the failure reports the last
+observed state and whether the path was a mount or a plain directory. The
+prerequisite never creates or mounts the path. If the wait expires, check
+=loginctl show-user lobo -p Linger -p RuntimePath= and the runtime directory,
+then recover with =sudo herd enable gak-compose && sudo herd
 start gak-compose=. Operator linger keeps elogind's user record active across
 ordinary logouts; the runtime directory is cleared with =/run= on reboot.
 The helper keeps ownership state, its lock and its readiness marker under

@@ -37,7 +37,8 @@ def mount_count(path):
 
 
 def mount_runtime(path, uid, gid, mode):
-    path.mkdir()
+    if not path.exists():
+        path.mkdir()
     command(PROFILE / "mount", "-t", "tmpfs", "-o",
             f"uid={uid},gid={gid},mode={mode:o},nosuid,nodev", "tmpfs", path)
     assert mount_count(path) == 1
@@ -45,7 +46,7 @@ def mount_runtime(path, uid, gid, mode):
 
 
 def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700,
-             plain=False):
+             plain=False, transition=None):
     place = root / label
     place.mkdir()
     runtime = place / "1000"
@@ -71,7 +72,11 @@ def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700
     mounted = False
     process = None
     try:
-        if plain:
+        if transition:
+            runtime.mkdir()
+            (runtime / "sentinel").write_text("elogind owns this runtime\n")
+            assert runtime.stat().st_uid == 0
+        elif plain:
             runtime.mkdir()
             (runtime / "sentinel").write_text("elogind owns this runtime\n")
             command(PROFILE / "chown", f"{uid}:{gid}", runtime)
@@ -80,30 +85,43 @@ def one_case(program, root, label, *, delay=None, uid=1000, gid=None, mode=0o700
         elif delay == 0:
             mount_runtime(runtime, uid, gid, mode)
             mounted = True
+        started = time.monotonic()
         process = subprocess.Popen([str(executable)], stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True)
         if delay is not None and delay > 0:
             time.sleep(delay)
             assert process.poll() is None, f"{label}: waiter exited before mount"
-            mount_runtime(runtime, uid, gid, mode)
-            mounted = True
+            if transition == "plain":
+                command(PROFILE / "chown", f"{uid}:{gid}", runtime)
+                command(PROFILE / "chmod", f"{mode:o}", runtime)
+                plain = True
+            else:
+                mount_runtime(runtime, uid, gid, mode)
+                mounted = True
         stdout, stderr = process.communicate(timeout=12)
+        elapsed = time.monotonic() - started
         requests = request_marker.read_text().splitlines() if request_marker.exists() else []
-        if label in ("before", "during", "after", "plain"):
+        if label in ("before", "during", "after", "plain",
+                     "root-to-mount", "root-to-plain"):
             assert process.returncode == 0, (label, stderr)
             assert (runtime / "sentinel").read_text() == "elogind owns this runtime\n"
             assert requests == (["request"] if label == "after" else []), requests
         elif label == "never":
-            assert process.returncode != 0 and "operator runtime directory " in stderr and " is missing" in stderr, stderr
+            assert process.returncode != 0 and "last observed state: missing" in stderr, stderr
             assert "loginctl show-user" in stderr and "sudo herd enable gak-compose && sudo herd start gak-compose" in stderr
             assert requests == ["request"], requests
+            assert elapsed >= 4, elapsed
         else:
-            assert process.returncode != 0 and "ownership or mode is wrong" in stderr, stderr
+            expected = {"wrong-owner": "mount owner", "wrong-mode": "mount mode",
+                        "wrong-plain-owner": "plain owner"}[label]
+            assert process.returncode != 0 and f"last observed state: {expected}" in stderr, stderr
             assert (runtime / "sentinel").read_text() == "elogind owns this runtime\n"
-            assert requests == [], requests
+            assert requests == ["request"], requests
+            assert elapsed >= 4, elapsed
         assert mount_count(runtime) == int(mounted), f"{label}: stacked or lost mount"
         print(f"{label}: {'ready' if process.returncode == 0 else 'refused'}; "
-              f"linger requests={len(requests)}; mounts={mount_count(runtime)}")
+              f"linger requests={len(requests)}; mounts={mount_count(runtime)}; "
+              f"elapsed={elapsed:.1f}s")
     finally:
         if process is not None and process.poll() is None:
             process.kill()
@@ -121,9 +139,14 @@ def inner(program, root):
     one_case(program, root, "during", delay=0.5, gid=account.pw_gid)
     one_case(program, root, "after", delay=2.5, gid=account.pw_gid)
     one_case(program, root, "plain", uid=1000, gid=account.pw_gid, plain=True)
+    one_case(program, root, "root-to-mount", delay=0.5, gid=account.pw_gid,
+             transition="mount")
+    one_case(program, root, "root-to-plain", delay=0.5, gid=account.pw_gid,
+             transition="plain")
     one_case(program, root, "never")
     one_case(program, root, "wrong-owner", delay=0, uid=0, gid=0)
     one_case(program, root, "wrong-mode", delay=0, gid=account.pw_gid, mode=0o755)
+    one_case(program, root, "wrong-plain-owner", uid=0, gid=0, plain=True)
 
 
 def main():
