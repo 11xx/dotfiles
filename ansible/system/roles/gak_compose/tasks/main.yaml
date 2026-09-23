@@ -31,6 +31,22 @@
     _gak_compose_newline: "\n"
   tags: ['gak-compose-config']
 
+- name: 'gak_compose: Deploy instance project and network policy'
+  ansible.builtin.copy:
+    content: "{{ (item.entries | join(_gak_compose_newline)) ~ (_gak_compose_newline if item.entries | length > 0 else '') }}"
+    dest: '{{ item.path }}'
+    mode: '0644'
+  loop:
+    - path: '{{ gak_compose_supported_file }}'
+      entries: '{{ gak_compose_supported }}'
+    - path: '{{ gak_compose_never_autostart_file }}'
+      entries: '{{ gak_compose_never_autostart }}'
+    - path: '{{ gak_compose_networks_file }}'
+      entries: '{{ gak_compose_external_networks }}'
+  vars:
+    _gak_compose_newline: "\n"
+  tags: ['gak-compose-config']
+
 - name: 'gak_compose: Deploy the lifecycle helper'
   ansible.builtin.copy:
     src: gak-compose-lifecycle

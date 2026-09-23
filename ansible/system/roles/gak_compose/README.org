@@ -1,0 +1,31 @@
+#+TITLE: Rootless Compose lifecycle instance
+
+* Instance contract
+
+An instance supplies a services root, a runtime directory, a Podman command,
+and five newline-delimited files in its services root:
+
+- =.compose-supported=: project names the instance accepts.
+- =.compose-applications=: declared projects with a =compose.yaml= file.
+- =.compose-autostart=: declared projects started in listed order.
+- =.compose-never-autostart=: supported projects excluded from autostart.
+- =.compose-networks=: external networks created before selected projects start.
+
+Every file is required. Empty lists are allowed.
+Names must be unique and syntactically valid. A declared project may put a
+=.compose-stop-order= file beside =compose.yaml= to list its Compose services
+in dependent-first shutdown order. The helper validates the file before
+starting projects. It stops recorded projects in reverse start order and
+selects their containers by the realpath in the Compose working-directory
+label. A recorded project with no containers produces a logged no-op. A query
+failure keeps the ownership record for a later retry.
+It keeps ownership, readiness and the lifecycle lock under the instance's
+runtime directory. Podman descendants do not inherit the lock descriptor.
+
+The role renders the five files from =gak_compose_supported=,
+=gak_applications=, =gak_compose_autostart=,
+=gak_compose_never_autostart= and =gak_compose_external_networks=. The
+instance sets =gak_compose_services_root= and can set the five destination
+paths. The host service supplies =HOME=, =XDG_RUNTIME_DIR= or
+=GAK_COMPOSE_RUNTIME_DIR=, and a PATH that resolves Podman and its rootless
+mapping helpers.

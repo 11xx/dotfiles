@@ -10,15 +10,23 @@ project. The resulting files live at =~/services/APPLICATION/compose.yaml= and
 are owned by the login user.
 
 =host_vars/gak/main= selects =gak_applications= and the explicit
-=gak_compose_autostart= list. The latter may select declared web applications
-and Nextcloud, but never the Recyclarr batch job. Ansible writes both lists, the
-lifecycle helper and the updater package sources under the login user's home.
+=gak_compose_autostart= list. It also supplies =gak_compose_supported=,
+=gak_compose_never_autostart= and =gak_compose_external_networks=. The
+autostart list may select declared web applications and Nextcloud, but never
+the Recyclarr batch job. Ansible writes the five instance lists, the lifecycle
+helper and the updater package sources under the login user's home.
 Guix Home installs the update command. The
-lifecycle helper validates every declared project and fails if a selected
-Compose file is missing; it does not discover projects from a directory
+lifecycle helper requires =.compose-supported=, =.compose-applications=,
+=.compose-autostart=, =.compose-never-autostart= and =.compose-networks= in
+the services root. Every file uses one name per line and may be empty.
+Entries must be unique and valid names. A
+declared project's =compose.yaml= must exist. A project with dependent
+services declares =.compose-stop-order= beside its Compose file, with one
+Compose service name per line in shutdown order. The helper refuses malformed
+or missing instance data and does not discover boot projects from a directory
 listing. Boot selection and update selection are separate questions: the update
-command discovers projects from the services root and never consults either
-list.
+command discovers projects from the services root and never consults the
+instance lists.
 
 Ansible owns service directories, Compose files, operator commands and secret
 files. Guix System owns only stable host integration: rootless Podman,
@@ -50,8 +58,8 @@ runs as container 1000:134; its secret file remains mode 0640 with the mapped
 group ownership. Nextcloud keeps its tested namespace-aware secret and
 database ownership operations.
 
-The three shared networks are named =starrs_net=, =services_net= and
-=nextcloud_net=. The login-user lifecycle helper creates them when a selected
+The media instance declares =starrs_net=, =services_net= and =nextcloud_net=
+as external networks. The login-user lifecycle helper creates them when a selected
 stack needs them. Every Compose file declares its network as external, so a
 project's =compose down= cannot remove a shared network. Compose projects do
 not share application state or networks across those boundaries.
@@ -72,7 +80,11 @@ Shepherd respawns. Recyclarr is never booted.
 
 The helper's long-lived process is intentional: Shepherd's stop destructor
 sends SIGTERM to it and waits while the helper runs Compose's graceful stop
-commands. Nextcloud stops cron and the frontend before Redis and PostgreSQL.
+commands. Shutdown selects containers by the Compose working-directory label,
+regardless of their project or container names. An empty result for a recorded
+project is logged and treated as already stopped; a failed query retains the
+ownership record. Nextcloud's project data stops
+cron and the frontend before Redis and PostgreSQL.
 The helper never pulls images during boot and never calls sudo.
 
 The lifecycle lock stays in the helper process. Podman commands close that
@@ -263,6 +275,7 @@ and touch no container, image or backup:
 
 #+begin_src sh
 roles/gak_compose/tests/lifecycle.bash
+roles/gak_compose/tests/lifecycle-instance.bash
 roles/gak_compose/tests/services-update.bash
 roles/gak_compose/tests/services-environment.bash
 roles/gak_compose/tests/services-provider.bash

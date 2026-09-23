@@ -17,6 +17,22 @@ gak_applications:
 - recyclarr
 - koito
 - nextcloud
+gak_compose_supported:
+- sabnzbd
+- prowlarr
+- sonarr
+- radarr
+- jellyfin
+- qbittorrent
+- recyclarr
+- koito
+- nextcloud
+gak_compose_never_autostart:
+- recyclarr
+gak_compose_external_networks:
+- starrs_net
+- services_net
+- nextcloud_net
 # Compose starts these projects during the stable boot integration. Recyclarr
 # is a manually invoked batch project and is intentionally absent.
 gak_compose_autostart:
