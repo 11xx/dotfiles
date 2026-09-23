@@ -51,11 +51,17 @@ reset_fixture() {
 
 declare_apps() {
     printf '%s\n' "$@" >"$services_root/.compose-applications"
+    printf '%s\n' sabnzbd prowlarr sonarr radarr jellyfin qbittorrent recyclarr koito nextcloud >"$services_root/.compose-supported"
+    printf '%s\n' recyclarr >"$services_root/.compose-never-autostart"
+    printf '%s\n' starrs_net services_net nextcloud_net >"$services_root/.compose-networks"
     : >"$services_root/.compose-autostart"
     local application
     for application in "$@"; do
         mkdir -p "$services_root/$application"
         : >"$services_root/$application/compose.yaml"
+        if [[ $application == nextcloud ]]; then
+            printf '%s\n' nextcloud-cron nextcloud nextcloud-redis nextcloud-db >"$services_root/$application/.compose-stop-order"
+        fi
     done
 }
 
@@ -87,9 +93,25 @@ if [[ ${1:-} == network ]]; then
     exit 0
 fi
 
-if [[ ${1:-} == container && ${2:-} == exists ]]; then
-    [[ -e "$FAKE_RUNNING_ROOT/${3:?}" ]]
-    exit $?
+if [[ ${1:-} == ps ]]; then
+    [[ ${2:-} == -a && ${@: -1} == '{{.Names}} {{.Label "com.docker.compose.service"}}' ]] || exit 90
+    project=
+    workdir=
+    for arg in "$@"; do
+        case $arg in
+            label=com.docker.compose.project=*) project=${arg#label=com.docker.compose.project=} ;;
+            label=com.docker.compose.project.working_dir=*) workdir=${arg#label=com.docker.compose.project.working_dir=} ;;
+        esac
+    done
+    [[ -n $project && $workdir == "$FAKE_SERVICES_ROOT/$project" ]] || exit 90
+    if [[ $project == nextcloud ]]; then
+        for service in nextcloud-cron nextcloud nextcloud-redis nextcloud-db; do
+            [[ ! -e $FAKE_RUNNING_ROOT/$service ]] || printf 'odd-%s %s\n' "$service" "$service"
+        done
+    elif [[ -e $FAKE_RUNNING_ROOT/$project ]]; then
+        printf 'odd-%s %s\n' "$project" "$project"
+    fi
+    exit 0
 fi
 
 if [[ ${1:-} == compose ]]; then
@@ -155,6 +177,7 @@ export FAKE_PODMAN_LOG="$log_file"
 export FAKE_EVENT_LOG="$event_file"
 export FAKE_NETWORK_ROOT="$network_root"
 export FAKE_RUNNING_ROOT="$running_root"
+export FAKE_SERVICES_ROOT="$services_root"
 export FAKE_DETACHED_PID_FILE="$fixture/detached.pid"
 write_fake_podman
 

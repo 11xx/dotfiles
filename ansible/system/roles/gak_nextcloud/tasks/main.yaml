@@ -148,6 +148,14 @@
   tags:
   - gak-nextcloud-config
   - gak-compose-config
+- name: 'gak_nextcloud: Deploy the lifecycle stop order'
+  ansible.builtin.copy:
+    src: compose-stop-order
+    dest: '{{ gak_nextcloud_dir }}/.compose-stop-order'
+    mode: '0644'
+  tags:
+  - gak-nextcloud-config
+  - gak-compose-config
 - name: 'gak_nextcloud: Check whether nextcloud is available for bootstrap'
   ansible.builtin.command:
     argv:
