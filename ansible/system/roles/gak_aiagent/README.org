@@ -13,6 +13,13 @@ of the service or SSH session that starts them.
 The image initializer reserves 256 GiB only when another 128 GiB remains free
 for the operator's services. It removes a partial candidate on failure and
 cleans up a candidate left by an interruption before retrying.
+The home service stays running while the image is mounted; runtime and cgroup
+setup are repeatable one-shots. Each prerequisite finishes before the
+lifecycle helper starts. Home creation and unmount hold the same root-only
+lock. Lock acquisition and disk operations have finite deadlines, with timed
+process groups terminated on expiry. A failed unmount can leave the image
+mounted even when Shepherd reports the service stopped, so =findmnt= determines
+the actual mount state.
 Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
 setuid =newuidmap= and =newgidmap= wrappers.
 The host account has tailscaled's non-operator read-only local API access;

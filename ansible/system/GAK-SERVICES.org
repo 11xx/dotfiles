@@ -48,6 +48,19 @@ reserve for operator services. A failed creation removes its temporary image;
 a later start removes any candidate left by interruption before checking
 space. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
 service and SSH session cgroups determine placement for containers and builds.
+Shepherd keeps the mounted home as a running service. Runtime and cgroup
+setup are one-shots with no teardown. Each prerequisite must finish before
+the Compose helper starts. Home creation and unmount share a root-only lock;
+a second start waits at most five minutes, then validates the first mount or
+fails. Allocation, formatting, fsck, mount and unmount have separate deadlines
+of ten, five, twenty, two and two minutes. An expired command's process group
+receives KILL at its deadline.
+
+A busy unmount can leave Shepherd reporting =aiagent-home= stopped while
+=findmnt /home/aiagent= still reports a mount. Check the mount directly,
+clear the processes holding it, run =sudo herd start aiagent-home= to restore
+Shepherd's running record, then retry =sudo herd stop aiagent-home=. The
+Compose helper is stopped before home stop is attempted.
 The host account retains tailscaled's non-operator read-only local API access.
 The Guix module does not change Tailscale. The agent container must exclude
 host runtime paths, including the Tailscale socket.
