@@ -54,10 +54,15 @@ The Fedora 44 base and harness package versions are pinned in
 [[file:../../aiagent.org][aiagent.org]]. Pi runs on a pinned upstream Node
 executable in the image; its interactive TUI, =/login= menu and print mode
 are available through the =pi= command.
-T3 Code v0.0.42 runs through its native executable as a foreground child of
-the image's supervisor, which restarts it two seconds after a crash.
-Restarting T3 leaves other container processes, including terminal sessions,
-running. A container start runs the supervisor. Compose publishes container
+T3 Code v0.0.42 runs through its native executable in the image supervisor's
+owned process group. The supervisor restarts it two seconds after a crash and
+cleans that group before the restart. Compose allows forty-five seconds for a
+container stop. The supervisor gives T3 forty seconds to exit, then terminates
+survivors in its group within three seconds. Descendants that create another
+group are outside that boundary, and active T3 work may still be interrupted
+by a container stop. A graceful supervisor exit is zero; forced group cleanup
+prints a warning and exits 124. Restarting T3 leaves separate terminal sessions running.
+A container start runs the supervisor. Compose publishes container
 port 3773 at host =127.0.0.1:gak_t3_port=; the host's named Tailscale service
 handles remote HTTPS. The =gak_t3_port= inventory value is shared by the
 agent and ingress roles through =group_vars/all/gak_agent=. T3 state and client
@@ -138,6 +143,8 @@ isolated filesystem; every failure must precede the project stop. Its live
 probe rejects a stopped server. Run =python3
 roles/gak_aiagent/tests/t3-port-render.py= to check default and alternate host
 ports across Compose and ingress.
+Run =python3 roles/gak_aiagent/tests/t3-supervise.py= to check graceful
+shutdown, owned descendant cleanup and restart after a native crash.
 From =ansible/system=, run =podman unshare python3
 roles/guix_config/tests/backup-security.py= for the root-shaped path probes,
 =python3 roles/guix_config/tests/backup-recovery.py= for failed-stop recovery,

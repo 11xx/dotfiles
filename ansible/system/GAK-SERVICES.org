@@ -120,9 +120,14 @@ it explicitly. Logins happen inside the container under the operator's
 control. Pi's interactive =/login= menu and print mode use the image's
 pinned upstream Node executable.
 The image pins T3 Code v0.0.42. Its foreground supervisor starts the native
-server on each container start and restarts it two seconds after an exit. Other
-processes in the container, including terminal sessions, continue through a
-T3 restart.
+server in an owned process group on each container start and restarts it two
+seconds after an exit. Compose gives the container forty-five seconds to stop.
+The supervisor asks the native server to exit, waits forty seconds for its group, then
+terminates survivors within three more seconds. Processes that create separate
+groups are outside that cleanup boundary. A container stop can interrupt active
+T3 work. Forced group cleanup prints a warning and makes the supervisor exit
+124; a graceful stop exits zero. An unexpected T3 restart leaves separate
+terminal sessions running.
 On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
 =gak-aiagent status=, =shell=, =restart= or =update= to forward to the
 account-local manager. =shell= requires a terminal. Set

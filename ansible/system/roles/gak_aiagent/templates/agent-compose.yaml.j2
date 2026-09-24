@@ -5,6 +5,7 @@ services:
     image: localhost/aiagent-fedora:44-v1
     container_name: aiagent
     init: true
+    stop_grace_period: 45s
     userns_mode: keep-id
     user: "1001:1001"
     ports:

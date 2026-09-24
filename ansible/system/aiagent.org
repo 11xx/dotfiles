@@ -1912,31 +1912,95 @@ done
 exec "$@"
 #+end_src
 
-The supervisor forwards container termination to T3 and waits for it to exit.
-An unexpected T3 exit leaves the container and its terminal sessions running.
+The supervisor starts T3 in its own process group. It forwards termination to
+the native server, allows forty seconds for its process tree to settle, then
+terminates only that group. Compose grants a forty-five-second stop window for
+this cleanup. An unexpected T3 exit cleans up its remaining group before a
+restart, while separate terminal sessions continue running. A descendant that
+creates another process group is outside the supervisor's cleanup boundary;
+container shutdown can still interrupt active work after its grace expires.
+Graceful shutdown exits zero; a forced kill is reported on standard error and
+exits 124.
 
-#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
-set -u
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
+import os
+import signal
+import subprocess
+import sys
+import time
 
-stopping=0
-child=
-stop() {
-    trap - TERM INT
-    stopping=1
-    if [[ -n $child ]]; then
-        kill -TERM "$child" 2>/dev/null || true
-        wait "$child" 2>/dev/null || true
-    fi
-}
-trap stop TERM INT
 
-while (( ! stopping )); do
-    /usr/local/bin/t3-web &
-    child=$!
-    wait "$child" || true
-    child=
-    (( stopping )) || sleep 2
-done
+SERVER = "/usr/local/bin/t3-web"
+STOP_GRACE = 40
+GROUP_GRACE = 3
+RESTART_DELAY = 2
+stopping = False
+
+
+def request_stop(_signal, _frame):
+    global stopping
+    stopping = True
+
+
+def group_alive(group):
+    try:
+        os.killpg(group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def wait_group(child, seconds):
+    deadline = time.monotonic() + seconds
+    while group_alive(child.pid) and time.monotonic() < deadline:
+        child.poll()
+        time.sleep(0.1)
+    return not group_alive(child.pid)
+
+
+def signal_group(group, number):
+    try:
+        os.killpg(group, number)
+    except ProcessLookupError:
+        pass
+
+
+def settle(child, grace):
+    forced = False
+    if child.poll() is None:
+        try:
+            child.terminate()
+        except ProcessLookupError:
+            pass
+    if not wait_group(child, grace):
+        signal_group(child.pid, signal.SIGTERM)
+        if not wait_group(child, GROUP_GRACE):
+            forced = True
+            print("t3-supervise: server group exceeded its stop grace; killing it",
+                  file=sys.stderr, flush=True)
+            signal_group(child.pid, signal.SIGKILL)
+    child.wait()
+    return forced
+
+
+def main():
+    signal.signal(signal.SIGTERM, request_stop)
+    signal.signal(signal.SIGINT, request_stop)
+    while not stopping:
+        child = subprocess.Popen([SERVER], start_new_session=True)
+        while child.poll() is None and not stopping:
+            time.sleep(0.1)
+        forced = settle(child, STOP_GRACE if stopping else 0)
+        if stopping:
+            return 124 if forced else 0
+        deadline = time.monotonic() + RESTART_DELAY
+        while time.monotonic() < deadline and not stopping:
+            time.sleep(0.1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
