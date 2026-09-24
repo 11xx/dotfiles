@@ -2855,8 +2855,10 @@ if __name__ == "__main__":
 #+end_src
 
 An update reports its build, probe, verified stop, backup and apply phases.
-Standard error from direct Podman commands remains visible. =--verbose= streams
-full direct build and stop output and the role-owned readiness hook's output
+Default builds keep routine stdout and stderr private; a failed or timed-out
+build prints only a bounded diagnostic tail and a =--verbose= retry hint.
+Standard error from other direct Podman commands remains visible.
+=--verbose= streams full direct build and stop output and the role-owned readiness hook's output
 from the shared updater. The shared updater's raw Compose provider diagnostics
 remain private because they can quote expanded definitions and environment;
 its own summary and sanitized failures remain visible. An operator can
@@ -2895,15 +2897,40 @@ IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 REQUEST = Path("/run/aiagent/backup-request")
 RESULT = Path("/run/aiagent/backup-result")
+BUILD_DIAGNOSTIC_BYTES = 16 * 1024
 
 
 def phase(message):
     print(f"aiagent: {message}", flush=True)
 
 
-def command(*argv, timeout=7200, verbose=False, env=None):
+def build_diagnostics(output):
+    output.flush()
+    size = output.tell()
+    output.seek(max(0, size - BUILD_DIAGNOSTIC_BYTES))
+    tail = output.read().decode("utf-8", errors="replace")
+    if size > BUILD_DIAGNOSTIC_BYTES:
+        print(f"aiagent: build output truncated to its last {BUILD_DIAGNOSTIC_BYTES} bytes",
+              file=sys.stderr)
+    if tail:
+        print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
+    print("aiagent: rerun aiagent update --verbose for full build output",
+          file=sys.stderr)
+
+
+def command(*argv, timeout=7200, verbose=False, env=None, quiet_build=False):
     if verbose:
         result = subprocess.run(argv, timeout=timeout, env=env)
+    elif quiet_build:
+        with tempfile.TemporaryFile(mode="w+b") as output:
+            try:
+                result = subprocess.run(argv, stdout=output, stderr=subprocess.STDOUT,
+                                        timeout=timeout, env=env)
+            except subprocess.TimeoutExpired:
+                build_diagnostics(output)
+                raise
+            if result.returncode:
+                build_diagnostics(output)
     else:
         with tempfile.TemporaryFile(mode="w+t") as output:
             try:
@@ -3062,7 +3089,8 @@ def main(verbose=False):
     try:
         phase("building candidate image")
         command(PODMAN, "build", "--pull=missing", "--tag", candidate,
-                "--file", str(context / "Containerfile"), str(context), verbose=verbose)
+                "--file", str(context / "Containerfile"), str(context),
+                verbose=verbose, quiet_build=True)
         built = True
         candidate_id = image_id(candidate)
         phase("checking isolated candidate")

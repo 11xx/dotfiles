@@ -139,12 +139,14 @@ account-local manager. =shell= requires a terminal. Set
 =GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
 =aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
 Python 3 and OpenSSH; T3 actions also need tailnet access.
-=gak-aiagent update --verbose= streams direct build and verified stop output,
+=gak-aiagent update --verbose= streams both direct build streams and verified stop output,
 and enables the shared updater's readiness hook output. The hook output may
 contain private data; inspect it before sharing. Raw Compose provider diagnostics
 remain redacted unless =GAK_SERVICES_SHOW_PROVIDER_ERRORS= is separately set,
-which can expose expanded environment. The default update prints named phases,
-sanitized failures and a final result. Backup waiting reports elapsed time every
+which can expose expanded environment. The default update captures routine
+build stdout and stderr and prints named phases and a final result. A failed or
+timed-out build prints a bounded tail of both streams and a =--verbose= retry
+hint; other lifecycle warnings remain visible. Backup waiting reports elapsed time every
 minute. An identical image is reported as unchanged; configuration application
 and readiness still run.
 
