@@ -120,11 +120,15 @@ elif name == "qrencode":
         self.assertEqual(self.invoke("shell")[0], 0)
         self.assertEqual(self.invoke("restart")[0], 17)
         self.assertEqual(self.invoke("update")[0], 0)
+        self.assertEqual(self.invoke("update", "--verbose")[0], 0)
+        self.assertEqual(self.invoke("update", "--verbose; touch /unwanted")[0], 2)
         calls = self.calls()
         self.assertIn("-tt", calls[1])
         self.assertIn("-T", calls[0])
-        self.assertEqual([shlex.split(call[-1])[-1] for call in calls],
-                         ["status", "shell", "restart", "update"])
+        self.assertEqual([shlex.split(call[-1])[1:] for call in calls],
+                         [["status"], ["shell"], ["restart"], ["update"],
+                          ["update", "--verbose"]])
+        self.assertFalse((self.root / "unwanted").exists())
 
     def test_pairing_quotes_label_and_feeds_qr_only_by_stdin(self):
         label = "phone'; touch /unwanted; echo '"

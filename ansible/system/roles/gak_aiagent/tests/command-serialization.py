@@ -227,6 +227,25 @@ def main():
             operation_descriptor = backup.operation_lock()
             os.close(operation_descriptor)
 
+            updater = home / ".local/bin/aiagent-update"
+            updater.write_text('''#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+Path(os.environ["AIAGENT_PROBE_ROOT"], "update-args").write_text(json.dumps(sys.argv[1:]))
+''')
+            updater.chmod(0o750)
+            assert subprocess.run([command, "update"], env=env).returncode == 0
+            assert json.loads((root / "update-args").read_text()) == []
+            assert subprocess.run([command, "update", "--verbose"], env=env).returncode == 0
+            assert json.loads((root / "update-args").read_text()) == ["--verbose"]
+            (root / "update-args").unlink()
+            assert subprocess.run([command, "update", "--verbose; touch /unwanted"],
+                                  env=env, capture_output=True).returncode != 0
+            assert not (root / "update-args").exists()
+            assert not (root / "unwanted").exists()
+
             (root / "spawn-detached").touch()
             assert subprocess.run([command, "recreate"], env=env).returncode == 0
             detached_pid = int((root / "detached.pid").read_text())
@@ -249,6 +268,7 @@ def main():
             print("worker death: recreate and backup waited for the surviving Compose child")
             print("detached workload did not retain the operation record or lock")
             print("persistent port helpers allowed restart, next operation and backup exclusion")
+            print("update --verbose reached only the account updater and rejected other arguments")
             print("cache cleanup stayed inside the cache subtree")
         finally:
             (root / "release").touch()

@@ -134,6 +134,11 @@ account-local manager. =shell= requires a terminal. Set
 =GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
 =aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
 Python 3 and OpenSSH; T3 actions also need tailnet access.
+=gak-aiagent update --verbose= streams full build and Compose output. The
+default update prints named phases, stderr warnings and a final result. On a
+failed command it also prints the captured stdout diagnostics. Backup waiting
+prints elapsed time every minute. An identical image is reported as unchanged;
+the update still applies the Compose configuration and checks readiness.
 
 =gak-aiagent t3 open= opens the canonical HTTPS origin in the desktop browser.
 =gak-aiagent t3 pair [label]= displays a five-minute, single-use link and a

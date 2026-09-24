@@ -157,7 +157,7 @@ def cache_clean():
         (cache / name).mkdir()
 
 
-def command_for(operation):
+def command_for(operation, verbose=False):
     compose = [PODMAN, "compose", "-f", str(PROJECT)]
     if operation == "build":
         context = HOME / "image"
@@ -168,7 +168,7 @@ def command_for(operation):
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
     if operation == "update":
-        return [str(HOME / ".local/bin/aiagent-update")]
+        return [str(HOME / ".local/bin/aiagent-update")] + (["--verbose"] if verbose else [])
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
@@ -184,8 +184,9 @@ def command_for(operation):
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise RuntimeError("expected one operation")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and
+                                     sys.argv[1:] != ["update", "--verbose"]):
+        raise RuntimeError("expected one operation; update accepts --verbose")
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
@@ -194,7 +195,7 @@ def main():
             cache_clean()
             return 0
         operation = sys.argv[1]
-        return run(command_for(operation), project=operation in
+        return run(command_for(operation, verbose=len(sys.argv) == 3), project=operation in
                    {"start", "stop", "restart", "recreate", "update"})
 
 

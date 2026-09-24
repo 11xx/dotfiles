@@ -2,8 +2,10 @@
 import hashlib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -16,16 +18,32 @@ REQUEST = Path("/run/aiagent/backup-request")
 RESULT = Path("/run/aiagent/backup-result")
 
 
-def command(*argv, timeout=7200):
-    result = subprocess.run(argv, timeout=timeout)
+def phase(message):
+    print(f"aiagent: {message}", flush=True)
+
+
+def command(*argv, timeout=7200, verbose=False):
+    if verbose:
+        result = subprocess.run(argv, timeout=timeout)
+    else:
+        with tempfile.TemporaryFile(mode="w+t") as output:
+            try:
+                result = subprocess.run(argv, stdout=output, timeout=timeout)
+            except subprocess.TimeoutExpired:
+                output.seek(0)
+                shutil.copyfileobj(output, sys.stderr)
+                raise
+            if result.returncode:
+                output.seek(0)
+                shutil.copyfileobj(output, sys.stderr)
     if result.returncode:
-        raise RuntimeError(f"command failed: {argv[1]}")
+        raise RuntimeError(f"command failed: {argv[1]} exited {result.returncode}")
 
 
 def image_id(reference):
     result = subprocess.run(
         [PODMAN, "image", "inspect", "--format", "{{.Id}}", reference],
-        capture_output=True, text=True, timeout=60,
+        stdout=subprocess.PIPE, text=True, timeout=60,
     )
     if result.returncode:
         raise RuntimeError("the local image is absent")
@@ -39,8 +57,15 @@ def backup():
     with os.fdopen(descriptor, "w") as request:
         request.write(nonce + "\n")
     try:
-        deadline = time.monotonic() + 7200
+        started = time.monotonic()
+        deadline = started + 7200
+        next_notice = started + 60
+        phase("waiting for scheduled backup")
         while time.monotonic() < deadline:
+            now = time.monotonic()
+            if now >= next_notice:
+                phase(f"waiting for scheduled backup ({int(now - started)}s elapsed)")
+                next_notice = now + 60
             try:
                 response = RESULT.read_text().strip()
             except FileNotFoundError:
@@ -57,7 +82,15 @@ def backup():
         RESULT.unlink(missing_ok=True)
 
 
-def main():
+def remove_candidate(candidate, verbose):
+    try:
+        command(PODMAN, "image", "rm", candidate, timeout=60, verbose=verbose)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: warning: could not remove candidate tag: {error}",
+              file=sys.stderr, flush=True)
+
+
+def main(verbose=False):
     context = HOME / "image"
     if not (context / "Containerfile").is_file():
         raise RuntimeError("image context is not deployed")
@@ -69,28 +102,41 @@ def main():
     quiesced = False
     applying = False
     try:
+        phase("building candidate image")
         command(PODMAN, "build", "--pull=missing", "--tag", candidate,
-                "--file", str(context / "Containerfile"), str(context))
+                "--file", str(context / "Containerfile"), str(context), verbose=verbose)
         built = True
         candidate_id = image_id(candidate)
+        phase("checking isolated candidate")
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180)
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
+                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180,
+                verbose=verbose)
+        phase("stopping agent")
+        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
+                verbose=verbose)
         quiesced = True
+        phase("backing up persistent state")
         backup()
         applying = True
+        phase("applying image and configuration")
         command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
-                "--prepared-image", f"agent={candidate_id}", timeout=900)
+                "--prepared-image", f"agent={candidate_id}", timeout=900,
+                verbose=verbose)
+        phase("checking accepted image")
         if image_id(IMAGE) != candidate_id:
             raise RuntimeError("the accepted image reference moved")
-        subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
-        print(f"aiagent: accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
+        remove_candidate(candidate, verbose)
+        if candidate_id == old:
+            phase(f"image unchanged ({candidate_id[:12]}); configuration applied and readiness passed")
+        else:
+            phase(f"accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
         if quiesced and not applying:
+            phase("restoring previous agent")
             command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
-                    timeout=180)
+                    timeout=180, verbose=verbose)
         if built and not applying:
-            subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+            remove_candidate(candidate, verbose)
         if applying:
             pin = "localhost/gak-services-previous:" + hashlib.sha256(
                 f"{PROJECT.parent.resolve()}:agent".encode()).hexdigest()[:24]
@@ -106,7 +152,9 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        if sys.argv[1:] not in ([], ["--verbose"]):
+            raise RuntimeError("usage: aiagent-update [--verbose]")
+        main(verbose=sys.argv[1:] == ["--verbose"])
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
         print(f"aiagent: update failed: {error}", file=sys.stderr)
         sys.exit(1)

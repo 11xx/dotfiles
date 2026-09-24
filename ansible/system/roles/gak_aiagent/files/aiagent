@@ -16,10 +16,10 @@ export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/pro
 
 die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
 usage() {
-    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update [--verbose]|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
-    exec "$operator" "$1"
+    exec "$operator" "$@"
 }
 status() {
     if "$podman" container exists "$container"; then
@@ -35,7 +35,8 @@ case "$cmd" in
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build|update|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    update) [[ $# -eq 0 || $# -eq 1 && $1 == --verbose ]] || die 'update accepts only --verbose'; mutate "$cmd" "$@" ;;
+    build|start|stop|restart|recreate|cache-clean) (($# == 0)) || die "$cmd accepts no arguments"; mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
     *) usage; exit 2 ;;
 esac

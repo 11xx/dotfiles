@@ -81,6 +81,11 @@ HTTPS origin with an ASCII DNS name, IPv4 address or bracketed IPv6 address.
 Set =GAK_AIAGENT_SSH_TARGET=, =GAK_AIAGENT_SSH_KEY= and
 =GAK_AIAGENT_T3_SERVICE= for another workstation or service name. A paired
 browser and a cold reboot require separate live verification.
+=gak-aiagent update --verbose= forwards full build and Compose output through
+SSH. A default update prints named phases, stderr warnings and its final result;
+failed commands also print captured stdout diagnostics. The backup wait reports
+elapsed time every minute. An unchanged image is reported honestly while
+configuration application and readiness still run.
 
 =aiagent status=, =logs=, =shell= and =exec= inspect or enter the container.
 =build=, =update=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
