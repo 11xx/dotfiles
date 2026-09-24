@@ -101,6 +101,9 @@ root-owned scratch directory on the backup disk, compares file checksums and pat
 removes the scratch tree and starts Compose.
 The host declaration must be activated by the operator before updates use the
 request job.
+Run =python3 roles/gak_aiagent/tests/update-flow.py= from =ansible/system= to
+exercise the image readiness file in an isolated filesystem with each mount
+point and harness absent; every failure must precede the project stop.
 From =ansible/system=, run =podman unshare python3
 roles/guix_config/tests/backup-security.py= for the root-shaped path probes,
 =python3 roles/guix_config/tests/backup-recovery.py= for failed-stop recovery,

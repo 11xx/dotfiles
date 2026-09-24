@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Exercise candidate isolation and the snapshot boundary of aiagent update."""
 
+import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import threading
 import time
 
 
-SOURCE = Path(__file__).resolve().parents[1] / "files/aiagent-update"
+ROLE = Path(__file__).resolve().parents[1]
+SOURCE = ROLE / "files/aiagent-update"
+READINESS = ROLE / "files/image/bin/aiagent-readiness"
 OLD = "a" * 64
 NEW = "e" * 64
 PODMAN = '''#!/usr/bin/env python3
@@ -33,8 +37,9 @@ if args[:2] == ["image", "inspect"]:
 elif args[0] == "run":
     assert "--network" in args and args[args.index("--network") + 1] == "none"
     assert not any(arg in ("-v", "--volume", "--mount") for arg in args)
-    if os.environ.get("BROKEN_PI_WRAPPER") and args[-1] == "/usr/local/bin/aiagent-readiness":
-        sys.exit(3)
+    assert args[-1] == "/usr/local/bin/aiagent-readiness"
+    import subprocess
+    sys.exit(subprocess.run(json.loads(os.environ["READINESS_PROBE"])).returncode)
 elif args[:2] == ["compose", "-f"] and "stop" in args:
     (root / "stopped").touch()
 elif args[:2] == ["compose", "-f"] and "up" in args:
@@ -60,7 +65,7 @@ def replace(source, old, new):
     return source.replace(old, new)
 
 
-def exercise(root, broken=False, postapply=False):
+def exercise(root, probe, broken=False, postapply=False):
     home = root / "home"
     (home / "image").mkdir(parents=True)
     (home / "image/Containerfile").write_text("FROM scratch\n")
@@ -85,9 +90,8 @@ def exercise(root, broken=False, postapply=False):
     script = root / "aiagent-update"
     script.write_text(source)
     script.chmod(0o755)
-    env = dict(os.environ, AIAGENT_UPDATE_TEST_ROOT=str(root))
-    if broken:
-        env["BROKEN_PI_WRAPPER"] = "1"
+    env = dict(os.environ, AIAGENT_UPDATE_TEST_ROOT=str(root),
+               READINESS_PROBE=json.dumps(probe))
     if postapply:
         env["FAIL_AFTER_APPLY"] = "1"
 
@@ -134,13 +138,66 @@ def exercise(root, broken=False, postapply=False):
 def main():
     with tempfile.TemporaryDirectory(prefix="aiagent-update-", dir=Path.home() / ".cache") as scratch:
         root = Path(scratch)
-        for name, broken, postapply in (("broken-pi", True, False),
-                                        ("accepted", False, False),
-                                        ("postapply-failure", False, True)):
+        binaries = root / "bin"
+        tools = root / "local"
+        binaries.mkdir()
+        tools.mkdir()
+        shutil.copy2(Path("/bin/sh").resolve(), binaries / "sh")
+        shutil.copy2(READINESS, tools / "aiagent-readiness")
+        harnesses = ("codex", "claude", "opencode", "t3", "pi")
+        for name in harnesses:
+            command = tools / name
+            command.write_text("#!/bin/sh\nexit 0\n")
+            command.chmod(0o755)
+
+        def probe(missing_dir=None):
+            argv = ["bwrap", "--unshare-all", "--die-with-parent", "--tmpfs", "/",
+                    "--dev", "/dev", "--ro-bind", "/usr/lib", "/usr/lib",
+                    "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib", "/lib64",
+                    "--ro-bind", str(binaries), "/usr/bin", "--symlink", "usr/bin", "/bin",
+                    "--ro-bind", str(tools), "/usr/local/bin"]
+            for directory in ("/home/node", "/work", "/cache"):
+                if directory != missing_dir:
+                    argv.extend(("--dir", directory))
+            return [*argv, "/usr/local/bin/aiagent-readiness"]
+
+        assert subprocess.run(probe()).returncode == 0
+        for directory in ("/home/node", "/work", "/cache"):
+            case = root / ("missing-dir-" + directory.replace("/", "-"))
+            case.mkdir()
+            exercise(case, probe(directory), broken=True)
+            print(f"missing {directory}: candidate refused before compose stop")
+        for name in harnesses:
+            command = tools / name
+            disabled = tools / (name + ".disabled")
+            command.rename(disabled)
+            try:
+                case = root / ("missing-tool-" + name)
+                case.mkdir()
+                exercise(case, probe(), broken=True)
+            finally:
+                disabled.rename(command)
+            print(f"missing {name}: candidate refused before compose stop")
+
+        pi = tools / "pi"
+        pi.rename(tools / "pi.disabled")
+        fallback = binaries / "pi"
+        fallback.write_text("#!/bin/sh\nexit 0\n")
+        fallback.chmod(0o755)
+        try:
+            case = root / "pi-fallback"
+            case.mkdir()
+            exercise(case, probe(), broken=True)
+        finally:
+            fallback.unlink()
+            (tools / "pi.disabled").rename(pi)
+        print("Pi fallback in /usr/bin: candidate refused before compose stop")
+
+        for name, postapply in (("accepted", False), ("postapply-failure", True)):
             case = root / name
             case.mkdir()
-            exercise(case, broken, postapply)
-    print("missing Pi wrapper failed candidate readiness before stop; accepted update followed a snapshot")
+            exercise(case, probe(), postapply=postapply)
+    print("accepted update followed a stopped snapshot")
     print("post-apply failure named the retained previous tag and manual rollback without auto rollback")
 
 
