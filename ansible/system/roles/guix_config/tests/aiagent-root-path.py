@@ -129,9 +129,11 @@ def probe_launcher(module_dir, root, account):
     body = body.replace("/sys/fs/cgroup/aiagent/delegated", str(service.parent))
     old_chdir = '(chdir "/home/aiagent")'
     old_exec = '(execl "/home/aiagent/.local/bin/gak-compose-lifecycle"'
-    assert body.count(old_chdir) == body.count(old_exec) == 1
+    old_reconcile = '"/home/aiagent/.local/bin/gak-aiagent-reconcile"'
+    assert body.count(old_chdir) == body.count(old_exec) == body.count(old_reconcile) == 1
     body = body.replace(old_chdir, '(chdir (string-append "/proc/self/fd/" (number->string (fileno home-port))))')
     body = body.replace(old_exec, '(execl (string-append "/proc/self/fd/" (number->string (fileno helper-port)))')
+    body = body.replace(old_reconcile, '"/run/current-system/profile/bin/true"')
     body = body.replace("/home/aiagent", str(home)).replace("/run/aiagent", str(runtime))
     prefix = (
         "(setgroups #(42))\n"
@@ -150,6 +152,40 @@ def probe_launcher(module_dir, root, account):
     }, identity
     assert procs.read_text().strip().isdigit()
     print("launcher: real setgroups/setgid/setuid cleared seeded group 42; preopened /proc/self/fd paths skip ancestor traversal")
+
+
+def probe_graceful_stop(module_dir, root, account):
+    service = root / "graceful-cgroup" / "service"
+    service.mkdir(parents=True)
+    procs = service / "cgroup.procs"
+    procs.write_text("")
+    interpreter = Path(sys.executable).resolve()
+    helper = script(
+        root / "graceful-helper.py",
+        f"#!{interpreter}\n"
+        "import json, os, sys\n"
+        "print(json.dumps({'uid': os.geteuid(), 'gid': os.getegid(), "
+        "'supplementary': os.getgroups(), 'args': sys.argv[1:], 'pid': os.getpid()}))\n",
+    )
+    source = built(module_dir, "aiagent-podman-stop-program").read_text()
+    header, body = source.split("!#\n", 1)
+    old_podman = '(execl "/run/current-system/profile/bin/podman"'
+    assert body.count(old_podman) == body.count("/sys/fs/cgroup/aiagent/delegated") == 1
+    body = body.replace("/sys/fs/cgroup/aiagent/delegated", str(service.parent))
+    body = body.replace(old_podman,
+                        '(execl (string-append "/proc/self/fd/" (number->string (fileno helper-port)))')
+    prefix = f'(let ((helper-port (open {json.dumps(str(helper))} O_RDONLY)))\n'
+    probe = script(root / "graceful-stop.scm", header + "!#\n" + prefix + body + ")\n")
+    identity = json.loads(namespace(probe).stdout.strip())
+    assert identity == {
+        "uid": account.pw_uid,
+        "gid": account.pw_gid,
+        "supplementary": [],
+        "args": ["stop", "--all", "--time", "10"],
+        "pid": identity["pid"],
+    }, identity
+    assert procs.read_text() == str(identity["pid"])
+    print("graceful Podman stop: real cgroup write and privilege drop; stop --all --time 10 reached")
 
 
 def probe_home(module_dir, root, account):
@@ -263,15 +299,23 @@ def probe_home(module_dir, root, account):
     print(f"home: existing-image hole restored; fsck clean; sentinel sha256 {expected}")
 
     drain_store = built(module_dir, "aiagent-cgroup-drain-program")
+    podman_stop_store = built(module_dir, "aiagent-podman-stop-program")
     drain_marker = root / "drain-called"
+    graceful_marker = root / "graceful-called"
     drain_stub = script(root / "drain-stub.sh", f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> {drain_marker}\n")
+    graceful_stub = script(root / "graceful-stub.sh",
+                           f"#!/bin/sh\nprintf graceful >> {graceful_marker}\n")
     stop_source = built(module_dir, "aiagent-home-stop-locked-program").read_text()
     assert stop_source.count(str(drain_store)) == 1
-    stop_source = stop_source.replace(str(drain_store), str(drain_stub)).replace("/home/aiagent", str(home))
+    assert stop_source.count(str(podman_stop_store)) == 1
+    stop_source = (stop_source.replace(str(drain_store), str(drain_stub))
+                   .replace(str(podman_stop_store), str(graceful_stub))
+                   .replace("/home/aiagent", str(home)))
     stop = script(root / "home-stop.scm", stop_source)
     failed = namespace(stop, check=False, timeout=10)
     assert failed.returncode != 0 and "Wrong type argument" not in failed.stderr
     assert drain_marker.read_text().splitlines() == ["all"]
+    assert graceful_marker.read_text() == "graceful"
     header, body = stop_source.split("!#\n", 1)
     stop_mock = script(root / "home-mock-umount.scm", header + "!#\n" +
                        "(define real-system* system*)\n"
@@ -281,6 +325,7 @@ def probe_home(module_dir, root, account):
                        "     0 (apply real-system* cmd args))))) " + body + ")\n")
     namespace(stop_mock)
     assert drain_marker.read_text().splitlines() == ["all", "all"]
+    assert graceful_marker.read_text() == "gracefulgraceful"
     assert namespace_owner(home)[2] == 0
     print("home stop: drain stubbed; real umount reached; post-unmount chmod passed with umount mocked")
     return home
@@ -319,6 +364,7 @@ def main():
         try:
             probe_runtime_cgroup_pam(module_dir, root, account)
             probe_launcher(module_dir, root, account)
+            probe_graceful_stop(module_dir, root, account)
             probe_home(module_dir, root, account)
             probe_stop_and_shell(module_dir, root)
         finally:

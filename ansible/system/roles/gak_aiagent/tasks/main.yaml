@@ -32,6 +32,12 @@
     dest: /home/aiagent/.local/bin/gak-compose-lifecycle
     mode: '0750'
 
+- name: 'aiagent: Install Podman state reconciler'
+  ansible.builtin.copy:
+    src: gak-aiagent-reconcile
+    dest: /home/aiagent/.local/bin/gak-aiagent-reconcile
+    mode: '0750'
+
 - name: 'aiagent: Install declared instance lists'
   ansible.builtin.copy:
     content: '{{ item.content }}'

@@ -16,10 +16,15 @@ Podman. Image builds inherit that placement. No container parent is specified
 in Compose.
 Shepherd waits for each host prerequisite program to exit successfully before
 starting the helper. The mounted home remains a running service so stopping
-it first stops the helper, kills every remaining process in the delegated
-cgroup, and then unmounts the image. The kill includes SSH sessions. Stopping
+it first stops the helper, asks Podman as aiagent to stop every container,
+kills any remaining process in the delegated cgroup, and then unmounts the
+image. The kill includes SSH sessions. Stopping
 Compose alone lets its helper finish and then kills residual processes in the
 service subtree, so a restart begins without a retained Podman pause process.
+Before the helper starts, aiagent's instance checks running Podman records
+against their payload and conmon PIDs. It asks Podman to stop only stale
+records and verifies that each leaves the running state. Healthy containers
+and their writable layers remain in place.
 Runtime and cgroup setup remain one-shots: their directories and limit writes
 are idempotent, and they have no mount to undo. Home creation and unmount
 hold the same root-only lock. A concurrent start waits up to five minutes,
@@ -34,8 +39,11 @@ fsck bound permits a populated 256 GiB image, and the short probe, mount and
 unmount bounds prevent routine kernel operations from extending shutdown.
 A timed-out command's process group receives KILL at its deadline, including
 descendants that could retain the lock. First creation has at most 43 minutes
-of external-command waits; a queued home stop adds at most eight minutes:
-five for its lock, one for cgroup drain and two for unmount. A drain writes
+of external-command waits; a queued home stop adds at most eleven minutes:
+five for its lock, three for Podman's graceful stop, one for cgroup drain and
+two for unmount. Podman gets ten seconds per container within its three-minute
+total bound; an incomplete stop falls through to the forced drain. Agent
+startup gives state reconciliation one minute. A drain writes
 to the root-owned =cgroup.kill= file under the delegated subtree and waits at
 most one minute
 for =cgroup.events= to report =populated 0=. At deadline it reports remaining
@@ -99,6 +107,9 @@ removes the account, sub-ID declaration and host services together.
 (define %home-unmount-seconds 120)
 (define %cgroup-drain-seconds 60)
 (define %cgroup-drain-poll-seconds 1)
+(define %podman-stop-grace-seconds 10)
+(define %podman-stop-deadline-seconds 180)
+(define %podman-reconcile-seconds 60)
 (define %runtime-init-seconds 60)
 (define %cgroup-init-seconds 60)
 (define %cgroup "/sys/fs/cgroup/aiagent")
@@ -259,6 +270,28 @@ removes the account, sub-ID declaration and host services together.
                                 #$aiagent-home-locked-program))
          (error "aiagent home initialization failed")))))
 
+(define aiagent-podman-stop-program
+  (program-file
+   "aiagent-podman-stop"
+   #~(begin
+       (let ((account (getpwnam "aiagent")))
+         (call-with-output-file
+             (string-append #$%delegated "/service/cgroup.procs")
+           (lambda (port) (display (getpid) port)))
+         (setgroups #())
+         (setgid (passwd:gid account))
+         (setuid (passwd:uid account))
+         (setenv "HOME" #$%home)
+         (setenv "XDG_RUNTIME_DIR" "/run/aiagent")
+         (setenv "TMPDIR" "/home/aiagent/tmp")
+         (setenv "CONTAINERS_IMAGE_COPY_TMPDIR"
+                 "/home/aiagent/image-copy-tmp")
+         (setenv "PATH"
+                 "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+         (execl "/run/current-system/profile/bin/podman" "podman"
+                "stop" "--all" "--time"
+                #$(number->string %podman-stop-grace-seconds))))))
+
 (define aiagent-cgroup-drain-program
   (program-file
    "aiagent-cgroup-drain"
@@ -343,6 +376,12 @@ removes the account, sub-ID declaration and host services together.
   (program-file
    "aiagent-home-stop-locked"
    #~(begin
+       (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
+                                "--signal=KILL"
+                                #$(number->string %podman-stop-deadline-seconds)
+                                #$aiagent-podman-stop-program))
+         (display "aiagent Podman stop incomplete; forcing cgroup drain\n"
+                  (current-error-port)))
        (unless (zero? (system* #$aiagent-cgroup-drain-program "all"))
          (error "aiagent delegated cgroup did not drain"))
        (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
@@ -458,6 +497,11 @@ removes the account, sub-ID declaration and host services together.
                  "/home/aiagent/.guix-profile/bin/podman-compose")
          (setenv "PATH"
                  "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+         (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
+                                  "--signal=KILL"
+                                  #$(number->string %podman-reconcile-seconds)
+                                  "/home/aiagent/.local/bin/gak-aiagent-reconcile"))
+           (error "aiagent Podman state reconciliation failed"))
          (execl "/home/aiagent/.local/bin/gak-compose-lifecycle"
                 "gak-compose-lifecycle" "run")))))
 
