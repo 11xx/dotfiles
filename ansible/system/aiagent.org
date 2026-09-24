@@ -26,7 +26,9 @@ against their payload and conmon PIDs. It asks Podman to stop only stale
 records and verifies that each leaves the running state. Healthy containers
 and their writable layers remain in place.
 Runtime and cgroup setup remain one-shots: their directories and limit writes
-are idempotent, and they have no mount to undo. Home creation and unmount
+are idempotent, and they have no mount to undo. Runtime setup creates the
+account-owned operation lock for both agent commands and the root backup job.
+Home creation and unmount
 hold the same root-only lock. A concurrent start waits up to five minutes,
 then checks the
 mounted image left by the first or fails without touching its candidate.
@@ -87,6 +89,7 @@ removes the account, sub-ID declaration and host services together.
   #:use-module (gnu packages bash)
   #:use-module (gnu packages linux)
   #:use-module (gnu services)
+  #:use-module (gnu services mcron)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services ssh)
   #:use-module (gnu system accounts)
@@ -414,8 +417,16 @@ removes the account, sub-ID declaration and host services together.
          (error "cannot create aiagent runtime directory"))
        (let ((account (getpwnam "aiagent")))
          (chown "/run/aiagent" (passwd:uid account)
-                (passwd:gid account)))
-       (chmod "/run/aiagent" #o700))))
+                (passwd:gid account))
+         (chmod "/run/aiagent" #o700)
+         (let ((fd (open "/run/aiagent/aiagent.lock"
+                         (logior O_WRONLY O_CREAT O_NOFOLLOW O_NONBLOCK)
+                         #o600)))
+           (unless (eq? (stat:type (fstat fd)) 'regular)
+             (error "aiagent operation lock is not a regular file"))
+           (chown fd (passwd:uid account) (passwd:gid account))
+           (chmod fd #o600)
+           (close fd))))))
 
 (define aiagent-cgroup-program
   (program-file
@@ -632,6 +643,19 @@ removes the account, sub-ID declaration and host services together.
 (define (aiagent-keys keys)
   (list (cons "aiagent" keys)))
 
+(define %backup-script (local-file "backup.sh"))
+
+(define (aiagent-backup-jobs _)
+  (list
+   #~(job "* * * * *"
+          (string-append #$(file-append bash-minimal "/bin/bash")
+                         " " #$%backup-script " request")
+          #:user "root")
+   #~(job "15 4 * * *"
+          (string-append #$(file-append bash-minimal "/bin/bash")
+                         " " #$%backup-script " daily")
+          #:user "root")))
+
 (define aiagent-host-service-type
   (service-type
    (name 'aiagent-host)
@@ -640,9 +664,102 @@ removes the account, sub-ID declaration and host services together.
           (service-extension subids-service-type aiagent-subids)
           (service-extension openssh-service-type aiagent-keys)
           (service-extension pam-root-service-type aiagent-pam-extensions)
+          (service-extension mcron-service-type aiagent-backup-jobs)
           (service-extension shepherd-root-service-type
                              aiagent-shepherd-services)))
    (description "Isolated rootless coding-agent host foundation.")))
+#+end_src
+
+The root mcron jobs use a store-captured program and a root-owned Restic
+password file at =/etc/aiagent/restic-password=. They write encrypted snapshots
+to =/marak/backups/aiagent/restic=. The daily job stops the Compose service
+while it copies the persistent workspaces and container home, then starts it.
+An update asks the minute job for a snapshot after stopping its project. The
+password and repository are outside the agent's mounted home and container.
+The backup job serializes itself with a root-only lock under =/var/lib/aiagent=
+and takes the account's operation lock before a daily stop or restore check.
+Seven daily, five weekly and twelve monthly snapshots are retained. A restore
+check takes a fresh snapshot, writes only inside the mounted image and compares
+every regular file by checksum before removing its scratch tree.
+
+#+begin_src shell :tangle (expand-file-name "roles/guix_config/files/modules/aiagent/backup.sh" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o644
+set -Eeuo pipefail
+umask 077
+export PATH=/run/current-system/profile/bin:/run/privileged/bin:/usr/bin:/bin
+export RESTIC_REPOSITORY=/marak/backups/aiagent/restic
+export RESTIC_PASSWORD_FILE=/etc/aiagent/restic-password
+
+[[ $EUID -eq 0 ]] || { printf '%s\n' 'agent backup requires root' >&2; exit 1; }
+[[ -f $RESTIC_PASSWORD_FILE && $(stat -c '%u:%a' "$RESTIC_PASSWORD_FILE") == 0:600 ]] || {
+    printf '%s\n' 'agent backup password file must be root-owned mode 0600' >&2
+    exit 1
+}
+exec 9>/var/lib/aiagent/backup.lock
+flock -n 9 || exit 75
+
+snapshot() {
+    findmnt -n --mountpoint /home/aiagent >/dev/null || return 1
+    install -d -m 0700 /marak/backups/aiagent "$RESTIC_REPOSITORY" || return 1
+    [[ -f $RESTIC_REPOSITORY/config ]] || restic init >/dev/null || return 1
+    restic backup --quiet --host gak --tag aiagent \
+        /home/aiagent/workspaces /home/aiagent/container-home || return 1
+    restic forget --quiet --host gak --tag aiagent \
+        --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --prune || return 1
+    restic check --quiet || return 1
+}
+
+case ${1:-} in
+    request)
+        request=/run/aiagent/backup-request
+        [[ -f $request ]] || exit 0
+        [[ $(stat -c '%u:%a' "$request") == 1001:600 ]] || exit 1
+        nonce=$(<"$request")
+        [[ $nonce =~ ^[0-9]+-[0-9]+$ ]] || exit 1
+        outcome=failed
+        if snapshot; then outcome=ok; fi
+        result=$(mktemp /run/aiagent/backup-result.XXXXXXXX)
+        printf '%s %s\n' "$outcome" "$nonce" >"$result"
+        chown aiagent:aiagent "$result"
+        mv -fT -- "$result" /run/aiagent/backup-result
+        rm -f -- "$request"
+        [[ $outcome == ok ]]
+        ;;
+    daily)
+        exec 8</run/aiagent/aiagent.lock
+        flock -n 8 || exit 75
+        timeout 180 herd stop aiagent-compose
+        trap 'timeout 180 herd start aiagent-compose' EXIT
+        snapshot
+        ;;
+    restore-check)
+        exec 8</run/aiagent/aiagent.lock
+        flock -n 8 || exit 75
+        timeout 180 herd stop aiagent-compose
+        scratch=
+        trap '[[ -z $scratch ]] || rm -rf -- "$scratch"; timeout 180 herd start aiagent-compose' EXIT
+        findmnt -n --mountpoint /home/aiagent >/dev/null
+        snapshot
+        scratch=$(mktemp -d /home/aiagent/restore-check.XXXXXXXX)
+        restic check --quiet
+        restic restore latest --host gak --tag aiagent --target "$scratch" --quiet
+        restored="$scratch/home/aiagent"
+        for name in workspaces container-home; do
+            [[ -d $restored/$name ]] || exit 1
+        done
+        (cd /home/aiagent && find workspaces container-home -type f -print0 |
+            LC_ALL=C sort -z | xargs -0 -r sha256sum) >"$scratch/source.sha256"
+        (cd "$restored" && find workspaces container-home -type f -print0 |
+            LC_ALL=C sort -z | xargs -0 -r sha256sum) >"$scratch/restored.sha256"
+        cmp "$scratch/source.sha256" "$scratch/restored.sha256"
+        (cd /home/aiagent && find workspaces container-home -printf '%P %y %l\n' | LC_ALL=C sort) \
+            >"$scratch/source.paths"
+        (cd "$restored" && find workspaces container-home -printf '%P %y %l\n' | LC_ALL=C sort) \
+            >"$scratch/restored.paths"
+        cmp "$scratch/source.paths" "$scratch/restored.paths"
+        printf '%s\n' 'agent restore checksums match'
+        ;;
+    *) printf '%s\n' 'usage: backup.sh {request|daily|restore-check}' >&2; exit 2 ;;
+esac
 #+end_src
 
 * Gak container image
@@ -794,11 +911,12 @@ export XDG_RUNTIME_DIR=/run/aiagent
 export TMPDIR="$home/tmp"
 export CONTAINERS_IMAGE_COPY_TMPDIR="$home/image-copy-tmp"
 export PODMAN_COMPOSE_PROVIDER="$home/.guix-profile/bin/podman-compose"
+export GAK_SERVICES_HOME_PROFILE="$home/.guix-profile"
 export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
 
 die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
 usage() {
-    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
     exec "$operator" "$1"
@@ -817,7 +935,7 @@ case "$cmd" in
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    build|update|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
     *) usage; exit 2 ;;
 esac
@@ -930,6 +1048,8 @@ def command_for(operation):
             raise RuntimeError(f"initial image already exists: {IMAGE}")
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
+    if operation == "update":
+        return [str(HOME / ".local/bin/aiagent-update")]
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
@@ -961,6 +1081,133 @@ if __name__ == "__main__":
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         print(f"aiagent: {error}", file=sys.stderr)
         sys.exit(1)
+#+end_src
+
+An update builds a uniquely tagged candidate from the deployed context. Its
+probe runs in a disposable container without persistent mounts or network
+access. The live project is stopped before the root backup job snapshots its
+workspaces and container home. The updater accepts the candidate's image ID
+from the stopped project and runs the project's readiness command. A failure
+before application starts the existing image again; a failed application keeps
+both image IDs and the recovery snapshot for operator inspection.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-update" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+UPDATER = HOME / ".guix-profile/bin/gak-services"
+IMAGE = "localhost/aiagent-fedora:44-v1"
+PROJECT = HOME / "services/agent/compose.yaml"
+REQUEST = Path("/run/aiagent/backup-request")
+RESULT = Path("/run/aiagent/backup-result")
+
+
+def command(*argv, timeout=7200):
+    result = subprocess.run(argv, timeout=timeout)
+    if result.returncode:
+        raise RuntimeError(f"command failed: {argv[1]}")
+
+
+def image_id(reference):
+    result = subprocess.run(
+        [PODMAN, "image", "inspect", "--format", "{{.Id}}", reference],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode:
+        raise RuntimeError("the local image is absent")
+    return result.stdout.strip().removeprefix("sha256:")
+
+
+def backup():
+    nonce = f"{os.getpid()}-{time.monotonic_ns()}"
+    RESULT.unlink(missing_ok=True)
+    descriptor = os.open(REQUEST, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(descriptor, "w") as request:
+        request.write(nonce + "\n")
+    try:
+        deadline = time.monotonic() + 7200
+        while time.monotonic() < deadline:
+            try:
+                response = RESULT.read_text().strip()
+            except FileNotFoundError:
+                time.sleep(1)
+                continue
+            if response == f"ok {nonce}":
+                return
+            if response == f"failed {nonce}":
+                raise RuntimeError("the root backup job failed")
+            time.sleep(1)
+        raise RuntimeError("the root backup job did not answer within 7200 seconds")
+    finally:
+        REQUEST.unlink(missing_ok=True)
+        RESULT.unlink(missing_ok=True)
+
+
+def main():
+    context = HOME / "image"
+    if not (context / "Containerfile").is_file():
+        raise RuntimeError("image context is not deployed")
+    if not UPDATER.is_file():
+        raise RuntimeError("the account's gak-services package is not installed")
+    old = image_id(IMAGE)
+    candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
+    built = False
+    quiesced = False
+    applying = False
+    try:
+        command(PODMAN, "build", "--pull=missing", "--tag", candidate,
+                "--file", str(context / "Containerfile"), str(context))
+        built = True
+        candidate_id = image_id(candidate)
+        command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
+                "/bin/bash", "-lc",
+                "command -v codex claude opencode t3 pi >/dev/null && t3 serve --help >/dev/null",
+                timeout=180)
+        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
+        quiesced = True
+        backup()
+        applying = True
+        command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
+                "--prepared-image", f"agent={candidate_id}", timeout=900)
+        if image_id(IMAGE) != candidate_id:
+            raise RuntimeError("the accepted image reference moved")
+        subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        print(f"aiagent: accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if quiesced and not applying:
+            command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
+                    timeout=180)
+        if built and not applying:
+            subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        raise
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: update failed: {error}", file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
+The update readiness command checks that the recreated container can execute
+the image-owned harness commands through its persistent mounts. It reports no
+credential content.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/gak-aiagent-update-ready" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+export HOME=/home/aiagent
+export XDG_RUNTIME_DIR=/run/aiagent
+export PATH="/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
+exec /run/current-system/profile/bin/podman exec aiagent /bin/sh -c \
+    'test -d /home/node && test -d /work && test -d /cache && command -v codex && command -v claude && command -v opencode && command -v t3 && command -v pi' \
+    >/dev/null
 #+end_src
 
 * Ak container reference

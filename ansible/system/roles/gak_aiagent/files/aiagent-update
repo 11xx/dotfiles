@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+UPDATER = HOME / ".guix-profile/bin/gak-services"
+IMAGE = "localhost/aiagent-fedora:44-v1"
+PROJECT = HOME / "services/agent/compose.yaml"
+REQUEST = Path("/run/aiagent/backup-request")
+RESULT = Path("/run/aiagent/backup-result")
+
+
+def command(*argv, timeout=7200):
+    result = subprocess.run(argv, timeout=timeout)
+    if result.returncode:
+        raise RuntimeError(f"command failed: {argv[1]}")
+
+
+def image_id(reference):
+    result = subprocess.run(
+        [PODMAN, "image", "inspect", "--format", "{{.Id}}", reference],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode:
+        raise RuntimeError("the local image is absent")
+    return result.stdout.strip().removeprefix("sha256:")
+
+
+def backup():
+    nonce = f"{os.getpid()}-{time.monotonic_ns()}"
+    RESULT.unlink(missing_ok=True)
+    descriptor = os.open(REQUEST, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(descriptor, "w") as request:
+        request.write(nonce + "\n")
+    try:
+        deadline = time.monotonic() + 7200
+        while time.monotonic() < deadline:
+            try:
+                response = RESULT.read_text().strip()
+            except FileNotFoundError:
+                time.sleep(1)
+                continue
+            if response == f"ok {nonce}":
+                return
+            if response == f"failed {nonce}":
+                raise RuntimeError("the root backup job failed")
+            time.sleep(1)
+        raise RuntimeError("the root backup job did not answer within 7200 seconds")
+    finally:
+        REQUEST.unlink(missing_ok=True)
+        RESULT.unlink(missing_ok=True)
+
+
+def main():
+    context = HOME / "image"
+    if not (context / "Containerfile").is_file():
+        raise RuntimeError("image context is not deployed")
+    if not UPDATER.is_file():
+        raise RuntimeError("the account's gak-services package is not installed")
+    old = image_id(IMAGE)
+    candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
+    built = False
+    quiesced = False
+    applying = False
+    try:
+        command(PODMAN, "build", "--pull=missing", "--tag", candidate,
+                "--file", str(context / "Containerfile"), str(context))
+        built = True
+        candidate_id = image_id(candidate)
+        command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
+                "/bin/bash", "-lc",
+                "command -v codex claude opencode t3 pi >/dev/null && t3 serve --help >/dev/null",
+                timeout=180)
+        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
+        quiesced = True
+        backup()
+        applying = True
+        command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
+                "--prepared-image", f"agent={candidate_id}", timeout=900)
+        if image_id(IMAGE) != candidate_id:
+            raise RuntimeError("the accepted image reference moved")
+        subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        print(f"aiagent: accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if quiesced and not applying:
+            command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
+                    timeout=180)
+        if built and not applying:
+            subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        raise
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: update failed: {error}", file=sys.stderr)
+        sys.exit(1)

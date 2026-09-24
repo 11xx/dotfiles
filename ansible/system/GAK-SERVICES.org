@@ -569,6 +569,26 @@ either snapshots first or recreates nothing.
 =nextcloud-db= container for its isolated scratch database, validates real
 application tables and removes only its own scratch state.
 
+The =aiagent= instance uses its own Guix-profile copy of =gak-services=.
+=aiagent update= builds and tests a local candidate without mounting the
+persistent state. It stops the agent project, waits for the root job's
+consistent Restic snapshot, then applies the exact prepared image ID without a
+pull. Its readiness command runs inside the recreated container. The prior
+image remains pinned until recovery is no longer needed. A failed candidate
+probe leaves the running container untouched; a failure after recreation
+requires inspection of the snapshot before any manual rollback because
+persistent state may have changed.
+
+The root backup declaration requires =/etc/aiagent/restic-password= as a
+root-owned mode-0600 file. Its repository at
+=/marak/backups/aiagent/restic= is root-owned. The job stores =workspaces= and
+=container-home=, with seven daily, five weekly and twelve monthly snapshots.
+The daily run quiesces the Compose service. A restore check stops the service,
+takes a fresh snapshot and writes its scratch tree under the mounted
+=/home/aiagent= image; it compares file checksums and paths, removes the tree
+and starts the service. The HDD copy
+is local recovery and does not constitute an off-host copy.
+
 Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or
 revoke an existing Tailscale endpoint. Drain ingress, stop the selected

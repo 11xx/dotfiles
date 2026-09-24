@@ -3,6 +3,7 @@
   #:use-module (gnu packages bash)
   #:use-module (gnu packages linux)
   #:use-module (gnu services)
+  #:use-module (gnu services mcron)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services ssh)
   #:use-module (gnu system accounts)
@@ -330,8 +331,16 @@
          (error "cannot create aiagent runtime directory"))
        (let ((account (getpwnam "aiagent")))
          (chown "/run/aiagent" (passwd:uid account)
-                (passwd:gid account)))
-       (chmod "/run/aiagent" #o700))))
+                (passwd:gid account))
+         (chmod "/run/aiagent" #o700)
+         (let ((fd (open "/run/aiagent/aiagent.lock"
+                         (logior O_WRONLY O_CREAT O_NOFOLLOW O_NONBLOCK)
+                         #o600)))
+           (unless (eq? (stat:type (fstat fd)) 'regular)
+             (error "aiagent operation lock is not a regular file"))
+           (chown fd (passwd:uid account) (passwd:gid account))
+           (chmod fd #o600)
+           (close fd))))))
 
 (define aiagent-cgroup-program
   (program-file
@@ -548,6 +557,19 @@
 (define (aiagent-keys keys)
   (list (cons "aiagent" keys)))
 
+(define %backup-script (local-file "backup.sh"))
+
+(define (aiagent-backup-jobs _)
+  (list
+   #~(job "* * * * *"
+          (string-append #$(file-append bash-minimal "/bin/bash")
+                         " " #$%backup-script " request")
+          #:user "root")
+   #~(job "15 4 * * *"
+          (string-append #$(file-append bash-minimal "/bin/bash")
+                         " " #$%backup-script " daily")
+          #:user "root")))
+
 (define aiagent-host-service-type
   (service-type
    (name 'aiagent-host)
@@ -556,6 +578,7 @@
           (service-extension subids-service-type aiagent-subids)
           (service-extension openssh-service-type aiagent-keys)
           (service-extension pam-root-service-type aiagent-pam-extensions)
+          (service-extension mcron-service-type aiagent-backup-jobs)
           (service-extension shepherd-root-service-type
                              aiagent-shepherd-services)))
    (description "Isolated rootless coding-agent host foundation.")))

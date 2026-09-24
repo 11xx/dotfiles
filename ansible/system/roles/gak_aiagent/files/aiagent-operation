@@ -100,6 +100,8 @@ def command_for(operation):
             raise RuntimeError(f"initial image already exists: {IMAGE}")
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
+    if operation == "update":
+        return [str(HOME / ".local/bin/aiagent-update")]
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
