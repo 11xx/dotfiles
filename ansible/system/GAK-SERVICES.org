@@ -117,8 +117,8 @@ the disposable cache mount. The persistent container home holds harness and
 T3 state, and the workspace mount holds project work. The cache target is
 32 GiB within the 256 GiB home image; the operator checks its size and clears
 it explicitly. Logins happen inside the container under the operator's
-control. Pi runs in print mode because its interactive TUI segfaults in the
-Fedora 44 container.
+control. Pi's interactive =/login= menu and print mode use the image's
+pinned upstream Node executable.
 The image's =/usr/local/bin= wins over persistent user executables in PATH.
 A later mutation waits for the recorded foreground Podman process when the
 invoking shell dies; detached container processes carry no lock descriptor.
