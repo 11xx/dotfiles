@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+home=/home/aiagent
+container=aiagent
+podman=/run/current-system/profile/bin/podman
+operator="$home/.local/bin/aiagent-operation"
+
+export HOME="$home"
+export XDG_RUNTIME_DIR=/run/aiagent
+export TMPDIR="$home/tmp"
+export CONTAINERS_IMAGE_COPY_TMPDIR="$home/image-copy-tmp"
+export PODMAN_COMPOSE_PROVIDER="$home/.guix-profile/bin/podman-compose"
+export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
+
+die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
+usage() {
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+}
+mutate() {
+    exec "$operator" "$1"
+}
+status() {
+    if "$podman" container exists "$container"; then
+        "$podman" ps -a --filter "name=^${container}$" --format '{{.Names}} {{.Status}} {{.Image}}'
+    else
+        printf '%s\n' absent
+    fi
+}
+cmd=${1:-}
+[[ $# -eq 0 ]] || shift
+case "$cmd" in
+    status) status ;;
+    logs) exec "$podman" logs "$@" "$container" ;;
+    shell) exec "$podman" exec -it "$container" bash -l ;;
+    exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
+    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    cache-size) du -sh "$home/cache" ;;
+    *) usage; exit 2 ;;
+esac

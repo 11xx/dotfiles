@@ -1,0 +1,50 @@
+FROM quay.io/fedora/fedora:44
+
+ARG OPENCODE_VERSION=1.18.32
+ARG CODEX_VERSION=0.156.1
+ARG CLAUDE_CODE_VERSION=2.1.281
+ARG T3_CODE_VERSION=0.0.42
+ARG PI_CODE_VERSION=0.87.1
+
+RUN dnf -y upgrade --refresh \
+ && dnf -y install --setopt=install_weak_deps=False \
+      bash ca-certificates curl fd-find findutils gcc-c++ git gzip jq less make \
+      nodejs npm openssh-clients procps-ng python3 ripgrep shellcheck \
+      tar tmux unzip which xz \
+ && dnf clean all
+
+RUN npm install -g \
+      "opencode-ai@${OPENCODE_VERSION}" \
+      "@openai/codex@${CODEX_VERSION}" \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "t3@${T3_CODE_VERSION}" \
+      "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
+ && npm cache clean --force
+
+RUN case "$(uname -m)" in \
+      x86_64) t3_arch=x64 ;; \
+      aarch64) t3_arch=arm64 ;; \
+      *) exit 1 ;; \
+    esac \
+ && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
+ && npm cache clean --force \
+ && t3 serve --help >/dev/null
+
+RUN groupadd -g 1001 node \
+ && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
+ && mkdir -p /home/node /work /cache \
+ && chown -R node:node /home/node /work /cache
+
+COPY --chmod=0755 init.sh /usr/local/bin/aiagent-init
+COPY --chmod=0755 bin/ /usr/local/bin/
+COPY --chmod=0755 init.d/ /usr/local/share/aiagent/init.d/
+COPY --chmod=0644 bashrc.d/ /usr/local/share/aiagent/bashrc.d/
+
+USER node
+ENV HOME=/home/node \
+    XDG_CACHE_HOME=/cache/xdg \
+    NPM_CONFIG_CACHE=/cache/npm \
+    TMPDIR=/cache/tmp
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/aiagent-init"]
+CMD ["sleep", "infinity"]

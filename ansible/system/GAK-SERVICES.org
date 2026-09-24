@@ -41,7 +41,7 @@ The =aiagent= service is declared by the =aiagent host= Guix module under
 =~/.config/guix/modules=. It owns a separate account, image-backed home,
 runtime directory and capped cgroup. The =gak-aiagent= inventory entry reaches
 that account with a dedicated operator-held key. The =gak_aiagent= role installs
-its private Podman configuration, the shared lifecycle helper and one =smoke=
+its private Podman configuration, the shared lifecycle helper and the =agent=
 project. The account's Podman state and temporary data remain inside its home
 image. First image creation requires 256 GiB for the image plus a 128 GiB host
 reserve for operator services. A failed creation removes its temporary image;
@@ -95,11 +95,30 @@ host runtime paths, including the Tailscale socket.
 
 Deploy the Guix configuration and module through the =gak= play, build with
 =-L ~/.config/guix/modules=, then activate and reboot under operator control.
-Run =ansible-playbook gak.yaml --tags gak-aiagent= after the home is mounted and
-before the cold boot that starts the project. The agent play installs its own
-Python and Compose provider before using Ansible modules. Its next run should
-report zero changes. The module and host details are documented in
+Run =ansible-playbook gak.yaml --tags gak-aiagent= after the home is mounted.
+The agent play installs its own Python and Compose provider before using
+Ansible modules. Its next run should report zero changes. The module and host
+details are documented in
 [[file:aiagent.org][aiagent.org]].
+
+The =agent= project runs =localhost/aiagent-fedora:44-v1=, built by =aiagent
+build= from the context under =/home/aiagent/image=. It has no Compose build
+step. =ansible-playbook gak.yaml --limit gak-aiagent --tags gak-aiagent-image=
+deploys the build context and command without changing the running project
+lists. Run =aiagent build= in an aiagent SSH session. Stop =aiagent-compose=
+before deploying the full agent role, then start it. These Shepherd actions belong to the
+operator. =aiagent status= and =logs= show the workload; =shell= and =exec=
+enter it. =start=, =stop=, =restart= and =recreate= are deliberate
+account-local container actions. =cache-size= and =cache-clean= cover only
+the disposable cache mount. The persistent container home holds harness and
+T3 state, and the workspace mount holds project work. The cache target is
+32 GiB within the 256 GiB home image; the operator checks its size and clears
+it explicitly. Logins happen inside the container under the operator's
+control. Pi runs in print mode because its interactive TUI segfaults in the
+Fedora 44 container.
+The image's =/usr/local/bin= wins over persistent user executables in PATH.
+A later mutation waits for the recorded foreground Podman process when the
+invoking shell dies; detached container processes carry no lock descriptor.
 
 * Storage and namespaces
 

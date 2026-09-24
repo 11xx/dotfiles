@@ -1,0 +1,13 @@
+name: agent
+
+services:
+  agent:
+    image: localhost/aiagent-fedora:44-v1
+    container_name: aiagent
+    init: true
+    userns_mode: keep-id
+    user: "1001:1001"
+    volumes:
+      - /home/aiagent/container-home:/home/node:rw
+      - /home/aiagent/workspaces:/work:rw
+      - /home/aiagent/cache:/cache:rw

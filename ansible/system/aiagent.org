@@ -645,6 +645,324 @@ removes the account, sub-ID declaration and host services together.
    (description "Isolated rootless coding-agent host foundation.")))
 #+end_src
 
+* Gak container image
+
+The Fedora 44 image installs the harness executables under =/usr/local=. The
+container mounts only its persistent home, workspaces and cache, all from the
+agent's image-backed host home. The image's executable paths remain visible
+when the persistent home is mounted. The container has no host runtime, socket,
+media or operator-home mount. Podman's =keep-id= mapping makes the agent's host
+directories writable by the container user.
+
+The harness versions are fixed at build time. Pi's interactive TUI segfaults
+in this Fedora 44 stack; use Pi in print mode in the container. Logins and
+provider state live under the persistent home. The cache subtree is disposable;
+the =aiagent= command reports its size and cleans only that subtree on request.
+Image-installed commands under =/usr/local/bin= take precedence over programs
+left in the persistent home.
+
+** Containerfile
+
+#+begin_src dockerfile :tangle (expand-file-name "roles/gak_aiagent/files/image/Containerfile" (file-name-directory (buffer-file-name))) :mkdirp yes
+FROM quay.io/fedora/fedora:44
+
+ARG OPENCODE_VERSION=1.18.32
+ARG CODEX_VERSION=0.156.1
+ARG CLAUDE_CODE_VERSION=2.1.281
+ARG T3_CODE_VERSION=0.0.42
+ARG PI_CODE_VERSION=0.87.1
+
+RUN dnf -y upgrade --refresh \
+ && dnf -y install --setopt=install_weak_deps=False \
+      bash ca-certificates curl fd-find findutils gcc-c++ git gzip jq less make \
+      nodejs npm openssh-clients procps-ng python3 ripgrep shellcheck \
+      tar tmux unzip which xz \
+ && dnf clean all
+
+RUN npm install -g \
+      "opencode-ai@${OPENCODE_VERSION}" \
+      "@openai/codex@${CODEX_VERSION}" \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "t3@${T3_CODE_VERSION}" \
+      "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
+ && npm cache clean --force
+
+RUN case "$(uname -m)" in \
+      x86_64) t3_arch=x64 ;; \
+      aarch64) t3_arch=arm64 ;; \
+      *) exit 1 ;; \
+    esac \
+ && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
+ && npm cache clean --force \
+ && t3 serve --help >/dev/null
+
+RUN groupadd -g 1001 node \
+ && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
+ && mkdir -p /home/node /work /cache \
+ && chown -R node:node /home/node /work /cache
+
+COPY --chmod=0755 init.sh /usr/local/bin/aiagent-init
+COPY --chmod=0755 bin/ /usr/local/bin/
+COPY --chmod=0755 init.d/ /usr/local/share/aiagent/init.d/
+COPY --chmod=0644 bashrc.d/ /usr/local/share/aiagent/bashrc.d/
+
+USER node
+ENV HOME=/home/node \
+    XDG_CACHE_HOME=/cache/xdg \
+    NPM_CONFIG_CACHE=/cache/npm \
+    TMPDIR=/cache/tmp
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/aiagent-init"]
+CMD ["sleep", "infinity"]
+#+end_src
+
+** Entrypoint and shell setup
+
+The entrypoint creates only missing persistent-home scaffolding. It reads
+image-owned startup scripts and leaves existing login state untouched.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.sh" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+
+for script in /usr/local/share/aiagent/init.d/*; do
+    [[ -x $script ]] || continue
+    "$script"
+done
+
+exec "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+
+mkdir -p "$HOME/.config" "$HOME/.local/share" /cache/tmp /cache/npm /cache/xdg
+if [[ ! -e $HOME/.bashrc ]]; then
+    cat >"$HOME/.bashrc" <<'BASHRC'
+for f in /usr/local/share/aiagent/bashrc.d/*; do
+    [ -r "$f" ] && . "$f"
+done
+BASHRC
+fi
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bashrc.d/10-path" (file-name-directory (buffer-file-name))) :mkdirp yes :tangle-mode o644
+export PATH="/usr/local/bin:$PATH:$HOME/.local/bin"
+#+end_src
+
+** Container command wrappers
+
+These wrappers are installed with the image, so rebuilding the container does
+not depend on replacing files in the persistent home.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/codex-auto" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-web" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec t3 serve --mode web --host 0.0.0.0 --port 3773 \
+    --base-dir "$HOME/.t3/userdata" --no-browser \
+    --auto-bootstrap-project-from-cwd /work "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi-readonly" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec pi --print --tools read,grep,find,ls "$@"
+#+end_src
+
+** Host command
+
+The account-local command uses one lock for its mutating operations. The
+foreground operation has a recorded process identity; a later caller waits for
+it even if the caller that started it dies. Podman's detached processes do not
+inherit the lock. Builds use the deployed context with all Podman and
+temporary paths inside the image-backed home. The command does not alter
+Shepherd, host ingress or other Compose instances. Cache cleanup removes only
+the declared disposable cache subtree.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+
+home=/home/aiagent
+container=aiagent
+podman=/run/current-system/profile/bin/podman
+operator="$home/.local/bin/aiagent-operation"
+
+export HOME="$home"
+export XDG_RUNTIME_DIR=/run/aiagent
+export TMPDIR="$home/tmp"
+export CONTAINERS_IMAGE_COPY_TMPDIR="$home/image-copy-tmp"
+export PODMAN_COMPOSE_PROVIDER="$home/.guix-profile/bin/podman-compose"
+export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
+
+die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
+usage() {
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+}
+mutate() {
+    exec "$operator" "$1"
+}
+status() {
+    if "$podman" container exists "$container"; then
+        "$podman" ps -a --filter "name=^${container}$" --format '{{.Names}} {{.Status}} {{.Image}}'
+    else
+        printf '%s\n' absent
+    fi
+}
+cmd=${1:-}
+[[ $# -eq 0 ]] || shift
+case "$cmd" in
+    status) status ;;
+    logs) exec "$podman" logs "$@" "$container" ;;
+    shell) exec "$podman" exec -it "$container" bash -l ;;
+    exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
+    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    cache-size) du -sh "$home/cache" ;;
+    *) usage; exit 2 ;;
+esac
+#+end_src
+
+The lock helper records only a PID and kernel start time under =/run/aiagent=.
+Its worker waits for that record before executing Podman. A dead caller closes
+the worker's start gate; an operation that already started remains recorded
+until its process exits. Cache cleanup runs in the lock holder itself.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-operation" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+IMAGE = "localhost/aiagent-fedora:44-v1"
+PROJECT = HOME / "services/agent/compose.yaml"
+LOCK = Path("/run/aiagent/aiagent.lock")
+ACTIVE = Path("/run/aiagent/aiagent.active")
+GATE = """
+import os
+import sys
+fd = int(sys.argv[1])
+ready = os.read(fd, 1)
+os.close(fd)
+if ready != b'1':
+    sys.exit(125)
+os.execv(sys.argv[2], sys.argv[2:])
+"""
+
+
+def process_identity(pid):
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    except FileNotFoundError:
+        return None
+    if fields[0] in ("Z", "X"):
+        return None
+    return fields[19]
+
+
+def wait_for_previous():
+    if not ACTIVE.exists():
+        return
+    record = json.loads(ACTIVE.read_text())
+    while process_identity(record["pid"]) == record["start"]:
+        time.sleep(0.1)
+    ACTIVE.unlink()
+
+
+def run(command):
+    read_fd, write_fd = os.pipe()
+    worker = None
+    recorded = False
+    try:
+        worker = subprocess.Popen(
+            [sys.executable, "-c", GATE, str(read_fd), *command],
+            pass_fds=(read_fd,),
+            start_new_session=True,
+        )
+        os.close(read_fd)
+        read_fd = -1
+        record = {"pid": worker.pid, "start": process_identity(worker.pid)}
+        if record["start"] is None:
+            raise RuntimeError("operation worker exited before startup")
+        temporary = ACTIVE.with_name(f"{ACTIVE.name}.{os.getpid()}")
+        temporary.write_text(json.dumps(record))
+        os.replace(temporary, ACTIVE)
+        recorded = True
+        os.write(write_fd, b"1")
+        return worker.wait()
+    finally:
+        if read_fd >= 0:
+            os.close(read_fd)
+        os.close(write_fd)
+        if worker is not None and not recorded:
+            worker.wait()
+        if recorded and worker.poll() is not None:
+            ACTIVE.unlink(missing_ok=True)
+
+
+def cache_clean():
+    cache = HOME / "cache"
+    if not cache.is_dir() or cache.is_symlink():
+        raise RuntimeError("cache directory is missing or linked")
+    for entry in cache.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+    for name in ("tmp", "npm", "xdg"):
+        (cache / name).mkdir()
+
+
+def command_for(operation):
+    compose = [PODMAN, "compose", "-f", str(PROJECT)]
+    if operation == "build":
+        context = HOME / "image"
+        if not (context / "Containerfile").is_file():
+            raise RuntimeError("image context is not deployed")
+        if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode == 0:
+            raise RuntimeError(f"initial image already exists: {IMAGE}")
+        return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
+                "--file", str(context / "Containerfile"), str(context)]
+    if operation == "start":
+        if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
+            raise RuntimeError(f"local image is absent: {IMAGE}")
+        return compose + ["up", "-d", "--pull", "never"]
+    if operation == "stop":
+        return compose + ["stop"]
+    if operation == "restart":
+        return compose + ["restart"]
+    if operation == "recreate":
+        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+    raise RuntimeError(f"unknown operation: {operation}")
+
+
+def main():
+    if len(sys.argv) != 2:
+        raise RuntimeError("expected one operation")
+    with LOCK.open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        wait_for_previous()
+        if sys.argv[1] == "cache-clean":
+            cache_clean()
+            return 0
+        return run(command_for(sys.argv[1]))
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, ValueError, KeyError) as error:
+        print(f"aiagent: {error}", file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
 * Ak container reference
 
 The ak-only blocks below are excluded from tangling. Their committed outputs

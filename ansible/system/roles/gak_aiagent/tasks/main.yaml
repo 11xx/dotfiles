@@ -1,5 +1,6 @@
 ---
 - name: 'aiagent: Create private configuration and state directories'
+  tags: ['gak-aiagent-image']
   ansible.builtin.file:
     path: '{{ item }}'
     state: directory
@@ -15,7 +16,11 @@
     - /home/aiagent/tmp
     - /home/aiagent/image-copy-tmp
     - /home/aiagent/services
-    - /home/aiagent/services/smoke
+    - /home/aiagent/services/agent
+    - /home/aiagent/container-home
+    - /home/aiagent/workspaces
+    - /home/aiagent/cache
+    - /home/aiagent/image
 
 - name: 'aiagent: Install private Podman configuration'
   ansible.builtin.copy:
@@ -38,41 +43,48 @@
     dest: /home/aiagent/.local/bin/gak-aiagent-reconcile
     mode: '0750'
 
+- name: 'aiagent: Install image build context'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: image/
+    dest: /home/aiagent/image/
+    mode: '0600'
+    directory_mode: '0700'
+
+- name: 'aiagent: Install account command'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: aiagent
+    dest: /home/aiagent/.local/bin/aiagent
+    mode: '0750'
+
+- name: 'aiagent: Install serialized operation helper'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: aiagent-operation
+    dest: /home/aiagent/.local/bin/aiagent-operation
+    mode: '0750'
+
 - name: 'aiagent: Install declared instance lists'
   ansible.builtin.copy:
     content: '{{ item.content }}'
     dest: '/home/aiagent/services/{{ item.name }}'
     mode: '0600'
   loop:
-    - { name: '.compose-supported', content: "smoke\n" }
-    - { name: '.compose-applications', content: "smoke\n" }
-    - { name: '.compose-autostart', content: "smoke\n" }
+    - { name: '.compose-supported', content: "agent\n" }
+    - { name: '.compose-applications', content: "agent\n" }
+    - { name: '.compose-autostart', content: "agent\n" }
     - { name: '.compose-never-autostart', content: '' }
     - { name: '.compose-networks', content: '' }
 
-- name: 'aiagent: Install the boot smoke project'
+- name: 'aiagent: Install the agent project'
+  tags: ['gak-aiagent-image']
   ansible.builtin.copy:
-    src: smoke-compose.yaml
-    dest: /home/aiagent/services/smoke/compose.yaml
+    src: agent-compose.yaml
+    dest: /home/aiagent/services/agent/compose.yaml
     mode: '0600'
 
-- name: 'aiagent: Check the boot smoke image'
-  ansible.builtin.command:
-    argv:
-      - /run/current-system/profile/bin/podman
-      - image
-      - exists
-      - docker.io/library/busybox:1.37.0
-  register: gak_aiagent_smoke_image
-  failed_when: false
-  changed_when: false
-
-- name: 'aiagent: Pull the boot smoke image'
-  ansible.builtin.command:
-    argv:
-      - /run/current-system/profile/bin/podman
-      - pull
-      - docker.io/library/busybox:1.37.0
-  when:
-    - not ansible_check_mode
-    - gak_aiagent_smoke_image.rc | default(0) != 0
+- name: 'aiagent: Remove the boot smoke project declaration'
+  ansible.builtin.file:
+    path: /home/aiagent/services/smoke/compose.yaml
+    state: absent
