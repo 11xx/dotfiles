@@ -16,13 +16,15 @@ revised module. From =ansible/system=, with the module tree staged on gak:
 
 #+begin_src sh
 scp roles/guix_config/tests/aiagent-root-path.py \
-  gak:.cache/gak-aiagent-host/slice2/aiagent-root-path.py
-ssh gak 'python3 ~/.cache/gak-aiagent-host/slice2/aiagent-root-path.py ~/.cache/gak-aiagent-host/slice2/modules'
+  gak:.cache/gak-aiagent-host/check/aiagent-root-path.py
+ssh gak 'python3 ~/.cache/gak-aiagent-host/check/aiagent-root-path.py ~/.cache/gak-aiagent-host/check/modules'
 #+end_src
 
 The probe builds each program and uses =podman unshare= with scratch targets
-for root-only paths. Namespace root is not host root. Guile performs real
-=setgroups=, =setgid=, =setuid=, =mkdir=, =chown= and =chmod= calls. Cgroup
+for root-only paths. It exercises runtime lock creation and reuse, both cgroup
+drain modes, and the home start and stop programs. Namespace root is not host
+root. Guile performs real =setgroups=, =setgid=, =setuid=, =mkdir=, =chown=,
+=chmod= and descriptor =stat= calls. Cgroup
 targets are ordinary files: they test argument types and file operations, not
 kernel placement or delegation. Preopened =/proc/self/fd= paths allow the
 post-drop =chdir= and =execl= calls without testing ancestor-directory

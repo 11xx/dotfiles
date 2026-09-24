@@ -423,7 +423,7 @@ removes the account, sub-ID declaration and host services together.
          (let ((fd (open "/run/aiagent/aiagent.lock"
                          (logior O_WRONLY O_CREAT O_NOFOLLOW O_NONBLOCK)
                          #o600)))
-           (unless (eq? (stat:type (fstat fd)) 'regular)
+           (unless (eq? (stat:type (stat fd)) 'regular)
              (error "aiagent operation lock is not a regular file"))
            (chown fd (passwd:uid account) (passwd:gid account))
            (chmod fd #o600)
@@ -1294,6 +1294,22 @@ not depend on replacing files in the persistent home. The =pi= wrapper selects
 the upstream Node executable while the other harness commands keep the Fedora
 runtime.
 
+The readiness command lives in the image. Both a disposable candidate and the
+running project execute this file with the same shell and executable search
+path. It requires the image-owned Pi wrapper and the three persistent mount
+points without reading login state.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-readiness" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/bin/sh :tangle-mode o755
+set -eu
+PATH=/usr/local/bin:/usr/bin:/bin
+export PATH
+test -d /home/node && test -d /work && test -d /cache
+for tool in codex claude opencode t3 pi; do
+    command -v "$tool" >/dev/null
+done
+test "$(command -v pi)" = /usr/local/bin/pi
+#+end_src
+
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
 exec /opt/pi-node/node /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js "$@"
 #+end_src
@@ -1545,9 +1561,12 @@ access. The live project is stopped before the root backup job snapshots its
 workspaces and container home. The updater accepts the candidate's image ID
 from the stopped project and runs the project's readiness command. A failure
 before application starts the existing image again; a failed application keeps
-both image IDs and the recovery snapshot for operator inspection.
+both image IDs and the recovery snapshot for operator inspection. The failed
+application reports the previous image's retention tag and the manual recovery
+procedure in =GAK-SERVICES.org=.
 
 #+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-update" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -1622,9 +1641,7 @@ def main():
         built = True
         candidate_id = image_id(candidate)
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/bin/bash", "-lc",
-                "command -v codex claude opencode t3 pi >/dev/null && t3 serve --help >/dev/null",
-                timeout=180)
+                "/usr/local/bin/aiagent-readiness", timeout=180)
         command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
         quiesced = True
         backup()
@@ -1641,6 +1658,16 @@ def main():
                     timeout=180)
         if built and not applying:
             subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        if applying:
+            pin = "localhost/gak-services-previous:" + hashlib.sha256(
+                f"{PROJECT.parent.resolve()}:agent".encode()).hexdigest()[:24]
+            try:
+                retained = image_id(pin) == old
+            except (OSError, RuntimeError, subprocess.TimeoutExpired):
+                retained = False
+            location = f"retained at {pin}" if retained else f"expected at {pin}; verify the pin"
+            print(f"aiagent: previous image {old[:12]} {location}; see GAK-SERVICES.org "
+                  "for manual rollback after inspecting the backup and state", file=sys.stderr)
         raise
 
 
@@ -1652,8 +1679,8 @@ if __name__ == "__main__":
         sys.exit(1)
 #+end_src
 
-The update readiness command checks that the recreated container can execute
-the image-owned harness commands through its persistent mounts. It reports no
+The host readiness command enters the running container to execute the same
+image-owned readiness file used by the disposable candidate. It reports no
 credential content.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/gak-aiagent-update-ready" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
@@ -1661,8 +1688,8 @@ set -euo pipefail
 export HOME=/home/aiagent
 export XDG_RUNTIME_DIR=/run/aiagent
 export PATH="/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
-exec /run/current-system/profile/bin/podman exec aiagent /bin/sh -c \
-    'test -d /home/node && test -d /work && test -d /cache && command -v codex && command -v claude && command -v opencode && command -v t3 && command -v pi' \
+exec /run/current-system/profile/bin/podman exec aiagent \
+    /usr/local/bin/aiagent-readiness \
     >/dev/null
 #+end_src
 
