@@ -21,7 +21,12 @@
              (gnu services nfs)
              (gnu system accounts)
              (guix gexp)
+{% if gak_aiagent_host_enabled | bool %}
              (aiagent host)
+{% endif %}
+{% if gak_git_hub_enabled | bool %}
+             (aiagent git-hub)
+{% endif %}
              ;; Guix upstream packages Tailscale's Go dependencies but not
              ;; Tailscale, so `tailscaled` comes from the rosenthal channel
              ;; already listed in channels.scm. Not a `use-service-modules`
@@ -45,6 +50,15 @@
               (string-append "(public-key\n"
                              "(ecc (curve Ed25519)\n"
                              "(q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)))")))
+
+{% if gak_git_hub_enabled | bool %}
+(define %git-hub-config
+  (git-hub-configuration
+   (admin-pubkey
+    (plain-file "operator.pub"
+                "{{ gak_git_hub_admin_public_key | trim }}\n"))
+   (max-push-bytes {{ gak_git_hub_max_push_bytes }})))
+{% endif %}
 
 (define %gak-operator-runtime-deadline-seconds 180)
 (define %gak-operator-runtime-request-seconds 30)
@@ -295,6 +309,9 @@
                 ))
               (stop #~(make-kill-destructor #:grace-period 1800))
               (respawn? #f)))))
+{% if gak_git_hub_enabled | bool %}
+          (git-hub-services %git-hub-config)
+{% endif %}
           ;; This is the default list of services we are appending to.
           (modify-services %base-services
                            (guix-service-type config =>

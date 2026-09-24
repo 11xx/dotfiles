@@ -633,3 +633,76 @@ Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or
 revoke an existing Tailscale endpoint. Drain ingress, stop the selected
 project and retain a verified backup before separate removal.
+
+* Agent Git exchange
+
+The =agentgit= account owns Gitolite under =/var/lib/agentgit=. Its private
+group and Gitolite umask prevent =aiagent= from reading the hub's storage on
+the host or in its container. The operator's public key initializes the
+administrative identity. The agent uses a separate hub key generated inside
+its persistent container home; its private key stays on gak. The Gitolite
+policy in [[file:roles/guix_config/files/git-hub/gitolite.conf][gitolite.conf]]
+gives =operator= full access to =arc= and =gitolite-admin=, while =aiagent=
+can read =arc= and write only =refs/heads/agent/*=. The account's Git
+configuration rejects incoming pack streams above 32 MiB; this is a per-push
+compressed transfer limit, not a repository quota. Ref policy is checked by
+Gitolite before ref updates.
+
+Apply the Guix system module and confirm the root-owned lock directory, file
+and =/etc/git-hub= trigger before accepting hub pushes or running a hub
+backup. Generate the agent hub key in the persistent container home. Clone
+=agentgit@gak:gitolite-admin= using the operator key,
+place the policy at =conf/gitolite.conf= and the agent's public key at
+=keydir/aiagent.pub=, then commit and push. The key's private half never
+enters the administrative repository. The operator seeds =arc= from the
+workstation checkout, then adds a hub remote there with a fetch refspec for
+=refs/heads/agent/*= into =refs/remotes/<remote>/agent/*=. Agent work occurs
+on an =agent/*= branch; the workstation fetches, reviews and merges it, then
+pushes the integration branch. The agent fetches the resulting history.
+
+The root Restic snapshot includes complete Git bundles for =gitolite-admin=
+and initialized =arc= refs. Gitolite receive commands, including updates to
+the administrative repository, hold the same lock that root backup verifies
+and holds through both bundles and Restic snapshot creation. Bundle writers
+run as =agentgit= through root-opened descriptors.
+
+The receive process retains the lock if its Gitolite parent exits abruptly;
+each original hook descendant also retains it until it closes the descriptor
+or exits. A detached process with an inherited descriptor can hold the lock
+beyond the push. This delays backup rather than permitting concurrent policy
+or project writes.
+
+The restore check imports the bundles into isolated bare repositories as
+=agentgit=, checks all expected refs and HEAD, runs
+=git fsck --full --strict --no-reflogs=, and checks that
+=conf/gitolite.conf= and =keydir= reconstruct from =gitolite-admin=. It
+compares the restored bundles with the snapshot's checksums before importing.
+The snapshot keeps =manifest.json= beside the bundles with expected refs,
+HEADs and administrative file hashes.
+
+If a receive holds the lock for more than five minutes, the root backup fails
+before snapshot creation and follows the agent Compose recovery path.
+Inspect the holder with =sudo lslocks -o PID,COMMAND,PATH= and =sudo fuser -v
+/var/lib/agentgit-lock/receive.lock=. Check active receives, administrative
+updates and hook descendants before terminating a genuinely stuck holder.
+Keep the lock file in place: removing or replacing it would create separate
+lock domains. Retry backup after the holder exits.
+
+For recovery, suspend pushes and restore one Restic snapshot into root-owned
+scratch. Import each bundle into an empty bare repository as =agentgit= with
+=git bundle unbundle=, install its advertised refs with =git update-ref=, set
+its recorded HEAD with =git symbolic-ref=, and run a full fsck. Compare refs
+with the snapshot's recorded set. Check out =conf/gitolite.conf= and =keydir=
+from the restored =gitolite-admin.git= as =agentgit=, compare those files with
+the checked snapshot, then install the reconstructed repositories and
+administrative files into empty destinations in the provisioned hub home.
+Keep its Guix-managed =.gitolite.rc= and =.gitconfig=. Run
+=gitolite setup= under the shared lock to regenerate hooks and access data, then resume
+pushes. Git against the hub's writable repositories runs as =agentgit=,
+never root. A repository with no refs is created by policy and has no bundle.
+
+An administrative =gitolite setup= outside a receive command runs as
+=agentgit= with =flock /var/lib/agentgit-lock/receive.lock gitolite setup=.
+Privileged Guix activation initializes Gitolite before hub pushes or scheduled
+hub backup are admitted. Subsequent reconfigurations that run Gitolite setup
+require those operations to be quiesced for the activation window.
