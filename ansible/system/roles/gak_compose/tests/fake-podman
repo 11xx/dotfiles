@@ -100,7 +100,13 @@ case ${1:-} in
             exit 0
         fi
         [[ ${2:-} == -f && ${3:-} == compose.yaml ]] || fail "unexpected compose command: $*"
-        case ${4:-} in
+        shift 3
+        override=
+        if [[ ${1:-} == -f ]]; then
+            override=${2:?}
+            shift 2
+        fi
+        case ${1:-} in
             config)
                 if [[ -f config.fail ]]; then
                     printf 'provider error quoting the definition: %s\n' \
@@ -125,7 +131,7 @@ case ${1:-} in
                 fi
                 ;;
             up)
-                shift 4
+                shift
                 [[ $* == '-d --force-recreate --pull never' ]] || fail "unexpected up arguments: $*"
                 [[ ! -f up.fail ]] || exit 1
                 here=$(realpath .)
@@ -135,23 +141,29 @@ case ${1:-} in
                 fi
                 awk -F'\t' -v dir="$here" '$6 != dir' "$containers" >"$containers.tmp"
                 mv -f -- "$containers.tmp" "$containers"
+                if [[ -f up.move ]]; then
+                    while IFS=$'\t' read -r ref id; do
+                        [[ -n $ref ]] && set_image "$ref" "$id"
+                    done <up.move
+                fi
                 while IFS=$'\t' read -r service ref container; do
                     [[ -n $service ]] || continue
                     if [[ -f up.only ]] && ! grep -Fxq "$service" up.only; then
                         continue
                     fi
-                    id=$(image_id "$ref") || fail "up without a local image: $ref"
+                    if [[ -n $override ]]; then
+                        id=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["services"][sys.argv[2]]["image"].removeprefix("sha256:"))' "$override" "$service") || fail 'invalid prepared override'
+                        awk -F'\t' -v id="$id" '$2 == id { found = 1 } END { exit !found }' "$images" ||
+                            fail "up without a prepared image: $service"
+                    else
+                        id=$(image_id "$ref") || fail "up without a local image: $ref"
+                    fi
                     set_container "$container" running 0 "$id" "$service" "$here"
                     if [[ -f up.flap ]]; then
                         mkdir -p "$FAKE_STATE/flap"
                         printf '0\n' >"$FAKE_STATE/flap/$container"
                     fi
                 done <services.map
-                if [[ -f up.move ]]; then
-                    while IFS=$'\t' read -r ref id; do
-                        [[ -n $ref ]] && set_image "$ref" "$id"
-                    done <up.move
-                fi
                 if [[ -f up.detach ]] && [[ ! -f "$FAKE_DETACHED_PID" ]]; then
                     sleep 60 >/dev/null 2>&1 &
                     printf '%s\n' "$!" >"$FAKE_DETACHED_PID"

@@ -29,6 +29,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -462,9 +463,15 @@ def discover(services_root: Path) -> list[Project]:
     return projects
 
 
-def compose(runtime: Runtime, project: Project, *arguments: str, timeout: int, what: str) -> Result:
+def compose(
+    runtime: Runtime, project: Project, *arguments: str, timeout: int, what: str,
+    override: Path | None = None,
+) -> Result:
+    files = ["-f", COMPOSE_BASENAME]
+    if override is not None:
+        files.extend(("-f", str(override)))
     return run(
-        runtime.podman_argv("compose", "-f", COMPOSE_BASENAME, *arguments),
+        runtime.podman_argv("compose", *files, *arguments),
         timeout=timeout,
         what=what,
         cwd=project.directory,
@@ -843,7 +850,7 @@ def select(runtime: Runtime, options: Options, services_root: Path) -> tuple[lis
     return loaded, loaded
 
 
-def update(runtime: Runtime, options: Options, services_root: Path) -> int:
+def update(runtime: Runtime, options: Options, services_root: Path, runtime_dir: Path) -> int:
     loaded, selected = select(runtime, options, services_root)
     if options.prepared:
         if len(selected) != 1:
@@ -889,7 +896,7 @@ def update(runtime: Runtime, options: Options, services_root: Path) -> int:
                 confirm_runtime(runtime, project, "while images were pulled")
                 project.outcome = "unchanged"
                 continue
-            recreate(runtime, project, options)
+            recreate(runtime, project, options, runtime_dir)
             project.outcome = "updated"
         except (ProjectFailure, Timeout, Fatal) as failure:
             project.outcome = f"failed: {failure}"
@@ -904,7 +911,7 @@ def update(runtime: Runtime, options: Options, services_root: Path) -> int:
     return status
 
 
-def recreate(runtime: Runtime, project: Project, options: Options) -> None:
+def recreate(runtime: Runtime, project: Project, options: Options, runtime_dir: Path) -> None:
     confirm_runtime(runtime, project, "between planning and recreation")
 
     if project.extension.before_update is not None:
@@ -928,47 +935,62 @@ def recreate(runtime: Runtime, project: Project, options: Options) -> None:
     if options.prepared:
         if resolve_images(runtime, project) != project.reference_ids:
             raise ProjectFailure(f"project {project.name} changed its image references before recreation")
-        retagged = []
-        try:
-            for service, identity in options.prepared.items():
-                old = project.reference_ids[service]
-                pin = "localhost/gak-services-previous:" + hashlib.sha256(
-                    f"{project.root}:{service}".encode()).hexdigest()[:24]
-                for source, target in ((old, pin), (identity, project.images[service])):
-                    result = run(runtime.podman_argv("tag", source, target),
-                                 timeout=runtime.inspect_timeout, what=f"tagging the image for {service}",
-                                 env=runtime.env)
-                    if result.status:
-                        raise ProjectFailure(f"could not tag the prepared image for {service}")
-                    if target == project.images[service]:
-                        retagged.append(service)
-            confirm_planned_images(runtime, project, "before recreation")
-        except (ProjectFailure, Timeout, Fatal):
-            for service in retagged:
-                run(runtime.podman_argv("tag", project.reference_ids[service], project.images[service]),
-                    timeout=runtime.inspect_timeout, what=f"restoring the image reference for {service}",
-                    env=runtime.env)
-            raise
+        for service in options.prepared:
+            old = project.reference_ids[service]
+            pin = "localhost/gak-services-previous:" + hashlib.sha256(
+                f"{project.root}:{service}".encode()).hexdigest()[:24]
+            result = run(runtime.podman_argv("tag", old, pin),
+                         timeout=runtime.inspect_timeout, what=f"retaining the image for {service}",
+                         env=runtime.env)
+            if result.status:
+                raise ProjectFailure(f"could not retain the previous image for {service}")
+        with tempfile.TemporaryDirectory(prefix="prepared-", dir=runtime_dir) as temporary:
+            override = Path(temporary) / "override.yaml"
+            override.write_text(json.dumps({"services": {
+                service: {"image": f"sha256:{identity}"}
+                for service, identity in project.planned_ids.items()
+            }}))
+            confirm_definition(runtime, project)
+            if resolve_images(runtime, project) != project.reference_ids:
+                raise ProjectFailure(f"project {project.name} changed its image references before recreation")
+            result = compose(
+                runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
+                timeout=runtime.recreate_timeout, what=f"recreating project {project.name}",
+                override=override,
+            )
+            if result.status != 0:
+                raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
+            await_readiness(
+                runtime, project,
+                timeout=readiness_bound(runtime, project, options.timeout),
+                interval=runtime.readiness_interval,
+                settle=runtime.settle_seconds,
+            )
+        if resolve_images(runtime, project) != project.reference_ids:
+            raise ProjectFailure(f"project {project.name} changed its image references during recreation")
+        for service, identity in options.prepared.items():
+            result = run(runtime.podman_argv("tag", identity, project.images[service]),
+                         timeout=runtime.inspect_timeout, what=f"accepting the image for {service}",
+                         env=runtime.env)
+            if result.status:
+                raise ProjectFailure(f"could not accept the prepared image for {service}")
+        confirm_planned_images(runtime, project, "after readiness")
     else:
         confirm_planned_images(runtime, project, "before recreation")
-
-    result = compose(
-        runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
-        timeout=runtime.recreate_timeout,
-        what=f"recreating project {project.name}",
-    )
-    if result.status != 0:
-        raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
-
-    confirm_planned_images(runtime, project, "during recreation")
-
-    await_readiness(
-        runtime, project,
-        timeout=readiness_bound(runtime, project, options.timeout),
-        interval=runtime.readiness_interval,
-        settle=runtime.settle_seconds,
-    )
-    confirm_planned_images(runtime, project, "during readiness")
+        result = compose(
+            runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
+            timeout=runtime.recreate_timeout, what=f"recreating project {project.name}",
+        )
+        if result.status != 0:
+            raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
+        confirm_planned_images(runtime, project, "during recreation")
+        await_readiness(
+            runtime, project,
+            timeout=readiness_bound(runtime, project, options.timeout),
+            interval=runtime.readiness_interval,
+            settle=runtime.settle_seconds,
+        )
+        confirm_planned_images(runtime, project, "during readiness")
 
 
 def show(runtime: Runtime, services_root: Path) -> int:
@@ -1067,7 +1089,7 @@ def main(argv: list[str]) -> int:
     runtime = build_runtime()
     descriptor = acquire_lock(runtime_dir)
     try:
-        return update(runtime, options, services_root)
+        return update(runtime, options, services_root, runtime_dir)
     finally:
         # The lock outlives every child it started: nothing is released while a
         # hook or a Compose command is still being stopped.

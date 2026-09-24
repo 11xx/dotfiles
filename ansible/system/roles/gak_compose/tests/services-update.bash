@@ -871,9 +871,12 @@ start_project "$root/alpha"
 printf '%s\t%s\n' example.invalid/alpha:latest ffffffffffff7777 >"$root/alpha/up.move"
 run_updater update alpha --prepared-image alpha=eeeeeeeeeeee5555
 ((updater_status != 0)) || fail 'image movement during apply was accepted'
-out_has 'changed what its image references resolve to during recreation'
+out_has 'changed its image references during recreation'
 ! grep -F 'alpha: updated' "$fixture/stdout" >/dev/null ||
     fail 'an image moved during apply was reported accepted'
+grep -F $'alpha\trunning\t0\teeeeeeeeeeee5555' "$FAKE_STATE/containers.tsv" >/dev/null ||
+    fail 'a moving tag selected an image other than the prepared ID'
+log_lacks 'tag eeeeeeeeeeee5555 example.invalid/alpha:latest'
 grep -F $'aaaaaaaaaaaa1111' "$FAKE_STATE/images.tsv" >/dev/null ||
     fail 'the previous image was not retained after failed acceptance'
 

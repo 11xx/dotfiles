@@ -35,7 +35,10 @@ mapping helpers.
 =gak-services update NAME --prepared-image SERVICE=IMAGE_ID= accepts an image
 already present in the account's Podman store. It verifies the exact ID before
 changing a reference, does not pull or build, pins the previous image, and
-uses the same lock, hooks, drift checks, recreation and readiness path as a
+passes the planned IDs in a temporary Compose override for recreation. The
+declared reference moves only after readiness succeeds. The override prevents
+a concurrent tag movement from selecting another image for the container.
+This path uses the same lock, hooks, drift checks, recreation and readiness as a
 registry update. =--from-stopped= accepts a fully stopped project for an update
 that took a consistent snapshot while quiesced. Other projects in that state
 remain ineligible. A changed image reference during application fails the
