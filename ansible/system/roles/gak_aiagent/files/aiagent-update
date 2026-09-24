@@ -74,7 +74,7 @@ def main():
         built = True
         candidate_id = image_id(candidate)
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/usr/local/bin/aiagent-readiness", timeout=180)
+                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180)
         command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
         quiesced = True
         backup()

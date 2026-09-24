@@ -216,6 +216,22 @@ def process_identity(pid):
     return fields[19]
 
 
+def process_session_active(pid, started):
+    identity = process_identity(pid)
+    if identity is not None:
+        return identity == started
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        except OSError:
+            continue
+        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+            return True
+    return False
+
+
 def active_operation():
     try:
         descriptor, _ = secure_file(RUNTIME / "aiagent.active", os.O_RDONLY, agent_account().pw_uid)
@@ -234,7 +250,7 @@ def active_operation():
             raise ValueError()
     except (ValueError, KeyError, TypeError):
         raise Busy("agent operation record is invalid") from None
-    return process_identity(pid) == started
+    return process_session_active(pid, started)
 
 
 def operation_lock():

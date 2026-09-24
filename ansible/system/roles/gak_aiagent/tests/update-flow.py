@@ -37,7 +37,7 @@ if args[:2] == ["image", "inspect"]:
 elif args[0] == "run":
     assert "--network" in args and args[args.index("--network") + 1] == "none"
     assert not any(arg in ("-v", "--volume", "--mount") for arg in args)
-    assert args[-1] == "/usr/local/bin/aiagent-readiness"
+    assert args[-2:] == ["/usr/local/bin/aiagent-readiness", "--candidate"]
     import subprocess
     sys.exit(subprocess.run(json.loads(os.environ["READINESS_PROBE"])).returncode)
 elif args[:2] == ["compose", "-f"] and "stop" in args:
@@ -57,6 +57,29 @@ if os.environ.get("FAIL_AFTER_APPLY"):
     (root / "pin-present").touch()
     sys.exit(1)
 (root / "accepted").touch()
+'''
+T3 = '''#!/usr/bin/env python3
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import os
+import sys
+
+if os.environ.get("T3_TEST_MODE") == "exit":
+    sys.exit(1)
+port = int(sys.argv[sys.argv.index("--port") + 1])
+mode = os.environ.get("T3_TEST_MODE", "healthy")
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(503 if mode == "wrong" else 200)
+        self.send_header("Content-Type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"T3 test server")
+    def log_message(self, *_args):
+        pass
+server = HTTPServer(("127.0.0.1", port), Handler)
+if mode == "wrong":
+    server.handle_request()
+else:
+    server.serve_forever()
 '''
 
 
@@ -142,16 +165,19 @@ def main():
         tools = root / "local"
         binaries.mkdir()
         tools.mkdir()
-        shutil.copy2(Path("/bin/sh").resolve(), binaries / "sh")
+        for name in ("sh", "env", "python3"):
+            shutil.copy2(Path(shutil.which(name)).resolve(), binaries / name)
         shutil.copy2(READINESS, tools / "aiagent-readiness")
-        harnesses = ("codex", "claude", "opencode", "t3", "t3-native", "pi")
+        harnesses = ("codex", "claude", "opencode", "t3", "pi")
         for name in harnesses:
             command = tools / name
             command.write_text("#!/bin/sh\nexit 0\n")
             command.chmod(0o755)
+        (tools / "t3-native").write_text(T3)
+        (tools / "t3-native").chmod(0o755)
 
-        def probe(missing_dir=None):
-            argv = ["bwrap", "--unshare-all", "--die-with-parent", "--tmpfs", "/",
+        def probe(missing_dir=None, mode="--candidate"):
+            argv = ["bwrap", "--unshare-all", "--share-net", "--die-with-parent", "--tmpfs", "/",
                     "--dev", "/dev", "--ro-bind", "/usr/lib", "/usr/lib",
                     "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib", "/lib64",
                     "--ro-bind", str(binaries), "/usr/bin", "--symlink", "usr/bin", "/bin",
@@ -159,7 +185,9 @@ def main():
             for directory in ("/home/node", "/work", "/cache"):
                 if directory != missing_dir:
                     argv.extend(("--dir", directory))
-            return [*argv, "/usr/local/bin/aiagent-readiness"]
+            if missing_dir != "/cache":
+                argv.extend(("--dir", "/cache/tmp"))
+            return [*argv, "/usr/local/bin/aiagent-readiness", mode]
 
         assert subprocess.run(probe()).returncode == 0
         for directory in ("/home/node", "/work", "/cache"):
@@ -167,7 +195,7 @@ def main():
             case.mkdir()
             exercise(case, probe(directory), broken=True)
             print(f"missing {directory}: candidate refused before compose stop")
-        for name in harnesses:
+        for name in (*harnesses, "t3-native"):
             command = tools / name
             disabled = tools / (name + ".disabled")
             command.rename(disabled)
@@ -178,6 +206,31 @@ def main():
             finally:
                 disabled.rename(command)
             print(f"missing {name}: candidate refused before compose stop")
+
+        for mode in ("exit", "wrong"):
+            case = root / ("t3-" + mode)
+            case.mkdir()
+            os.environ["T3_TEST_MODE"] = mode
+            try:
+                exercise(case, probe(), broken=True)
+            finally:
+                os.environ.pop("T3_TEST_MODE")
+            print(f"T3 {mode}: candidate refused before compose stop")
+
+        assert subprocess.run(probe(mode="--live")).returncode != 0
+        server = subprocess.Popen([tools / "t3-native", "serve", "--port", "3773"])
+        try:
+            for _ in range(50):
+                if subprocess.run(probe(mode="--live"), capture_output=True).returncode == 0:
+                    break
+                time.sleep(0.05)
+            else:
+                raise AssertionError("live readiness did not accept a serving T3")
+        finally:
+            server.terminate()
+            server.wait(timeout=5)
+        assert subprocess.run(probe(mode="--live")).returncode != 0
+        print("deployed readiness required a live HTTP server and rejected its shutdown")
 
         pi = tools / "pi"
         pi.rename(tools / "pi.disabled")

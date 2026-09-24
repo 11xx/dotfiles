@@ -2,7 +2,9 @@
 
 This role deploys =gak-tailscale-services=, which reconciles named HTTPS handlers
 for enabled Koito and Nextcloud applications and for the enabled agent host.
-The T3 name and loopback port are =gak_t3_service_name= and =gak_t3_port=.
+The T3 name is =gak_t3_service_name=. The =gak_t3_port= inventory value in
+=group_vars/all/gak_agent= renders this loopback backend and the agent's
+Compose host publication.
 Run the command explicitly after checking backend health and grants.
 
 Gak uses =tag:server=. Verify tag ownership, grants and advertisement approval
