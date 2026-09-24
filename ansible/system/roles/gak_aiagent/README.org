@@ -86,12 +86,20 @@ The host module's root mcron extension handles update requests every minute
 and takes a daily snapshot at 04:15. The Restic password is a root-owned 0600
 file at =/etc/aiagent/restic-password=, outside the mounted agent home. The
 repository is =/marak/backups/aiagent/restic=. The root job retains seven
-daily, five weekly and twelve monthly snapshots. With Compose stopped,
-=backup.sh restore-check= stops Compose, takes a fresh snapshot, restores to a
-scratch directory inside the mounted image, compares file checksums and paths,
+daily, five weekly and twelve monthly snapshots. Its request result is created
+under root-owned =/run/aiagent-backup= and atomically handed to aiagent. Daily
+backup and restore check reject a surviving operation worker before stopping
+Compose. A failed stop still triggers service recovery. =backup.py restore-check=
+stops Compose, takes a fresh snapshot, restores to a
+root-owned scratch directory on the backup disk, compares file checksums and paths,
 removes the scratch tree and starts Compose.
 The host declaration must be activated by the operator before updates use the
 request job.
+From =ansible/system=, run =podman unshare python3
+roles/guix_config/tests/backup-security.py= for the root-shaped path probes,
+=python3 roles/guix_config/tests/backup-recovery.py= for failed-stop recovery,
+and =python3 roles/gak_aiagent/tests/command-serialization.py= for interrupted
+agent operations and backup exclusion.
 Run =python3 roles/gak_aiagent/tests/command-serialization.py= from
 =ansible/system= to exercise a killed caller, concurrent operations and scoped
 cache cleanup against scratch paths.

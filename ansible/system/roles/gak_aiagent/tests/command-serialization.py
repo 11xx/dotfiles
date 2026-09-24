@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise operation ordering when the caller exits before its child."""
 
+import importlib.util
 import os
 from pathlib import Path
 import signal
@@ -8,11 +9,13 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 
 
 ROLE = Path(__file__).resolve().parents[1]
 SOURCE = Path(os.environ.get("AIAGENT_OPERATION_SOURCE", ROLE / "files/aiagent-operation"))
 COMMAND = Path(os.environ.get("AIAGENT_COMMAND_SOURCE", ROLE / "files/aiagent"))
+BACKUP = ROLE.parent / "guix_config/files/modules/aiagent/backup.py"
 FAKE_PODMAN = '''#!/usr/bin/env python3
 import os
 from pathlib import Path
@@ -74,12 +77,24 @@ def main():
         command.write_text(replace_one(COMMAND.read_text(), "home=/home/aiagent", f"home={home}"))
         command.chmod(0o750)
         env = dict(os.environ, AIAGENT_PROBE_ROOT=str(root))
+        spec = importlib.util.spec_from_file_location("agent_backup", BACKUP)
+        backup = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(backup)
+        backup.RUNTIME = root
+        backup.agent_account = lambda: SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid())
         first = subprocess.Popen([command, "stop"], env=env)
         second = None
         try:
             wait_until(lambda: (root / "events").exists())
             first.send_signal(signal.SIGKILL)
             first.wait(timeout=5)
+            for caller in ("daily", "restore-check"):
+                try:
+                    backup.operation_lock()
+                except backup.Busy:
+                    pass
+                else:
+                    raise AssertionError(f"{caller} ignored the surviving worker")
             second = subprocess.Popen([command, "restart"], env=env)
             time.sleep(0.4)
             assert (root / "events").read_text().splitlines() == ["stop"]
@@ -87,6 +102,8 @@ def main():
             assert second.wait(timeout=5) == 0
             assert (root / "events").read_text().splitlines() == ["stop", "restart"]
             assert not (root / "aiagent.active").exists()
+            operation_descriptor = backup.operation_lock()
+            os.close(operation_descriptor)
             cache = home / "cache"
             (cache / "data").mkdir(parents=True)
             (cache / "data/file").write_text("disposable")
@@ -99,6 +116,7 @@ def main():
             assert outside.read_text() == "persistent"
             assert all((cache / name).is_dir() for name in ("tmp", "npm", "xdg"))
             print("supervisor killed: restart waited for stop child; lock not inherited")
+            print("daily and restore-check refused the surviving worker, then accepted an idle lock")
             print("cache cleanup stayed inside the cache subtree")
         finally:
             (root / "release").touch()

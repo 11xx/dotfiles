@@ -75,6 +75,12 @@
   register: guix_system_modules
   tags: ['guix-system']
 
+- name: 'guix: Remove obsolete agent backup source'
+  ansible.builtin.file:
+    path: "{{ guix_config_dir }}/modules/aiagent/backup.sh"
+    state: absent
+  tags: ['guix-system']
+
 - name: 'guix: Deploy the channel list'
   ansible.builtin.copy:
     src: channels.scm
@@ -123,6 +129,7 @@
     - "{{ guix_config_dir }}/system.scm"
     - /run/current-system
     - "{{ guix_config_dir }}/modules/aiagent/host.scm"
+    - "{{ guix_config_dir }}/modules/aiagent/backup.py"
     - "{{ guix_home_config_dir }}/home-configuration.scm"
     - "{{ ansible_facts['user_dir'] }}/.guix-home"
   register: guix_generations
@@ -138,8 +145,10 @@
   vars:
     _stamps: "{{ guix_generations.results | default([]) | map(attribute='stat') | list }}"
     _system_stale: "{{ _stamps[0].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _module_stale: "{{ _stamps[2].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _home_stale: "{{ _stamps[3].mtime | default(0) > _stamps[4].mtime | default(0) }}"
+    _host_module_stale: "{{ _stamps[2].mtime | default(0) > _stamps[1].mtime | default(0) }}"
+    _backup_module_stale: "{{ _stamps[3].mtime | default(0) > _stamps[1].mtime | default(0) }}"
+    _module_stale: "{{ _host_module_stale or _backup_module_stale }}"
+    _home_stale: "{{ _stamps[4].mtime | default(0) > _stamps[5].mtime | default(0) }}"
     _channels_changed: "{{ guix_channels_config.changed | default(false) }}"
     _channel_changed: "{{ guix_channel_source.changed | default(false) }}"
     _system_changed: "{{ guix_system_config.changed | default(false) }}"

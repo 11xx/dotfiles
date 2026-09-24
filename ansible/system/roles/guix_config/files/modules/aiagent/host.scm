@@ -2,6 +2,7 @@
   #:use-module (gnu packages base)
   #:use-module (gnu packages bash)
   #:use-module (gnu packages linux)
+  #:use-module (gnu packages python)
   #:use-module (gnu services)
   #:use-module (gnu services mcron)
   #:use-module (gnu services shepherd)
@@ -557,16 +558,16 @@
 (define (aiagent-keys keys)
   (list (cons "aiagent" keys)))
 
-(define %backup-script (local-file "backup.sh"))
+(define %backup-script (local-file "backup.py"))
 
 (define (aiagent-backup-jobs _)
   (list
    #~(job "* * * * *"
-          (string-append #$(file-append bash-minimal "/bin/bash")
+          (string-append #$(file-append python "/bin/python3")
                          " " #$%backup-script " request")
           #:user "root")
    #~(job "15 4 * * *"
-          (string-append #$(file-append bash-minimal "/bin/bash")
+          (string-append #$(file-append python "/bin/python3")
                          " " #$%backup-script " daily")
           #:user "root")))
 
