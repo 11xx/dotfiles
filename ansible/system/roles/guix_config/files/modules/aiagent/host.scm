@@ -197,8 +197,8 @@
                (else (error "invalid aiagent cgroup drain target"))))
        (define (uptime-seconds)
          (call-with-input-file "/proc/uptime" read))
-       (define (populated?)
-         (call-with-input-file (string-append target "/cgroup.events")
+       (define (populated? directory)
+         (call-with-input-file (string-append directory "/cgroup.events")
            (lambda (port)
              (let loop ((name (read port)))
                (when (eof-object? name)
@@ -233,19 +233,37 @@
                                    (lambda (name)
                                      (not (member name '("." "..")))))))))
            (lambda _ '())))
+       (define (remove-empty-descendants directory)
+         (for-each
+          (lambda (name)
+            (let ((child (string-append directory "/" name)))
+              (when (catch 'system-error
+                      (lambda () (eq? (stat:type (stat child)) 'directory))
+                      (lambda _ #f))
+                (remove-empty-descendants child)
+                (unless (or (string=? child
+                                     (string-append #$%delegated "/service"))
+                            (populated? child))
+                  (rmdir child)))))
+          (scandir directory
+                   (lambda (name) (not (member name '("." "..")))))))
        (unless (= (geteuid) 0)
          (error "aiagent cgroup drain requires root"))
        (call-with-output-file (string-append target "/cgroup.kill")
          (lambda (port) (display "1" port)))
        (let ((deadline (+ (uptime-seconds) #$%cgroup-drain-seconds)))
          (let loop ()
-           (when (populated?)
+           (when (populated? target)
              (if (>= (uptime-seconds) deadline)
                  (error "aiagent cgroup remains populated; remaining PIDs"
                         (remaining-pids target))
                  (begin
                    (sleep #$%cgroup-drain-poll-seconds)
-                   (loop)))))))))
+                   (loop)))))
+       (remove-empty-descendants target)
+       (when (populated? target)
+         (error "aiagent cgroup repopulated during cleanup; remaining PIDs"
+                (remaining-pids target)))))))
 
 (define aiagent-home-stop-locked-program
   (program-file

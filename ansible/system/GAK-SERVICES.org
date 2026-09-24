@@ -66,6 +66,10 @@ SSH sessions. It waits up to one minute for =cgroup.events= to report
 =populated 0= before unmounting; a populated subtree fails the stop with
 remaining PIDs reported. A queued home stop is bounded by five minutes for the
 lock, one for cgroup drain and two for unmount.
+An empty drain removes descendant cgroups, including Podman's runtime group
+and stale SSH leaves, while preserving the delegated and service roots.
+Populated cgroups remain in place. This lets the same Podman container start
+after a stop and home remount without changing its persistent runroot.
 The delegated directory belongs to aiagent; its parent
 =/sys/fs/cgroup/aiagent= and each =cgroup.kill= file belong to root.
 

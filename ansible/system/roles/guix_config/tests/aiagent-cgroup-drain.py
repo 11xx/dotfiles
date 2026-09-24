@@ -41,7 +41,7 @@ def script(path, source):
 
 
 def drain_copy(source, path, target, seconds):
-    assert source.count(PRODUCTION_CGROUP) == 2
+    assert source.count(PRODUCTION_CGROUP) == 3
     assert source.count("(deadline (+ (uptime-seconds) 60))") == 1
     return script(
         path,
@@ -112,8 +112,9 @@ def test_real_cgroup(drain_store, stop_store, root):
         namespace(drain, "service")
         helper_survivor.wait(timeout=5)
         assert not populated(service) and populated(CGROUP)
+        assert service.exists() and not runtime.exists()
         assert ssh_survivor.poll() is None
-        print("service drain: detached helper survivor killed; SSH survivor retained")
+        print("service drain: detached helper survivor killed; runtime cgroup removed; SSH survivor retained")
 
         marker = root / "unmounted"
         stop = stop_copy(stop_store.read_text(), root / "stop.scm", drain_store,
@@ -122,8 +123,9 @@ def test_real_cgroup(drain_store, stop_store, root):
         ssh_survivor.wait(timeout=5)
         assert marker.read_text() == "unmount reached"
         assert not populated(CGROUP)
+        assert service.exists() and not ssh.exists()
         assert home.stat().st_mode & 0o777 == 0
-        print("home stop: detached SSH survivor killed; populated 0 preceded mocked unmount")
+        print("home stop: detached SSH survivor killed; SSH leaf removed; populated 0 preceded mocked unmount")
     finally:
         for process in processes:
             if process.poll() is None:
@@ -134,6 +136,8 @@ def test_real_cgroup(drain_store, stop_store, root):
             (CGROUP / "cgroup.kill").write_text("1")
             for path in (CGROUP / "service/runtime", CGROUP / "service",
                          CGROUP / "ssh-probe", CGROUP):
+                if not path.exists():
+                    continue
                 for _ in range(20):
                     try:
                         path.rmdir()
@@ -165,6 +169,35 @@ def test_stuck_cgroup(drain_store, stop_store, root):
     print(f"stuck drain: failed after {elapsed:.1f}s with PID 424242; unmount skipped")
 
 
+def test_populated_leaf(drain_store, root):
+    fake = root / "leaves"
+    service = fake / "service"
+    busy = fake / "ssh-busy"
+    empty = fake / "ssh-empty"
+    runtime = service / "runtime"
+    for path in (fake, service, busy, empty, runtime):
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "cgroup.events").write_text(
+            "populated 1\n" if path == busy else "populated 0\n"
+        )
+        (path / "cgroup.procs").write_text("424242\n" if path == busy else "")
+    (fake / "cgroup.kill").write_text("")
+    drain = drain_copy(drain_store.read_text(), root / "leaf-drain.scm", fake, 2)
+    header, body = drain.read_text().split("!#\n", 1)
+    stand_in = script(root / "leaf-files.scm", header + "!#\n" +
+                     "(define real-rmdir rmdir)\n"
+                     "(let ((rmdir (lambda (path)\n"
+                     " (for-each (lambda (name)\n"
+                     "   (let ((file (string-append path \"/\" name)))\n"
+                     "     (when (file-exists? file) (delete-file file))))\n"
+                     "   '(\"cgroup.events\" \"cgroup.procs\" \"cgroup.kill\"))\n"
+                     " (real-rmdir path)))) " + body + ")\n")
+    namespace(stand_in, "all")
+    assert busy.exists() and service.exists()
+    assert not empty.exists() and not runtime.exists()
+    print("leaf cleanup: populated SSH leaf retained; empty SSH and runtime leaves removed")
+
+
 def main():
     modules = Path(sys.argv[1]).resolve()
     assert (modules / "aiagent/host.scm").is_file()
@@ -179,6 +212,7 @@ def main():
         scratch = Path(name)
         test_real_cgroup(drain_store, stop_store, scratch)
         test_stuck_cgroup(drain_store, stop_store, scratch)
+        test_populated_leaf(drain_store, scratch)
 
 
 if __name__ == "__main__":
