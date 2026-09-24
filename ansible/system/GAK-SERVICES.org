@@ -664,9 +664,15 @@ The root Restic snapshot includes complete Git bundles for =gitolite-admin=
 and initialized =arc= refs. Gitolite receive commands, including updates to
 the administrative repository, hold the same lock that root backup verifies
 and holds through both bundles and Restic snapshot creation. Bundle writers
-run as =agentgit= through root-opened descriptors. The restore check imports
-the bundles into isolated bare repositories as =agentgit=, checks all expected
-refs and HEAD, runs =git fsck --full --strict --no-reflogs=, and checks that
+run as =agentgit= through root-opened descriptors.
+
+The receive process retains the lock if its Gitolite parent exits abruptly;
+the lock is released after the receive and its synchronous hooks settle.
+Unrelated detached hook processes do not retain it.
+
+The restore check imports the bundles into isolated bare repositories as
+=agentgit=, checks all expected refs and HEAD, runs
+=git fsck --full --strict --no-reflogs=, and checks that
 =conf/gitolite.conf= and =keydir= reconstruct from =gitolite-admin=. It
 compares the restored bundles with the snapshot's checksums before importing.
 The snapshot keeps =manifest.json= beside the bundles with expected refs,

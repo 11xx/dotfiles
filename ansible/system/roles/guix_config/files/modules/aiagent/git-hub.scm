@@ -58,11 +58,24 @@
       (chown path 0 (group:gid group))
       (chmod path #o660)))
 
+(define %hub-hook-program
+  (computed-file
+   "HubHook.sh"
+   #~(begin
+       (copy-file #$(local-file "HubHook.sh") #$output)
+       (chmod #$output #o555))))
+
 (define (git-hub-services config)
   (list (service gitolite-service-type (git-hub-gitolite config))
         (simple-service
          'git-hub-code etc-service-type
-         (list (list "git-hub/lib/Gitolite/Triggers/HubLock.pm"
-                     (local-file "HubLock.pm"))))
+         (cons (list "git-hub/lib/Gitolite/Triggers/HubLock.pm"
+                     (local-file "HubLock.pm"))
+               (map (lambda (name)
+                      (list (string-append "git-hub/hooks/" name)
+                            %hub-hook-program))
+                    '("pre-receive" "update" "post-receive" "post-update"
+                      "proc-receive" "reference-transaction" "push-to-checkout"
+                      "pre-auto-gc"))))
         (simple-service
          'git-hub-lock activation-service-type %hub-lock-activation)))

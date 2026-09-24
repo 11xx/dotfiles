@@ -2,6 +2,7 @@
 """Prove Gitolite receive and the complete multi-repo backup share a lock."""
 
 from contextlib import contextmanager
+import fcntl
 import importlib.util
 import json
 import os
@@ -56,7 +57,17 @@ def setup():
 
     code = ROOT / "local-code/lib/Gitolite/Triggers"
     code.mkdir(parents=True)
-    shutil.copyfile(os.environ["HUB_LOCK_SOURCE"], code / "HubLock.pm")
+    lock_source = Path(os.environ["HUB_LOCK_SOURCE"]).read_text()
+    (code / "HubLock.pm").write_text(lock_source.replace(
+        "'/etc/git-hub/hooks'", f"'{ROOT / 'local-code/hooks'}'"))
+    hooks = ROOT / "local-code/hooks"
+    hooks.mkdir()
+    for name in ("pre-receive", "update", "post-receive", "post-update",
+                 "proc-receive", "reference-transaction", "push-to-checkout",
+                 "pre-auto-gc"):
+        destination = hooks / name
+        shutil.copyfile(os.environ["HUB_HOOK_SOURCE"], destination)
+        destination.chmod(0o755)
     rc = Path(os.environ["GENERATED_RC"]).read_text()
     assert 'LOCAL_CODE => "/etc/git-hub"' in rc
     assert "PRE_GIT => ['HubLock::pre_git']" in rc
@@ -261,7 +272,13 @@ def main():
                    "show-ref", "--verify", "refs/heads/agent/oversize"],
                   as_hub=True, env=environment, check=False)
     assert missing.returncode != 0
+    descriptor = os.open(LOCK / "receive.lock", os.O_RDWR | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    finally:
+        os.close(descriptor)
     print("generated Git configuration rejected an oversized Gitolite push without a ref")
+    print("rejected receive released the shared lock")
 
 
 if __name__ == "__main__":
