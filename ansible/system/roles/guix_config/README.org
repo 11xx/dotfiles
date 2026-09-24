@@ -36,3 +36,14 @@ selection is controlled by =gak_aiagent_host_enabled=. The operator's rootless
 Podman declaration remains separate, including its subordinate IDs. A change
 to a deployed module reports a pending system activation even when the main
 expression is unchanged.
+
+The =aiagent git-hub= module is tangled from the same Org source and selected
+by =gak_git_hub_enabled=. It selects Guix's =gitolite-service-type= with the
+private =agentgit= account. Its home is =/var/lib/agentgit=, outside the
+agent's mounted home. =gak_git_hub_admin_public_key= names the operator's
+public key; =gak_git_hub_max_push_bytes= bounds each incoming pack stream.
+The two service selections can be removed independently. The reference
+[[file:files/git-hub/gitolite.conf][Gitolite policy]] belongs in the
+=gitolite-admin= repository with the agent's public key at
+=keydir/aiagent.pub=. Only the operator pushes that administrative repository.
+The private agent key stays in the container home on gak.

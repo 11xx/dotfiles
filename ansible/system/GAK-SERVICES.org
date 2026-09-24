@@ -633,3 +633,40 @@ Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or
 revoke an existing Tailscale endpoint. Drain ingress, stop the selected
 project and retain a verified backup before separate removal.
+
+* Agent Git exchange
+
+The =agentgit= account owns Gitolite under =/var/lib/agentgit=. Its private
+group and Gitolite umask prevent =aiagent= from reading the hub's storage on
+the host or in its container. The operator's public key initializes the
+administrative identity. The agent uses a separate hub key generated inside
+its persistent container home; its private key stays on gak. The Gitolite
+policy in [[file:roles/guix_config/files/git-hub/gitolite.conf][gitolite.conf]]
+gives =operator= full access to =arc= and =gitolite-admin=, while =aiagent=
+can read =arc= and write only =refs/heads/agent/*=. The account's Git
+configuration rejects incoming pack streams above 32 MiB; this is a per-push
+compressed transfer limit, not a repository quota. Ref policy is checked by
+Gitolite before ref updates.
+
+After activation, clone =agentgit@gak:gitolite-admin= using the operator key,
+place the policy at =conf/gitolite.conf= and the agent's public key at
+=keydir/aiagent.pub=, then commit and push. The key's private half never
+enters the administrative repository. The operator seeds =arc= from the
+workstation checkout, then adds a hub remote there with a fetch refspec for
+=refs/heads/agent/*= into =refs/remotes/<remote>/agent/*=. Agent work occurs
+on an =agent/*= branch; the workstation fetches, reviews and merges it, then
+pushes the integration branch. The agent fetches the resulting history.
+
+The root Restic snapshot includes complete Git bundles for =gitolite-admin=
+and initialized =arc= refs. Bundle creation runs as =agentgit= and writes to
+root-owned backup scratch through a descriptor supplied by root; Git's
+advertised refs select complete object histories even if a push is in flight.
+The restore check compares each bundle's checksum and verifies its history.
+To recover, suspend pushes, restore the bundles to root-controlled scratch and
+verify them in an empty bare repository. With empty repository destinations,
+run =git clone --mirror= from each bundle into =/var/lib/agentgit/repositories=
+as =agentgit=. Check out =conf= and =keydir= from the restored
+=gitolite-admin.git= into =/var/lib/agentgit/.gitolite= as that account, then
+run =gitolite setup= to regenerate hooks and access data. Git against the
+hub's writable repositories runs as =agentgit=, never root. A repository
+with no refs is created by the Gitolite policy and has no bundle to restore.

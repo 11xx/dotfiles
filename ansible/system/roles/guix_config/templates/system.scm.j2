@@ -21,7 +21,12 @@
              (gnu services nfs)
              (gnu system accounts)
              (guix gexp)
+{% if gak_aiagent_host_enabled | bool %}
              (aiagent host)
+{% endif %}
+{% if gak_git_hub_enabled | bool %}
+             (aiagent git-hub)
+{% endif %}
              ;; Guix upstream packages Tailscale's Go dependencies but not
              ;; Tailscale, so `tailscaled` comes from the rosenthal channel
              ;; already listed in channels.scm. Not a `use-service-modules`
@@ -240,6 +245,15 @@
                                       "{{ gak_aiagent_deploy_public_key | trim }}\n")
                           (plain-file "gak-aiagent-shell.pub"
                                       "{{ gak_aiagent_shell_public_key | trim }}\n")))
+{% endif %}
+
+{% if gak_git_hub_enabled | bool %}
+           (git-hub-service
+            (git-hub-configuration
+             (admin-pubkey
+              (plain-file "operator.pub"
+                          "{{ gak_git_hub_admin_public_key | trim }}\n"))
+             (max-push-bytes {{ gak_git_hub_max_push_bytes }})))
 {% endif %}
 
 {% if 'nextcloud' in gak_applications %}

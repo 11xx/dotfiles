@@ -19,6 +19,8 @@ from contextlib import contextmanager
 
 
 HOME = Path("/home/aiagent")
+HUB_HOME = Path("/var/lib/agentgit")
+HUB_REPOS = ("gitolite-admin", "arc")
 RUNTIME = Path("/run/aiagent")
 RESULT_ROOT = Path("/run/aiagent-backup")
 STATE = Path("/var/lib/aiagent")
@@ -86,6 +88,13 @@ def agent_account():
     return pwd.getpwnam("aiagent")
 
 
+def hub_account():
+    try:
+        return pwd.getpwnam("agentgit")
+    except KeyError:
+        return None
+
+
 def root_directory(path, create=False):
     if create:
         try:
@@ -136,13 +145,14 @@ def stop_process(process):
 
 def run_process(arguments, *, check=False, timeout=None, env=None,
                 stdout=None, stderr=None, capture_output=False, text=False,
-                ignore_interrupt=False):
+                ignore_interrupt=False, user=None, group=None, extra_groups=None):
     if not ignore_interrupt:
         check_interrupted()
     process = subprocess.Popen(
         arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
         stderr=subprocess.PIPE if capture_output else stderr,
-        text=text, start_new_session=True,
+        text=text, start_new_session=True, user=user, group=group,
+        extra_groups=extra_groups,
     )
     deadline = None if timeout is None else time.monotonic() + timeout
     try:
@@ -180,6 +190,76 @@ def validate_password():
         raise RuntimeError("backup password file must be root-owned mode 0600")
 
 
+def digest_file(path):
+    digest = hashlib.sha256()
+    descriptor, _ = secure_file(path, os.O_RDONLY, 0)
+    with os.fdopen(descriptor, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            check_interrupted()
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_bundles(directory, names):
+    empty = directory / "verify.git"
+    run_process(("git", "init", "--bare", "--quiet", str(empty)), check=True)
+    try:
+        for name in names:
+            run_process(("git", "-C", str(empty), "bundle", "verify",
+                         str(directory / f"{name}.bundle")), check=True,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        shutil.rmtree(empty)
+
+
+def hub_bundles():
+    account = hub_account()
+    if account is None:
+        return None, {}
+    metadata = HUB_HOME.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != account.pw_uid or stat.S_IMODE(metadata.st_mode) != 0o750:
+        raise RuntimeError("unsafe Git hub home")
+    scratch = Path(tempfile.mkdtemp(prefix="hub-bundles.", dir=BACKUP_ROOT))
+    names = []
+    environment = dict(os.environ, HOME=str(HUB_HOME),
+                       XDG_CONFIG_HOME=str(HUB_HOME / ".config"),
+                       GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+    try:
+        for name in HUB_REPOS:
+            source = HUB_HOME / "repositories" / f"{name}.git"
+            try:
+                repo = source.lstat()
+            except FileNotFoundError:
+                if name == "arc":
+                    continue
+                raise RuntimeError("Git hub administration repository is missing") from None
+            if not stat.S_ISDIR(repo.st_mode) or repo.st_uid != account.pw_uid:
+                raise RuntimeError("unsafe Git hub repository")
+            if name == "arc":
+                refs = run_process(("git", "-C", str(source), "show-ref", "--quiet"),
+                                   env=environment, user=account.pw_uid,
+                                   group=account.pw_gid, extra_groups=[])
+                if refs.returncode == 1:
+                    continue
+                if refs.returncode:
+                    raise RuntimeError("cannot inspect Arc hub refs")
+            destination = scratch / f"{name}.bundle"
+            descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
+            try:
+                run_process(("git", "-C", str(source), "bundle", "create", "-", "--all"),
+                            check=True, env=environment, stdout=descriptor,
+                            user=account.pw_uid, group=account.pw_gid, extra_groups=[])
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            names.append(name)
+        verify_bundles(scratch, names)
+        return scratch, {name: digest_file(scratch / f"{name}.bundle") for name in names}
+    except BaseException:
+        shutil.rmtree(scratch)
+        raise
+
+
 def snapshot():
     validate_password()
     if run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
@@ -196,14 +276,21 @@ def snapshot():
             argv.insert(1, "--quiet")
         run_process(argv, check=True, env=environment)
 
-    if not (REPOSITORY / "config").is_file():
-        restic("init")
-    restic("backup", "--host", "gak", "--tag", "aiagent",
-           str(HOME / "workspaces"), str(HOME / "container-home"))
-    restic("forget", "--host", "gak", "--tag", "aiagent",
-           "--keep-daily", "7", "--keep-weekly", "5", "--keep-monthly", "12", "--prune")
-    restic("check")
-    return environment
+    bundles, hashes = hub_bundles()
+    try:
+        if not (REPOSITORY / "config").is_file():
+            restic("init")
+        sources = [str(HOME / "workspaces"), str(HOME / "container-home")]
+        if bundles is not None:
+            sources.append(str(bundles))
+        restic("backup", "--host", "gak", "--tag", "aiagent", *sources)
+        restic("forget", "--host", "gak", "--tag", "aiagent",
+               "--keep-daily", "7", "--keep-weekly", "5", "--keep-monthly", "12", "--prune")
+        restic("check")
+        return environment, bundles, hashes
+    finally:
+        if bundles is not None:
+            shutil.rmtree(bundles)
 
 
 def process_identity(pid):
@@ -429,7 +516,7 @@ def manifest(root):
 
 
 def restore_check():
-    environment = snapshot()
+    environment, bundles, hashes = snapshot()
     scratch = Path(tempfile.mkdtemp(prefix="restore-check.", dir=BACKUP_ROOT))
     try:
         run_process(("restic", "--quiet", "restore", "latest", "--host", "gak",
@@ -439,6 +526,15 @@ def restore_check():
         if manifest(HOME) != manifest(restored):
             raise RuntimeError("agent restore checksums or paths differ")
         print("agent restore checksums match")
+        if bundles is not None:
+            restored_bundles = scratch / bundles.relative_to("/")
+            if {path.name for path in restored_bundles.iterdir()} != {f"{name}.bundle" for name in hashes}:
+                raise RuntimeError("Git hub restore bundle set differs")
+            for name, expected in hashes.items():
+                if digest_file(restored_bundles / f"{name}.bundle") != expected:
+                    raise RuntimeError("Git hub restore bundle checksum differs")
+            verify_bundles(restored_bundles, hashes)
+            print("Git hub restore bundles match and verify")
     finally:
         shutil.rmtree(scratch)
 
