@@ -814,6 +814,69 @@ run_updater update alpha --timeout 2
 out_has 'changed its definition'
 log_lacks 'force-recreate'
 
+# --- prepared local images keep the old image until acceptance --------------
+
+reset_fixture
+root="$fixture/roots/services"
+export GAK_COMPOSE_SERVICES_ROOT="$root"
+mkdir -p "$root"
+seed_image example.invalid/alpha:latest aaaaaaaaaaaa1111
+seed_image localhost/candidate:1 eeeeeeeeeeee5555
+write_project "$root/alpha" alpha 'alpha|example.invalid/alpha:latest|alpha'
+start_project "$root/alpha"
+run_updater update alpha --prepared-image alpha=eeeeeeeeeeee5555
+((updater_status == 0)) || fail 'prepared image update failed'
+out_has 'alpha: updated'
+log_lacks 'compose -f compose.yaml pull'
+log_has 'tag eeeeeeeeeeee5555 example.invalid/alpha:latest'
+grep -F $'aaaaaaaaaaaa1111' "$FAKE_STATE/images.tsv" >/dev/null ||
+    fail 'the previous image was removed before acceptance'
+grep -F $'alpha\trunning\t0\teeeeeeeeeeee5555' "$FAKE_STATE/containers.tsv" >/dev/null ||
+    fail 'the exact prepared image was not applied'
+
+reset_fixture
+root="$fixture/roots/services"
+export GAK_COMPOSE_SERVICES_ROOT="$root"
+mkdir -p "$root"
+seed_image example.invalid/alpha:latest aaaaaaaaaaaa1111
+seed_image localhost/candidate:1 eeeeeeeeeeee5555
+write_project "$root/alpha" alpha 'alpha|example.invalid/alpha:latest|alpha'
+run_updater update alpha --prepared-image alpha=eeeeeeeeeeee5555 --from-stopped
+((updater_status == 0)) || fail 'a quiesced project could not use its prepared image'
+out_has 'alpha: updated'
+log_lacks 'compose -f compose.yaml pull'
+
+reset_fixture
+root="$fixture/roots/services"
+export GAK_COMPOSE_SERVICES_ROOT="$root"
+mkdir -p "$root"
+seed_image example.invalid/alpha:latest aaaaaaaaaaaa1111
+write_project "$root/alpha" alpha 'alpha|example.invalid/alpha:latest|alpha'
+start_project "$root/alpha"
+run_updater update alpha --prepared-image alpha=eeeeeeeeeeee5555
+((updater_status != 0)) || fail 'an absent prepared image was accepted'
+err_has 'prepared image for alpha is absent'
+log_lacks 'compose -f compose.yaml pull'
+log_lacks 'force-recreate'
+log_lacks 'build'
+
+reset_fixture
+root="$fixture/roots/services"
+export GAK_COMPOSE_SERVICES_ROOT="$root"
+mkdir -p "$root"
+seed_image example.invalid/alpha:latest aaaaaaaaaaaa1111
+seed_image localhost/candidate:1 eeeeeeeeeeee5555
+write_project "$root/alpha" alpha 'alpha|example.invalid/alpha:latest|alpha'
+start_project "$root/alpha"
+printf '%s\t%s\n' example.invalid/alpha:latest ffffffffffff7777 >"$root/alpha/up.move"
+run_updater update alpha --prepared-image alpha=eeeeeeeeeeee5555
+((updater_status != 0)) || fail 'image movement during apply was accepted'
+out_has 'changed what its image references resolve to during recreation'
+! grep -F 'alpha: updated' "$fixture/stdout" >/dev/null ||
+    fail 'an image moved during apply was reported accepted'
+grep -F $'aaaaaaaaaaaa1111' "$FAKE_STATE/images.tsv" >/dev/null ||
+    fail 'the previous image was not retained after failed acceptance'
+
 if grep -F 'sudo' "$updater" >/dev/null; then
     fail 'the updater contains a hidden sudo path'
 fi
