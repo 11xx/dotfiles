@@ -685,7 +685,9 @@ under =/run/aiagent=. They attempt service recovery even when stopping Compose
 fails; the stop deadline covers the documented service and home stop chain.
 Termination signals settle the current command's process group before a
 bounded recovery of the home mount and Compose service. Further signals during
-recovery do not release the operation lock early.
+recovery do not release the operation lock early. The handler records the
+request; command waits check it at bounded intervals, and recovery performs no
+asynchronous interruption checks.
 Seven daily, five weekly and twelve monthly snapshots are retained. A restore
 check takes a fresh snapshot into root-controlled scratch on the backup disk,
 compares every regular file by checksum and removes the scratch tree.
@@ -726,9 +728,6 @@ NOFOLLOW = os.O_NOFOLLOW | os.O_CLOEXEC
 SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
 _signal_depth = 0
 _interrupted = None
-_recovering = False
-_settling = False
-_starting = False
 
 
 class Busy(Exception):
@@ -745,8 +744,11 @@ def handle_signal(signum, _frame):
     global _interrupted
     if _interrupted is None:
         _interrupted = signum
-        if not (_recovering or _settling or _starting):
-            raise Interrupted(signum)
+
+
+def check_interrupted():
+    if _interrupted is not None:
+        raise Interrupted(_interrupted)
 
 
 @contextmanager
@@ -799,60 +801,62 @@ def secure_file(path, flags, owner=None):
 
 
 def stop_process(process):
-    global _settling
-    _settling = True
     try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        process.poll()
         try:
-            os.killpg(process.pid, signal.SIGTERM)
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            process.poll()
-            try:
-                os.killpg(process.pid, 0)
-            except ProcessLookupError:
-                break
-            time.sleep(0.05)
-        else:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+    try:
+        process.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
         try:
-            process.communicate(timeout=5)
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait(timeout=5)
-    finally:
-        _settling = False
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=5)
 
 
 def run_process(arguments, *, check=False, timeout=None, env=None,
-                stdout=None, stderr=None, capture_output=False, text=False):
-    global _starting
-    if _interrupted is not None and not _recovering:
-        raise Interrupted(_interrupted)
-    _starting = True
+                stdout=None, stderr=None, capture_output=False, text=False,
+                ignore_interrupt=False):
+    if not ignore_interrupt:
+        check_interrupted()
+    process = subprocess.Popen(
+        arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
+        stderr=subprocess.PIPE if capture_output else stderr,
+        text=text, start_new_session=True,
+    )
+    deadline = None if timeout is None else time.monotonic() + timeout
     try:
-        process = subprocess.Popen(
-            arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
-            stderr=subprocess.PIPE if capture_output else stderr,
-            text=text, start_new_session=True,
-        )
-        try:
-            _starting = False
-            if _interrupted is not None and not _recovering:
-                raise Interrupted(_interrupted)
-            output, errors = process.communicate(timeout=timeout)
-        except (Interrupted, subprocess.TimeoutExpired):
-            stop_process(process)
-            raise
-    finally:
-        _starting = False
+        while True:
+            if not ignore_interrupt:
+                check_interrupted()
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise subprocess.TimeoutExpired(arguments, timeout)
+            interval = 0.2 if remaining is None else min(0.2, remaining)
+            try:
+                output, errors = process.communicate(timeout=interval)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        if not ignore_interrupt:
+            check_interrupted()
+    except (Interrupted, subprocess.TimeoutExpired):
+        stop_process(process)
+        raise
     result = subprocess.CompletedProcess(arguments, process.returncode, output, errors)
     if check:
         result.check_returncode()
@@ -1027,7 +1031,8 @@ def recover_service():
     def start(service, limit):
         for attempt in range(2):
             try:
-                started = run_process(("herd", "start", service), timeout=bound(limit))
+                started = run_process(("herd", "start", service), timeout=bound(limit),
+                                      ignore_interrupt=True)
                 status = started.returncode
             except subprocess.TimeoutExpired:
                 status = 124
@@ -1035,7 +1040,8 @@ def recover_service():
                 return
             if attempt == 0:
                 try:
-                    run_process(("herd", "enable", service), timeout=bound(START_TIMEOUT))
+                    run_process(("herd", "enable", service), timeout=bound(START_TIMEOUT),
+                                ignore_interrupt=True)
                 except subprocess.TimeoutExpired:
                     pass
         raise RuntimeError(f"agent service did not restart: {service}")
@@ -1043,7 +1049,7 @@ def recover_service():
     def mounted():
         return run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
                            timeout=bound(30), stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL).returncode == 0
+                           stderr=subprocess.DEVNULL, ignore_interrupt=True).returncode == 0
 
     if not mounted():
         start("aiagent-home", HOME_START_TIMEOUT)
@@ -1059,25 +1065,23 @@ def recover_service():
 
 
 def quiesced(action):
-    global _recovering
     with signal_guard():
         try:
+            check_interrupted()
             command("herd", "stop", SERVICE, timeout=STOP_TIMEOUT)
+            check_interrupted()
             action()
+            check_interrupted()
         finally:
-            _recovering = True
-            try:
-                recover_service()
-            finally:
-                _recovering = False
-        if _interrupted is not None:
-            raise Interrupted(_interrupted)
+            recover_service()
+        check_interrupted()
 
 
 def manifest(root):
     entries = {}
 
     def visit(path):
+        check_interrupted()
         metadata = path.lstat()
         relative = str(path.relative_to(root))
         if stat.S_ISLNK(metadata.st_mode):
@@ -1091,6 +1095,7 @@ def manifest(root):
             descriptor, _ = secure_file(path, os.O_RDONLY)
             with os.fdopen(descriptor, "rb") as source:
                 for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    check_interrupted()
                     digest.update(chunk)
             entries[relative] = ("file", digest.hexdigest())
         else:
@@ -1146,8 +1151,7 @@ def run_operation(operation):
 def main(operation):
     with signal_guard():
         run_operation(operation)
-        if _interrupted is not None:
-            raise Interrupted(_interrupted)
+        check_interrupted()
 
 
 if __name__ == "__main__":
