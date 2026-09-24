@@ -59,6 +59,15 @@ a second start waits at most five minutes, then validates the first mount or
 fails. Allocation, formatting, fsck, mount and unmount have separate deadlines
 of ten, five, twenty, two and two minutes. An expired command's process group
 receives KILL at its deadline.
+Stopping Compose lets its helper exit, then kills any remaining process in the
+service cgroup. Stopping the home first stops Compose, then writes to the
+delegated subtree's =cgroup.kill=, terminating every aiagent process including
+SSH sessions. It waits up to one minute for =cgroup.events= to report
+=populated 0= before unmounting; a populated subtree fails the stop with
+remaining PIDs reported. A queued home stop is bounded by five minutes for the
+lock, one for cgroup drain and two for unmount.
+The delegated directory belongs to aiagent; its parent
+=/sys/fs/cgroup/aiagent= and each =cgroup.kill= file belong to root.
 
 A busy unmount can leave Shepherd reporting =aiagent-home= stopped while
 =findmnt /home/aiagent= still reports a mount. Check the mount directly,

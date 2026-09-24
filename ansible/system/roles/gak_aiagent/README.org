@@ -23,6 +23,9 @@ lock. Lock acquisition and disk operations have finite deadlines, with timed
 process groups terminated on expiry. A failed unmount can leave the image
 mounted even when Shepherd reports the service stopped, so =findmnt= determines
 the actual mount state.
+Stopping Compose kills residual processes in its service cgroup after the
+helper exits. Stopping the home kills the full delegated cgroup, including SSH
+sessions, waits up to one minute for it to empty, then unmounts.
 Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
 setuid =newuidmap= and =newgidmap= wrappers.
 The host account has tailscaled's non-operator read-only local API access;
