@@ -66,6 +66,8 @@ SSH sessions. It waits up to one minute for =cgroup.events= to report
 =populated 0= before unmounting; a populated subtree fails the stop with
 remaining PIDs reported. A queued home stop is bounded by five minutes for the
 lock, one for cgroup drain and two for unmount.
+The delegated directory belongs to aiagent; its parent
+=/sys/fs/cgroup/aiagent= and each =cgroup.kill= file belong to root.
 
 A busy unmount can leave Shepherd reporting =aiagent-home= stopped while
 =findmnt /home/aiagent= still reports a mount. Check the mount directly,

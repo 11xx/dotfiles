@@ -7,8 +7,9 @@ The =aiagent= account has a private group and a mounted home backed by a
 preallocated ext4 image. The backing image is root-owned. Shepherd establishes
 the mount, runtime directory and capped cgroup before starting its Compose
 helper. SSH sessions enter the delegated cgroup through PAM before launching
-the user's command. The agent owns only the delegated subtree; the limit files
-belong to root. Gak uses Podman's cgroupfs manager. Its per-user
+the user's command. The delegated directory belongs to aiagent; its parent,
+the limit files and each =cgroup.kill= file belong to root. Gak uses Podman's
+cgroupfs manager. Its per-user
 =containers.conf= selects =cgroups = "split"=, so conmon and each container
 payload become children of the service or SSH session cgroup that launched
 Podman. Image builds inherit that placement. No container parent is specified
@@ -35,7 +36,8 @@ A timed-out command's process group receives KILL at its deadline, including
 descendants that could retain the lock. First creation has at most 43 minutes
 of external-command waits; a queued home stop adds at most eight minutes:
 five for its lock, one for cgroup drain and two for unmount. A drain writes
-=cgroup.kill= on the root-owned delegated subtree and waits at most one minute
+to the root-owned =cgroup.kill= file under the delegated subtree and waits at
+most one minute
 for =cgroup.events= to report =populated 0=. At deadline it reports remaining
 PIDs and leaves the home mounted. The same bound applies to Compose's service
 subtree drain after its helper exits.
