@@ -4,6 +4,7 @@ Each project directory holding a compose.yaml is its own source of truth: the
 image channels come from the definition, and an optional top-level `x-update`
 mapping declares the project's pre-update gate and readiness probe. Nothing here
 carries a list of applications, and boot selection is a separate concern.
+An explicit prepared image ID can move a declared reference without a pull.
 
 The Compose provider parses the definition; this program reads the provider's
 normalized output with a safe YAML loader and validates it against a small
@@ -28,6 +29,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -320,7 +322,7 @@ def read_services(document: dict, project: str) -> dict[str, str]:
         if "build" in definition:
             raise Fatal(
                 f"project {project} service {name} is built locally; "
-                "this updater only moves projects between published images"
+                "this updater does not execute Compose builds"
             )
         image = definition.get("image")
         if not isinstance(image, str) or not image.strip():
@@ -439,6 +441,7 @@ class Project:
     running_ids: dict[str, str] = field(default_factory=dict)
     initial_ids: dict[str, str] = field(default_factory=dict)
     planned_ids: dict[str, str] = field(default_factory=dict)
+    reference_ids: dict[str, str] = field(default_factory=dict)
     outcome: str = ""
     definition_digest: str = ""
 
@@ -460,9 +463,15 @@ def discover(services_root: Path) -> list[Project]:
     return projects
 
 
-def compose(runtime: Runtime, project: Project, *arguments: str, timeout: int, what: str) -> Result:
+def compose(
+    runtime: Runtime, project: Project, *arguments: str, timeout: int, what: str,
+    override: Path | None = None,
+) -> Result:
+    files = ["-f", COMPOSE_BASENAME]
+    if override is not None:
+        files.extend(("-f", str(override)))
     return run(
-        runtime.podman_argv("compose", "-f", COMPOSE_BASENAME, *arguments),
+        runtime.podman_argv("compose", *files, *arguments),
         timeout=timeout,
         what=what,
         cwd=project.directory,
@@ -785,6 +794,8 @@ class Options:
     dry_run: bool
     force: bool
     timeout: int
+    prepared: dict[str, str]
+    from_stopped: bool
 
 
 def select(runtime: Runtime, options: Options, services_root: Path) -> tuple[list[Project], list[Project]]:
@@ -832,15 +843,28 @@ def select(runtime: Runtime, options: Options, services_root: Path) -> tuple[lis
             raise Fatal(
                 f"project {project.name} is only partially running; repair it before updating it"
             )
-        if project.state != "running":
+        if project.state != "running" and not (options.from_stopped and project.state == "stopped"):
             raise Fatal(
                 f"project {project.name} is not running; start it deliberately before updating it"
             )
     return loaded, loaded
 
 
-def update(runtime: Runtime, options: Options, services_root: Path) -> int:
+def update(runtime: Runtime, options: Options, services_root: Path, runtime_dir: Path) -> int:
     loaded, selected = select(runtime, options, services_root)
+    if options.prepared:
+        if len(selected) != 1:
+            raise Usage("prepared images require exactly one named project")
+        unknown = sorted(set(options.prepared) - set(selected[0].images))
+        if unknown:
+            raise Usage(f"project {selected[0].name} has no services: {', '.join(unknown)}")
+        selected[0].reference_ids = resolve_images(runtime, selected[0])
+        for service, identity in options.prepared.items():
+            result = run(runtime.podman_argv("image", "inspect", "--format", "{{.Id}}", identity),
+                         timeout=runtime.inspect_timeout, what=f"checking prepared image for {service}",
+                         env=runtime.env)
+            if result.status or normalize_id(result.stdout.strip()) != identity:
+                raise Fatal(f"prepared image for {service} is absent or changed locally")
 
     if options.dry_run:
         print_plan(loaded, services_root)
@@ -850,27 +874,29 @@ def update(runtime: Runtime, options: Options, services_root: Path) -> int:
         print_summary(selected)
         return 0
 
-    for project in selected:
-        result = compose(
-            runtime, project, "pull",
-            timeout=runtime.pull_timeout,
-            what=f"pulling project {project.name}",
-        )
-        if result.status != 0:
-            raise Fatal(
-                f"the pull failed for project {project.name}; nothing was recreated"
-                + provider_detail(runtime, result)
+    if not options.prepared:
+        for project in selected:
+            result = compose(
+                runtime, project, "pull",
+                timeout=runtime.pull_timeout,
+                what=f"pulling project {project.name}",
             )
+            if result.status != 0:
+                raise Fatal(
+                    f"the pull failed for project {project.name}; nothing was recreated"
+                    + provider_detail(runtime, result)
+                )
 
     status = 0
     for position, project in enumerate(selected):
         try:
             project.planned_ids = resolve_images(runtime, project)
+            project.planned_ids.update(options.prepared)
             if not options.force and project.planned_ids == project.running_ids:
                 confirm_runtime(runtime, project, "while images were pulled")
                 project.outcome = "unchanged"
                 continue
-            recreate(runtime, project, options)
+            recreate(runtime, project, options, runtime_dir)
             project.outcome = "updated"
         except (ProjectFailure, Timeout, Fatal) as failure:
             project.outcome = f"failed: {failure}"
@@ -885,7 +911,7 @@ def update(runtime: Runtime, options: Options, services_root: Path) -> int:
     return status
 
 
-def recreate(runtime: Runtime, project: Project, options: Options) -> None:
+def recreate(runtime: Runtime, project: Project, options: Options, runtime_dir: Path) -> None:
     confirm_runtime(runtime, project, "between planning and recreation")
 
     if project.extension.before_update is not None:
@@ -899,25 +925,72 @@ def recreate(runtime: Runtime, project: Project, options: Options) -> None:
         # The gate may legitimately touch the project; nothing may be recreated
         # on a picture taken before it ran.
         confirm_runtime(runtime, project, "while the before-update hook ran")
-        confirm_planned_images(runtime, project, "while the before-update hook ran")
+        if options.prepared:
+            if resolve_images(runtime, project) != project.reference_ids:
+                raise ProjectFailure(f"project {project.name} changed its image references while the before-update hook ran")
+        else:
+            confirm_planned_images(runtime, project, "while the before-update hook ran")
 
     confirm_definition(runtime, project)
-    confirm_planned_images(runtime, project, "before recreation")
-
-    result = compose(
-        runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
-        timeout=runtime.recreate_timeout,
-        what=f"recreating project {project.name}",
-    )
-    if result.status != 0:
-        raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
-
-    await_readiness(
-        runtime, project,
-        timeout=readiness_bound(runtime, project, options.timeout),
-        interval=runtime.readiness_interval,
-        settle=runtime.settle_seconds,
-    )
+    if options.prepared:
+        if resolve_images(runtime, project) != project.reference_ids:
+            raise ProjectFailure(f"project {project.name} changed its image references before recreation")
+        for service in options.prepared:
+            old = project.reference_ids[service]
+            pin = "localhost/gak-services-previous:" + hashlib.sha256(
+                f"{project.root}:{service}".encode()).hexdigest()[:24]
+            result = run(runtime.podman_argv("tag", old, pin),
+                         timeout=runtime.inspect_timeout, what=f"retaining the image for {service}",
+                         env=runtime.env)
+            if result.status:
+                raise ProjectFailure(f"could not retain the previous image for {service}")
+        with tempfile.TemporaryDirectory(prefix="prepared-", dir=runtime_dir) as temporary:
+            override = Path(temporary) / "override.yaml"
+            override.write_text(json.dumps({"services": {
+                service: {"image": f"sha256:{identity}"}
+                for service, identity in project.planned_ids.items()
+            }}))
+            confirm_definition(runtime, project)
+            if resolve_images(runtime, project) != project.reference_ids:
+                raise ProjectFailure(f"project {project.name} changed its image references before recreation")
+            result = compose(
+                runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
+                timeout=runtime.recreate_timeout, what=f"recreating project {project.name}",
+                override=override,
+            )
+            if result.status != 0:
+                raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
+            await_readiness(
+                runtime, project,
+                timeout=readiness_bound(runtime, project, options.timeout),
+                interval=runtime.readiness_interval,
+                settle=runtime.settle_seconds,
+            )
+        if resolve_images(runtime, project) != project.reference_ids:
+            raise ProjectFailure(f"project {project.name} changed its image references during recreation")
+        for service, identity in options.prepared.items():
+            result = run(runtime.podman_argv("tag", identity, project.images[service]),
+                         timeout=runtime.inspect_timeout, what=f"accepting the image for {service}",
+                         env=runtime.env)
+            if result.status:
+                raise ProjectFailure(f"could not accept the prepared image for {service}")
+        confirm_planned_images(runtime, project, "after readiness")
+    else:
+        confirm_planned_images(runtime, project, "before recreation")
+        result = compose(
+            runtime, project, "up", "-d", "--force-recreate", "--pull", "never",
+            timeout=runtime.recreate_timeout, what=f"recreating project {project.name}",
+        )
+        if result.status != 0:
+            raise ProjectFailure("recreation failed" + provider_detail(runtime, result))
+        confirm_planned_images(runtime, project, "during recreation")
+        await_readiness(
+            runtime, project,
+            timeout=readiness_bound(runtime, project, options.timeout),
+            interval=runtime.readiness_interval,
+            settle=runtime.settle_seconds,
+        )
+        confirm_planned_images(runtime, project, "during readiness")
 
 
 def show(runtime: Runtime, services_root: Path) -> int:
@@ -958,11 +1031,13 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog=PROGRAM, add_help=True)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="show the discovered projects and their update policy")
-    updater = commands.add_parser("update", help="pull and recreate selected projects")
+    updater = commands.add_parser("update", help="update selected projects")
     updater.add_argument("names", nargs="*", metavar="NAME")
     updater.add_argument("--all", dest="every", action="store_true")
     updater.add_argument("--dry-run", dest="dry_run", action="store_true")
     updater.add_argument("--force", action="store_true")
+    updater.add_argument("--prepared-image", action="append", default=[], metavar="SERVICE=IMAGE_ID")
+    updater.add_argument("--from-stopped", action="store_true")
     updater.add_argument("--timeout", type=int, default=None)
     return parser.parse_args(argv)
 
@@ -988,6 +1063,18 @@ def main(argv: list[str]) -> int:
         raise Usage("name at least one project or pass --all")
     if arguments.timeout is not None and arguments.timeout < 1:
         raise Usage("--timeout needs a positive number of seconds")
+    prepared = {}
+    for specification in arguments.prepared_image:
+        service, separator, identity = specification.partition("=")
+        identity = normalize_id(identity)
+        if (not separator or not service or service in prepared or len(identity) < 12
+                or any(character not in "0123456789abcdef" for character in identity)):
+            raise Usage("--prepared-image requires a unique SERVICE=IMAGE_ID with a hexadecimal image ID")
+        prepared[service] = identity
+    if prepared and (arguments.every or len(arguments.names) != 1):
+        raise Usage("prepared images require exactly one named project")
+    if arguments.from_stopped and not prepared:
+        raise Usage("--from-stopped requires a prepared image")
 
     options = Options(
         names=list(arguments.names),
@@ -995,12 +1082,14 @@ def main(argv: list[str]) -> int:
         dry_run=arguments.dry_run,
         force=arguments.force,
         timeout=arguments.timeout or positive_setting("GAK_SERVICES_READINESS_TIMEOUT", 180),
+        prepared=prepared,
+        from_stopped=arguments.from_stopped,
     )
 
     runtime = build_runtime()
     descriptor = acquire_lock(runtime_dir)
     try:
-        return update(runtime, options, services_root)
+        return update(runtime, options, services_root, runtime_dir)
     finally:
         # The lock outlives every child it started: nothing is released while a
         # hook or a Compose command is still being stopped.

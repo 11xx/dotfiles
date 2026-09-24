@@ -21,6 +21,35 @@
     - /home/aiagent/workspaces
     - /home/aiagent/cache
     - /home/aiagent/image
+    - /home/aiagent/tools
+    - /home/aiagent/tools/gak-services
+
+- name: 'aiagent: Install packaged updater sources'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: '{{ playbook_dir }}/roles/gak_compose/files/{{ item }}'
+    dest: '/home/aiagent/tools/gak-services/{{ item }}'
+    mode: '0600'
+  loop:
+    - gak-services.scm
+    - gak-services.py
+  register: gak_aiagent_updater_sources
+
+- name: 'aiagent: Check the packaged updater'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.stat:
+    path: /home/aiagent/.guix-profile/bin/gak-services
+  register: gak_aiagent_updater_command
+
+- name: 'aiagent: Install the packaged updater in the account profile'
+  ansible.builtin.command:
+    argv:
+      - guix
+      - package
+      - -f
+      - /home/aiagent/tools/gak-services/gak-services.scm
+  when: gak_aiagent_updater_sources.changed or not gak_aiagent_updater_command.stat.exists
+  tags: ['gak-aiagent-image']
 
 - name: 'aiagent: Install private Podman configuration'
   ansible.builtin.copy:
@@ -64,6 +93,16 @@
     src: aiagent-operation
     dest: /home/aiagent/.local/bin/aiagent-operation
     mode: '0750'
+
+- name: 'aiagent: Install update and readiness commands'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: '{{ item }}'
+    dest: '/home/aiagent/.local/bin/{{ item }}'
+    mode: '0750'
+  loop:
+    - aiagent-update
+    - gak-aiagent-update-ready
 
 - name: 'aiagent: Install declared instance lists'
   ansible.builtin.copy:

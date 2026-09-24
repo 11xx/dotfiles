@@ -29,3 +29,17 @@ instance sets =gak_compose_services_root= and can set the five destination
 paths. The host service supplies =HOME=, =XDG_RUNTIME_DIR= or
 =GAK_COMPOSE_RUNTIME_DIR=, and a PATH that resolves Podman and its rootless
 mapping helpers.
+
+* Prepared images
+
+=gak-services update NAME --prepared-image SERVICE=IMAGE_ID= accepts an image
+already present in the account's Podman store. It verifies the exact ID before
+changing a reference, does not pull or build, pins the previous image, and
+passes the planned IDs in a temporary Compose override for recreation. The
+declared reference moves only after readiness succeeds. The override prevents
+a concurrent tag movement from selecting another image for the container.
+This path uses the same lock, hooks, drift checks, recreation and readiness as a
+registry update. =--from-stopped= accepts a fully stopped project for an update
+that took a consistent snapshot while quiesced. Other projects in that state
+remain ineligible. A changed image reference during application fails the
+update; the previous image remains available for recovery.

@@ -52,6 +52,9 @@ existing image has holes, ordinary =fallocate= restores their reservation
 without changing file data, provided free space covers the missing bytes plus
 the 128 GiB host reserve. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
 service and SSH session cgroups determine placement for containers and builds.
+The =aiagent= command moves project mutations into the service's =cli= leaf
+before invoking Podman; read-only commands stay in their invoking session.
+The CLI leaf is removed when empty and remains while its container runs.
 Shepherd keeps the mounted home as a running service. Runtime and cgroup
 setup are one-shots with no teardown. Each prerequisite must finish before
 the Compose helper starts. Home creation and unmount share a root-only lock;
@@ -568,6 +571,32 @@ either snapshots first or recreates nothing.
 =gak-nextcloud-restore-check= uses the image identity of the running
 =nextcloud-db= container for its isolated scratch database, validates real
 application tables and removes only its own scratch state.
+
+The =aiagent= instance uses its own Guix-profile copy of =gak-services=.
+=aiagent update= builds and tests a local candidate without mounting the
+persistent state. It stops the agent project, waits for the root job's
+consistent Restic snapshot, then applies the exact prepared image ID without a
+pull. A temporary Compose override pins that ID while the container starts;
+the declared tag moves after readiness. Its readiness command runs inside the
+recreated container. The prior
+image remains pinned until recovery is no longer needed. A failed candidate
+probe leaves the running container untouched; a failure after recreation
+requires inspection of the snapshot before any manual rollback because
+persistent state may have changed.
+
+The root backup declaration requires =/etc/aiagent/restic-password= as a
+root-owned mode-0600 file. Its repository at
+=/marak/backups/aiagent/restic= is root-owned. The job stores =workspaces= and
+=container-home=, with seven daily, five weekly and twelve monthly snapshots.
+The minute job publishes its result from root-owned runtime storage; daily
+backup and restore check reject a surviving agent operation before stopping
+Compose. Stop failures and termination signals settle active child processes
+and trigger bounded home and Compose recovery before releasing the lock.
+The daily run quiesces the Compose service. A restore check stops the service,
+takes a fresh snapshot and writes its scratch tree under the root-owned
+=/marak/backups/aiagent= directory; it compares file checksums and paths, removes the tree
+and starts the service. The HDD copy
+is local recovery and does not constitute an off-host copy.
 
 Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or

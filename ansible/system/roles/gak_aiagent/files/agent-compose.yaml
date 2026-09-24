@@ -11,3 +11,8 @@ services:
       - /home/aiagent/container-home:/home/node:rw
       - /home/aiagent/workspaces:/work:rw
       - /home/aiagent/cache:/cache:rw
+
+x-update:
+  readiness:
+    - /home/aiagent/.local/bin/gak-aiagent-update-ready
+  readiness-timeout: 120

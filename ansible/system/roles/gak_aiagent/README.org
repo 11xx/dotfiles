@@ -56,7 +56,7 @@ executable in the image; its interactive TUI, =/login= menu and print mode
 are available through the =pi= command.
 
 =aiagent status=, =logs=, =shell= and =exec= inspect or enter the container.
-=build=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
+=build=, =update=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
 account-local lock. =cache-size= reports the disposable cache subtree;
 =cache-clean= removes only that subtree's contents. Harness logins and project
 work remain in the separate persistent mounts. The 32 GiB cache target is
@@ -65,6 +65,45 @@ image's 256 GiB size is the hard account budget.
 The operation helper keeps a PID and kernel start time under =/run/aiagent=.
 It waits for a recorded foreground operation after an interrupted caller,
 while Podman's detached processes inherit no lock descriptor.
+Project mutations move their worker from the SSH cgroup into the
+=/aiagent/delegated/service/cli= leaf before invoking Podman. Containers
+created there remain in the service subtree. Read-only commands stay in the
+invoking session. An empty CLI leaf is removed after the worker exits; a leaf
+with a running container stays until that container stops or home stop drains
+the service subtree.
+
+=aiagent update= builds a candidate under a unique local tag and tests it in
+a disposable container without persistent mounts or network access. It stops
+the project and waits for the root backup job to snapshot =workspaces= and
+=container-home= before passing the candidate's exact ID to the shared
+updater. The Compose project declares a readiness command. An update that
+fails before image application starts the existing image; a failure during
+application retains the previous image and backup for operator recovery. The
+account's Guix profile carries its own =gak-services= package and Compose
+provider.
+
+The host module's root mcron extension handles update requests every minute
+and takes a daily snapshot at 04:15. The Restic password is a root-owned 0600
+file at =/etc/aiagent/restic-password=, outside the mounted agent home. The
+repository is =/marak/backups/aiagent/restic=. The root job retains seven
+daily, five weekly and twelve monthly snapshots. Its request result is created
+under root-owned =/run/aiagent-backup= and atomically handed to aiagent. Daily
+backup and restore check reject a surviving operation worker before stopping
+Compose. A failed stop or termination signal settles the current child process
+group and triggers bounded recovery of the home mount and Compose service
+before the operation lock is released. =backup.py restore-check=
+stops Compose, takes a fresh snapshot, restores to a
+root-owned scratch directory on the backup disk, compares file checksums and paths,
+removes the scratch tree and starts Compose.
+The host declaration must be activated by the operator before updates use the
+request job.
+From =ansible/system=, run =podman unshare python3
+roles/guix_config/tests/backup-security.py= for the root-shaped path probes,
+=python3 roles/guix_config/tests/backup-recovery.py= for failed-stop recovery,
+and =python3 roles/gak_aiagent/tests/command-serialization.py= for interrupted
+agent operations and backup exclusion. Run =python3
+roles/guix_config/tests/backup-signals.py= for termination during snapshot and
+restore.
 Run =python3 roles/gak_aiagent/tests/command-serialization.py= from
 =ansible/system= to exercise a killed caller, concurrent operations and scoped
 cache cleanup against scratch paths.

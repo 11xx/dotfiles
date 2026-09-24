@@ -15,6 +15,7 @@ IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
+PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
 GATE = """
 import os
 import sys
@@ -23,7 +24,12 @@ ready = os.read(fd, 1)
 os.close(fd)
 if ready != b'1':
     sys.exit(125)
-os.execv(sys.argv[2], sys.argv[2:])
+leaf = sys.argv[2]
+if leaf:
+    os.makedirs(leaf, mode=0o700, exist_ok=True)
+    with open(os.path.join(leaf, 'cgroup.procs'), 'w') as target:
+        target.write(str(os.getpid()))
+os.execv(sys.argv[3], sys.argv[3:])
 """
 
 
@@ -46,13 +52,27 @@ def wait_for_previous():
     ACTIVE.unlink()
 
 
-def run(command):
+def clean_project_cgroup():
+    try:
+        events = dict(line.split() for line in (PROJECT_CGROUP / "cgroup.events").read_text().splitlines())
+        if events.get("populated") != "0":
+            return
+        for directory, children, _ in os.walk(PROJECT_CGROUP, topdown=False):
+            for child in children:
+                (Path(directory) / child).rmdir()
+        PROJECT_CGROUP.rmdir()
+    except (FileNotFoundError, OSError):
+        pass
+
+
+def run(command, project=False):
     read_fd, write_fd = os.pipe()
     worker = None
     recorded = False
     try:
         worker = subprocess.Popen(
-            [sys.executable, "-c", GATE, str(read_fd), *command],
+            [sys.executable, "-c", GATE, str(read_fd),
+             str(PROJECT_CGROUP) if project else "", *command],
             pass_fds=(read_fd,),
             start_new_session=True,
         )
@@ -75,6 +95,8 @@ def run(command):
             worker.wait()
         if recorded and worker.poll() is not None:
             ACTIVE.unlink(missing_ok=True)
+        if project and worker is not None and worker.poll() is not None:
+            clean_project_cgroup()
 
 
 def cache_clean():
@@ -100,6 +122,8 @@ def command_for(operation):
             raise RuntimeError(f"initial image already exists: {IMAGE}")
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
+    if operation == "update":
+        return [str(HOME / ".local/bin/aiagent-update")]
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
@@ -119,10 +143,13 @@ def main():
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
+        clean_project_cgroup()
         if sys.argv[1] == "cache-clean":
             cache_clean()
             return 0
-        return run(command_for(sys.argv[1]))
+        operation = sys.argv[1]
+        return run(command_for(operation), project=operation in
+                   {"start", "stop", "restart", "recreate", "update"})
 
 
 if __name__ == "__main__":

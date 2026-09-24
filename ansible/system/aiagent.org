@@ -26,7 +26,9 @@ against their payload and conmon PIDs. It asks Podman to stop only stale
 records and verifies that each leaves the running state. Healthy containers
 and their writable layers remain in place.
 Runtime and cgroup setup remain one-shots: their directories and limit writes
-are idempotent, and they have no mount to undo. Home creation and unmount
+are idempotent, and they have no mount to undo. Runtime setup creates the
+account-owned operation lock for both agent commands and the root backup job.
+Home creation and unmount
 hold the same root-only lock. A concurrent start waits up to five minutes,
 then checks the
 mounted image left by the first or fails without touching its candidate.
@@ -86,7 +88,9 @@ removes the account, sub-ID declaration and host services together.
   #:use-module (gnu packages base)
   #:use-module (gnu packages bash)
   #:use-module (gnu packages linux)
+  #:use-module (gnu packages python)
   #:use-module (gnu services)
+  #:use-module (gnu services mcron)
   #:use-module (gnu services shepherd)
   #:use-module (gnu services ssh)
   #:use-module (gnu system accounts)
@@ -414,8 +418,16 @@ removes the account, sub-ID declaration and host services together.
          (error "cannot create aiagent runtime directory"))
        (let ((account (getpwnam "aiagent")))
          (chown "/run/aiagent" (passwd:uid account)
-                (passwd:gid account)))
-       (chmod "/run/aiagent" #o700))))
+                (passwd:gid account))
+         (chmod "/run/aiagent" #o700)
+         (let ((fd (open "/run/aiagent/aiagent.lock"
+                         (logior O_WRONLY O_CREAT O_NOFOLLOW O_NONBLOCK)
+                         #o600)))
+           (unless (eq? (stat:type (fstat fd)) 'regular)
+             (error "aiagent operation lock is not a regular file"))
+           (chown fd (passwd:uid account) (passwd:gid account))
+           (chmod fd #o600)
+           (close fd))))))
 
 (define aiagent-cgroup-program
   (program-file
@@ -632,6 +644,19 @@ removes the account, sub-ID declaration and host services together.
 (define (aiagent-keys keys)
   (list (cons "aiagent" keys)))
 
+(define %backup-script (local-file "backup.py"))
+
+(define (aiagent-backup-jobs _)
+  (list
+   #~(job "* * * * *"
+          (string-append #$(file-append python "/bin/python3")
+                         " " #$%backup-script " request")
+          #:user "root")
+   #~(job "15 4 * * *"
+          (string-append #$(file-append python "/bin/python3")
+                         " " #$%backup-script " daily")
+          #:user "root")))
+
 (define aiagent-host-service-type
   (service-type
    (name 'aiagent-host)
@@ -640,9 +665,507 @@ removes the account, sub-ID declaration and host services together.
           (service-extension subids-service-type aiagent-subids)
           (service-extension openssh-service-type aiagent-keys)
           (service-extension pam-root-service-type aiagent-pam-extensions)
+          (service-extension mcron-service-type aiagent-backup-jobs)
           (service-extension shepherd-root-service-type
                              aiagent-shepherd-services)))
    (description "Isolated rootless coding-agent host foundation.")))
+#+end_src
+
+The root mcron jobs use a store-captured program and a root-owned Restic
+password file at =/etc/aiagent/restic-password=. They write encrypted snapshots
+to =/marak/backups/aiagent/restic=. The daily job stops the Compose service
+while it copies the persistent workspaces and container home, then starts it.
+An update asks the minute job for a snapshot after stopping its project. The
+password and repository are outside the agent's mounted home and container.
+The backup job serializes itself with a root-only lock under =/var/lib/aiagent=.
+The minute job creates its result under root-owned =/run/aiagent-backup= and
+atomically hands the finished file to the account. Daily backup and restore
+check take the account's operation lock and reject a surviving worker recorded
+under =/run/aiagent=. They attempt service recovery even when stopping Compose
+fails; the stop deadline covers the documented service and home stop chain.
+Termination signals settle the current command's process group before a
+bounded recovery of the home mount and Compose service. Further signals during
+recovery do not release the operation lock early. The handler records the
+request; command waits check it at bounded intervals, and recovery performs no
+asynchronous interruption checks.
+Seven daily, five weekly and twelve monthly snapshots are retained. A restore
+check takes a fresh snapshot into root-controlled scratch on the backup disk,
+compares every regular file by checksum and removes the scratch tree.
+
+#+begin_src python :tangle (expand-file-name "roles/guix_config/files/modules/aiagent/backup.py" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o644
+import errno
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import secrets
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from contextlib import contextmanager
+
+
+HOME = Path("/home/aiagent")
+RUNTIME = Path("/run/aiagent")
+RESULT_ROOT = Path("/run/aiagent-backup")
+STATE = Path("/var/lib/aiagent")
+BACKUP_ROOT = Path("/marak/backups/aiagent")
+REPOSITORY = BACKUP_ROOT / "restic"
+PASSWORD = Path("/etc/aiagent/restic-password")
+SERVICE = "aiagent-compose"
+STOP_TIMEOUT = 2700
+START_TIMEOUT = 180
+HOME_START_TIMEOUT = 1800
+RECOVERY_TIMEOUT = 2700
+NOFOLLOW = os.O_NOFOLLOW | os.O_CLOEXEC
+SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+_signal_depth = 0
+_interrupted = None
+
+
+class Busy(Exception):
+    pass
+
+
+class Interrupted(Exception):
+    def __init__(self, signum):
+        super().__init__(f"interrupted by signal {signum}")
+        self.signum = signum
+
+
+def handle_signal(signum, _frame):
+    global _interrupted
+    if _interrupted is None:
+        _interrupted = signum
+
+
+def check_interrupted():
+    if _interrupted is not None:
+        raise Interrupted(_interrupted)
+
+
+@contextmanager
+def signal_guard():
+    global _signal_depth, _interrupted
+    previous = None
+    if _signal_depth == 0:
+        _interrupted = None
+        previous = {}
+        try:
+            for signum in SIGNALS:
+                previous[signum] = signal.getsignal(signum)
+                signal.signal(signum, handle_signal)
+        except BaseException:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+            raise
+    _signal_depth += 1
+    try:
+        yield
+    finally:
+        _signal_depth -= 1
+        if previous is not None:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+
+
+def agent_account():
+    return pwd.getpwnam("aiagent")
+
+
+def root_directory(path, create=False):
+    if create:
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+    metadata = path.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != 0 or stat.S_IMODE(metadata.st_mode) != 0o700:
+        raise RuntimeError(f"unsafe backup directory: {path}")
+
+
+def secure_file(path, flags, owner=None):
+    descriptor = os.open(path, flags | NOFOLLOW | os.O_NONBLOCK)
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISREG(metadata.st_mode) or (owner is not None and metadata.st_uid != owner):
+        os.close(descriptor)
+        raise RuntimeError(f"unsafe backup file: {path}")
+    return descriptor, metadata
+
+
+def stop_process(process):
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        process.poll()
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    try:
+        process.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=5)
+
+
+def run_process(arguments, *, check=False, timeout=None, env=None,
+                stdout=None, stderr=None, capture_output=False, text=False,
+                ignore_interrupt=False):
+    if not ignore_interrupt:
+        check_interrupted()
+    process = subprocess.Popen(
+        arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
+        stderr=subprocess.PIPE if capture_output else stderr,
+        text=text, start_new_session=True,
+    )
+    deadline = None if timeout is None else time.monotonic() + timeout
+    try:
+        while True:
+            if not ignore_interrupt:
+                check_interrupted()
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise subprocess.TimeoutExpired(arguments, timeout)
+            interval = 0.2 if remaining is None else min(0.2, remaining)
+            try:
+                output, errors = process.communicate(timeout=interval)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        if not ignore_interrupt:
+            check_interrupted()
+    except (Interrupted, subprocess.TimeoutExpired):
+        stop_process(process)
+        raise
+    result = subprocess.CompletedProcess(arguments, process.returncode, output, errors)
+    if check:
+        result.check_returncode()
+    return result
+
+
+def command(*arguments, timeout=None, capture=False):
+    return run_process(arguments, check=True, timeout=timeout,
+                       capture_output=capture, text=capture)
+
+
+def validate_password():
+    metadata = PASSWORD.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0 or stat.S_IMODE(metadata.st_mode) != 0o600:
+        raise RuntimeError("backup password file must be root-owned mode 0600")
+
+
+def snapshot():
+    validate_password()
+    if run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        raise RuntimeError("agent home is not mounted")
+    root_directory(BACKUP_ROOT, create=True)
+    root_directory(REPOSITORY, create=True)
+    environment = dict(os.environ, RESTIC_REPOSITORY=str(REPOSITORY),
+                       RESTIC_PASSWORD_FILE=str(PASSWORD))
+
+    def restic(*arguments, quiet=True):
+        argv = ["restic", *arguments]
+        if quiet:
+            argv.insert(1, "--quiet")
+        run_process(argv, check=True, env=environment)
+
+    if not (REPOSITORY / "config").is_file():
+        restic("init")
+    restic("backup", "--host", "gak", "--tag", "aiagent",
+           str(HOME / "workspaces"), str(HOME / "container-home"))
+    restic("forget", "--host", "gak", "--tag", "aiagent",
+           "--keep-daily", "7", "--keep-weekly", "5", "--keep-monthly", "12", "--prune")
+    restic("check")
+    return environment
+
+
+def process_identity(pid):
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    except FileNotFoundError:
+        return None
+    if fields[0] in ("Z", "X"):
+        return None
+    return fields[19]
+
+
+def active_operation():
+    try:
+        descriptor, _ = secure_file(RUNTIME / "aiagent.active", os.O_RDONLY, agent_account().pw_uid)
+    except FileNotFoundError:
+        return False
+    try:
+        payload = os.read(descriptor, 4097)
+    finally:
+        os.close(descriptor)
+    if len(payload) > 4096:
+        raise Busy("agent operation record is too large")
+    try:
+        record = json.loads(payload)
+        pid, started = record["pid"], record["start"]
+        if not isinstance(pid, int) or pid < 1 or not isinstance(started, str):
+            raise ValueError()
+    except (ValueError, KeyError, TypeError):
+        raise Busy("agent operation record is invalid") from None
+    return process_identity(pid) == started
+
+
+def operation_lock():
+    descriptor, _ = secure_file(RUNTIME / "aiagent.lock", os.O_RDONLY, agent_account().pw_uid)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise Busy("an agent operation holds the lock") from None
+        if active_operation():
+            raise Busy("an agent operation worker is still running")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def read_request():
+    path = RUNTIME / "backup-request"
+    try:
+        descriptor, metadata = secure_file(path, os.O_RDONLY, agent_account().pw_uid)
+    except FileNotFoundError:
+        return None
+    try:
+        if stat.S_IMODE(metadata.st_mode) != 0o600:
+            raise RuntimeError("unsafe backup request mode")
+        payload = os.read(descriptor, 129)
+        if len(payload) > 128:
+            raise RuntimeError("backup request is too large")
+    finally:
+        os.close(descriptor)
+    try:
+        nonce = payload.decode("ascii").strip()
+    except UnicodeDecodeError:
+        raise RuntimeError("invalid backup request") from None
+    if re.fullmatch(r"[0-9]+-[0-9]+", nonce) is None:
+        raise RuntimeError("invalid backup request")
+    return nonce, (metadata.st_dev, metadata.st_ino)
+
+
+def publish_result(nonce, outcome):
+    account = agent_account()
+    for _ in range(10):
+        temporary = RESULT_ROOT / f"result.{secrets.token_hex(12)}"
+        try:
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
+            break
+        except FileExistsError:
+            continue
+    else:
+        raise RuntimeError("cannot reserve backup result")
+    try:
+        payload = memoryview(f"{outcome} {nonce}\n".encode())
+        while payload:
+            payload = payload[os.write(descriptor, payload):]
+        os.fchown(descriptor, account.pw_uid, account.pw_gid)
+        os.fsync(descriptor)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    finally:
+        os.close(descriptor)
+    try:
+        os.replace(temporary, RUNTIME / "backup-result")
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def request():
+    received = read_request()
+    if received is None:
+        return
+    nonce, identity = received
+    failure = None
+    try:
+        snapshot()
+    except Exception as error:
+        failure = error
+    publish_result(nonce, "failed" if failure else "ok")
+    try:
+        current = (RUNTIME / "backup-request").lstat()
+        if (current.st_dev, current.st_ino) == identity:
+            (RUNTIME / "backup-request").unlink()
+    except FileNotFoundError:
+        pass
+    if failure:
+        raise failure
+
+
+def recover_service():
+    deadline = time.monotonic() + RECOVERY_TIMEOUT
+
+    def bound(limit):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("agent Compose recovery deadline expired")
+        return min(limit, remaining)
+
+    def start(service, limit):
+        for attempt in range(2):
+            try:
+                started = run_process(("herd", "start", service), timeout=bound(limit),
+                                      ignore_interrupt=True)
+                status = started.returncode
+            except subprocess.TimeoutExpired:
+                status = 124
+            if status == 0:
+                return
+            if attempt == 0:
+                try:
+                    run_process(("herd", "enable", service), timeout=bound(START_TIMEOUT),
+                                ignore_interrupt=True)
+                except subprocess.TimeoutExpired:
+                    pass
+        raise RuntimeError(f"agent service did not restart: {service}")
+
+    def mounted():
+        return run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
+                           timeout=bound(30), stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, ignore_interrupt=True).returncode == 0
+
+    if not mounted():
+        start("aiagent-home", HOME_START_TIMEOUT)
+        if not mounted():
+            raise RuntimeError("agent home did not remount")
+    try:
+        start(SERVICE, START_TIMEOUT)
+    except RuntimeError:
+        start("aiagent-home", HOME_START_TIMEOUT)
+        if not mounted():
+            raise RuntimeError("agent home did not remount") from None
+        start(SERVICE, START_TIMEOUT)
+
+
+def quiesced(action):
+    with signal_guard():
+        try:
+            check_interrupted()
+            command("herd", "stop", SERVICE, timeout=STOP_TIMEOUT)
+            check_interrupted()
+            action()
+            check_interrupted()
+        finally:
+            recover_service()
+        check_interrupted()
+
+
+def manifest(root):
+    entries = {}
+
+    def visit(path):
+        check_interrupted()
+        metadata = path.lstat()
+        relative = str(path.relative_to(root))
+        if stat.S_ISLNK(metadata.st_mode):
+            entries[relative] = ("link", os.readlink(path))
+        elif stat.S_ISDIR(metadata.st_mode):
+            entries[relative] = ("directory",)
+            for child in sorted(path.iterdir()):
+                visit(child)
+        elif stat.S_ISREG(metadata.st_mode):
+            digest = hashlib.sha256()
+            descriptor, _ = secure_file(path, os.O_RDONLY)
+            with os.fdopen(descriptor, "rb") as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    check_interrupted()
+                    digest.update(chunk)
+            entries[relative] = ("file", digest.hexdigest())
+        else:
+            entries[relative] = ("special", stat.S_IFMT(metadata.st_mode))
+
+    for name in ("workspaces", "container-home"):
+        visit(root / name)
+    return entries
+
+
+def restore_check():
+    environment = snapshot()
+    scratch = Path(tempfile.mkdtemp(prefix="restore-check.", dir=BACKUP_ROOT))
+    try:
+        run_process(("restic", "--quiet", "restore", "latest", "--host", "gak",
+                     "--tag", "aiagent", "--target", str(scratch)),
+                    check=True, env=environment)
+        restored = scratch / HOME.relative_to("/")
+        if manifest(HOME) != manifest(restored):
+            raise RuntimeError("agent restore checksums or paths differ")
+        print("agent restore checksums match")
+    finally:
+        shutil.rmtree(scratch)
+
+
+def run_operation(operation):
+    if os.geteuid() != 0:
+        raise RuntimeError("agent backup requires root")
+    os.environ["PATH"] = "/run/current-system/profile/bin:/run/privileged/bin:/usr/bin:/bin"
+    root_directory(STATE)
+    root_directory(RESULT_ROOT, create=True)
+    descriptor = os.open(STATE / "backup.lock", os.O_RDWR | os.O_CREAT | NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise Busy("another backup is running") from None
+        if operation == "request":
+            request()
+        elif operation in ("daily", "restore-check"):
+            validate_password()
+            operation_descriptor = operation_lock()
+            try:
+                quiesced(snapshot if operation == "daily" else restore_check)
+            finally:
+                os.close(operation_descriptor)
+        else:
+            raise RuntimeError("usage: backup.py {request|daily|restore-check}")
+    finally:
+        os.close(descriptor)
+
+
+def main(operation):
+    with signal_guard():
+        run_operation(operation)
+        check_interrupted()
+
+
+if __name__ == "__main__":
+    try:
+        main(sys.argv[1] if len(sys.argv) == 2 else "")
+    except Busy as error:
+        print(f"agent backup: {error}", file=sys.stderr)
+        sys.exit(75)
+    except Interrupted as error:
+        print(f"agent backup: {error}", file=sys.stderr)
+        sys.exit(128 + error.signum)
+    except (OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        print(f"agent backup: {error}", file=sys.stderr)
+        sys.exit(1)
 #+end_src
 
 * Gak container image
@@ -815,11 +1338,12 @@ export XDG_RUNTIME_DIR=/run/aiagent
 export TMPDIR="$home/tmp"
 export CONTAINERS_IMAGE_COPY_TMPDIR="$home/image-copy-tmp"
 export PODMAN_COMPOSE_PROVIDER="$home/.guix-profile/bin/podman-compose"
+export GAK_SERVICES_HOME_PROFILE="$home/.guix-profile"
 export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
 
 die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
 usage() {
-    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
     exec "$operator" "$1"
@@ -838,7 +1362,7 @@ case "$cmd" in
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    build|update|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
     *) usage; exit 2 ;;
 esac
@@ -847,7 +1371,11 @@ esac
 The lock helper records only a PID and kernel start time under =/run/aiagent=.
 Its worker waits for that record before executing Podman. A dead caller closes
 the worker's start gate; an operation that already started remains recorded
-until its process exits. Cache cleanup runs in the lock holder itself.
+until its process exits. Project mutations move the worker into
+=/sys/fs/cgroup/aiagent/delegated/service/cli= before executing Podman, so
+long-lived project containers stay in the service subtree. An empty CLI leaf
+is removed after the worker exits; a populated leaf stays until its container
+stops or the home stop drains it. Cache cleanup runs in the lock holder itself.
 
 #+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-operation" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
 import fcntl
@@ -866,6 +1394,7 @@ IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
+PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
 GATE = """
 import os
 import sys
@@ -874,7 +1403,12 @@ ready = os.read(fd, 1)
 os.close(fd)
 if ready != b'1':
     sys.exit(125)
-os.execv(sys.argv[2], sys.argv[2:])
+leaf = sys.argv[2]
+if leaf:
+    os.makedirs(leaf, mode=0o700, exist_ok=True)
+    with open(os.path.join(leaf, 'cgroup.procs'), 'w') as target:
+        target.write(str(os.getpid()))
+os.execv(sys.argv[3], sys.argv[3:])
 """
 
 
@@ -897,13 +1431,27 @@ def wait_for_previous():
     ACTIVE.unlink()
 
 
-def run(command):
+def clean_project_cgroup():
+    try:
+        events = dict(line.split() for line in (PROJECT_CGROUP / "cgroup.events").read_text().splitlines())
+        if events.get("populated") != "0":
+            return
+        for directory, children, _ in os.walk(PROJECT_CGROUP, topdown=False):
+            for child in children:
+                (Path(directory) / child).rmdir()
+        PROJECT_CGROUP.rmdir()
+    except (FileNotFoundError, OSError):
+        pass
+
+
+def run(command, project=False):
     read_fd, write_fd = os.pipe()
     worker = None
     recorded = False
     try:
         worker = subprocess.Popen(
-            [sys.executable, "-c", GATE, str(read_fd), *command],
+            [sys.executable, "-c", GATE, str(read_fd),
+             str(PROJECT_CGROUP) if project else "", *command],
             pass_fds=(read_fd,),
             start_new_session=True,
         )
@@ -926,6 +1474,8 @@ def run(command):
             worker.wait()
         if recorded and worker.poll() is not None:
             ACTIVE.unlink(missing_ok=True)
+        if project and worker is not None and worker.poll() is not None:
+            clean_project_cgroup()
 
 
 def cache_clean():
@@ -951,6 +1501,8 @@ def command_for(operation):
             raise RuntimeError(f"initial image already exists: {IMAGE}")
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
+    if operation == "update":
+        return [str(HOME / ".local/bin/aiagent-update")]
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
@@ -970,10 +1522,13 @@ def main():
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
+        clean_project_cgroup()
         if sys.argv[1] == "cache-clean":
             cache_clean()
             return 0
-        return run(command_for(sys.argv[1]))
+        operation = sys.argv[1]
+        return run(command_for(operation), project=operation in
+                   {"start", "stop", "restart", "recreate", "update"})
 
 
 if __name__ == "__main__":
@@ -982,6 +1537,133 @@ if __name__ == "__main__":
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         print(f"aiagent: {error}", file=sys.stderr)
         sys.exit(1)
+#+end_src
+
+An update builds a uniquely tagged candidate from the deployed context. Its
+probe runs in a disposable container without persistent mounts or network
+access. The live project is stopped before the root backup job snapshots its
+workspaces and container home. The updater accepts the candidate's image ID
+from the stopped project and runs the project's readiness command. A failure
+before application starts the existing image again; a failed application keeps
+both image IDs and the recovery snapshot for operator inspection.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-update" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+UPDATER = HOME / ".guix-profile/bin/gak-services"
+IMAGE = "localhost/aiagent-fedora:44-v1"
+PROJECT = HOME / "services/agent/compose.yaml"
+REQUEST = Path("/run/aiagent/backup-request")
+RESULT = Path("/run/aiagent/backup-result")
+
+
+def command(*argv, timeout=7200):
+    result = subprocess.run(argv, timeout=timeout)
+    if result.returncode:
+        raise RuntimeError(f"command failed: {argv[1]}")
+
+
+def image_id(reference):
+    result = subprocess.run(
+        [PODMAN, "image", "inspect", "--format", "{{.Id}}", reference],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode:
+        raise RuntimeError("the local image is absent")
+    return result.stdout.strip().removeprefix("sha256:")
+
+
+def backup():
+    nonce = f"{os.getpid()}-{time.monotonic_ns()}"
+    RESULT.unlink(missing_ok=True)
+    descriptor = os.open(REQUEST, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(descriptor, "w") as request:
+        request.write(nonce + "\n")
+    try:
+        deadline = time.monotonic() + 7200
+        while time.monotonic() < deadline:
+            try:
+                response = RESULT.read_text().strip()
+            except FileNotFoundError:
+                time.sleep(1)
+                continue
+            if response == f"ok {nonce}":
+                return
+            if response == f"failed {nonce}":
+                raise RuntimeError("the root backup job failed")
+            time.sleep(1)
+        raise RuntimeError("the root backup job did not answer within 7200 seconds")
+    finally:
+        REQUEST.unlink(missing_ok=True)
+        RESULT.unlink(missing_ok=True)
+
+
+def main():
+    context = HOME / "image"
+    if not (context / "Containerfile").is_file():
+        raise RuntimeError("image context is not deployed")
+    if not UPDATER.is_file():
+        raise RuntimeError("the account's gak-services package is not installed")
+    old = image_id(IMAGE)
+    candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
+    built = False
+    quiesced = False
+    applying = False
+    try:
+        command(PODMAN, "build", "--pull=missing", "--tag", candidate,
+                "--file", str(context / "Containerfile"), str(context))
+        built = True
+        candidate_id = image_id(candidate)
+        command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
+                "/bin/bash", "-lc",
+                "command -v codex claude opencode t3 pi >/dev/null && t3 serve --help >/dev/null",
+                timeout=180)
+        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
+        quiesced = True
+        backup()
+        applying = True
+        command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
+                "--prepared-image", f"agent={candidate_id}", timeout=900)
+        if image_id(IMAGE) != candidate_id:
+            raise RuntimeError("the accepted image reference moved")
+        subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        print(f"aiagent: accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if quiesced and not applying:
+            command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
+                    timeout=180)
+        if built and not applying:
+            subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        raise
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: update failed: {error}", file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
+The update readiness command checks that the recreated container can execute
+the image-owned harness commands through its persistent mounts. It reports no
+credential content.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/gak-aiagent-update-ready" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+export HOME=/home/aiagent
+export XDG_RUNTIME_DIR=/run/aiagent
+export PATH="/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
+exec /run/current-system/profile/bin/podman exec aiagent /bin/sh -c \
+    'test -d /home/node && test -d /work && test -d /cache && command -v codex && command -v claude && command -v opencode && command -v t3 && command -v pi' \
+    >/dev/null
 #+end_src
 
 * Ak container reference
