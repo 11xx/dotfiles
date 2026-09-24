@@ -67,8 +67,11 @@ delegated subtree's =cgroup.kill=, terminating every aiagent process including
 SSH sessions. It waits up to one minute for =cgroup.events= to report
 =populated 0= before unmounting; a populated subtree fails the stop with
 remaining PIDs reported. A queued home stop is bounded by five minutes for the
-lock, three for Podman, one for cgroup drain and two for unmount. An incomplete
-Podman stop still proceeds to the forced drain.
+lock, three for Podman, one for cgroup drain and two for unmount: eleven minutes
+for the home action. The full stop chain has forty-two minutes of configured
+waits: Compose's thirty-minute helper grace and one-minute service drain,
+followed by the home action. These bounds exclude an already-running start.
+An incomplete Podman stop still proceeds to the forced drain.
 An empty drain removes descendant cgroups, including Podman's runtime group
 and stale SSH leaves, while preserving the delegated and service roots.
 Populated cgroups remain in place. This lets the same Podman container start
