@@ -51,6 +51,15 @@
                              "(ecc (curve Ed25519)\n"
                              "(q #C1FD53E5D4CE971933EC50C9F307AE2171A2D3B52C804642A7A35F84F3A4EA98#)))")))
 
+{% if gak_git_hub_enabled | bool %}
+(define %git-hub-config
+  (git-hub-configuration
+   (admin-pubkey
+    (plain-file "operator.pub"
+                "{{ gak_git_hub_admin_public_key | trim }}\n"))
+   (max-push-bytes {{ gak_git_hub_max_push_bytes }})))
+{% endif %}
+
 (define %gak-operator-runtime-deadline-seconds 180)
 (define %gak-operator-runtime-request-seconds 30)
 (define %gak-operator-runtime-poll-seconds 1)
@@ -247,15 +256,6 @@
                                       "{{ gak_aiagent_shell_public_key | trim }}\n")))
 {% endif %}
 
-{% if gak_git_hub_enabled | bool %}
-           (git-hub-service
-            (git-hub-configuration
-             (admin-pubkey
-              (plain-file "operator.pub"
-                          "{{ gak_git_hub_admin_public_key | trim }}\n"))
-             (max-push-bytes {{ gak_git_hub_max_push_bytes }})))
-{% endif %}
-
 {% if 'nextcloud' in gak_applications %}
 {{ lookup('ansible.builtin.template', role_path ~ '/../gak_nextcloud/templates/jobs.scm.j2') }}
 {% endif %}
@@ -309,6 +309,9 @@
                 ))
               (stop #~(make-kill-destructor #:grace-period 1800))
               (respawn? #f)))))
+{% if gak_git_hub_enabled | bool %}
+          (git-hub-services %git-hub-config)
+{% endif %}
           ;; This is the default list of services we are appending to.
           (modify-services %base-services
                            (guix-service-type config =>

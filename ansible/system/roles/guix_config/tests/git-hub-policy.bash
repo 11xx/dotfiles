@@ -7,7 +7,9 @@ original_home=$HOME
 scratch=$(mktemp -d "${HOME}/.cache/gak-git-hub-policy.XXXXXXXX")
 trap 'rm -rf -- "$scratch"' EXIT
 export HOME="$scratch/home"
-export PATH="$(dirname "$gitolite_bin"):/run/current-system/profile/bin:$original_home/.guix-profile/bin:/usr/bin:/bin"
+gitolite_dir=$(dirname "$gitolite_bin")
+PATH="$gitolite_dir:/run/current-system/profile/bin:$original_home/.guix-profile/bin:/usr/bin:/bin"
+export PATH
 mkdir -m 0700 "$HOME"
 ssh-keygen -q -t ed25519 -N '' -f "$scratch/operator" >/dev/null
 ssh-keygen -q -t ed25519 -N '' -f "$scratch/aiagent" >/dev/null

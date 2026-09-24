@@ -21,6 +21,8 @@ from contextlib import contextmanager
 HOME = Path("/home/aiagent")
 HUB_HOME = Path("/var/lib/agentgit")
 HUB_REPOS = ("gitolite-admin", "arc")
+HUB_LOCK_DIRECTORY = Path("/var/lib/agentgit-lock")
+HUB_LOCK = HUB_LOCK_DIRECTORY / "receive.lock"
 RUNTIME = Path("/run/aiagent")
 RESULT_ROOT = Path("/run/aiagent-backup")
 STATE = Path("/var/lib/aiagent")
@@ -95,6 +97,36 @@ def hub_account():
         return None
 
 
+@contextmanager
+def hub_exclusion():
+    account = hub_account()
+    if account is None:
+        yield
+        return
+    directory = HUB_LOCK_DIRECTORY.lstat()
+    if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != 0
+            or directory.st_gid != account.pw_gid
+            or stat.S_IMODE(directory.st_mode) != 0o750):
+        raise RuntimeError("unsafe Git hub lock directory")
+    descriptor, metadata = secure_file(HUB_LOCK, os.O_RDWR, 0)
+    try:
+        if metadata.st_gid != account.pw_gid or stat.S_IMODE(metadata.st_mode) != 0o660:
+            raise RuntimeError("unsafe Git hub lock file")
+        deadline = time.monotonic() + 300
+        while True:
+            check_interrupted()
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise Busy("Git hub receive did not finish before backup deadline") from None
+                time.sleep(0.2)
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def root_directory(path, create=False):
     if create:
         try:
@@ -144,14 +176,16 @@ def stop_process(process):
 
 
 def run_process(arguments, *, check=False, timeout=None, env=None,
-                stdout=None, stderr=None, capture_output=False, text=False,
+                stdin=None, stdout=None, stderr=None, capture_output=False, text=False,
+                cwd=None,
                 ignore_interrupt=False, user=None, group=None, extra_groups=None):
     if not ignore_interrupt:
         check_interrupted()
     process = subprocess.Popen(
-        arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
+        arguments, env=env, stdin=stdin,
+        stdout=subprocess.PIPE if capture_output else stdout,
         stderr=subprocess.PIPE if capture_output else stderr,
-        text=text, start_new_session=True, user=user, group=group,
+        text=text, cwd=cwd, start_new_session=True, user=user, group=group,
         extra_groups=extra_groups,
     )
     deadline = None if timeout is None else time.monotonic() + timeout
@@ -200,31 +234,99 @@ def digest_file(path):
     return digest.hexdigest()
 
 
-def verify_bundles(directory, names):
-    empty = directory / "verify.git"
-    run_process(("git", "init", "--bare", "--quiet", str(empty)), check=True)
+def hub_git(account, environment, arguments, **kwargs):
+    return run_process(("git", *arguments), check=True, env=environment,
+                       user=account.pw_uid, group=account.pw_gid,
+                       extra_groups=[], **kwargs)
+
+
+def hub_git_environment():
+    return dict(os.environ, HOME=str(HUB_HOME),
+                XDG_CONFIG_HOME=str(HUB_HOME / ".config"),
+                GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+
+
+def hub_refs(account, environment, source, cwd=None):
+    result = hub_git(account, environment,
+                     ("-C", str(source), "for-each-ref",
+                      "--format=%(objectname) %(refname)"),
+                     capture_output=True, text=True, cwd=cwd)
+    refs = {}
+    for line in result.stdout.splitlines():
+        oid, ref = line.split(" ", 1)
+        refs[ref] = oid
+    head = hub_git(account, environment,
+                   ("-C", str(source), "symbolic-ref", "HEAD"),
+                   capture_output=True, text=True, cwd=cwd).stdout.strip()
+    return refs, head
+
+
+def verify_bundles(directory, expected, admin_files, account):
+    imports = Path(tempfile.mkdtemp(prefix="restore.", dir=HUB_LOCK_DIRECTORY))
+    os.chown(imports, account.pw_uid, account.pw_gid)
+    environment = hub_git_environment()
     try:
-        for name in names:
-            run_process(("git", "-C", str(empty), "bundle", "verify",
-                         str(directory / f"{name}.bundle")), check=True,
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for name, details in expected.items():
+            destination = f"{name}.git"
+            hub_git(account, environment, ("init", "--bare", "--quiet", destination),
+                    cwd=imports)
+            descriptor, _ = secure_file(directory / f"{name}.bundle", os.O_RDONLY, 0)
+            try:
+                received = hub_git(account, environment,
+                                   ("-C", destination, "bundle", "unbundle", "-"),
+                                   stdin=descriptor, cwd=imports,
+                                   capture_output=True, text=True)
+            finally:
+                os.close(descriptor)
+            advertised = {}
+            for line in received.stdout.splitlines():
+                oid, ref = line.split(" ", 1)
+                if ref.startswith("refs/"):
+                    advertised[ref] = oid
+            if advertised != details["refs"]:
+                raise RuntimeError(f"Git hub bundle refs differ: {name}")
+            for ref, oid in details["refs"].items():
+                hub_git(account, environment,
+                        ("-C", destination, "update-ref", ref, oid), cwd=imports)
+            hub_git(account, environment,
+                    ("-C", destination, "symbolic-ref", "HEAD", details["head"]),
+                    cwd=imports)
+            hub_git(account, environment,
+                    ("-C", destination, "fsck", "--full", "--strict", "--no-reflogs"),
+                    cwd=imports, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL)
+            refs, head = hub_refs(account, environment, destination, cwd=imports)
+            if refs != details["refs"] or head != details["head"]:
+                raise RuntimeError(f"Git hub restored refs differ: {name}")
+        checkout = imports / "admin-files"
+        checkout.mkdir(mode=0o700)
+        os.chown(checkout, account.pw_uid, account.pw_gid)
+        hub_git(account, environment,
+                (f"--git-dir={imports / 'gitolite-admin.git'}",
+                 f"--work-tree={checkout}", "checkout", "-f", "HEAD", "--",
+                 "conf", "keydir"), cwd=imports)
+        restored_files = manifest(checkout, ("conf/gitolite.conf", "keydir"))
+        if restored_files != admin_files:
+            differing = sorted(name for name in set(restored_files) | set(admin_files)
+                               if restored_files.get(name) != admin_files.get(name))
+            raise RuntimeError(f"Git hub administrative policy or keys differ: {differing}")
     finally:
-        shutil.rmtree(empty)
+        shutil.rmtree(imports)
 
 
 def hub_bundles():
     account = hub_account()
     if account is None:
-        return None, {}
+        return None, None
     metadata = HUB_HOME.lstat()
     if not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != account.pw_uid or stat.S_IMODE(metadata.st_mode) != 0o750:
         raise RuntimeError("unsafe Git hub home")
     scratch = Path(tempfile.mkdtemp(prefix="hub-bundles.", dir=BACKUP_ROOT))
-    names = []
-    environment = dict(os.environ, HOME=str(HUB_HOME),
-                       XDG_CONFIG_HOME=str(HUB_HOME / ".config"),
-                       GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+    expected = {}
+    environment = hub_git_environment()
     try:
+        admin_files = manifest(HUB_HOME / ".gitolite",
+                               ("conf/gitolite.conf", "keydir"))
         for name in HUB_REPOS:
             source = HUB_HOME / "repositories" / f"{name}.git"
             try:
@@ -235,26 +337,31 @@ def hub_bundles():
                 raise RuntimeError("Git hub administration repository is missing") from None
             if not stat.S_ISDIR(repo.st_mode) or repo.st_uid != account.pw_uid:
                 raise RuntimeError("unsafe Git hub repository")
-            if name == "arc":
-                refs = run_process(("git", "-C", str(source), "show-ref", "--quiet"),
-                                   env=environment, user=account.pw_uid,
-                                   group=account.pw_gid, extra_groups=[])
-                if refs.returncode == 1:
+            refs, head = hub_refs(account, environment, source)
+            if not refs:
+                if name == "arc":
                     continue
-                if refs.returncode:
-                    raise RuntimeError("cannot inspect Arc hub refs")
+                raise RuntimeError("Git hub administration repository is empty")
             destination = scratch / f"{name}.bundle"
             descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
             try:
-                run_process(("git", "-C", str(source), "bundle", "create", "-", "--all"),
-                            check=True, env=environment, stdout=descriptor,
-                            user=account.pw_uid, group=account.pw_gid, extra_groups=[])
+                hub_git(account, environment,
+                        ("-C", str(source), "bundle", "create", "-", "--all"),
+                        stdout=descriptor)
                 os.fsync(descriptor)
             finally:
                 os.close(descriptor)
-            names.append(name)
-        verify_bundles(scratch, names)
-        return scratch, {name: digest_file(scratch / f"{name}.bundle") for name in names}
+            expected[name] = {"digest": digest_file(destination),
+                              "refs": refs, "head": head}
+        verify_bundles(scratch, expected, admin_files, account)
+        recorded = {"repos": expected, "admin_files": admin_files}
+        manifest_file = scratch / "manifest.json"
+        descriptor = os.open(manifest_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, "w") as output:
+            json.dump(recorded, output, sort_keys=True)
+            output.flush()
+            os.fsync(output.fileno())
+        return scratch, recorded
     except BaseException:
         shutil.rmtree(scratch)
         raise
@@ -276,21 +383,22 @@ def snapshot():
             argv.insert(1, "--quiet")
         run_process(argv, check=True, env=environment)
 
-    bundles, hashes = hub_bundles()
-    try:
-        if not (REPOSITORY / "config").is_file():
-            restic("init")
-        sources = [str(HOME / "workspaces"), str(HOME / "container-home")]
-        if bundles is not None:
-            sources.append(str(bundles))
-        restic("backup", "--host", "gak", "--tag", "aiagent", *sources)
-        restic("forget", "--host", "gak", "--tag", "aiagent",
-               "--keep-daily", "7", "--keep-weekly", "5", "--keep-monthly", "12", "--prune")
-        restic("check")
-        return environment, bundles, hashes
-    finally:
-        if bundles is not None:
-            shutil.rmtree(bundles)
+    with hub_exclusion():
+        bundles, expected = hub_bundles()
+        try:
+            if not (REPOSITORY / "config").is_file():
+                restic("init")
+            sources = [str(HOME / "workspaces"), str(HOME / "container-home")]
+            if bundles is not None:
+                sources.append(str(bundles))
+            restic("backup", "--host", "gak", "--tag", "aiagent", *sources)
+        finally:
+            if bundles is not None:
+                shutil.rmtree(bundles)
+    restic("forget", "--host", "gak", "--tag", "aiagent",
+           "--keep-daily", "7", "--keep-weekly", "5", "--keep-monthly", "12", "--prune")
+    restic("check")
+    return environment, bundles, expected
 
 
 def process_identity(pid):
@@ -486,7 +594,7 @@ def quiesced(action):
         check_interrupted()
 
 
-def manifest(root):
+def manifest(root, names=("workspaces", "container-home")):
     entries = {}
 
     def visit(path):
@@ -510,13 +618,13 @@ def manifest(root):
         else:
             entries[relative] = ("special", stat.S_IFMT(metadata.st_mode))
 
-    for name in ("workspaces", "container-home"):
+    for name in names:
         visit(root / name)
     return entries
 
 
 def restore_check():
-    environment, bundles, hashes = snapshot()
+    environment, bundles, expected = snapshot()
     scratch = Path(tempfile.mkdtemp(prefix="restore-check.", dir=BACKUP_ROOT))
     try:
         run_process(("restic", "--quiet", "restore", "latest", "--host", "gak",
@@ -528,13 +636,20 @@ def restore_check():
         print("agent restore checksums match")
         if bundles is not None:
             restored_bundles = scratch / bundles.relative_to("/")
-            if {path.name for path in restored_bundles.iterdir()} != {f"{name}.bundle" for name in hashes}:
+            names = {f"{name}.bundle" for name in expected["repos"]}
+            if {path.name for path in restored_bundles.iterdir()} != names | {"manifest.json"}:
                 raise RuntimeError("Git hub restore bundle set differs")
-            for name, expected in hashes.items():
-                if digest_file(restored_bundles / f"{name}.bundle") != expected:
+            descriptor, _ = secure_file(restored_bundles / "manifest.json", os.O_RDONLY, 0)
+            with os.fdopen(descriptor) as source:
+                recorded = json.load(source)
+            if recorded != json.loads(json.dumps(expected)):
+                raise RuntimeError("Git hub restore manifest differs")
+            for name, details in expected["repos"].items():
+                if digest_file(restored_bundles / f"{name}.bundle") != details["digest"]:
                     raise RuntimeError("Git hub restore bundle checksum differs")
-            verify_bundles(restored_bundles, hashes)
-            print("Git hub restore bundles match and verify")
+            verify_bundles(restored_bundles, expected["repos"],
+                           expected["admin_files"], hub_account())
+            print("Git hub restored objects, refs, policy and keys match")
     finally:
         shutil.rmtree(scratch)
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Exercise a hub bundle while receive-pack has quarantined a new branch."""
+"""Exercise bundle integrity and recovery during a quarantined push."""
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -39,12 +40,22 @@ def main():
         backup.hub_account = lambda: SimpleNamespace(pw_uid=hub_uid, pw_gid=hub_uid)
         source = root / "source"
         run("git", "init", "-q", str(source))
+        (source / "conf").mkdir()
+        (source / "keydir").mkdir()
+        (source / "conf/gitolite.conf").write_text("repo arc\n    RW+ = operator\n")
+        (source / "keydir/operator.pub").write_text("test operator key\n")
+        (source / "keydir/aiagent.pub").write_text("test agent key\n")
+        run("git", "-C", str(source), "add", "conf", "keydir")
         run("git", "-C", str(source), "-c", "user.name=Test",
-            "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "seed")
+            "-c", "user.email=test@example.invalid", "commit", "-qm", "seed")
+        admin = backup.HUB_HOME / ".gitolite"
+        shutil.copytree(source / "conf", admin / "conf")
+        shutil.copytree(source / "keydir", admin / "keydir")
         for name in backup.HUB_REPOS:
             bare = repos / f"{name}.git"
-            run("git", "init", "--bare", "-q", str(bare))
-            run("git", "-C", str(source), "push", "-q", str(bare), "HEAD:refs/heads/main")
+            branch = "master" if name == "gitolite-admin" else "main"
+            run("git", "init", "--bare", "-q", "-b", branch, str(bare))
+            run("git", "-C", str(source), "push", "-q", str(bare), f"HEAD:refs/heads/{branch}")
 
         marker = root / "receiving"
         release = root / "release"
@@ -68,6 +79,33 @@ def main():
                 for name in dirs + files:
                     os.chown(Path(directory) / name, hub_uid, hub_uid)
             os.chown(backup.HUB_HOME, hub_uid, hub_uid)
+            lock_directory = root / "hub-lock"
+            lock_directory.mkdir(mode=0o750)
+            os.chown(lock_directory, 0, hub_uid)
+            lock_file = lock_directory / "receive.lock"
+            lock_file.touch(mode=0o660)
+            os.chown(lock_file, 0, hub_uid)
+            lock_file.chmod(0o660)
+            backup.HUB_LOCK_DIRECTORY = lock_directory
+            backup.HUB_LOCK = lock_file
+            if hub_uid != 0:
+                read_fd, write_fd = os.pipe()
+                child = os.fork()
+                if child == 0:
+                    os.close(read_fd)
+                    os.setgroups([])
+                    os.setgid(hub_uid)
+                    os.setuid(hub_uid)
+                    try:
+                        lock_file.rename(lock_file.with_name("replacement"))
+                        os.write(write_fd, b"replaced")
+                    except PermissionError:
+                        os.write(write_fd, b"denied")
+                    os._exit(0)
+                os.close(write_fd)
+                assert os.read(read_fd, 16) == b"denied"
+                os.close(read_fd)
+                os.waitpid(child, 0)
             read_fd, write_fd = os.pipe()
             child = os.fork()
             if child == 0:
@@ -85,24 +123,42 @@ def main():
             assert os.read(read_fd, 16) == b"denied"
             os.close(read_fd)
             os.waitpid(child, 0)
-            bundles, hashes = backup.hub_bundles()
-            assert set(hashes) == set(backup.HUB_REPOS)
-            assert all((bundles / f"{name}.bundle").stat().st_uid == 0 for name in hashes)
+            with backup.hub_exclusion():
+                bundles, expected = backup.hub_bundles()
+            assert set(expected["repos"]) == set(backup.HUB_REPOS)
+            assert json.loads((bundles / "manifest.json").read_text()) == json.loads(json.dumps(expected))
+            assert all((bundles / f"{name}.bundle").stat().st_uid == 0 for name in expected["repos"])
             heads = subprocess.check_output(("git", "bundle", "list-heads",
                                              str(bundles / "arc.bundle")), text=True)
             assert "refs/heads/main" in heads
             assert "refs/heads/agent/pending" not in heads
             assert calls.read_text().splitlines() == ["called"]
-            backup.verify_bundles(bundles, hashes)
-            print("in-flight push excluded; both bundles are complete and root-owned")
+            bundle = bundles / "arc.bundle"
+            content = bundle.read_bytes()
+            bundle.write_bytes(content[:content.index(b"PACK")])
+            try:
+                backup.verify_bundles(bundles, expected["repos"],
+                                      expected["admin_files"], backup.hub_account())
+            except (RuntimeError, subprocess.CalledProcessError):
+                pass
+            else:
+                raise AssertionError("a truncated bundle was accepted")
+            bundle.write_bytes(content)
+            backup.verify_bundles(bundles, expected["repos"],
+                                  expected["admin_files"], backup.hub_account())
+            print("quarantined ref omitted; both bundles are complete and root-owned")
             print("root backup did not execute the repository pre-receive hook")
             print("agent UID cannot read the hub home")
+            if hub_uid != 0:
+                print("hub UID cannot replace the root-owned lock")
+            print("truncated bundle rejected; refs, policy and keys reconstructed")
         finally:
             release.touch()
             assert push.wait(timeout=10) == 0, push.stderr.read().decode()
 
         if os.environ.get("GAK_TEST_RESTIC"):
             assert shutil.which("restic"), "restic is unavailable"
+            os.environ["TMPDIR"] = str(root)
             backup.HOME = root / "agent"
             for name in ("workspaces", "container-home"):
                 directory = backup.HOME / name

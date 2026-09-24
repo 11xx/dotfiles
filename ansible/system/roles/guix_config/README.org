@@ -47,3 +47,10 @@ The two service selections can be removed independently. The reference
 =gitolite-admin= repository with the agent's public key at
 =keydir/aiagent.pub=. Only the operator pushes that administrative repository.
 The private agent key stays in the container home on gak.
+
+The module installs its Gitolite receive trigger from root-controlled
+=/etc/git-hub= and creates =/var/lib/agentgit-lock/receive.lock= as a
+root-owned file writable by the private hub group. The hub cannot replace its
+root-owned parent directory. Receive commands hold this lock through Gitolite
+administrative hooks; root backup checks the same inode before it captures
+both repositories and completes the Restic snapshot.
