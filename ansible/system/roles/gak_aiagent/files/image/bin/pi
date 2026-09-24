@@ -1,2 +1,15 @@
 #!/usr/bin/env bash
-exec /opt/pi-node/node /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js "$@"
+set -euo pipefail
+
+package=/home/node/.local/aiagent/npm/lib/node_modules/@earendil-works/pi-coding-agent
+link=/home/node/.local/aiagent/npm/bin/pi
+if [[ ! -L $link ]]; then
+    printf 'pi: selected user-owned package is absent; install @earendil-works/pi-coding-agent with npm\n' >&2
+    exit 127
+fi
+entry=$(realpath -e -- "$link") || exit 127
+case "$entry" in
+    "$package"/*) ;;
+    *) printf 'pi: selected package link leaves the trusted prefix\n' >&2; exit 127 ;;
+esac
+exec /opt/pi-node/node "$entry" "$@"

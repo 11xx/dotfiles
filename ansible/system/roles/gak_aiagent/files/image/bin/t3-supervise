@@ -1,22 +1,81 @@
-#!/usr/bin/env bash
-set -u
+#!/usr/bin/env python3
+import os
+import signal
+import subprocess
+import sys
+import time
 
-stopping=0
-child=
-stop() {
-    trap - TERM INT
-    stopping=1
-    if [[ -n $child ]]; then
-        kill -TERM "$child" 2>/dev/null || true
-        wait "$child" 2>/dev/null || true
-    fi
-}
-trap stop TERM INT
 
-while (( ! stopping )); do
-    /usr/local/bin/t3-web &
-    child=$!
-    wait "$child" || true
-    child=
-    (( stopping )) || sleep 2
-done
+SERVER = "/usr/local/bin/t3-web"
+STOP_GRACE = 40
+GROUP_GRACE = 3
+RESTART_DELAY = 2
+stopping = False
+
+
+def request_stop(_signal, _frame):
+    global stopping
+    stopping = True
+
+
+def group_alive(group):
+    try:
+        os.killpg(group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def wait_group(child, seconds):
+    deadline = time.monotonic() + seconds
+    while group_alive(child.pid) and time.monotonic() < deadline:
+        child.poll()
+        time.sleep(0.1)
+    return not group_alive(child.pid)
+
+
+def signal_group(group, number):
+    try:
+        os.killpg(group, number)
+    except ProcessLookupError:
+        pass
+
+
+def settle(child, grace):
+    escalated = False
+    if child.poll() is None:
+        try:
+            child.terminate()
+        except ProcessLookupError:
+            pass
+    if not wait_group(child, grace):
+        escalated = True
+        print("t3-supervise: server group exceeded its stop grace; sending TERM",
+              file=sys.stderr, flush=True)
+        signal_group(child.pid, signal.SIGTERM)
+        if not wait_group(child, GROUP_GRACE):
+            print("t3-supervise: server group did not exit after TERM; killing it",
+                  file=sys.stderr, flush=True)
+            signal_group(child.pid, signal.SIGKILL)
+    child.wait()
+    return escalated
+
+
+def main():
+    signal.signal(signal.SIGTERM, request_stop)
+    signal.signal(signal.SIGINT, request_stop)
+    while not stopping:
+        child = subprocess.Popen([SERVER], start_new_session=True)
+        while child.poll() is None and not stopping:
+            time.sleep(0.1)
+        escalated = settle(child, STOP_GRACE if stopping else 0)
+        if stopping:
+            return 124 if escalated else 0
+        deadline = time.monotonic() + RESTART_DELAY
+        while time.monotonic() < deadline and not stopping:
+            time.sleep(0.1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

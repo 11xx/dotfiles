@@ -94,7 +94,7 @@
     dest: /home/aiagent/.local/bin/aiagent-operation
     mode: '0750'
 
-- name: 'aiagent: Install update and readiness commands'
+- name: 'aiagent: Install update, stop and readiness commands'
   tags: ['gak-aiagent-image']
   ansible.builtin.copy:
     src: '{{ item }}'
@@ -102,6 +102,7 @@
     mode: '0750'
   loop:
     - aiagent-update
+    - aiagent-stop-outcome
     - gak-aiagent-update-ready
 
 - name: 'aiagent: Install declared instance lists'

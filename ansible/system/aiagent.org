@@ -9,7 +9,10 @@ retain the manager's exit status and output. T3 uses the host's named tailnet
 HTTPS service. Its origin is derived from read-only Tailscale status unless the
 operator supplies an explicit origin. Pairing checks the running server,
 issues a five-minute token against its persistent data directory and displays
-the link and terminal QR code only in the invoking terminal.
+the link and terminal QR code only in the invoking terminal. =providers= reports
+selected user-owned npm versions beside image seed versions. =provider-reseed=
+uses the account operation lock, stopped backup and a network-isolated
+disposable container when the selected prefix needs explicit repair.
 
 #+begin_src python :tangle (expand-file-name "../../.local/bin/gak-aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
 import datetime as dt
@@ -37,7 +40,7 @@ class OperatorError(Exception):
 
 
 def usage():
-    print("usage: gak-aiagent {status|shell|restart|update|t3 open|t3 pair [label]|help}")
+    print("usage: gak-aiagent {status|providers|shell|restart|update [--verbose]|provider-reseed [--verbose]|t3 open|t3 pair [label]|help}")
 
 
 def ssh_args(interactive=False):
@@ -201,9 +204,11 @@ def main(argv):
         usage()
         return 0 if argv else 2
     command = argv[0]
-    if command in ("status", "shell", "restart", "update") and len(argv) == 1:
+    if (command in ("status", "providers", "shell", "restart", "update", "provider-reseed")
+            and (len(argv) == 1 or command in ("update", "provider-reseed")
+                 and argv[1:] == ["--verbose"])):
         return subprocess.run(ssh_args(interactive=command == "shell")
-                              + [remote_argv(MANAGER, command)]).returncode
+                              + [remote_argv(MANAGER, *argv)]).returncode
     if command == "t3" and argv[1:] == ["open"]:
         base_url = origin()
         check_web(base_url)
@@ -1810,14 +1815,15 @@ when the persistent home is mounted. The container has no host runtime, socket,
 media or operator-home mount. Podman's =keep-id= mapping makes the agent's host
 directories writable by the container user.
 
-The harness versions are fixed at build time. Pi uses the pinned upstream
-Node executable under =/opt/pi-node= for its interactive TUI and print mode;
-the Fedora Node installation serves npm and the other harnesses. Pi's =/login=
-menu runs inside the container. Logins and provider state live under the
-persistent home. The cache subtree is disposable;
-the =aiagent= command reports its size and cleans only that subtree on request.
-Image-installed commands under =/usr/local/bin= take precedence over programs
-left in the persistent home.
+The image provides pinned first-install packages for Claude, Codex, OpenCode,
+Pi and npm-check-updates. On first start, the container publishes them into a
+user-owned npm prefix in the persistent home. Later starts validate the prefix
+without reinstalling packages, so an intentional uninstall remains absent.
+The image-owned Pi shim runs the selected prefix's package with the pinned
+upstream Node executable under =/opt/pi-node=. Fedora Node serves npm and the
+other harnesses. Logins and provider state live under the persistent home. The
+cache subtree is disposable; =aiagent= reports its size and cleans only that
+subtree on request. T3 and operating system packages remain image-owned.
 T3 Code v0.0.42 runs in web mode on the container's port 3773. The image's
 foreground supervisor owns the native server process and restarts it two
 seconds after an exit. T3's process is
@@ -1838,6 +1844,7 @@ ARG CLAUDE_CODE_VERSION=2.1.281
 ARG T3_CODE_VERSION=0.0.42
 ARG PI_CODE_VERSION=0.87.1
 ARG PI_NODE_VERSION=22.23.1
+ARG NCU_VERSION=22.2.9
 
 RUN dnf -y upgrade --refresh \
  && dnf -y install --setopt=install_weak_deps=False \
@@ -1846,12 +1853,13 @@ RUN dnf -y upgrade --refresh \
       tar tmux unzip which xz \
  && dnf clean all
 
-RUN npm install -g \
+RUN npm install -g --prefix /opt/aiagent-provider-seed \
       "opencode-ai@${OPENCODE_VERSION}" \
       "@openai/codex@${CODEX_VERSION}" \
       "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
-      "t3@${T3_CODE_VERSION}" \
       "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
+      "npm-check-updates@${NCU_VERSION}" \
+ && npm install -g "t3@${T3_CODE_VERSION}" \
  && npm cache clean --force
 
 RUN case "$(uname -m)" in \
@@ -1864,7 +1872,7 @@ RUN case "$(uname -m)" in \
  && printf '%s  %s\n' "$pi_node_sha256" /tmp/pi-node.tar.xz | sha256sum -c - \
  && mkdir -p /opt/pi-node \
  && tar -xJf /tmp/pi-node.tar.xz -C /opt/pi-node --strip-components=2 "node-v${PI_NODE_VERSION}-linux-${pi_node_arch}/bin/node" \
- && rm /tmp/pi-node.tar.xz /usr/local/bin/pi
+ && rm /tmp/pi-node.tar.xz
 
 RUN case "$(uname -m)" in \
       x86_64) t3_arch=x64 ;; \
@@ -1885,11 +1893,16 @@ COPY --chmod=0755 init.sh /usr/local/bin/aiagent-init
 COPY --chmod=0755 bin/ /usr/local/bin/
 COPY --chmod=0755 init.d/ /usr/local/share/aiagent/init.d/
 COPY --chmod=0644 bashrc.d/ /usr/local/share/aiagent/bashrc.d/
+COPY --chmod=0644 profile.d/aiagent-path.sh /etc/profile.d/aiagent-path.sh
+RUN install -d /opt/aiagent-shims/bin \
+ && mv /usr/local/bin/pi /opt/aiagent-shims/bin/pi
 
 USER node
 ENV HOME=/home/node \
     XDG_CACHE_HOME=/cache/xdg \
     NPM_CONFIG_CACHE=/cache/npm \
+    NPM_CONFIG_PREFIX=/home/node/.local/aiagent/npm \
+    PATH=/opt/aiagent-shims/bin:/home/node/.local/aiagent/npm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     TMPDIR=/cache/tmp
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/aiagent-init"]
@@ -1906,37 +1919,103 @@ set -euo pipefail
 
 for script in /usr/local/share/aiagent/init.d/*; do
     [[ -x $script ]] || continue
-    "$script"
+    "$script" "$@"
 done
 
 exec "$@"
 #+end_src
 
-The supervisor forwards container termination to T3 and waits for it to exit.
-An unexpected T3 exit leaves the container and its terminal sessions running.
+The supervisor starts T3 in its own process group. It forwards termination to
+the native server, allows forty seconds for its process tree to settle, then
+terminates only that group. Compose grants a forty-five-second stop window for
+this cleanup. An unexpected T3 exit cleans up its remaining group before a
+restart, while separate terminal sessions continue running. A descendant that
+creates another process group is outside the supervisor's cleanup boundary;
+container shutdown can still interrupt active work after its grace expires.
+Graceful shutdown exits zero; escalation to a group signal is reported on
+standard error and exits 124.
 
-#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
-set -u
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
+import os
+import signal
+import subprocess
+import sys
+import time
 
-stopping=0
-child=
-stop() {
-    trap - TERM INT
-    stopping=1
-    if [[ -n $child ]]; then
-        kill -TERM "$child" 2>/dev/null || true
-        wait "$child" 2>/dev/null || true
-    fi
-}
-trap stop TERM INT
 
-while (( ! stopping )); do
-    /usr/local/bin/t3-web &
-    child=$!
-    wait "$child" || true
-    child=
-    (( stopping )) || sleep 2
-done
+SERVER = "/usr/local/bin/t3-web"
+STOP_GRACE = 40
+GROUP_GRACE = 3
+RESTART_DELAY = 2
+stopping = False
+
+
+def request_stop(_signal, _frame):
+    global stopping
+    stopping = True
+
+
+def group_alive(group):
+    try:
+        os.killpg(group, 0)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def wait_group(child, seconds):
+    deadline = time.monotonic() + seconds
+    while group_alive(child.pid) and time.monotonic() < deadline:
+        child.poll()
+        time.sleep(0.1)
+    return not group_alive(child.pid)
+
+
+def signal_group(group, number):
+    try:
+        os.killpg(group, number)
+    except ProcessLookupError:
+        pass
+
+
+def settle(child, grace):
+    escalated = False
+    if child.poll() is None:
+        try:
+            child.terminate()
+        except ProcessLookupError:
+            pass
+    if not wait_group(child, grace):
+        escalated = True
+        print("t3-supervise: server group exceeded its stop grace; sending TERM",
+              file=sys.stderr, flush=True)
+        signal_group(child.pid, signal.SIGTERM)
+        if not wait_group(child, GROUP_GRACE):
+            print("t3-supervise: server group did not exit after TERM; killing it",
+                  file=sys.stderr, flush=True)
+            signal_group(child.pid, signal.SIGKILL)
+    child.wait()
+    return escalated
+
+
+def main():
+    signal.signal(signal.SIGTERM, request_stop)
+    signal.signal(signal.SIGINT, request_stop)
+    while not stopping:
+        child = subprocess.Popen([SERVER], start_new_session=True)
+        while child.poll() is None and not stopping:
+            time.sleep(0.1)
+        escalated = settle(child, STOP_GRACE if stopping else 0)
+        if stopping:
+            return 124 if escalated else 0
+        deadline = time.monotonic() + RESTART_DELAY
+        while time.monotonic() < deadline and not stopping:
+            time.sleep(0.1)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
@@ -1952,31 +2031,297 @@ BASHRC
 fi
 #+end_src
 
+The provider initializer checks the image seed without copying it during a
+disposable candidate probe. A normal container start publishes or validates the
+selected prefix before T3 starts.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/20-provider-prefix" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+
+if [[ $# -eq 2 && $1 == /usr/local/bin/aiagent-readiness && $2 == --candidate ]]; then
+    exec /usr/local/bin/aiagent-provider-prefix check-seed
+fi
+exec /usr/local/bin/aiagent-provider-prefix ensure
+#+end_src
+
+The server and ordinary commands inherit the selected prefix from the image.
+Fedora login shells read the same fixed path through =/etc/profile.d=, including
+when an existing persistent =.bashrc= is present. The path contains one
+image-owned Pi shim directory and the selected npm prefix before system tools;
+it excludes other home executable directories.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/profile.d/aiagent-path.sh" (file-name-directory (buffer-file-name))) :mkdirp yes :tangle-mode o644
+export PATH=/opt/aiagent-shims/bin:/home/node/.local/aiagent/npm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export NPM_CONFIG_PREFIX=/home/node/.local/aiagent/npm
+#+end_src
+
+The prefix is published with its completion marker in one directory rename.
+An existing prefix without a valid marker or valid package links is an
+incomplete state and stops startup with a repair message. A marked prefix may
+have any of the optional packages deliberately absent. =reseed= is explicit:
+it prepares a full pinned seed before moving the previous prefix to a named
+backup and publishing the new one. It never runs during ordinary startup.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-provider-prefix" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import sys
+import time
+
+
+HOME = Path("/home/node")
+SEED = Path("/opt/aiagent-provider-seed")
+PREFIX = HOME / ".local/aiagent/npm"
+MARKER = ".aiagent-seed.json"
+PACKAGES = {
+    "claude": "@anthropic-ai/claude-code",
+    "codex": "@openai/codex",
+    "opencode": "opencode-ai",
+    "pi": "@earendil-works/pi-coding-agent",
+    "ncu": "npm-check-updates",
+    "npm-check-updates": "npm-check-updates",
+}
+
+
+class PrefixError(Exception):
+    pass
+
+
+def plain_directory(path):
+    try:
+        return stat.S_ISDIR(path.lstat().st_mode)
+    except FileNotFoundError:
+        return False
+
+
+def present(path):
+    return path.exists() or path.is_symlink()
+
+
+def package_path(root, name):
+    return root / "lib/node_modules" / name
+
+
+def check_package(root, command, name, required, owned):
+    package = package_path(root, name)
+    link = root / "bin" / command
+    installed = present(package)
+    linked = present(link)
+    if not installed and not linked and not required:
+        return
+    if (not plain_directory(package.parent) or not plain_directory(package)
+            or not link.is_symlink()):
+        raise PrefixError(f"incomplete {name} installation in {root}")
+    if owned and (package.stat().st_uid != os.getuid() or
+                  not os.access(package, os.W_OK) or
+                  package.parent.stat().st_uid != os.getuid() or
+                  not os.access(package.parent, os.W_OK)):
+        raise PrefixError(f"{name} installation is not writable by the container user")
+    manifest = package / "package.json"
+    if not manifest.is_file() or manifest.is_symlink():
+        raise PrefixError(f"invalid {name} package manifest in {root}")
+    try:
+        details = json.loads(manifest.read_text())
+        bins = details["bin"]
+        if not isinstance(bins, dict) or command not in bins:
+            raise TypeError
+        package_root = package.resolve(strict=True)
+        for binary, declared in bins.items():
+            if not isinstance(binary, str) or not binary or "/" in binary or binary in (".", ".."):
+                raise TypeError
+            binary_link = root / "bin" / binary
+            target = (package / declared).resolve(strict=True)
+            linked_target = binary_link.resolve(strict=True)
+            if (not binary_link.is_symlink() or target != linked_target
+                    or not target.is_relative_to(package_root) or not target.is_file()
+                    or not os.access(target, os.X_OK)):
+                raise TypeError
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+        raise PrefixError(f"invalid {name} package entry point in {root}") from None
+    if details.get("name") != name or not isinstance(details.get("version"), str):
+        raise PrefixError(f"invalid {name} package entry point in {root}")
+
+
+def check_tree(root, required, owned=False):
+    for directory in (root, root / "bin", root / "lib", root / "lib/node_modules"):
+        if not plain_directory(directory):
+            raise PrefixError(f"missing or linked npm directory: {directory}")
+        if owned and (directory.stat().st_uid != os.getuid() or
+                      not os.access(directory, os.W_OK)):
+            raise PrefixError(f"npm directory is not writable by the container user: {directory}")
+    for command, name in PACKAGES.items():
+        check_package(root, command, name, required, owned)
+
+
+def check_marker(root):
+    marker = root / MARKER
+    if not marker.is_file() or marker.is_symlink():
+        raise PrefixError("provider prefix has no valid completion marker; use explicit reseed")
+    if marker.stat().st_uid != os.getuid():
+        raise PrefixError("provider prefix completion marker is not owned by the container user")
+    try:
+        value = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        raise PrefixError("provider prefix completion marker is unreadable; use explicit reseed") from None
+    if value != {"schema": 1, "prefix": str(PREFIX)}:
+        raise PrefixError("provider prefix completion marker is invalid; use explicit reseed")
+
+
+def check_selected():
+    parent_directory(create=False)
+    if not plain_directory(PREFIX):
+        raise PrefixError("provider prefix is missing or linked; use explicit reseed")
+    check_marker(PREFIX)
+    check_tree(PREFIX, required=False, owned=True)
+
+
+def parent_directory(create=True):
+    if not plain_directory(HOME) or HOME.stat().st_uid != os.getuid():
+        raise PrefixError("persistent container home is missing or not owned by the container user")
+    for directory in (HOME / ".local", PREFIX.parent):
+        if create and not present(directory):
+            directory.mkdir(mode=0o700)
+        if (not plain_directory(directory) or directory.stat().st_uid != os.getuid()
+                or not os.access(directory, os.W_OK)):
+            raise PrefixError(f"untrusted provider prefix parent: {directory}")
+
+
+def staged_seed():
+    check_tree(SEED, required=True)
+    parent_directory()
+    stage = PREFIX.parent / f".npm-seed-{os.getpid()}-{time.monotonic_ns()}"
+    try:
+        shutil.copytree(SEED, stage, symlinks=True)
+        marker = stage / MARKER
+        marker.write_text(json.dumps({"schema": 1, "prefix": str(PREFIX)}) + "\n")
+        marker.chmod(0o600)
+        check_tree(stage, required=True)
+        return stage
+    except BaseException:
+        if plain_directory(stage):
+            shutil.rmtree(stage)
+        raise
+
+
+def ensure():
+    parent_directory()
+    if present(PREFIX):
+        check_selected()
+        return
+    if list(PREFIX.parent.glob("npm.before-reseed-*")):
+        raise PrefixError("provider reseed was interrupted; inspect the retained prefix backup")
+    if list(PREFIX.parent.glob(".npm-seed-*")):
+        raise PrefixError("provider seed is incomplete; use explicit reseed")
+    stage = staged_seed()
+    try:
+        if present(PREFIX):
+            raise PrefixError("provider prefix appeared during initialization")
+        stage.rename(PREFIX)
+    finally:
+        if plain_directory(stage):
+            shutil.rmtree(stage)
+    check_selected()
+
+
+def reseed():
+    parent_directory()
+    for incomplete in PREFIX.parent.glob(".npm-seed-*"):
+        if not plain_directory(incomplete):
+            raise PrefixError(f"invalid incomplete provider seed: {incomplete}")
+        retained = PREFIX.parent / f"npm.incomplete-{time.time_ns()}"
+        incomplete.rename(retained)
+        print(f"incomplete provider seed retained at {retained}")
+    stage = staged_seed()
+    backup = None
+    try:
+        if present(PREFIX):
+            backup = PREFIX.parent / f"npm.before-reseed-{time.time_ns()}"
+            PREFIX.rename(backup)
+        try:
+            stage.rename(PREFIX)
+        except OSError:
+            if backup is not None and not present(PREFIX):
+                backup.rename(PREFIX)
+            raise
+    finally:
+        if plain_directory(stage):
+            shutil.rmtree(stage)
+    check_selected()
+    if backup is not None:
+        print(f"previous provider prefix retained at {backup}")
+
+
+def status():
+    check_tree(SEED, required=True)
+    check_selected()
+    print(f"selected user-owned npm prefix: {PREFIX}")
+    seen = set()
+    for command, name in PACKAGES.items():
+        if name in seen:
+            continue
+        seen.add(name)
+        seed = json.loads((package_path(SEED, name) / "package.json").read_text())["version"]
+        selected = package_path(PREFIX, name)
+        version = json.loads((selected / "package.json").read_text())["version"] if selected.exists() else "absent"
+        print(f"{command}: {version} (image seed {seed})")
+
+
+def main():
+    command = sys.argv[1:]
+    if command == ["check-seed"]:
+        check_tree(SEED, required=True)
+    elif command == ["check"]:
+        check_selected()
+    elif command == ["status"]:
+        status()
+    elif command in (["ensure"], ["reseed"]):
+        parent_directory()
+        with (PREFIX.parent / ".provider-prefix.lock").open("a+") as lock:
+            os.fchmod(lock.fileno(), 0o600)
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if command == ["ensure"]:
+                ensure()
+            else:
+                reseed()
+    else:
+        raise PrefixError("usage: aiagent-provider-prefix {check-seed|check|status|ensure|reseed}")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, PrefixError) as error:
+        print(f"aiagent provider prefix: {error}", file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bashrc.d/10-path" (file-name-directory (buffer-file-name))) :mkdirp yes :tangle-mode o644
-export PATH="/usr/local/bin:$PATH:$HOME/.local/bin"
+export PATH=/opt/aiagent-shims/bin:/home/node/.local/aiagent/npm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export NPM_CONFIG_PREFIX=/home/node/.local/aiagent/npm
 #+end_src
 
 ** Container command wrappers
 
-These wrappers are installed with the image, so rebuilding the container does
-not depend on replacing files in the persistent home. The =pi= wrapper selects
-the upstream Node executable while the other harness commands keep the Fedora
-runtime.
+These wrappers are installed with the image. The =pi= wrapper resolves only the
+selected user-owned package and executes its declared bin with the pinned
+upstream Node; npm can change that bin path on an explicit update. A missing or
+invalid Pi package fails without selecting an image copy.
 
-The readiness command lives in the image. Both a disposable candidate and the
-running project execute the same entry point and executable search path. It
-requires the native T3 executable, image-owned Pi wrapper and the
-three persistent mount points without reading login state. Candidate readiness
-starts the native server against temporary state on container loopback and
-requires an HTTP response before stopping it. Running-project readiness
-requires the supervised server to answer on its container port, so a failing
-persistent T3 state cannot pass the update gate.
+The readiness command checks T3's native and pairing executables, startup initializer and
+three mount points without requiring optional provider CLIs. Candidate
+readiness validates the image seed and starts the native server against
+temporary state on loopback. Running-project readiness validates the selected
+prefix state and requires the supervised server to answer on its container
+port, so failing persistent T3 state cannot pass the update gate.
 
 #+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-readiness" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
 import http.client
 import os
 from pathlib import Path
-import shutil
 import signal
 import socket
 import subprocess
@@ -1989,17 +2334,12 @@ PORT = 3773
 
 
 def require_image():
-    os.environ["PATH"] = "/usr/local/bin:/usr/bin:/bin"
     for directory in ("/home/node", "/work", "/cache"):
         if not Path(directory).is_dir():
             raise RuntimeError(f"missing mount point: {directory}")
-    for tool in ("codex", "claude", "opencode", "t3", "pi"):
-        if shutil.which(tool) is None:
-            raise RuntimeError(f"missing image command: {tool}")
-    if not os.access("/usr/local/bin/t3-native", os.X_OK):
-        raise RuntimeError("missing native T3 server")
-    if shutil.which("pi") != "/usr/local/bin/pi":
-        raise RuntimeError("Pi does not resolve to the image wrapper")
+    for tool in ("t3", "t3-native", "t3-web", "aiagent-provider-prefix"):
+        if not os.access(f"/usr/local/bin/{tool}", os.X_OK):
+            raise RuntimeError(f"missing image service command: {tool}")
 
 
 def serving(port):
@@ -2060,6 +2400,9 @@ def main():
     if mode not in (["--live"], ["--candidate"]):
         raise RuntimeError("usage: aiagent-readiness [--live|--candidate]")
     require_image()
+    state = "check-seed" if mode == ["--candidate"] else "check"
+    if subprocess.run(["/usr/local/bin/aiagent-provider-prefix", state]).returncode:
+        raise RuntimeError("provider prefix state is invalid")
     if mode == ["--candidate"]:
         candidate()
     elif not serving(PORT):
@@ -2075,7 +2418,20 @@ if __name__ == "__main__":
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
-exec /opt/pi-node/node /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js "$@"
+set -euo pipefail
+
+package=/home/node/.local/aiagent/npm/lib/node_modules/@earendil-works/pi-coding-agent
+link=/home/node/.local/aiagent/npm/bin/pi
+if [[ ! -L $link ]]; then
+    printf 'pi: selected user-owned package is absent; install @earendil-works/pi-coding-agent with npm\n' >&2
+    exit 127
+fi
+entry=$(realpath -e -- "$link") || exit 127
+case "$entry" in
+    "$package"/*) ;;
+    *) printf 'pi: selected package link leaves the trusted prefix\n' >&2; exit 127 ;;
+esac
+exec /opt/pi-node/node "$entry" "$@"
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/codex-auto" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
@@ -2107,7 +2463,9 @@ Shepherd, host ingress or other Compose instances. Cache cleanup removes only
 the declared disposable cache subtree.
 Restart stops and starts the Compose project in one recorded worker. This
 releases the rootless port listener before the new container binds it and
-keeps restart serialized if its invoking shell exits.
+keeps restart serialized if its invoking shell exits. A stop outcome that
+escalates or cannot be verified prevents the start and leaves the agent state
+for operator inspection.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
@@ -2127,10 +2485,10 @@ export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/pro
 
 die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
 usage() {
-    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+    printf '%s\n' 'usage: aiagent {status|providers|logs|shell|exec|build|update [--verbose]|provider-reseed [--verbose]|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
-    exec "$operator" "$1"
+    exec "$operator" "$@"
 }
 status() {
     if "$podman" container exists "$container"; then
@@ -2143,13 +2501,130 @@ cmd=${1:-}
 [[ $# -eq 0 ]] || shift
 case "$cmd" in
     status) status ;;
+    providers) (($# == 0)) || die 'providers accepts no arguments'; exec "$podman" exec "$container" /usr/local/bin/aiagent-provider-prefix status ;;
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build|update|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
+    update|provider-reseed) [[ $# -eq 0 || $# -eq 1 && $1 == --verbose ]] || die "$cmd accepts only --verbose"; mutate "$cmd" "$@" ;;
+    build|start|stop|restart|recreate|cache-clean) (($# == 0)) || die "$cmd accepts no arguments"; mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
     *) usage; exit 2 ;;
 esac
+#+end_src
+
+The stop helper observes the named container before Compose acts, then checks
+both that exact container ID and the current name after Compose returns. A
+successful Compose command is not enough to establish a graceful shutdown:
+the stopped process may have exited 124 after supervisor escalation. Only a
+verified running-to-exited transition reports a new stop result. An existing
+stopped container keeps its earlier exit status as history. An unverifiable or
+replaced identity stops later operations before backup or restart.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-stop-outcome" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+PROJECT = HOME / "services/agent/compose.yaml"
+NAME = "aiagent"
+FORMAT = "{{.Id}}|{{.State.Running}}|{{.State.Status}}|{{.State.ExitCode}}"
+
+
+class StopError(Exception):
+    pass
+
+
+def inspect(reference):
+    result = subprocess.run(
+        [PODMAN, "inspect", "--type=container", "--format", FORMAT, reference],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode:
+        raise StopError("the recorded agent container could not be inspected")
+    fields = result.stdout.strip().split("|")
+    if len(fields) != 4 or not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
+        raise StopError("the agent container inspection was malformed")
+    identity, running, status, exit_code = fields
+    if (running not in ("true", "false") or status not in
+            ("running", "exited", "created", "stopped", "paused")
+            or not exit_code.isdecimal() or int(exit_code) > 255):
+        raise StopError("the agent container state was malformed")
+    return identity, running == "true", status, int(exit_code)
+
+
+def current():
+    result = subprocess.run(
+        [PODMAN, "container", "exists", NAME],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+    )
+    if result.returncode == 1:
+        return None
+    if result.returncode:
+        raise StopError("agent container existence could not be verified")
+    return inspect(NAME)
+
+
+def stop():
+    before = current()
+    if before is not None and before[2] not in ("running", "exited", "created", "stopped"):
+        raise StopError("agent container is not in a stoppable state")
+    if before is not None and before[1] != (before[2] == "running"):
+        raise StopError("agent container running state was inconsistent")
+    result = subprocess.run([PODMAN, "compose", "-f", str(PROJECT), "stop"],
+                            timeout=180)
+    if before is None:
+        if current() is not None:
+            raise StopError("an agent container appeared during the stop")
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        print("aiagent: no container was running; project remains stopped", flush=True)
+        return 0
+    after = inspect(before[0])
+    named = current()
+    if after[0] != before[0] or named is None or named != after:
+        raise StopError("the agent container identity changed during the stop")
+    if after[1] or after[2] not in ("exited", "stopped", "created"):
+        raise StopError("the recorded agent container is still active")
+    if before[1]:
+        if before[2] != "running" or after[2] != "exited":
+            raise StopError("the running agent did not reach an exited state")
+        if after[3] == 124:
+            print(f"aiagent: warning: T3 shutdown escalated for container {after[0][:12]}; "
+                  "agent remains stopped (exit 124)", file=sys.stderr, flush=True)
+            if result.returncode:
+                raise StopError(f"Compose stop also exited {result.returncode} after escalation")
+            return 124
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        if after[3]:
+            raise StopError(f"agent container {after[0][:12]} exited {after[3]}; "
+                            "agent remains stopped")
+        print(f"aiagent: container {after[0][:12]} stopped gracefully", flush=True)
+    else:
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        if after[3] == 124:
+            print(f"aiagent: warning: container {after[0][:12]} was already stopped "
+                  "with historical exit 124", file=sys.stderr, flush=True)
+        else:
+            print(f"aiagent: container {after[0][:12]} was already stopped "
+                  f"(historical exit {after[3]})", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        if sys.argv[1:]:
+            raise StopError("usage: aiagent-stop-outcome")
+        sys.exit(stop())
+    except (OSError, StopError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: stop failed: {error}; no later action is safe",
+              file=sys.stderr)
+        sys.exit(1)
 #+end_src
 
 The lock helper records only a PID and kernel start time under =/run/aiagent=.
@@ -2179,6 +2654,7 @@ HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
 PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
@@ -2323,7 +2799,7 @@ def cache_clean():
         (cache / name).mkdir()
 
 
-def command_for(operation):
+def command_for(operation, verbose=False):
     compose = [PODMAN, "compose", "-f", str(PROJECT)]
     if operation == "build":
         context = HOME / "image"
@@ -2334,24 +2810,30 @@ def command_for(operation):
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
     if operation == "update":
-        return [str(HOME / ".local/bin/aiagent-update")]
+        return [str(HOME / ".local/bin/aiagent-update")] + (["--verbose"] if verbose else [])
+    if operation == "provider-reseed":
+        return [str(HOME / ".local/bin/aiagent-update"), "--provider-reseed"] + (["--verbose"] if verbose else [])
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
         return compose + ["up", "-d", "--pull", "never"]
     if operation == "stop":
-        return compose + ["stop"]
+        return [str(STOP_OUTCOME)]
     if operation == "restart":
         return [sys.executable, "-c", SEQUENCE,
-                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
+                json.dumps([[str(STOP_OUTCOME)], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
-        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([[str(STOP_OUTCOME)],
+                            compose + ["up", "-d", "--force-recreate", "--pull", "never"]])]
     raise RuntimeError(f"unknown operation: {operation}")
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise RuntimeError("expected one operation")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and
+                                     sys.argv[1:] not in (["update", "--verbose"],
+                                                          ["provider-reseed", "--verbose"])):
+        raise RuntimeError("expected one operation; update and provider-reseed accept --verbose")
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
@@ -2360,8 +2842,8 @@ def main():
             cache_clean()
             return 0
         operation = sys.argv[1]
-        return run(command_for(operation), project=operation in
-                   {"start", "stop", "restart", "recreate", "update"})
+        return run(command_for(operation, verbose=len(sys.argv) == 3), project=operation in
+                   {"start", "stop", "restart", "recreate", "update", "provider-reseed"})
 
 
 if __name__ == "__main__":
@@ -2371,6 +2853,18 @@ if __name__ == "__main__":
         print(f"aiagent: {error}", file=sys.stderr)
         sys.exit(1)
 #+end_src
+
+An update reports its build, probe, verified stop, backup and apply phases.
+Standard error from direct Podman commands remains visible. =--verbose= streams
+full direct build and stop output and the role-owned readiness hook's output
+from the shared updater. The shared updater's raw Compose provider diagnostics
+remain private because they can quote expanded definitions and environment;
+its own summary and sanitized failures remain visible. An operator can
+separately opt into =GAK_SERVICES_SHOW_PROVIDER_ERRORS= after assessing that
+privacy risk. A stop that escalates or cannot be verified halts before backup
+or image application without automatically restarting an uncertain container.
+The final result distinguishes an unchanged image from a newly accepted one;
+configuration application and readiness still run for an unchanged image.
 
 An update builds a uniquely tagged candidate from the deployed context. Its
 probe runs in a disposable container without persistent mounts or network
@@ -2386,30 +2880,50 @@ procedure in =GAK-SERVICES.org=.
 import hashlib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 
 HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 UPDATER = HOME / ".guix-profile/bin/gak-services"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 REQUEST = Path("/run/aiagent/backup-request")
 RESULT = Path("/run/aiagent/backup-result")
 
 
-def command(*argv, timeout=7200):
-    result = subprocess.run(argv, timeout=timeout)
+def phase(message):
+    print(f"aiagent: {message}", flush=True)
+
+
+def command(*argv, timeout=7200, verbose=False, env=None):
+    if verbose:
+        result = subprocess.run(argv, timeout=timeout, env=env)
+    else:
+        with tempfile.TemporaryFile(mode="w+t") as output:
+            try:
+                result = subprocess.run(argv, stdout=output, timeout=timeout, env=env)
+            except subprocess.TimeoutExpired:
+                output.seek(0)
+                shutil.copyfileobj(output, sys.stderr)
+                raise
+            if result.returncode:
+                output.seek(0)
+                shutil.copyfileobj(output, sys.stderr)
     if result.returncode:
-        raise RuntimeError(f"command failed: {argv[1]}")
+        label = argv[1] if len(argv) > 1 else Path(argv[0]).name
+        raise RuntimeError(f"command failed: {label} exited {result.returncode}")
 
 
 def image_id(reference):
     result = subprocess.run(
         [PODMAN, "image", "inspect", "--format", "{{.Id}}", reference],
-        capture_output=True, text=True, timeout=60,
+        stdout=subprocess.PIPE, text=True, timeout=60,
     )
     if result.returncode:
         raise RuntimeError("the local image is absent")
@@ -2423,8 +2937,15 @@ def backup():
     with os.fdopen(descriptor, "w") as request:
         request.write(nonce + "\n")
     try:
-        deadline = time.monotonic() + 7200
+        started = time.monotonic()
+        deadline = started + 7200
+        next_notice = started + 60
+        phase("waiting for scheduled backup")
         while time.monotonic() < deadline:
+            now = time.monotonic()
+            if now >= next_notice:
+                phase(f"waiting for scheduled backup ({int(now - started)}s elapsed)")
+                next_notice = now + 60
             try:
                 response = RESULT.read_text().strip()
             except FileNotFoundError:
@@ -2441,7 +2962,92 @@ def backup():
         RESULT.unlink(missing_ok=True)
 
 
-def main():
+def remove_candidate(candidate, verbose):
+    try:
+        command(PODMAN, "image", "rm", candidate, timeout=60, verbose=verbose)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: warning: could not remove candidate tag: {error}",
+              file=sys.stderr, flush=True)
+
+
+def await_agent_ready(seconds):
+    deadline = time.monotonic() + seconds
+    last_error = ""
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            [PODMAN, "exec", "aiagent", "/usr/local/bin/aiagent-readiness", "--live"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            return
+        last_error = result.stderr
+        time.sleep(2)
+    if last_error:
+        print(last_error, file=sys.stderr, end="")
+    raise RuntimeError("agent did not become ready")
+
+
+def reseed_providers(verbose=False):
+    home = HOME / "container-home"
+    if not home.is_dir() or home.is_symlink():
+        raise RuntimeError("persistent container home is missing or linked")
+    accepted = image_id(IMAGE)
+    container = f"aiagent-provider-reseed-{os.getpid()}-{time.monotonic_ns()}"
+    stop_attempted = False
+    stop_verified = False
+    reseeded = False
+    try:
+        phase("stopping agent for provider repair")
+        stop_attempted = True
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
+        stop_verified = True
+        phase("backing up persistent state")
+        backup()
+        phase("reseeding user-owned provider prefix")
+        try:
+            command(PODMAN, "run", "--rm", "--name", container, "--pull", "never",
+                    "--network", "none", "--userns", "keep-id", "--mount",
+                    f"type=bind,src={home},dst=/home/node,rw",
+                    "--entrypoint", "/usr/local/bin/aiagent-provider-prefix",
+                    accepted, "reseed", timeout=600, verbose=True)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired):
+            try:
+                subprocess.run([PODMAN, "rm", "-f", container], stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=60)
+            except (OSError, subprocess.TimeoutExpired) as cleanup:
+                print(f"aiagent: warning: disposable repair container cleanup failed: {cleanup}",
+                      file=sys.stderr, flush=True)
+            raise
+        reseeded = True
+        phase("starting agent")
+        command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
+                timeout=180, verbose=verbose)
+        phase("checking agent readiness")
+        await_agent_ready(120)
+        phase("provider prefix reseeded; agent ready")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if stop_attempted and not stop_verified:
+            print("aiagent: stop was forced or could not be verified; backup and reseed "
+                  "were skipped; agent may remain stopped; inspect before starting it",
+                  file=sys.stderr, flush=True)
+        elif stop_verified and not reseeded:
+            try:
+                phase("restoring previous agent")
+                command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d",
+                        "--pull", "never", timeout=180, verbose=verbose)
+                await_agent_ready(30)
+                phase("previous agent ready after failed provider reseed")
+            except (OSError, RuntimeError, subprocess.TimeoutExpired) as recovery:
+                print(f"aiagent: previous agent is not ready after failed provider reseed: {recovery}",
+                      file=sys.stderr, flush=True)
+        elif reseeded:
+            print("aiagent: provider prefix was reseeded but agent readiness failed; "
+                  "inspect the retained prefix and backup before recovery",
+                  file=sys.stderr, flush=True)
+        raise
+
+
+def main(verbose=False):
     context = HOME / "image"
     if not (context / "Containerfile").is_file():
         raise RuntimeError("image context is not deployed")
@@ -2450,31 +3056,57 @@ def main():
     old = image_id(IMAGE)
     candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
     built = False
+    stop_attempted = False
     quiesced = False
     applying = False
     try:
+        phase("building candidate image")
         command(PODMAN, "build", "--pull=missing", "--tag", candidate,
-                "--file", str(context / "Containerfile"), str(context))
+                "--file", str(context / "Containerfile"), str(context), verbose=verbose)
         built = True
         candidate_id = image_id(candidate)
+        phase("checking isolated candidate")
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180)
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
+                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180,
+                verbose=verbose)
+        phase("stopping agent")
+        stop_attempted = True
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
         quiesced = True
+        phase("backing up persistent state")
         backup()
         applying = True
+        phase("applying image and configuration")
+        updater_env = None
+        if verbose:
+            updater_env = dict(os.environ, GAK_SERVICES_SHOW_HOOK_OUTPUT="1")
+            print("aiagent: verbose shows readiness hook output, which may contain "
+                  "private data; inspect it before sharing. Compose provider diagnostics "
+                  "remain private unless separately enabled",
+                  file=sys.stderr, flush=True)
         command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
-                "--prepared-image", f"agent={candidate_id}", timeout=900)
+                "--prepared-image", f"agent={candidate_id}", timeout=900,
+                verbose=verbose, env=updater_env)
+        phase("checking accepted image")
         if image_id(IMAGE) != candidate_id:
             raise RuntimeError("the accepted image reference moved")
-        subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
-        print(f"aiagent: accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
+        remove_candidate(candidate, verbose)
+        if candidate_id == old:
+            phase(f"image unchanged ({candidate_id[:12]}); configuration applied and readiness passed")
+        else:
+            phase(f"accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if stop_attempted and not quiesced:
+            print("aiagent: stop was forced or could not be verified; backup and image "
+                  "application were skipped; agent may remain stopped; inspect before "
+                  "starting it",
+                  file=sys.stderr, flush=True)
         if quiesced and not applying:
+            phase("restoring previous agent")
             command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
-                    timeout=180)
+                    timeout=180, verbose=verbose)
         if built and not applying:
-            subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+            remove_candidate(candidate, verbose)
         if applying:
             pin = "localhost/gak-services-previous:" + hashlib.sha256(
                 f"{PROJECT.parent.resolve()}:agent".encode()).hexdigest()[:24]
@@ -2490,9 +3122,15 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        if sys.argv[1:] in ([], ["--verbose"]):
+            main(verbose=sys.argv[1:] == ["--verbose"])
+        elif sys.argv[1:] in (["--provider-reseed"], ["--provider-reseed", "--verbose"]):
+            reseed_providers(verbose=sys.argv[1:] == ["--provider-reseed", "--verbose"])
+        else:
+            raise RuntimeError("usage: aiagent-update [--verbose|--provider-reseed [--verbose]]")
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
-        print(f"aiagent: update failed: {error}", file=sys.stderr)
+        operation = "provider reseed" if "--provider-reseed" in sys.argv[1:] else "update"
+        print(f"aiagent: {operation} failed: {error}", file=sys.stderr)
         sys.exit(1)
 #+end_src
 

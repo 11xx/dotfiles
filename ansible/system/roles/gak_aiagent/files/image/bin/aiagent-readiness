@@ -2,7 +2,6 @@
 import http.client
 import os
 from pathlib import Path
-import shutil
 import signal
 import socket
 import subprocess
@@ -15,17 +14,12 @@ PORT = 3773
 
 
 def require_image():
-    os.environ["PATH"] = "/usr/local/bin:/usr/bin:/bin"
     for directory in ("/home/node", "/work", "/cache"):
         if not Path(directory).is_dir():
             raise RuntimeError(f"missing mount point: {directory}")
-    for tool in ("codex", "claude", "opencode", "t3", "pi"):
-        if shutil.which(tool) is None:
-            raise RuntimeError(f"missing image command: {tool}")
-    if not os.access("/usr/local/bin/t3-native", os.X_OK):
-        raise RuntimeError("missing native T3 server")
-    if shutil.which("pi") != "/usr/local/bin/pi":
-        raise RuntimeError("Pi does not resolve to the image wrapper")
+    for tool in ("t3", "t3-native", "t3-web", "aiagent-provider-prefix"):
+        if not os.access(f"/usr/local/bin/{tool}", os.X_OK):
+            raise RuntimeError(f"missing image service command: {tool}")
 
 
 def serving(port):
@@ -86,6 +80,9 @@ def main():
     if mode not in (["--live"], ["--candidate"]):
         raise RuntimeError("usage: aiagent-readiness [--live|--candidate]")
     require_image()
+    state = "check-seed" if mode == ["--candidate"] else "check"
+    if subprocess.run(["/usr/local/bin/aiagent-provider-prefix", state]).returncode:
+        raise RuntimeError("provider prefix state is invalid")
     if mode == ["--candidate"]:
         candidate()
     elif not serving(PORT):

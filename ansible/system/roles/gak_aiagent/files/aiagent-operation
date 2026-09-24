@@ -13,6 +13,7 @@ HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
 PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
@@ -157,7 +158,7 @@ def cache_clean():
         (cache / name).mkdir()
 
 
-def command_for(operation):
+def command_for(operation, verbose=False):
     compose = [PODMAN, "compose", "-f", str(PROJECT)]
     if operation == "build":
         context = HOME / "image"
@@ -168,24 +169,30 @@ def command_for(operation):
         return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
                 "--file", str(context / "Containerfile"), str(context)]
     if operation == "update":
-        return [str(HOME / ".local/bin/aiagent-update")]
+        return [str(HOME / ".local/bin/aiagent-update")] + (["--verbose"] if verbose else [])
+    if operation == "provider-reseed":
+        return [str(HOME / ".local/bin/aiagent-update"), "--provider-reseed"] + (["--verbose"] if verbose else [])
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
         return compose + ["up", "-d", "--pull", "never"]
     if operation == "stop":
-        return compose + ["stop"]
+        return [str(STOP_OUTCOME)]
     if operation == "restart":
         return [sys.executable, "-c", SEQUENCE,
-                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
+                json.dumps([[str(STOP_OUTCOME)], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
-        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([[str(STOP_OUTCOME)],
+                            compose + ["up", "-d", "--force-recreate", "--pull", "never"]])]
     raise RuntimeError(f"unknown operation: {operation}")
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise RuntimeError("expected one operation")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and
+                                     sys.argv[1:] not in (["update", "--verbose"],
+                                                          ["provider-reseed", "--verbose"])):
+        raise RuntimeError("expected one operation; update and provider-reseed accept --verbose")
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
@@ -194,8 +201,8 @@ def main():
             cache_clean()
             return 0
         operation = sys.argv[1]
-        return run(command_for(operation), project=operation in
-                   {"start", "stop", "restart", "recreate", "update"})
+        return run(command_for(operation, verbose=len(sys.argv) == 3), project=operation in
+                   {"start", "stop", "restart", "recreate", "update", "provider-reseed"})
 
 
 if __name__ == "__main__":
