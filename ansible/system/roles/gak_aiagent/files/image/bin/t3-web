@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-exec t3 serve --mode web --host 0.0.0.0 --port 3773 \
+exec t3-native serve --mode web --host 0.0.0.0 --port 3773 \
     --base-dir "$HOME/.t3/userdata" --no-browser \
     --auto-bootstrap-project-from-cwd /work "$@"

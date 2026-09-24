@@ -144,7 +144,7 @@ def main():
         tools.mkdir()
         shutil.copy2(Path("/bin/sh").resolve(), binaries / "sh")
         shutil.copy2(READINESS, tools / "aiagent-readiness")
-        harnesses = ("codex", "claude", "opencode", "t3", "pi")
+        harnesses = ("codex", "claude", "opencode", "t3", "t3-native", "pi")
         for name in harnesses:
             command = tools / name
             command.write_text("#!/bin/sh\nexit 0\n")

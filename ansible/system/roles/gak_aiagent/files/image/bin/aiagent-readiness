@@ -8,4 +8,5 @@ test -d /cache
 for tool in codex claude opencode t3 pi; do
     command -v "$tool" >/dev/null
 done
+test -x /usr/local/bin/t3-native
 test "$(command -v pi)" = /usr/local/bin/pi

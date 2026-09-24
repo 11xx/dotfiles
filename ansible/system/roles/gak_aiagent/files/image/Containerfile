@@ -41,7 +41,8 @@ RUN case "$(uname -m)" in \
     esac \
  && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
  && npm cache clean --force \
- && t3 serve --help >/dev/null
+ && ln -s "/usr/local/lib/node_modules/t3/node_modules/@t3code/t3-linux-${t3_arch}/t3" /usr/local/bin/t3-native \
+ && t3-native serve --help >/dev/null
 
 RUN groupadd -g 1001 node \
  && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
@@ -60,4 +61,4 @@ ENV HOME=/home/node \
     TMPDIR=/cache/tmp
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/aiagent-init"]
-CMD ["sleep", "infinity"]
+CMD ["/usr/local/bin/t3-supervise"]

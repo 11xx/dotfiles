@@ -1,13 +1,20 @@
 #+TITLE: Private service ingress
 
 This role deploys =gak-tailscale-services=, which reconciles named HTTPS handlers
-for enabled Koito and Nextcloud applications using their role-owned names and
-loopback ports. Run it explicitly after checking backend health and grants.
+for enabled Koito and Nextcloud applications and for the enabled agent host.
+The T3 name and loopback port are =gak_t3_service_name= and =gak_t3_port=.
+Run the command explicitly after checking backend health and grants.
 
 Gak uses =tag:server=. Verify tag ownership, grants and advertisement approval
 in the tailnet administration interface. Test each canonical origin and client
 API from another tailnet node. Removing an application from Ansible does not
 revoke its existing endpoint.
+T3 requires client pairing as well as tailnet grants. Pair the phone and
+workstation through T3 after the named service is approved. Confirm both
+clients reconnect through HTTPS and WebSockets; an unpaired client must be
+refused. Pairing also applies to callers that can reach the host loopback port.
+The container has no tailscaled socket, and T3 does not administer
+Tailscale Serve itself.
 
 Inspect =sudo tailscale serve get-config --all -= before changing handlers.
 Remove only the intended handler; =tailscale serve reset= clears unrelated

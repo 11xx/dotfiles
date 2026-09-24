@@ -31,6 +31,15 @@ if leaf:
         target.write(str(os.getpid()))
 os.execv(sys.argv[3], sys.argv[3:])
 """
+SEQUENCE = """
+import json
+import subprocess
+import sys
+for command in json.loads(sys.argv[1]):
+    status = subprocess.run(command).returncode
+    if status:
+        sys.exit(status)
+"""
 
 
 def process_identity(pid):
@@ -131,7 +140,8 @@ def command_for(operation):
     if operation == "stop":
         return compose + ["stop"]
     if operation == "restart":
-        return compose + ["restart"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
         return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
     raise RuntimeError(f"unknown operation: {operation}")

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+
+stopping=0
+child=
+stop() {
+    trap - TERM INT
+    stopping=1
+    if [[ -n $child ]]; then
+        kill -TERM "$child" 2>/dev/null || true
+        wait "$child" 2>/dev/null || true
+    fi
+}
+trap stop TERM INT
+
+while (( ! stopping )); do
+    /usr/local/bin/t3-web &
+    child=$!
+    wait "$child" || true
+    child=
+    (( stopping )) || sleep 2
+done

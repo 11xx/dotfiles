@@ -30,9 +30,11 @@ for fd in Path("/proc/self/fd").iterdir():
     except FileNotFoundError:
         pass
 
-operation = sys.argv[-1]
-if operation in ("stop", "restart"):
-    assert (root / "service/cli/cgroup.procs").read_text() == str(os.getpid())
+operation = "up" if "up" in sys.argv else sys.argv[-1]
+if operation in ("stop", "up"):
+    assert (root / "service/cli/cgroup.procs").read_text() in (str(os.getpid()), str(os.getppid()))
+if operation == "up":
+    assert sys.argv[sys.argv.index("--pull") + 1] == "never"
 with (root / "events").open("a") as events:
     events.write(operation + "\\n")
 if operation == "stop":
@@ -100,7 +102,7 @@ def main():
             assert (root / "events").read_text().splitlines() == ["stop"]
             (root / "release").touch()
             assert second.wait(timeout=5) == 0
-            assert (root / "events").read_text().splitlines() == ["stop", "restart"]
+            assert (root / "events").read_text().splitlines() == ["stop", "stop", "up"]
             assert not (root / "aiagent.active").exists()
             operation_descriptor = backup.operation_lock()
             os.close(operation_descriptor)

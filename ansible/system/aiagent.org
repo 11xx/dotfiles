@@ -1185,6 +1185,13 @@ persistent home. The cache subtree is disposable;
 the =aiagent= command reports its size and cleans only that subtree on request.
 Image-installed commands under =/usr/local/bin= take precedence over programs
 left in the persistent home.
+T3 Code v0.0.42 runs in web mode on the container's port 3773. The image's
+foreground supervisor owns the native server process and restarts it two
+seconds after an exit. T3's process is
+separate from terminal sessions, and a container start launches the supervisor
+without a host-side exec. Podman publishes port 3773 only on host loopback;
+host Tailscale owns HTTPS ingress. T3's pairing state stays in the persistent
+container home.
 
 ** Containerfile
 
@@ -1232,7 +1239,8 @@ RUN case "$(uname -m)" in \
     esac \
  && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
  && npm cache clean --force \
- && t3 serve --help >/dev/null
+ && ln -s "/usr/local/lib/node_modules/t3/node_modules/@t3code/t3-linux-${t3_arch}/t3" /usr/local/bin/t3-native \
+ && t3-native serve --help >/dev/null
 
 RUN groupadd -g 1001 node \
  && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
@@ -1251,7 +1259,7 @@ ENV HOME=/home/node \
     TMPDIR=/cache/tmp
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/aiagent-init"]
-CMD ["sleep", "infinity"]
+CMD ["/usr/local/bin/t3-supervise"]
 #+end_src
 
 ** Entrypoint and shell setup
@@ -1268,6 +1276,33 @@ for script in /usr/local/share/aiagent/init.d/*; do
 done
 
 exec "$@"
+#+end_src
+
+The supervisor forwards container termination to T3 and waits for it to exit.
+An unexpected T3 exit leaves the container and its terminal sessions running.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -u
+
+stopping=0
+child=
+stop() {
+    trap - TERM INT
+    stopping=1
+    if [[ -n $child ]]; then
+        kill -TERM "$child" 2>/dev/null || true
+        wait "$child" 2>/dev/null || true
+    fi
+}
+trap stop TERM INT
+
+while (( ! stopping )); do
+    /usr/local/bin/t3-web &
+    child=$!
+    wait "$child" || true
+    child=
+    (( stopping )) || sleep 2
+done
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
@@ -1296,8 +1331,8 @@ runtime.
 
 The readiness command lives in the image. Both a disposable candidate and the
 running project execute this file with the same shell and executable search
-path. It requires the image-owned Pi wrapper and the three persistent mount
-points without reading login state.
+path. It requires the native T3 executable, image-owned Pi wrapper and the
+three persistent mount points without reading login state.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-readiness" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/bin/sh :tangle-mode o755
 set -eu
@@ -1309,6 +1344,7 @@ test -d /cache
 for tool in codex claude opencode t3 pi; do
     command -v "$tool" >/dev/null
 done
+test -x /usr/local/bin/t3-native
 test "$(command -v pi)" = /usr/local/bin/pi
 #+end_src
 
@@ -1323,7 +1359,7 @@ exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-web" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
 set -euo pipefail
-exec t3 serve --mode web --host 0.0.0.0 --port 3773 \
+exec t3-native serve --mode web --host 0.0.0.0 --port 3773 \
     --base-dir "$HOME/.t3/userdata" --no-browser \
     --auto-bootstrap-project-from-cwd /work "$@"
 #+end_src
@@ -1342,6 +1378,9 @@ inherit the lock. Builds use the deployed context with all Podman and
 temporary paths inside the image-backed home. The command does not alter
 Shepherd, host ingress or other Compose instances. Cache cleanup removes only
 the declared disposable cache subtree.
+Restart stops and starts the Compose project in one recorded worker. This
+releases the rootless port listener before the new container binds it and
+keeps restart serialized if its invoking shell exits.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
@@ -1427,6 +1466,15 @@ if leaf:
     with open(os.path.join(leaf, 'cgroup.procs'), 'w') as target:
         target.write(str(os.getpid()))
 os.execv(sys.argv[3], sys.argv[3:])
+"""
+SEQUENCE = """
+import json
+import subprocess
+import sys
+for command in json.loads(sys.argv[1]):
+    status = subprocess.run(command).returncode
+    if status:
+        sys.exit(status)
 """
 
 
@@ -1528,7 +1576,8 @@ def command_for(operation):
     if operation == "stop":
         return compose + ["stop"]
     if operation == "restart":
-        return compose + ["restart"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
         return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
     raise RuntimeError(f"unknown operation: {operation}")
