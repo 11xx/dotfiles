@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p "$HOME/.config" "$HOME/.local/share" /cache/tmp /cache/npm /cache/xdg
+if [[ ! -e $HOME/.bashrc ]]; then
+    cat >"$HOME/.bashrc" <<'BASHRC'
+for f in /usr/local/share/aiagent/bashrc.d/*; do
+    [ -r "$f" ] && . "$f"
+done
+BASHRC
+fi

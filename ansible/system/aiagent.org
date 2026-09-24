@@ -645,6 +645,205 @@ removes the account, sub-ID declaration and host services together.
    (description "Isolated rootless coding-agent host foundation.")))
 #+end_src
 
+* Gak container image
+
+The Fedora 44 image installs the harness executables under =/usr/local=. The
+container mounts only its persistent home, workspaces and cache, all from the
+agent's image-backed host home. The image's executable paths remain visible
+when the persistent home is mounted. The container has no host runtime, socket,
+media or operator-home mount. Podman's =keep-id= mapping makes the agent's host
+directories writable by the container user.
+
+The harness versions are fixed at build time. Pi's interactive TUI segfaults
+in this Fedora 44 stack; use Pi in print mode in the container. Logins and
+provider state live under the persistent home. The cache subtree is disposable;
+the =aiagent= command reports its size and cleans only that subtree on request.
+
+** Containerfile
+
+#+begin_src dockerfile :tangle (expand-file-name "roles/gak_aiagent/files/image/Containerfile" (file-name-directory (buffer-file-name))) :mkdirp yes
+FROM quay.io/fedora/fedora:44
+
+ARG OPENCODE_VERSION=1.18.32
+ARG CODEX_VERSION=0.156.1
+ARG CLAUDE_CODE_VERSION=2.1.281
+ARG T3_CODE_VERSION=0.0.42
+ARG PI_CODE_VERSION=0.87.1
+
+RUN dnf -y upgrade --refresh \
+ && dnf -y install --setopt=install_weak_deps=False \
+      bash ca-certificates curl fd-find findutils gcc-c++ git gzip jq less make \
+      nodejs npm openssh-clients procps-ng python3 ripgrep shellcheck \
+      tar tmux unzip which xz \
+ && dnf clean all
+
+RUN npm install -g \
+      "opencode-ai@${OPENCODE_VERSION}" \
+      "@openai/codex@${CODEX_VERSION}" \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+      "t3@${T3_CODE_VERSION}" \
+      "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
+ && npm cache clean --force
+
+RUN case "$(uname -m)" in \
+      x86_64) t3_arch=x64 ;; \
+      aarch64) t3_arch=arm64 ;; \
+      *) exit 1 ;; \
+    esac \
+ && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
+ && npm cache clean --force \
+ && t3 serve --help >/dev/null
+
+RUN groupadd -g 1001 node \
+ && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
+ && mkdir -p /home/node /work /cache \
+ && chown -R node:node /home/node /work /cache
+
+COPY --chmod=0755 init.sh /usr/local/bin/aiagent-init
+COPY --chmod=0755 bin/ /usr/local/bin/
+COPY --chmod=0755 init.d/ /usr/local/share/aiagent/init.d/
+COPY --chmod=0644 bashrc.d/ /usr/local/share/aiagent/bashrc.d/
+
+USER node
+ENV HOME=/home/node \
+    XDG_CACHE_HOME=/cache/xdg \
+    NPM_CONFIG_CACHE=/cache/npm \
+    TMPDIR=/cache/tmp
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/aiagent-init"]
+CMD ["sleep", "infinity"]
+#+end_src
+
+** Entrypoint and shell setup
+
+The entrypoint creates only missing persistent-home scaffolding. It reads
+image-owned startup scripts and leaves existing login state untouched.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.sh" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+
+for script in /usr/local/share/aiagent/init.d/*; do
+    [[ -x $script ]] || continue
+    "$script"
+done
+
+exec "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+
+mkdir -p "$HOME/.config" "$HOME/.local/share" /cache/tmp /cache/npm /cache/xdg
+if [[ ! -e $HOME/.bashrc ]]; then
+    cat >"$HOME/.bashrc" <<'BASHRC'
+for f in /usr/local/share/aiagent/bashrc.d/*; do
+    [ -r "$f" ] && . "$f"
+done
+BASHRC
+fi
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bashrc.d/10-path" (file-name-directory (buffer-file-name))) :mkdirp yes :tangle-mode o644
+export PATH="$HOME/.local/bin:$PATH"
+#+end_src
+
+** Container command wrappers
+
+These wrappers are installed with the image, so rebuilding the container does
+not depend on replacing files in the persistent home.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/codex-auto" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-web" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec t3 serve --mode web --host 0.0.0.0 --port 3773 \
+    --base-dir "$HOME/.t3/userdata" --no-browser \
+    --auto-bootstrap-project-from-cwd /work "$@"
+#+end_src
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi-readonly" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -euo pipefail
+exec pi --print --tools read,grep,find,ls "$@"
+#+end_src
+
+** Host command
+
+The account-local command uses one lock for its mutating operations. It builds
+from the deployed context with all Podman and temporary paths inside the
+image-backed home. It does not alter Shepherd, host ingress or other Compose
+instances. Cache cleanup removes only the declared disposable cache subtree.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
+set -euo pipefail
+
+home=/home/aiagent
+project="$home/services/agent/compose.yaml"
+image=localhost/aiagent-fedora:44-v1
+container=aiagent
+lock=/run/aiagent/aiagent.lock
+podman=/run/current-system/profile/bin/podman
+
+export HOME="$home"
+export XDG_RUNTIME_DIR=/run/aiagent
+export TMPDIR="$home/tmp"
+export CONTAINERS_IMAGE_COPY_TMPDIR="$home/image-copy-tmp"
+export PODMAN_COMPOSE_PROVIDER="$home/.guix-profile/bin/podman-compose"
+export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
+
+die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
+usage() {
+    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+}
+mutate() {
+    exec 9>"$lock"
+    flock 9
+    "$@" 9>&-
+}
+compose() { "$podman" compose -f "$project" "$@"; }
+status() {
+    if "$podman" container exists "$container"; then
+        "$podman" ps -a --filter "name=^${container}$" --format '{{.Names}} {{.Status}} {{.Image}}'
+    else
+        printf '%s\n' absent
+    fi
+}
+build() {
+    [[ -f $home/image/Containerfile ]] || die 'image context is not deployed'
+    ! "$podman" image exists "$image" || die "initial image already exists: $image"
+    "$podman" build --pull=missing --tag "$image" \
+        --file "$home/image/Containerfile" "$home/image"
+}
+start() {
+    "$podman" image exists "$image" || die "local image is absent: $image"
+    compose up -d --pull never
+}
+cache_clean() {
+    [[ -d $home/cache && ! -L $home/cache ]] || die 'cache directory is missing or linked'
+    find "$home/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    mkdir -p "$home/cache/tmp" "$home/cache/npm" "$home/cache/xdg"
+}
+
+cmd=${1:-}
+[[ $# -eq 0 ]] || shift
+case "$cmd" in
+    status) status ;;
+    logs) exec "$podman" logs "$@" "$container" ;;
+    shell) exec "$podman" exec -it "$container" bash -l ;;
+    exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
+    build) mutate build ;;
+    start) mutate start ;;
+    stop) mutate compose stop ;;
+    restart) mutate compose restart ;;
+    recreate) mutate compose up -d --force-recreate --pull never ;;
+    cache-size) du -sh "$home/cache" ;;
+    cache-clean) mutate cache_clean ;;
+    *) usage; exit 2 ;;
+esac
+#+end_src
+
 * Ak container reference
 
 The ak-only blocks below are excluded from tangling. Their committed outputs

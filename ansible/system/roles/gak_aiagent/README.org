@@ -40,9 +40,33 @@ The host account has tailscaled's non-operator read-only local API access;
 the Guix module leaves the socket unchanged. The agent container must omit
 host runtime paths, including that socket.
 
-The =smoke= project uses a published BusyBox image with no mounts or network.
-Its init forwards termination and reaps the shell loop so a normal stop does
-not consume the container's 30-second SIGTERM grace period.
-Its image is pulled before a cold boot, since the lifecycle helper starts with
-=--pull never=. The helper reads the five instance lists from
-=/home/aiagent/services=. A second play run is idempotent.
+The =agent= Compose project names =localhost/aiagent-fedora:44-v1= and has no
+=build:= key. Its build context lives under =/home/aiagent/image=. The
+account-local =aiagent build= command builds that tag, with Podman's storage and
+temporary paths inside the home image. It refuses to overwrite an existing
+initial tag. The project mounts only
+=container-home= at =/home/node=, =workspaces= at =/work= and =cache= at
+=/cache=. The container uses =keep-id= for the agent's host UID. No host
+runtime, socket, media path or operator home is mounted. The image installs
+harness binaries and wrappers under =/usr/local=, outside the persistent home.
+The Fedora 44 base and harness package versions are pinned in
+[[file:../../aiagent.org][aiagent.org]]. Pi's interactive TUI segfaults in this
+environment, so container Pi is for print mode.
+
+=aiagent status=, =logs=, =shell= and =exec= inspect or enter the container.
+=build=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
+account-local lock. =cache-size= reports the disposable cache subtree;
+=cache-clean= removes only that subtree's contents. Harness logins and project
+work remain in the separate persistent mounts. The 32 GiB cache target is
+operator-maintained through =cache-size= and explicit =cache-clean=; the home
+image's 256 GiB size is the hard account budget.
+
+The helper reads its five instance lists from =/home/aiagent/services= and
+starts the project with =--pull never=. The =gak-aiagent-image= Ansible tag
+deploys the context, command, private directories and Compose file without
+changing the running instance lists. Build the image through an aiagent SSH
+session. Stop =aiagent-compose= before deploying the full role, then start the
+service under operator control. The
+service's lifecycle lock is held while it runs, and its recorded project list
+must match the deployed declarations before it stops. A second play run is
+idempotent.
