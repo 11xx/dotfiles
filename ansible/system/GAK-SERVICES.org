@@ -667,8 +667,10 @@ and holds through both bundles and Restic snapshot creation. Bundle writers
 run as =agentgit= through root-opened descriptors.
 
 The receive process retains the lock if its Gitolite parent exits abruptly;
-the lock is released after the receive and its synchronous hooks settle.
-Unrelated detached hook processes do not retain it.
+each original hook descendant also retains it until it closes the descriptor
+or exits. A detached process with an inherited descriptor can hold the lock
+beyond the push. This delays backup rather than permitting concurrent policy
+or project writes.
 
 The restore check imports the bundles into isolated bare repositories as
 =agentgit=, checks all expected refs and HEAD, runs
@@ -680,6 +682,11 @@ HEADs and administrative file hashes.
 
 If a receive holds the lock for more than five minutes, the root backup fails
 before snapshot creation and follows the agent Compose recovery path.
+Inspect the holder with =sudo lslocks -o PID,COMMAND,PATH= and =sudo fuser -v
+/var/lib/agentgit-lock/receive.lock=. Check active receives, administrative
+updates and hook descendants before terminating a genuinely stuck holder.
+Keep the lock file in place: removing or replacing it would create separate
+lock domains. Retry backup after the holder exits.
 
 For recovery, suspend pushes and restore one Restic snapshot into root-owned
 scratch. Import each bundle into an empty bare repository as =agentgit= with

@@ -60,14 +60,15 @@ def setup():
     lock_source = Path(os.environ["HUB_LOCK_SOURCE"]).read_text()
     (code / "HubLock.pm").write_text(lock_source.replace(
         "'/etc/git-hub/hooks'", f"'{ROOT / 'local-code/hooks'}'"))
-    hooks = ROOT / "local-code/hooks"
-    hooks.mkdir()
-    for name in ("pre-receive", "update", "post-receive", "post-update",
-                 "proc-receive", "reference-transaction", "push-to-checkout",
-                 "pre-auto-gc"):
-        destination = hooks / name
-        shutil.copyfile(os.environ["HUB_HOOK_SOURCE"], destination)
-        destination.chmod(0o755)
+    if "'/etc/git-hub/hooks'" in lock_source:
+        hooks = ROOT / "local-code/hooks"
+        hooks.mkdir()
+        for name in ("pre-receive", "update", "post-receive", "post-update",
+                     "proc-receive", "reference-transaction", "push-to-checkout",
+                     "pre-auto-gc"):
+            destination = hooks / name
+            shutil.copyfile(os.environ["HUB_HOOK_SOURCE"], destination)
+            destination.chmod(0o755)
     rc = Path(os.environ["GENERATED_RC"]).read_text()
     assert 'LOCAL_CODE => "/etc/git-hub"' in rc
     assert "PRE_GIT => ['HubLock::pre_git']" in rc

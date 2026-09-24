@@ -748,25 +748,12 @@ it is not a quota on the resulting repository size.
       (chown path 0 (group:gid group))
       (chmod path #o660)))
 
-(define %hub-hook-program
-  (computed-file
-   "HubHook.sh"
-   #~(begin
-       (copy-file #$(local-file "HubHook.sh") #$output)
-       (chmod #$output #o555))))
-
 (define (git-hub-services config)
   (list (service gitolite-service-type (git-hub-gitolite config))
         (simple-service
          'git-hub-code etc-service-type
-         (cons (list "git-hub/lib/Gitolite/Triggers/HubLock.pm"
-                     (local-file "HubLock.pm"))
-               (map (lambda (name)
-                      (list (string-append "git-hub/hooks/" name)
-                            %hub-hook-program))
-                    '("pre-receive" "update" "post-receive" "post-update"
-                      "proc-receive" "reference-transaction" "push-to-checkout"
-                      "pre-auto-gc"))))
+         (list (list "git-hub/lib/Gitolite/Triggers/HubLock.pm"
+                     (local-file "HubLock.pm"))))
         (simple-service
          'git-hub-lock activation-service-type %hub-lock-activation)))
 #+end_src
@@ -774,9 +761,12 @@ it is not a quota on the resulting repository size.
 The Gitolite receive command holds the root-owned shared lock until
 =git-receive-pack= and Gitolite's administrative hooks finish. The receive
 process inherits the descriptor across exec, so the lock survives death of
-the Gitolite parent. A completed receive releases it without retaining an
-unrelated detached hook process. The lock directory is root-owned and cannot
-be renamed by =agentgit=. Root backup
+the Gitolite parent. Git's original hooks and their descendants inherit the
+same descriptor. Exclusion lasts until every holder closes it or exits, even
+when a hook's direct parent dies. A detached process that retains the
+descriptor also retains the lock; backup then waits at most five minutes and
+fails without a snapshot. The lock directory is root-owned and cannot be
+renamed by =agentgit=. Root backup
 checks the directory and file ownership before waiting on the same inode.
 It waits at most five minutes for an active receive, then fails without a hub
 snapshot and follows the existing agent service recovery path.
@@ -790,7 +780,6 @@ use warnings;
 use Fcntl qw(:flock :DEFAULT F_GETFD F_SETFD FD_CLOEXEC);
 
 my $held;
-my $config_slot;
 my $directory = '/var/lib/agentgit-lock';
 my $path = "$directory/receive.lock";
 
@@ -814,61 +803,14 @@ sub pre_git {
         && $file_stat[5] == $gid && ($file_stat[2] & 07777) == 0660;
     flock($handle, LOCK_EX) or die "cannot lock Git hub\n";
     $held = $handle;
-    my $count = $ENV{GIT_CONFIG_COUNT} // 0;
-    die "invalid Git config count\n" unless $count =~ /^\d+$/ && $count < 32;
-    $config_slot = $count;
-    $ENV{"GIT_CONFIG_KEY_$count"} = 'core.hooksPath';
-    $ENV{"GIT_CONFIG_VALUE_$count"} = '/etc/git-hub/hooks';
-    $ENV{GIT_CONFIG_COUNT} = $count + 1;
-    $ENV{GAK_HUB_CONFIG_BASE} = $count;
-    $ENV{GAK_HUB_LOCK_FD} = fileno($handle);
 }
 
 sub post_git {
     close($held) if $held;
     undef $held;
-    if (defined $config_slot) {
-        $ENV{GIT_CONFIG_COUNT} = $config_slot;
-        delete $ENV{"GIT_CONFIG_KEY_$config_slot"};
-        delete $ENV{"GIT_CONFIG_VALUE_$config_slot"};
-        undef $config_slot;
-    }
-    delete $ENV{GAK_HUB_CONFIG_BASE};
-    delete $ENV{GAK_HUB_LOCK_FD};
 }
 
 1;
-#+end_src
-
-Each receive hook enters a root-controlled wrapper that holds the descriptor
-while its original repository hook runs. The wrapper closes the descriptor in
-the hook child before exec, so a detached child cannot extend the lock past
-the completed receive. The original Gitolite hooks still enforce ref policy
-and update the administrative repository.
-
-#+begin_src shell :tangle (expand-file-name "roles/guix_config/files/modules/aiagent/HubHook.sh" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/bin/sh :tangle-mode o755
-set -eu
-
-hook=${0##*/}
-fd=${GAK_HUB_LOCK_FD:-}
-slot=${GAK_HUB_CONFIG_BASE:-}
-case "$fd:$slot" in
-    *[!0-9:]*|:*|*:) exit 1 ;;
-esac
-[ "$fd" -ge 3 ] && [ "$fd" -le 255 ] && [ "$slot" -lt 32 ] || exit 1
-
-repository=${GIT_DIR:-.}
-original="$repository/hooks/$hook"
-[ -x "$original" ] || exit 0
-
-(
-    eval "exec ${fd}>&-"
-    eval "unset GIT_CONFIG_KEY_${slot} GIT_CONFIG_VALUE_${slot}"
-    GIT_CONFIG_COUNT=$slot
-    export GIT_CONFIG_COUNT
-    unset GAK_HUB_LOCK_FD GAK_HUB_CONFIG_BASE
-    exec "$original" "$@"
-)
 #+end_src
 
 The root mcron jobs use a store-captured program and a root-owned Restic
