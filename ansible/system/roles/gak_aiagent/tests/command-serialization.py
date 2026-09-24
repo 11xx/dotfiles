@@ -28,6 +28,8 @@ for fd in Path("/proc/self/fd").iterdir():
         pass
 
 operation = sys.argv[-1]
+if operation in ("stop", "restart"):
+    assert (root / "service/cli/cgroup.procs").read_text() == str(os.getpid())
 with (root / "events").open("a") as events:
     events.write(operation + "\\n")
 if operation == "stop":
@@ -64,6 +66,8 @@ def main():
         source = replace_one(source, 'PODMAN = "/run/current-system/profile/bin/podman"', f'PODMAN = {str(fake)!r}')
         source = replace_one(source, 'LOCK = Path("/run/aiagent/aiagent.lock")', f'LOCK = Path({str(root / "aiagent.lock")!r})')
         source = replace_one(source, 'ACTIVE = Path("/run/aiagent/aiagent.active")', f'ACTIVE = Path({str(root / "aiagent.active")!r})')
+        source = replace_one(source, 'PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")',
+                             f'PROJECT_CGROUP = Path({str(root / "service/cli")!r})')
         helper.write_text(source)
         helper.chmod(0o750)
         command = root / "aiagent"

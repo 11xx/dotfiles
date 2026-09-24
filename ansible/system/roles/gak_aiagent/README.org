@@ -64,6 +64,12 @@ image's 256 GiB size is the hard account budget.
 The operation helper keeps a PID and kernel start time under =/run/aiagent=.
 It waits for a recorded foreground operation after an interrupted caller,
 while Podman's detached processes inherit no lock descriptor.
+Project mutations move their worker from the SSH cgroup into the
+=/aiagent/delegated/service/cli= leaf before invoking Podman. Containers
+created there remain in the service subtree. Read-only commands stay in the
+invoking session. An empty CLI leaf is removed after the worker exits; a leaf
+with a running container stays until that container stops or home stop drains
+the service subtree.
 
 =aiagent update= builds a candidate under a unique local tag and tests it in
 a disposable container without persistent mounts or network access. It stops
