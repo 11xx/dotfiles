@@ -3,8 +3,10 @@
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import os
 from pathlib import Path
 import subprocess
+from tempfile import TemporaryDirectory
 import threading
 
 
@@ -47,15 +49,20 @@ config = {
         }
     }
 }
-path = Path.home() / ".pi/agent/models.json"
-path.parent.mkdir(parents=True, exist_ok=True)
-path.write_text(json.dumps(config))
 try:
-    result = subprocess.run(
-        ["pi", "-p", "--no-session", "--provider", "fixture", "--model",
-         "fixture-model", "hello"],
-        capture_output=True, text=True, timeout=15,
-    )
+    with TemporaryDirectory(prefix="pi-print-") as home:
+        agent_dir = Path(home) / ".pi/agent"
+        agent_dir.mkdir(parents=True)
+        (agent_dir / "models.json").write_text(json.dumps(config))
+        env = os.environ.copy()
+        env["HOME"] = home
+        env["PI_CODING_AGENT_DIR"] = str(agent_dir)
+        env["PI_OFFLINE"] = "1"
+        result = subprocess.run(
+            ["pi", "-p", "--no-session", "--provider", "fixture", "--model",
+             "fixture-model", "hello"],
+            capture_output=True, text=True, timeout=15, env=env,
+        )
 finally:
     server.shutdown()
 print(f"print mode: exit {result.returncode}, response {result.stdout.strip()!r}")
