@@ -77,7 +77,11 @@ def normalize_https_origin(value):
             if "%" in host:
                 raise ValueError
             address = ipaddress.IPv6Address(host)
-            authority = f"[{address.compressed}]"
+            if address.ipv4_mapped is not None:
+                mapped = int(address.ipv4_mapped)
+                authority = f"[::ffff:{mapped >> 16:x}:{mapped & 0xffff:x}]"
+            else:
+                authority = f"[{address.compressed}]"
         else:
             if ":" in host:
                 raise ValueError

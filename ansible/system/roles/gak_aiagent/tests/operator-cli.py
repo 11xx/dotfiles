@@ -198,6 +198,8 @@ elif name == "qrencode":
             ("HTTPS://T3.EXAMPLE.TEST:0443/", ORIGIN),
             ("https://127.0.0.1:0443", "https://127.0.0.1"),
             ("https://[2001:0DB8::1]:443/", "https://[2001:db8::1]"),
+            ("https://[::ffff:192.0.2.1]", "https://[::ffff:c000:201]"),
+            ("https://[::ffff:c000:201]", "https://[::ffff:c000:201]"),
             ("https://T3.EXAMPLE.TEST.:8443", "https://t3.example.test.:8443"),
             ("https://LOCALHOST:443", "https://localhost"),
         ]
