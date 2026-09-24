@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /opt/pi-node/node /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js "$@"

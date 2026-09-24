@@ -654,9 +654,11 @@ when the persistent home is mounted. The container has no host runtime, socket,
 media or operator-home mount. Podman's =keep-id= mapping makes the agent's host
 directories writable by the container user.
 
-The harness versions are fixed at build time. Pi's interactive TUI segfaults
-in this Fedora 44 stack; use Pi in print mode in the container. Logins and
-provider state live under the persistent home. The cache subtree is disposable;
+The harness versions are fixed at build time. Pi uses the pinned upstream
+Node executable under =/opt/pi-node= for its interactive TUI and print mode;
+the Fedora Node installation serves npm and the other harnesses. Pi's =/login=
+menu runs inside the container. Logins and provider state live under the
+persistent home. The cache subtree is disposable;
 the =aiagent= command reports its size and cleans only that subtree on request.
 Image-installed commands under =/usr/local/bin= take precedence over programs
 left in the persistent home.
@@ -671,6 +673,7 @@ ARG CODEX_VERSION=0.156.1
 ARG CLAUDE_CODE_VERSION=2.1.281
 ARG T3_CODE_VERSION=0.0.42
 ARG PI_CODE_VERSION=0.87.1
+ARG PI_NODE_VERSION=22.23.1
 
 RUN dnf -y upgrade --refresh \
  && dnf -y install --setopt=install_weak_deps=False \
@@ -686,6 +689,18 @@ RUN npm install -g \
       "t3@${T3_CODE_VERSION}" \
       "@earendil-works/pi-coding-agent@${PI_CODE_VERSION}" \
  && npm cache clean --force
+
+RUN case "$(uname -m)" in \
+      x86_64) pi_node_arch=x64; pi_node_sha256=9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578 ;; \
+      aarch64) pi_node_arch=arm64; pi_node_sha256=0294e8b915ab75f92c7513d2fcb830ae06e10684e6c603e99a87dbf8835389c1 ;; \
+      *) exit 1 ;; \
+    esac \
+ && pi_node_archive="node-v${PI_NODE_VERSION}-linux-${pi_node_arch}.tar.xz" \
+ && curl -fsSLo /tmp/pi-node.tar.xz "https://nodejs.org/dist/v${PI_NODE_VERSION}/${pi_node_archive}" \
+ && printf '%s  %s\n' "$pi_node_sha256" /tmp/pi-node.tar.xz | sha256sum -c - \
+ && mkdir -p /opt/pi-node \
+ && tar -xJf /tmp/pi-node.tar.xz -C /opt/pi-node --strip-components=2 "node-v${PI_NODE_VERSION}-linux-${pi_node_arch}/bin/node" \
+ && rm /tmp/pi-node.tar.xz /usr/local/bin/pi
 
 RUN case "$(uname -m)" in \
       x86_64) t3_arch=x64 ;; \
@@ -752,7 +767,13 @@ export PATH="/usr/local/bin:$PATH:$HOME/.local/bin"
 ** Container command wrappers
 
 These wrappers are installed with the image, so rebuilding the container does
-not depend on replacing files in the persistent home.
+not depend on replacing files in the persistent home. The =pi= wrapper selects
+the upstream Node executable while the other harness commands keep the Fedora
+runtime.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+exec /opt/pi-node/node /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js "$@"
+#+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/codex-auto" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
 set -euo pipefail
