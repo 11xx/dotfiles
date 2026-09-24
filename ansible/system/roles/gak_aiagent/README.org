@@ -6,7 +6,8 @@ directory, SSH cgroup placement and a capped parent before this role runs.
 The play installs Python and =podman-compose= in the account's Guix profile.
 
 This role keeps Podman storage, its runroot and both temporary directories in
-the ext4 home image. The account's shell and Shepherd service set =TMPDIR=,
+the ext4 home image. Its storage configuration declares one graphroot and a
+separate runroot. The account's shell and Shepherd service set =TMPDIR=,
 =CONTAINERS_IMAGE_COPY_TMPDIR= and =XDG_RUNTIME_DIR=. Podman's cgroupfs manager
 uses =cgroups = "split"=, placing conmon and the payload beneath the cgroup
 of the service or SSH session that starts them.
