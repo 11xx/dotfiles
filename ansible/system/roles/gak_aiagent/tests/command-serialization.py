@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Exercise operation ordering when the caller exits before its child."""
+"""Exercise operation ordering across caller and worker deaths."""
 
 import importlib.util
+import json
 import os
 from pathlib import Path
 import signal
@@ -30,14 +31,25 @@ for fd in Path("/proc/self/fd").iterdir():
     except FileNotFoundError:
         pass
 
-operation = sys.argv[-1]
-if operation in ("stop", "restart"):
-    assert (root / "service/cli/cgroup.procs").read_text() == str(os.getpid())
+operation = "up" if "up" in sys.argv else sys.argv[-1]
+if operation in ("stop", "up"):
+    assert (root / "service/cli/cgroup.procs").read_text() in (str(os.getpid()), str(os.getppid()))
+if operation == "up":
+    assert sys.argv[sys.argv.index("--pull") + 1] == "never"
 with (root / "events").open("a") as events:
     events.write(operation + "\\n")
 if operation == "stop":
+    if os.getpid() != os.getsid(0):
+        os.setpgid(0, 0)
+    (root / "stop-child.pid").write_text(str(os.getpid()))
     while not (root / "release").exists():
         time.sleep(0.05)
+if operation == "up" and (root / "spawn-detached").exists():
+    import subprocess
+    detached = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
+                                start_new_session=True, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+    (root / "detached.pid").write_text(str(detached.pid))
 '''
 
 
@@ -84,6 +96,9 @@ def main():
         backup.agent_account = lambda: SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid())
         first = subprocess.Popen([command, "stop"], env=env)
         second = None
+        crashed = None
+        following = None
+        detached_pid = None
         try:
             wait_until(lambda: (root / "events").exists())
             first.send_signal(signal.SIGKILL)
@@ -100,7 +115,44 @@ def main():
             assert (root / "events").read_text().splitlines() == ["stop"]
             (root / "release").touch()
             assert second.wait(timeout=5) == 0
-            assert (root / "events").read_text().splitlines() == ["stop", "restart"]
+            assert (root / "events").read_text().splitlines() == ["stop", "stop", "up"]
+            assert not (root / "aiagent.active").exists()
+            operation_descriptor = backup.operation_lock()
+            os.close(operation_descriptor)
+
+            (root / "release").unlink()
+            (root / "events").unlink()
+            crashed = subprocess.Popen([command, "restart"], env=env)
+            wait_until(lambda: (root / "events").exists())
+            assert (root / "events").read_text().splitlines() == ["stop"]
+            record = json.loads((root / "aiagent.active").read_text())
+            os.kill(record["pid"], signal.SIGKILL)
+            assert crashed.wait(timeout=5) != 0
+            stop_pid = int((root / "stop-child.pid").read_text())
+            assert Path(f"/proc/{stop_pid}/stat").exists()
+            assert os.getpgid(stop_pid) != record["pid"]
+            assert os.getsid(stop_pid) == record["pid"]
+            for caller in ("daily", "restore-check"):
+                try:
+                    backup.operation_lock()
+                except backup.Busy:
+                    pass
+                else:
+                    raise AssertionError(f"{caller} ignored the surviving Compose child")
+            following = subprocess.Popen([command, "recreate"], env=env)
+            time.sleep(0.4)
+            assert (root / "events").read_text().splitlines() == ["stop"]
+            (root / "release").touch()
+            assert following.wait(timeout=5) == 0
+            assert (root / "events").read_text().splitlines() == ["stop", "up"]
+            assert not (root / "aiagent.active").exists()
+            operation_descriptor = backup.operation_lock()
+            os.close(operation_descriptor)
+
+            (root / "spawn-detached").touch()
+            assert subprocess.run([command, "recreate"], env=env).returncode == 0
+            detached_pid = int((root / "detached.pid").read_text())
+            assert Path(f"/proc/{detached_pid}/stat").exists()
             assert not (root / "aiagent.active").exists()
             operation_descriptor = backup.operation_lock()
             os.close(operation_descriptor)
@@ -115,11 +167,21 @@ def main():
             assert not (cache / "link").exists()
             assert outside.read_text() == "persistent"
             assert all((cache / name).is_dir() for name in ("tmp", "npm", "xdg"))
-            print("supervisor killed: restart waited for stop child; lock not inherited")
-            print("daily and restore-check refused the surviving worker, then accepted an idle lock")
+            print("caller death: restart waited for the surviving stop worker")
+            print("worker death: recreate and backup waited for the surviving Compose child")
+            print("detached workload did not retain the operation record or lock")
             print("cache cleanup stayed inside the cache subtree")
         finally:
             (root / "release").touch()
+            if detached_pid is not None:
+                try:
+                    os.kill(detached_pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            for process in (following, crashed):
+                if process is not None and process.poll() is None:
+                    process.kill()
+                    process.wait()
             if second is not None and second.poll() is None:
                 second.kill()
                 second.wait()

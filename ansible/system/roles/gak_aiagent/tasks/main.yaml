@@ -118,8 +118,8 @@
 
 - name: 'aiagent: Install the agent project'
   tags: ['gak-aiagent-image']
-  ansible.builtin.copy:
-    src: agent-compose.yaml
+  ansible.builtin.template:
+    src: agent-compose.yaml.j2
     dest: /home/aiagent/services/agent/compose.yaml
     mode: '0600'
 

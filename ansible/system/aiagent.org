@@ -680,8 +680,10 @@ password and repository are outside the agent's mounted home and container.
 The backup job serializes itself with a root-only lock under =/var/lib/aiagent=.
 The minute job creates its result under root-owned =/run/aiagent-backup= and
 atomically hands the finished file to the account. Daily backup and restore
-check take the account's operation lock and reject a surviving worker recorded
-under =/run/aiagent=. They attempt service recovery even when stopping Compose
+check take the account's operation lock and reject a surviving foreground
+operation session recorded under =/run/aiagent=, including Compose children that
+outlive their worker. Detached workloads leave that session and do not hold the
+exclusion. The jobs attempt service recovery even when stopping Compose
 fails; the stop deadline covers the documented service and home stop chain.
 Termination signals settle the current command's process group before a
 bounded recovery of the home mount and Compose service. Further signals during
@@ -910,6 +912,22 @@ def process_identity(pid):
     return fields[19]
 
 
+def process_session_active(pid, started):
+    identity = process_identity(pid)
+    if identity is not None:
+        return identity == started
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        except OSError:
+            continue
+        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+            return True
+    return False
+
+
 def active_operation():
     try:
         descriptor, _ = secure_file(RUNTIME / "aiagent.active", os.O_RDONLY, agent_account().pw_uid)
@@ -928,7 +946,7 @@ def active_operation():
             raise ValueError()
     except (ValueError, KeyError, TypeError):
         raise Busy("agent operation record is invalid") from None
-    return process_identity(pid) == started
+    return process_session_active(pid, started)
 
 
 def operation_lock():
@@ -1185,6 +1203,14 @@ persistent home. The cache subtree is disposable;
 the =aiagent= command reports its size and cleans only that subtree on request.
 Image-installed commands under =/usr/local/bin= take precedence over programs
 left in the persistent home.
+T3 Code v0.0.42 runs in web mode on the container's port 3773. The image's
+foreground supervisor owns the native server process and restarts it two
+seconds after an exit. T3's process is
+separate from terminal sessions, and a container start launches the supervisor
+without a host-side exec. Podman publishes container port 3773 only on host
+loopback. The shared =gak_t3_port= inventory value selects that host port and
+the Tailscale backend port; host Tailscale owns HTTPS ingress. T3's pairing
+state stays in the persistent container home.
 
 ** Containerfile
 
@@ -1232,7 +1258,8 @@ RUN case "$(uname -m)" in \
     esac \
  && npm install -g "@t3code/t3-linux-${t3_arch}@${T3_CODE_VERSION}" \
  && npm cache clean --force \
- && t3 serve --help >/dev/null
+ && ln -s "/usr/local/lib/node_modules/t3/node_modules/@t3code/t3-linux-${t3_arch}/t3" /usr/local/bin/t3-native \
+ && t3-native serve --help >/dev/null
 
 RUN groupadd -g 1001 node \
  && useradd -u 1001 -g 1001 -d /home/node -s /bin/bash node \
@@ -1251,7 +1278,7 @@ ENV HOME=/home/node \
     TMPDIR=/cache/tmp
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/aiagent-init"]
-CMD ["sleep", "infinity"]
+CMD ["/usr/local/bin/t3-supervise"]
 #+end_src
 
 ** Entrypoint and shell setup
@@ -1268,6 +1295,33 @@ for script in /usr/local/share/aiagent/init.d/*; do
 done
 
 exec "$@"
+#+end_src
+
+The supervisor forwards container termination to T3 and waits for it to exit.
+An unexpected T3 exit leaves the container and its terminal sessions running.
+
+#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-supervise" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
+set -u
+
+stopping=0
+child=
+stop() {
+    trap - TERM INT
+    stopping=1
+    if [[ -n $child ]]; then
+        kill -TERM "$child" 2>/dev/null || true
+        wait "$child" 2>/dev/null || true
+    fi
+}
+trap stop TERM INT
+
+while (( ! stopping )); do
+    /usr/local/bin/t3-web &
+    child=$!
+    wait "$child" || true
+    child=
+    (( stopping )) || sleep 2
+done
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/init.d/10-home" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
@@ -1295,21 +1349,114 @@ the upstream Node executable while the other harness commands keep the Fedora
 runtime.
 
 The readiness command lives in the image. Both a disposable candidate and the
-running project execute this file with the same shell and executable search
-path. It requires the image-owned Pi wrapper and the three persistent mount
-points without reading login state.
+running project execute the same entry point and executable search path. It
+requires the native T3 executable, image-owned Pi wrapper and the
+three persistent mount points without reading login state. Candidate readiness
+starts the native server against temporary state on container loopback and
+requires an HTTP response before stopping it. Running-project readiness
+requires the supervised server to answer on its container port, so a failing
+persistent T3 state cannot pass the update gate.
 
-#+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-readiness" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/bin/sh :tangle-mode o755
-set -eu
-PATH=/usr/local/bin:/usr/bin:/bin
-export PATH
-test -d /home/node
-test -d /work
-test -d /cache
-for tool in codex claude opencode t3 pi; do
-    command -v "$tool" >/dev/null
-done
-test "$(command -v pi)" = /usr/local/bin/pi
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/aiagent-readiness" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o755
+import http.client
+import os
+from pathlib import Path
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+
+PORT = 3773
+
+
+def require_image():
+    os.environ["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+    for directory in ("/home/node", "/work", "/cache"):
+        if not Path(directory).is_dir():
+            raise RuntimeError(f"missing mount point: {directory}")
+    for tool in ("codex", "claude", "opencode", "t3", "pi"):
+        if shutil.which(tool) is None:
+            raise RuntimeError(f"missing image command: {tool}")
+    if not os.access("/usr/local/bin/t3-native", os.X_OK):
+        raise RuntimeError("missing native T3 server")
+    if shutil.which("pi") != "/usr/local/bin/pi":
+        raise RuntimeError("Pi does not resolve to the image wrapper")
+
+
+def serving(port):
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+    try:
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        return (response.status == 200
+                and response.getheader("Content-Type", "").split(";", 1)[0] == "text/html"
+                and bool(response.read(1)))
+    finally:
+        connection.close()
+
+
+def candidate():
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    with tempfile.TemporaryDirectory(prefix="t3-readiness-", dir="/cache/tmp") as state:
+        server = subprocess.Popen(
+            ["/usr/local/bin/t3-native", "serve", "--mode", "web",
+             "--host", "127.0.0.1", "--port", str(port),
+             "--base-dir", state, "--no-browser"],
+            cwd="/work", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        try:
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                if server.poll() is not None:
+                    raise RuntimeError("candidate T3 server exited before serving")
+                try:
+                    if serving(port):
+                        time.sleep(0.25)
+                        if server.poll() is None and serving(port):
+                            return
+                except OSError:
+                    pass
+                time.sleep(0.25)
+            raise RuntimeError("candidate T3 server did not serve HTTP")
+        finally:
+            try:
+                os.killpg(server.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(server.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                server.wait()
+
+
+def main():
+    mode = sys.argv[1:] or ["--live"]
+    if mode not in (["--live"], ["--candidate"]):
+        raise RuntimeError("usage: aiagent-readiness [--live|--candidate]")
+    require_image()
+    if mode == ["--candidate"]:
+        candidate()
+    elif not serving(PORT):
+        raise RuntimeError("supervised T3 server did not serve HTTP")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, RuntimeError) as error:
+        print(f"aiagent readiness: {error}", file=sys.stderr)
+        sys.exit(1)
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/pi" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
@@ -1323,7 +1470,7 @@ exec codex --sandbox workspace-write --ask-for-approval on-request "$@"
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bin/t3-web" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o755
 set -euo pipefail
-exec t3 serve --mode web --host 0.0.0.0 --port 3773 \
+exec t3-native serve --mode web --host 0.0.0.0 --port 3773 \
     --base-dir "$HOME/.t3/userdata" --no-browser \
     --auto-bootstrap-project-from-cwd /work "$@"
 #+end_src
@@ -1337,11 +1484,15 @@ exec pi --print --tools read,grep,find,ls "$@"
 
 The account-local command uses one lock for its mutating operations. The
 foreground operation has a recorded process identity; a later caller waits for
-it even if the caller that started it dies. Podman's detached processes do not
-inherit the lock. Builds use the deployed context with all Podman and
+its process session even if the caller or worker dies. The root backup job checks
+the same record. Detached workloads leave the session and do not retain the
+lock. Builds use the deployed context with all Podman and
 temporary paths inside the image-backed home. The command does not alter
 Shepherd, host ingress or other Compose instances. Cache cleanup removes only
 the declared disposable cache subtree.
+Restart stops and starts the Compose project in one recorded worker. This
+releases the rootless port listener before the new container binds it and
+keeps restart serialized if its invoking shell exits.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
@@ -1428,6 +1579,15 @@ if leaf:
         target.write(str(os.getpid()))
 os.execv(sys.argv[3], sys.argv[3:])
 """
+SEQUENCE = """
+import json
+import subprocess
+import sys
+for command in json.loads(sys.argv[1]):
+    status = subprocess.run(command).returncode
+    if status:
+        sys.exit(status)
+"""
 
 
 def process_identity(pid):
@@ -1440,11 +1600,27 @@ def process_identity(pid):
     return fields[19]
 
 
+def process_session_active(pid, started):
+    identity = process_identity(pid)
+    if identity is not None:
+        return identity == started
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        except OSError:
+            continue
+        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+            return True
+    return False
+
+
 def wait_for_previous():
     if not ACTIVE.exists():
         return
     record = json.loads(ACTIVE.read_text())
-    while process_identity(record["pid"]) == record["start"]:
+    while process_session_active(record["pid"], record["start"]):
         time.sleep(0.1)
     ACTIVE.unlink()
 
@@ -1490,9 +1666,11 @@ def run(command, project=False):
         os.close(write_fd)
         if worker is not None and not recorded:
             worker.wait()
-        if recorded and worker.poll() is not None:
+        settled = recorded and worker.poll() is not None and not process_session_active(
+            record["pid"], record["start"])
+        if settled:
             ACTIVE.unlink(missing_ok=True)
-        if project and worker is not None and worker.poll() is not None:
+        if project and worker is not None and settled:
             clean_project_cgroup()
 
 
@@ -1528,7 +1706,8 @@ def command_for(operation):
     if operation == "stop":
         return compose + ["stop"]
     if operation == "restart":
-        return compose + ["restart"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
         return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
     raise RuntimeError(f"unknown operation: {operation}")
@@ -1643,7 +1822,7 @@ def main():
         built = True
         candidate_id = image_id(candidate)
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/usr/local/bin/aiagent-readiness", timeout=180)
+                "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180)
         command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
         quiesced = True
         backup()

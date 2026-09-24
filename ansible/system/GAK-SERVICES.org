@@ -119,9 +119,28 @@ T3 state, and the workspace mount holds project work. The cache target is
 it explicitly. Logins happen inside the container under the operator's
 control. Pi's interactive =/login= menu and print mode use the image's
 pinned upstream Node executable.
+The image pins T3 Code v0.0.42. Its foreground supervisor starts the native
+server on each container start and restarts it two seconds after an exit. Other
+processes in the container, including terminal sessions, continue through a
+T3 restart.
+Compose publishes container port 3773 at =127.0.0.1:gak_t3_port= only. The
+shared inventory value =gak_t3_port= renders both the agent's Compose project
+and the host's Tailscale backend. Before running =gak-tailscale-services=,
+check the local T3 response and the existing =tailscale serve get-config --all=
+result. The tailnet administrator defines and approves the T3 service, then
+grants access to the intended clients. Pair the phone and workstation in T3;
+pairing state lives in =container-home=. Check HTTPS, WebSockets, refusal of an unpaired
+client, and reconnection after a phone network change from tailnet clients.
 The image's =/usr/local/bin= wins over persistent user executables in PATH.
-A later mutation waits for the recorded foreground Podman process when the
-invoking shell dies; detached container processes carry no lock descriptor.
+A later mutation waits for the recorded foreground process session when the
+invoking shell or worker dies; the root backup job checks the same session before
+quiescing Compose. Detached container processes do not retain the lock.
+=aiagent restart= stops and starts Compose within one recorded worker, so the
+loopback listener is released before it is bound again.
+Candidate update readiness starts a temporary T3 server in the disposable
+network-isolated image and checks its HTTP response. Project readiness checks
+the supervised T3 server against the persistent home. Both checks require the
+image-owned harness commands before an update is accepted.
 
 * Storage and namespaces
 

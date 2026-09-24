@@ -31,6 +31,15 @@ if leaf:
         target.write(str(os.getpid()))
 os.execv(sys.argv[3], sys.argv[3:])
 """
+SEQUENCE = """
+import json
+import subprocess
+import sys
+for command in json.loads(sys.argv[1]):
+    status = subprocess.run(command).returncode
+    if status:
+        sys.exit(status)
+"""
 
 
 def process_identity(pid):
@@ -43,11 +52,27 @@ def process_identity(pid):
     return fields[19]
 
 
+def process_session_active(pid, started):
+    identity = process_identity(pid)
+    if identity is not None:
+        return identity == started
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
+        except OSError:
+            continue
+        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+            return True
+    return False
+
+
 def wait_for_previous():
     if not ACTIVE.exists():
         return
     record = json.loads(ACTIVE.read_text())
-    while process_identity(record["pid"]) == record["start"]:
+    while process_session_active(record["pid"], record["start"]):
         time.sleep(0.1)
     ACTIVE.unlink()
 
@@ -93,9 +118,11 @@ def run(command, project=False):
         os.close(write_fd)
         if worker is not None and not recorded:
             worker.wait()
-        if recorded and worker.poll() is not None:
+        settled = recorded and worker.poll() is not None and not process_session_active(
+            record["pid"], record["start"])
+        if settled:
             ACTIVE.unlink(missing_ok=True)
-        if project and worker is not None and worker.poll() is not None:
+        if project and worker is not None and settled:
             clean_project_cgroup()
 
 
@@ -131,7 +158,8 @@ def command_for(operation):
     if operation == "stop":
         return compose + ["stop"]
     if operation == "restart":
-        return compose + ["restart"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
         return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
     raise RuntimeError(f"unknown operation: {operation}")

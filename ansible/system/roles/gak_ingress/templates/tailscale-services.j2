@@ -21,4 +21,12 @@ tailscale serve \
     http://127.0.0.1:{{ gak_nextcloud_port }}
 {% endif %}
 
+{% if gak_aiagent_host_enabled | default(false) | bool %}
+tailscale serve \
+    --service=svc:{{ gak_t3_service_name }} \
+    --https=443 \
+    --yes \
+    http://127.0.0.1:{{ gak_t3_port }}
+{% endif %}
+
 tailscale serve status
