@@ -41,7 +41,7 @@ def script(path, source):
 
 
 def drain_copy(source, path, target, seconds):
-    assert source.count(PRODUCTION_CGROUP) == 2
+    assert source.count(PRODUCTION_CGROUP) == 3
     assert source.count("(deadline (+ (uptime-seconds) 60))") == 1
     return script(
         path,
@@ -52,10 +52,14 @@ def drain_copy(source, path, target, seconds):
     )
 
 
-def stop_copy(source, path, drain_store, drain, home, marker, events):
+def stop_copy(source, path, drain_store, drain, stop_store, stop_stub,
+              home, marker, events, stop_marker):
     assert source.count(str(drain_store)) == 1
+    assert source.count(str(stop_store)) == 1
     assert source.count("/home/aiagent") == 2
     header, body = source.replace(str(drain_store), str(drain)).replace(
+        str(stop_store), str(stop_stub)
+    ).replace(
         "/home/aiagent", str(home)
     ).split("!#\n", 1)
     wrapper = (
@@ -63,7 +67,9 @@ def stop_copy(source, path, drain_store, drain, home, marker, events):
         "(let ((system* (lambda (cmd . args)\n"
         " (if (and (string-suffix? \"/timeout\" cmd)\n"
         "          (string-suffix? \"/umount\" (list-ref args 2)))\n"
-        f"     (begin (call-with-input-file {json.dumps(str(events))}\n"
+        f"     (begin (unless (file-exists? {json.dumps(str(stop_marker))})\n"
+        "              (error \"unmount before graceful stop\"))\n"
+        f"            (call-with-input-file {json.dumps(str(events))}\n"
         "              (lambda (port)\n"
         "                (unless (and (eq? (read port) 'populated)\n"
         "                             (= (read port) 0))\n"
@@ -90,7 +96,7 @@ def detached_sleep(path):
     return process
 
 
-def test_real_cgroup(drain_store, stop_store, root):
+def test_real_cgroup(drain_store, stop_store, podman_stop_store, root):
     assert not CGROUP.exists(), "scratch cgroup already exists"
     assert CGROUP.parent.is_dir() and CGROUP.parent.stat().st_uid == os.getuid()
     CGROUP.mkdir()
@@ -112,18 +118,27 @@ def test_real_cgroup(drain_store, stop_store, root):
         namespace(drain, "service")
         helper_survivor.wait(timeout=5)
         assert not populated(service) and populated(CGROUP)
+        assert service.exists() and not runtime.exists()
         assert ssh_survivor.poll() is None
-        print("service drain: detached helper survivor killed; SSH survivor retained")
+        print("service drain: detached helper survivor killed; runtime cgroup removed; SSH survivor retained")
 
         marker = root / "unmounted"
+        stop_marker = root / "graceful"
+        stop_stub = script(root / "graceful.sh",
+                           f"#!/bin/sh\n"
+                           f"grep -q '^populated 1$' {CGROUP / 'cgroup.events'} || exit 9\n"
+                           f"printf graceful > {stop_marker}\n")
         stop = stop_copy(stop_store.read_text(), root / "stop.scm", drain_store,
-                         drain, home, marker, CGROUP / "cgroup.events")
+                         drain, podman_stop_store, stop_stub, home, marker,
+                         CGROUP / "cgroup.events", stop_marker)
         namespace(stop)
         ssh_survivor.wait(timeout=5)
         assert marker.read_text() == "unmount reached"
+        assert stop_marker.read_text() == "graceful"
         assert not populated(CGROUP)
+        assert service.exists() and not ssh.exists()
         assert home.stat().st_mode & 0o777 == 0
-        print("home stop: detached SSH survivor killed; populated 0 preceded mocked unmount")
+        print("home stop: graceful marker preceded kill; SSH survivor and leaf removed; populated 0 preceded mocked unmount")
     finally:
         for process in processes:
             if process.poll() is None:
@@ -134,6 +149,8 @@ def test_real_cgroup(drain_store, stop_store, root):
             (CGROUP / "cgroup.kill").write_text("1")
             for path in (CGROUP / "service/runtime", CGROUP / "service",
                          CGROUP / "ssh-probe", CGROUP):
+                if not path.exists():
+                    continue
                 for _ in range(20):
                     try:
                         path.rmdir()
@@ -144,7 +161,7 @@ def test_real_cgroup(drain_store, stop_store, root):
                     raise AssertionError(f"scratch cgroup remains: {path}")
 
 
-def test_stuck_cgroup(drain_store, stop_store, root):
+def test_stuck_cgroup(drain_store, stop_store, podman_stop_store, root):
     fake = root / "stuck"
     fake.mkdir()
     (fake / "cgroup.events").write_text("populated 1\nfrozen 0\n")
@@ -153,16 +170,50 @@ def test_stuck_cgroup(drain_store, stop_store, root):
     home = root / "stuck-home"
     home.mkdir(mode=0o700)
     marker = root / "wrong-unmount"
+    stop_marker = root / "stuck-graceful"
+    stop_stub = script(root / "stuck-graceful.sh",
+                       f"#!/bin/sh\nprintf graceful > {stop_marker}\n")
     drain = drain_copy(drain_store.read_text(), root / "stuck-drain.scm", fake, 2)
     stop = stop_copy(stop_store.read_text(), root / "stuck-stop.scm", drain_store,
-                     drain, home, marker, fake / "cgroup.events")
+                     drain, podman_stop_store, stop_stub, home, marker,
+                     fake / "cgroup.events", stop_marker)
     started = time.monotonic()
     result = namespace(stop, check=False)
     elapsed = time.monotonic() - started
     assert result.returncode != 0 and 2 <= elapsed < 8, (elapsed, result.stderr)
     assert "remaining PIDs" in result.stderr and "424242" in result.stderr
+    assert stop_marker.read_text() == "graceful"
     assert not marker.exists() and home.stat().st_mode & 0o777 == 0o700
     print(f"stuck drain: failed after {elapsed:.1f}s with PID 424242; unmount skipped")
+
+
+def test_populated_leaf(drain_store, root):
+    fake = root / "leaves"
+    service = fake / "service"
+    busy = fake / "ssh-busy"
+    empty = fake / "ssh-empty"
+    runtime = service / "runtime"
+    for path in (fake, service, busy, empty, runtime):
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "cgroup.events").write_text(
+            "populated 1\n" if path == busy else "populated 0\n"
+        )
+        (path / "cgroup.procs").write_text("424242\n" if path == busy else "")
+    (fake / "cgroup.kill").write_text("")
+    drain = drain_copy(drain_store.read_text(), root / "leaf-drain.scm", fake, 2)
+    header, body = drain.read_text().split("!#\n", 1)
+    stand_in = script(root / "leaf-files.scm", header + "!#\n" +
+                     "(define real-rmdir rmdir)\n"
+                     "(let ((rmdir (lambda (path)\n"
+                     " (for-each (lambda (name)\n"
+                     "   (let ((file (string-append path \"/\" name)))\n"
+                     "     (when (file-exists? file) (delete-file file))))\n"
+                     "   '(\"cgroup.events\" \"cgroup.procs\" \"cgroup.kill\"))\n"
+                     " (real-rmdir path)))) " + body + ")\n")
+    namespace(stand_in, "all")
+    assert busy.exists() and service.exists()
+    assert not empty.exists() and not runtime.exists()
+    print("leaf cleanup: populated SSH leaf retained; empty SSH and runtime leaves removed")
 
 
 def main():
@@ -175,10 +226,12 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     drain_store = built(modules, "aiagent-cgroup-drain-program")
     stop_store = built(modules, "aiagent-home-stop-locked-program")
+    podman_stop_store = built(modules, "aiagent-podman-stop-program")
     with tempfile.TemporaryDirectory(prefix="cgroup-drain-", dir=root) as name:
         scratch = Path(name)
-        test_real_cgroup(drain_store, stop_store, scratch)
-        test_stuck_cgroup(drain_store, stop_store, scratch)
+        test_real_cgroup(drain_store, stop_store, podman_stop_store, scratch)
+        test_stuck_cgroup(drain_store, stop_store, podman_stop_store, scratch)
+        test_populated_leaf(drain_store, scratch)
 
 
 if __name__ == "__main__":

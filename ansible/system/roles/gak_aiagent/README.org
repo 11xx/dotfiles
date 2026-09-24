@@ -6,7 +6,8 @@ directory, SSH cgroup placement and a capped parent before this role runs.
 The play installs Python and =podman-compose= in the account's Guix profile.
 
 This role keeps Podman storage, its runroot and both temporary directories in
-the ext4 home image. The account's shell and Shepherd service set =TMPDIR=,
+the ext4 home image. Its storage configuration declares one graphroot and a
+separate runroot. The account's shell and Shepherd service set =TMPDIR=,
 =CONTAINERS_IMAGE_COPY_TMPDIR= and =XDG_RUNTIME_DIR=. Podman's cgroupfs manager
 uses =cgroups = "split"=, placing conmon and the payload beneath the cgroup
 of the service or SSH session that starts them.
@@ -24,8 +25,15 @@ process groups terminated on expiry. A failed unmount can leave the image
 mounted even when Shepherd reports the service stopped, so =findmnt= determines
 the actual mount state.
 Stopping Compose kills residual processes in its service cgroup after the
-helper exits. Stopping the home kills the full delegated cgroup, including SSH
-sessions, waits up to one minute for it to empty, then unmounts.
+helper exits. Stopping the home asks Podman as aiagent to stop all containers
+before it kills the full delegated cgroup, including SSH
+sessions, waits up to one minute for it to empty, removes empty descendant
+cgroups and then unmounts. Podman's runtime cgroup and stale SSH leaves are
+cleared; the service and delegated roots remain.
+Before Compose starts, this instance reconciles records that still say running
+although the payload or conmon PID has died. It uses Podman's stop transition
+on those records and leaves healthy containers and their writable layers in
+place. The check is bounded to one minute.
 Both launch paths put =/run/privileged/bin= first so Podman resolves Guix's
 setuid =newuidmap= and =newgidmap= wrappers.
 The host account has tailscaled's non-operator read-only local API access;
@@ -33,6 +41,8 @@ the Guix module leaves the socket unchanged. The agent container must omit
 host runtime paths, including that socket.
 
 The =smoke= project uses a published BusyBox image with no mounts or network.
+Its init forwards termination and reaps the shell loop so a normal stop does
+not consume the container's 30-second SIGTERM grace period.
 Its image is pulled before a cold boot, since the lifecycle helper starts with
 =--pull never=. The helper reads the five instance lists from
 =/home/aiagent/services=. A second play run is idempotent.

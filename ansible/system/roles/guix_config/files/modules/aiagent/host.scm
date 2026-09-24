@@ -25,6 +25,9 @@
 (define %home-unmount-seconds 120)
 (define %cgroup-drain-seconds 60)
 (define %cgroup-drain-poll-seconds 1)
+(define %podman-stop-grace-seconds 10)
+(define %podman-stop-deadline-seconds 180)
+(define %podman-reconcile-seconds 60)
 (define %runtime-init-seconds 60)
 (define %cgroup-init-seconds 60)
 (define %cgroup "/sys/fs/cgroup/aiagent")
@@ -185,6 +188,28 @@
                                 #$aiagent-home-locked-program))
          (error "aiagent home initialization failed")))))
 
+(define aiagent-podman-stop-program
+  (program-file
+   "aiagent-podman-stop"
+   #~(begin
+       (let ((account (getpwnam "aiagent")))
+         (call-with-output-file
+             (string-append #$%delegated "/service/cgroup.procs")
+           (lambda (port) (display (getpid) port)))
+         (setgroups #())
+         (setgid (passwd:gid account))
+         (setuid (passwd:uid account))
+         (setenv "HOME" #$%home)
+         (setenv "XDG_RUNTIME_DIR" "/run/aiagent")
+         (setenv "TMPDIR" "/home/aiagent/tmp")
+         (setenv "CONTAINERS_IMAGE_COPY_TMPDIR"
+                 "/home/aiagent/image-copy-tmp")
+         (setenv "PATH"
+                 "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+         (execl "/run/current-system/profile/bin/podman" "podman"
+                "stop" "--all" "--time"
+                #$(number->string %podman-stop-grace-seconds))))))
+
 (define aiagent-cgroup-drain-program
   (program-file
    "aiagent-cgroup-drain"
@@ -197,8 +222,8 @@
                (else (error "invalid aiagent cgroup drain target"))))
        (define (uptime-seconds)
          (call-with-input-file "/proc/uptime" read))
-       (define (populated?)
-         (call-with-input-file (string-append target "/cgroup.events")
+       (define (populated? directory)
+         (call-with-input-file (string-append directory "/cgroup.events")
            (lambda (port)
              (let loop ((name (read port)))
                (when (eof-object? name)
@@ -233,24 +258,48 @@
                                    (lambda (name)
                                      (not (member name '("." "..")))))))))
            (lambda _ '())))
+       (define (remove-empty-descendants directory)
+         (for-each
+          (lambda (name)
+            (let ((child (string-append directory "/" name)))
+              (when (catch 'system-error
+                      (lambda () (eq? (stat:type (stat child)) 'directory))
+                      (lambda _ #f))
+                (remove-empty-descendants child)
+                (unless (or (string=? child
+                                     (string-append #$%delegated "/service"))
+                            (populated? child))
+                  (rmdir child)))))
+          (scandir directory
+                   (lambda (name) (not (member name '("." "..")))))))
        (unless (= (geteuid) 0)
          (error "aiagent cgroup drain requires root"))
        (call-with-output-file (string-append target "/cgroup.kill")
          (lambda (port) (display "1" port)))
        (let ((deadline (+ (uptime-seconds) #$%cgroup-drain-seconds)))
          (let loop ()
-           (when (populated?)
+           (when (populated? target)
              (if (>= (uptime-seconds) deadline)
                  (error "aiagent cgroup remains populated; remaining PIDs"
                         (remaining-pids target))
                  (begin
                    (sleep #$%cgroup-drain-poll-seconds)
-                   (loop)))))))))
+                   (loop)))))
+       (remove-empty-descendants target)
+       (when (populated? target)
+         (error "aiagent cgroup repopulated during cleanup; remaining PIDs"
+                (remaining-pids target)))))))
 
 (define aiagent-home-stop-locked-program
   (program-file
    "aiagent-home-stop-locked"
    #~(begin
+       (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
+                                "--signal=KILL"
+                                #$(number->string %podman-stop-deadline-seconds)
+                                #$aiagent-podman-stop-program))
+         (display "aiagent Podman stop incomplete; forcing cgroup drain\n"
+                  (current-error-port)))
        (unless (zero? (system* #$aiagent-cgroup-drain-program "all"))
          (error "aiagent delegated cgroup did not drain"))
        (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
@@ -366,6 +415,11 @@
                  "/home/aiagent/.guix-profile/bin/podman-compose")
          (setenv "PATH"
                  "/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:/usr/bin:/bin")
+         (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
+                                  "--signal=KILL"
+                                  #$(number->string %podman-reconcile-seconds)
+                                  "/home/aiagent/.local/bin/gak-aiagent-reconcile"))
+           (error "aiagent Podman state reconciliation failed"))
          (execl "/home/aiagent/.local/bin/gak-compose-lifecycle"
                 "gak-compose-lifecycle" "run")))))
 

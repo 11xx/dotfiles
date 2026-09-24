@@ -60,12 +60,27 @@ fails. Allocation, formatting, fsck, mount and unmount have separate deadlines
 of ten, five, twenty, two and two minutes. An expired command's process group
 receives KILL at its deadline.
 Stopping Compose lets its helper exit, then kills any remaining process in the
-service cgroup. Stopping the home first stops Compose, then writes to the
+service cgroup. Stopping the home first stops Compose, asks Podman as aiagent
+to stop all containers with ten seconds per container and a three-minute
+overall bound, then writes to the
 delegated subtree's =cgroup.kill=, terminating every aiagent process including
 SSH sessions. It waits up to one minute for =cgroup.events= to report
 =populated 0= before unmounting; a populated subtree fails the stop with
 remaining PIDs reported. A queued home stop is bounded by five minutes for the
-lock, one for cgroup drain and two for unmount.
+lock, three for Podman, one for cgroup drain and two for unmount: eleven minutes
+for the home action. The full stop chain has forty-two minutes of configured
+waits: Compose's thirty-minute helper grace and one-minute service drain,
+followed by the home action. These bounds exclude an already-running start.
+An incomplete Podman stop still proceeds to the forced drain.
+An empty drain removes descendant cgroups, including Podman's runtime group
+and stale SSH leaves, while preserving the delegated and service roots.
+Populated cgroups remain in place. This lets the same Podman container start
+after a stop and home remount without changing its persistent runroot.
+Before Compose starts, the agent instance checks recorded running payload and
+conmon PIDs. It asks Podman to stop a stale container with zero grace, then
+requires its running record to clear. Healthy containers and their writable
+layers are left alone. This check is confined to aiagent's Podman store; the
+media instance has no corresponding startup step.
 The delegated directory belongs to aiagent; its parent
 =/sys/fs/cgroup/aiagent= and each =cgroup.kill= file belong to root.
 
