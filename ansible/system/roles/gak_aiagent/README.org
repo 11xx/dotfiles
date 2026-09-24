@@ -87,13 +87,15 @@ HTTPS origin with an ASCII DNS name, IPv4 address or bracketed IPv6 address.
 Set =GAK_AIAGENT_SSH_TARGET=, =GAK_AIAGENT_SSH_KEY= and
 =GAK_AIAGENT_T3_SERVICE= for another workstation or service name. A paired
 browser and a cold reboot require separate live verification.
-=gak-aiagent update --verbose= streams direct build and verified stop output
+=gak-aiagent update --verbose= streams both direct build streams and verified stop output
 through SSH and enables the shared updater's readiness hook output. That hook
 output may contain private data; inspect it before sharing. Raw Compose provider
 diagnostics remain redacted unless the operator separately sets
 =GAK_SERVICES_SHOW_PROVIDER_ERRORS=, which can reveal expanded environment.
-A default update prints named phases and a final result; failed commands also
-print captured stdout and sanitized shared-updater diagnostics. The backup wait
+A default update hides routine build stdout and stderr while printing named
+phases and a final result. A failed or timed-out build prints a bounded tail of
+both streams and a =--verbose= retry hint; other failed commands retain their
+diagnostics and the shared updater keeps provider output sanitized. The backup wait
 reports elapsed time every minute. An unchanged image is reported honestly
 while configuration application and readiness still run.
 =gak-aiagent providers= reports selected npm package versions next to the

@@ -52,8 +52,15 @@ elif args[0] == "inspect":
     print(f"{identity}|{'false' if stopped else 'true'}|{'exited' if stopped else 'running'}|{code}")
 elif args[0] == "build":
     print("build progress from podman")
-    print("build warning from podman", file=sys.stderr)
+    print("Fedora 44 - Updates: repository metadata", file=sys.stderr)
+    print("[1/117] Installing nodejs", file=sys.stderr)
+    if os.environ.get("FAIL_PHASE") == "build-large":
+        print("early build detail that must be truncated")
+        print("x" * 200000)
+        print("final build failure detail")
+        sys.exit(37)
     if os.environ.get("FAIL_PHASE") == "build":
+        print("build failure stderr detail", file=sys.stderr)
         print("build failure detail from podman")
         sys.exit(37)
 elif args[0] == "run":
@@ -164,6 +171,30 @@ time.sleep(5)
     assert "partial progress before timeout" in errors.getvalue()
 
 
+def build_timeout_diagnostics(root):
+    module = importlib.machinery.SourceFileLoader("aiagent_build_timeout_probe", str(SOURCE)).load_module()
+    stalled = root / "stalled-build"
+    stalled.write_text('''#!/usr/bin/env python3
+import sys
+import time
+print("partial build stdout", flush=True)
+print("partial build stderr", file=sys.stderr, flush=True)
+time.sleep(5)
+''')
+    stalled.chmod(0o755)
+    errors = io.StringIO()
+    with contextlib.redirect_stderr(errors):
+        try:
+            module.command(str(stalled), "build", timeout=0.2, quiet_build=True)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            raise AssertionError("build timeout was ignored")
+    assert "partial build stdout" in errors.getvalue()
+    assert "partial build stderr" in errors.getvalue()
+    assert "rerun aiagent update --verbose" in errors.getvalue()
+
+
 def exercise(root, probe, broken=False, postapply=False, verbose=False,
              same_image=False, fail_phase=None, stop_mode="graceful"):
     home = root / "home"
@@ -221,7 +252,7 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
         raise AssertionError("backup was not requested")
 
     responder = None
-    if not broken and fail_phase not in ("build", "stop") and stop_mode not in ("forced", "replacement"):
+    if not broken and fail_phase not in ("build", "build-large", "stop") and stop_mode not in ("forced", "replacement"):
         responder = threading.Thread(target=answer_backup)
         responder.start()
     result = subprocess.run([script] + (["--verbose"] if verbose else []),
@@ -232,16 +263,33 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     assert result.returncode == (1 if failed else 0), result.stderr
     calls = (root / "calls").read_text().splitlines()
     assert all('"pull"' not in call for call in calls)
-    if fail_phase != "build":
+    if fail_phase not in ("build", "build-large"):
         assert any('"/usr/local/bin/aiagent-readiness"' in call for call in calls)
     assert (home / "workspaces/sentinel").read_text() == "workspace state"
     assert (home / "container-home/sentinel").read_text() == "login state"
-    if fail_phase in ("build", "stop"):
+    if fail_phase in ("build", "build-large", "stop"):
         assert (root / "stopped").exists() == (fail_phase == "stop")
         assert not (root / "updater-args").exists()
-        assert f"{fail_phase} failure detail" in result.stderr
-        command = "build" if fail_phase == "build" else "aiagent-stop-outcome"
+        if fail_phase == "build" and verbose:
+            assert "build failure detail from podman" in result.stdout
+            assert "build progress from podman" in result.stdout
+            assert "Fedora 44 - Updates: repository metadata" in result.stderr
+            assert "build failure stderr detail" in result.stderr
+            assert "rerun aiagent update --verbose" not in result.stderr
+        elif fail_phase == "build-large":
+            assert "final build failure detail" in result.stderr
+            assert "early build detail that must be truncated" not in result.stderr
+            assert "build output truncated" in result.stderr
+            assert len(result.stderr) < 20000
+        else:
+            assert f"{fail_phase} failure detail" in result.stderr
+            if fail_phase == "build":
+                assert "build failure stderr detail" in result.stderr
+        command = "build" if fail_phase != "stop" else "aiagent-stop-outcome"
         assert f"{command} exited" in result.stderr
+        if fail_phase != "stop" and not verbose:
+            assert "Fedora 44 - Updates: repository metadata" in result.stderr or fail_phase == "build-large"
+            assert "rerun aiagent update --verbose" in result.stderr
         if fail_phase == "stop":
             assert "Compose stop exited 38" in result.stderr
             assert "backup and image application were skipped" in result.stderr
@@ -284,10 +332,14 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
         if verbose:
             assert "readiness hook output, which may contain private data" in result.stderr
             assert "build progress from podman" in result.stdout
+            assert "Fedora 44 - Updates: repository metadata" in result.stderr
+            assert "[1/117] Installing nodejs" in result.stderr
             assert "compose stop progress" in result.stdout
             assert "shared updater progress" in result.stdout
         else:
             assert "build progress from podman" not in result.stdout
+            assert "Fedora 44 - Updates: repository metadata" not in result.stderr
+            assert "[1/117] Installing nodejs" not in result.stderr
             assert "compose stop progress" not in result.stdout
             assert "shared updater progress" not in result.stdout
         updater_env = json.loads((root / "updater-env").read_text())
@@ -304,6 +356,7 @@ def main():
         root = Path(scratch)
         backup_progress(root)
         timeout_diagnostics(root)
+        build_timeout_diagnostics(root)
         binaries = root / "bin"
         tools = root / "local"
         binaries.mkdir()
@@ -396,6 +449,8 @@ def main():
             ("verbose", {"verbose": True}),
             ("unchanged", {"same_image": True}),
             ("build-failure", {"fail_phase": "build"}),
+            ("verbose-build-failure", {"fail_phase": "build", "verbose": True}),
+            ("build-large-failure", {"fail_phase": "build-large"}),
             ("stop-failure", {"fail_phase": "stop"}),
             ("forced-stop", {"stop_mode": "forced"}),
             ("replacement-stop", {"stop_mode": "replacement"}),
@@ -411,6 +466,7 @@ def main():
     print("quiet and verbose progress, unchanged image, warnings and command failures verified")
     print("scheduled backup wait reported elapsed progress and cleared its request")
     print("timed-out command replayed captured progress")
+    print("quiet build captured both streams and replayed bounded failure and timeout tails")
 
 
 if __name__ == "__main__":
