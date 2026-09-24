@@ -60,8 +60,9 @@ cleans that group before the restart. Compose allows forty-five seconds for a
 container stop. The supervisor gives T3 forty seconds to exit, then terminates
 survivors in its group within three seconds. Descendants that create another
 group are outside that boundary, and active T3 work may still be interrupted
-by a container stop. A graceful supervisor exit is zero; forced group cleanup
-prints a warning and exits 124. Restarting T3 leaves separate terminal sessions running.
+by a container stop. A graceful supervisor exit is zero; a group signal after
+the grace window prints a warning and exits 124. Restarting T3 leaves separate
+terminal sessions running.
 A container start runs the supervisor. Compose publishes container
 port 3773 at host =127.0.0.1:gak_t3_port=; the host's named Tailscale service
 handles remote HTTPS. The =gak_t3_port= inventory value is shared by the

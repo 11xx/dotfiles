@@ -30,6 +30,8 @@ if mode == "restart" and len((root / "starts").read_text().splitlines()) == 1:
 child = subprocess.Popen([sys.executable, str(root / "harness")])
 def terminate(_number, _frame):
     (root / "native-term").touch()
+    if mode == "group-term":
+        sys.exit(0)
     if mode != "stubborn":
         child.send_signal(signal.SIGTERM)
         if mode != "orphan":
@@ -121,12 +123,13 @@ def exercise(root, mode):
         started = time.monotonic()
         process.send_signal(signal.SIGTERM)
         _, errors = process.communicate(timeout=5)
-        assert process.returncode == (124 if mode in ("stubborn", "orphan") else 0), errors
+        assert process.returncode == (124 if mode in ("group-term", "stubborn", "orphan") else 0), errors
         assert time.monotonic() - started < 3
         await_file(root / "native-term")
-        if mode in ("stubborn", "orphan"):
+        if mode in ("group-term", "stubborn", "orphan"):
             await_file(root / "harness-term")
-            assert "exceeded its stop grace" in errors
+            assert "exceeded its stop grace; sending TERM" in errors
+            assert ("killing it" in errors) == (mode != "group-term")
         else:
             await_file(root / "harness-term")
             assert "exceeded its stop grace" not in errors
@@ -146,7 +149,7 @@ def exercise(root, mode):
 
 def main():
     with tempfile.TemporaryDirectory(prefix="t3-supervise-", dir=Path.home() / ".cache") as scratch:
-        for mode in ("graceful", "stubborn", "orphan", "restart"):
+        for mode in ("graceful", "group-term", "stubborn", "orphan", "restart"):
             exercise(Path(scratch) / mode, mode)
             print(f"{mode}: owned T3 group stopped and reaped")
 

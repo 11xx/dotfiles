@@ -42,21 +42,23 @@ def signal_group(group, number):
 
 
 def settle(child, grace):
-    forced = False
+    escalated = False
     if child.poll() is None:
         try:
             child.terminate()
         except ProcessLookupError:
             pass
     if not wait_group(child, grace):
+        escalated = True
+        print("t3-supervise: server group exceeded its stop grace; sending TERM",
+              file=sys.stderr, flush=True)
         signal_group(child.pid, signal.SIGTERM)
         if not wait_group(child, GROUP_GRACE):
-            forced = True
-            print("t3-supervise: server group exceeded its stop grace; killing it",
+            print("t3-supervise: server group did not exit after TERM; killing it",
                   file=sys.stderr, flush=True)
             signal_group(child.pid, signal.SIGKILL)
     child.wait()
-    return forced
+    return escalated
 
 
 def main():
@@ -66,9 +68,9 @@ def main():
         child = subprocess.Popen([SERVER], start_new_session=True)
         while child.poll() is None and not stopping:
             time.sleep(0.1)
-        forced = settle(child, STOP_GRACE if stopping else 0)
+        escalated = settle(child, STOP_GRACE if stopping else 0)
         if stopping:
-            return 124 if forced else 0
+            return 124 if escalated else 0
         deadline = time.monotonic() + RESTART_DELAY
         while time.monotonic() < deadline and not stopping:
             time.sleep(0.1)

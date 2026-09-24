@@ -125,9 +125,9 @@ seconds after an exit. Compose gives the container forty-five seconds to stop.
 The supervisor asks the native server to exit, waits forty seconds for its group, then
 terminates survivors within three more seconds. Processes that create separate
 groups are outside that cleanup boundary. A container stop can interrupt active
-T3 work. Forced group cleanup prints a warning and makes the supervisor exit
-124; a graceful stop exits zero. An unexpected T3 restart leaves separate
-terminal sessions running.
+T3 work. A group signal after the grace window prints a warning and makes the
+supervisor exit 124; a graceful stop exits zero. An unexpected T3 restart
+leaves separate terminal sessions running.
 On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
 =gak-aiagent status=, =shell=, =restart= or =update= to forward to the
 account-local manager. =shell= requires a terminal. Set
