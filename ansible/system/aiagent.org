@@ -15,10 +15,14 @@ Podman. Image builds inherit that placement. No container parent is specified
 in Compose.
 Shepherd waits for each host prerequisite program to exit successfully before
 starting the helper. The mounted home remains a running service so stopping
-it first stops the helper and then unmounts the image. Runtime and cgroup
-setup remain one-shots: their directories and limit writes are idempotent,
-and they have no mount to undo. Home creation and unmount hold the same
-root-only lock. A concurrent start waits up to five minutes, then checks the
+it first stops the helper, kills every remaining process in the delegated
+cgroup, and then unmounts the image. The kill includes SSH sessions. Stopping
+Compose alone lets its helper finish and then kills residual processes in the
+service subtree, so a restart begins without a retained Podman pause process.
+Runtime and cgroup setup remain one-shots: their directories and limit writes
+are idempotent, and they have no mount to undo. Home creation and unmount
+hold the same root-only lock. A concurrent start waits up to five minutes,
+then checks the
 mounted image left by the first or fails without touching its candidate.
 
 Lock acquisition is limited to five minutes. Allocation has ten minutes,
@@ -29,7 +33,12 @@ fsck bound permits a populated 256 GiB image, and the short probe, mount and
 unmount bounds prevent routine kernel operations from extending shutdown.
 A timed-out command's process group receives KILL at its deadline, including
 descendants that could retain the lock. First creation has at most 43 minutes
-of external-command waits; a queued home stop adds at most seven minutes.
+of external-command waits; a queued home stop adds at most eight minutes:
+five for its lock, one for cgroup drain and two for unmount. A drain writes
+=cgroup.kill= on the root-owned delegated subtree and waits at most one minute
+for =cgroup.events= to report =populated 0=. At deadline it reports remaining
+PIDs and leaves the home mounted. The same bound applies to Compose's service
+subtree drain after its helper exits.
 Runtime and cgroup setup each add at most one minute, and the helper's own
 stop grace is thirty minutes. A busy unmount can
 leave Shepherd showing the home stopped while =findmnt /home/aiagent= still
@@ -83,6 +92,8 @@ removes the account, sub-ID declaration and host services together.
 (define %home-fsck-seconds 1200)
 (define %home-mount-seconds 120)
 (define %home-unmount-seconds 120)
+(define %cgroup-drain-seconds 60)
+(define %cgroup-drain-poll-seconds 1)
 (define %runtime-init-seconds 60)
 (define %cgroup-init-seconds 60)
 (define %cgroup "/sys/fs/cgroup/aiagent")
@@ -243,10 +254,74 @@ removes the account, sub-ID declaration and host services together.
                                 #$aiagent-home-locked-program))
          (error "aiagent home initialization failed")))))
 
+(define aiagent-cgroup-drain-program
+  (program-file
+   "aiagent-cgroup-drain"
+   #~(begin
+       (use-modules (ice-9 ftw))
+       (define target
+         (cond ((equal? (cdr (command-line)) '("all")) #$%delegated)
+               ((equal? (cdr (command-line)) '("service"))
+                (string-append #$%delegated "/service"))
+               (else (error "invalid aiagent cgroup drain target"))))
+       (define (uptime-seconds)
+         (call-with-input-file "/proc/uptime" read))
+       (define (populated?)
+         (call-with-input-file (string-append target "/cgroup.events")
+           (lambda (port)
+             (let loop ((name (read port)))
+               (when (eof-object? name)
+                 (error "aiagent cgroup.events has no populated field"))
+               (let ((value (read port)))
+                 (if (eq? name 'populated)
+                     (case value
+                       ((0) #f)
+                       ((1) #t)
+                       (else (error "invalid aiagent cgroup populated value" value)))
+                     (loop (read port))))))))
+       (define (remaining-pids directory)
+         (catch 'system-error
+           (lambda ()
+             (append
+              (call-with-input-file
+                  (string-append directory "/cgroup.procs")
+                (lambda (port)
+                  (let loop ((pid (read port)))
+                    (if (eof-object? pid) '()
+                        (cons pid (loop (read port)))))))
+              (apply append
+                     (map (lambda (name)
+                            (let ((child (string-append directory "/" name)))
+                              (catch 'system-error
+                                (lambda ()
+                                  (if (eq? (stat:type (stat child)) 'directory)
+                                      (remaining-pids child)
+                                      '()))
+                                (lambda _ '()))))
+                          (scandir directory
+                                   (lambda (name)
+                                     (not (member name '("." "..")))))))))
+           (lambda _ '())))
+       (unless (= (geteuid) 0)
+         (error "aiagent cgroup drain requires root"))
+       (call-with-output-file (string-append target "/cgroup.kill")
+         (lambda (port) (display "1" port)))
+       (let ((deadline (+ (uptime-seconds) #$%cgroup-drain-seconds)))
+         (let loop ()
+           (when (populated?)
+             (if (>= (uptime-seconds) deadline)
+                 (error "aiagent cgroup remains populated; remaining PIDs"
+                        (remaining-pids target))
+                 (begin
+                   (sleep #$%cgroup-drain-poll-seconds)
+                   (loop)))))))))
+
 (define aiagent-home-stop-locked-program
   (program-file
    "aiagent-home-stop-locked"
    #~(begin
+       (unless (zero? (system* #$aiagent-cgroup-drain-program "all"))
+         (error "aiagent delegated cgroup did not drain"))
        (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
                                 "--signal=KILL"
                                 #$(number->string %home-unmount-seconds)
@@ -387,9 +462,34 @@ removes the account, sub-ID declaration and host services together.
     (requirement '(user-processes))
     (start #~(lambda _ (zero? (system* #$aiagent-home-program))))
     (stop #~(lambda _
+              (define (remaining-pids directory)
+                (catch 'system-error
+                  (lambda ()
+                    (append
+                     (call-with-input-file
+                         (string-append directory "/cgroup.procs")
+                       (lambda (port)
+                         (let loop ((pid (read port)))
+                           (if (eof-object? pid) '()
+                               (cons pid (loop (read port)))))))
+                     (apply append
+                            (map (lambda (name)
+                                   (let ((child (string-append directory "/" name)))
+                                     (catch 'system-error
+                                       (lambda ()
+                                         (if (eq? (stat:type (stat child))
+                                                  'directory)
+                                             (remaining-pids child)
+                                             '()))
+                                       (lambda _ '()))))
+                                 ((@ (ice-9 ftw) scandir) directory
+                                  (lambda (name)
+                                    (not (member name '("." "..")))))))))
+                  (lambda _ '())))
               (if (zero? (system* #$aiagent-home-stop-program))
                   #f
-                  (error "aiagent home may remain mounted; check findmnt"))))
+                  (error "aiagent home may remain mounted; check findmnt; remaining delegated PIDs"
+                         (remaining-pids #$%delegated)))))
     (respawn? #f))
    (shepherd-service
     (provision '(aiagent-runtime))
@@ -418,7 +518,11 @@ removes the account, sub-ID declaration and host services together.
     (requirement '(aiagent-home aiagent-runtime aiagent-cgroup
                    networking rootless-podman-shared-root-fs))
     (start #~(make-forkexec-constructor (list #$aiagent-compose-program)))
-    (stop #~(make-kill-destructor #:grace-period 1800))
+    (stop #~(lambda (process)
+              ((make-kill-destructor #:grace-period 1800) process)
+              (unless (zero? (system* #$aiagent-cgroup-drain-program "service"))
+                (error "aiagent Compose cgroup did not drain"))
+              #f))
     (respawn? #f))))
 
 (define (aiagent-pam-extensions _)

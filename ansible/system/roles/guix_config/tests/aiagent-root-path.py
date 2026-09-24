@@ -262,15 +262,27 @@ def probe_home(module_dir, root, account):
     assert hashlib.sha256(after.read_bytes()).hexdigest() == expected
     print(f"home: existing-image hole restored; fsck clean; sentinel sha256 {expected}")
 
-    stop_source = built(module_dir, "aiagent-home-stop-locked-program").read_text().replace("/home/aiagent", str(home))
+    drain_store = built(module_dir, "aiagent-cgroup-drain-program")
+    drain_marker = root / "drain-called"
+    drain_stub = script(root / "drain-stub.sh", f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> {drain_marker}\n")
+    stop_source = built(module_dir, "aiagent-home-stop-locked-program").read_text()
+    assert stop_source.count(str(drain_store)) == 1
+    stop_source = stop_source.replace(str(drain_store), str(drain_stub)).replace("/home/aiagent", str(home))
     stop = script(root / "home-stop.scm", stop_source)
     failed = namespace(stop, check=False, timeout=10)
     assert failed.returncode != 0 and "Wrong type argument" not in failed.stderr
+    assert drain_marker.read_text().splitlines() == ["all"]
     header, body = stop_source.split("!#\n", 1)
-    stop_mock = script(root / "home-mock-umount.scm", header + "!#\n" + "(let ((system* (lambda args 0))) " + body + ")\n")
+    stop_mock = script(root / "home-mock-umount.scm", header + "!#\n" +
+                       "(define real-system* system*)\n"
+                       "(let ((system* (lambda (cmd . args)\n"
+                       " (if (and (string-suffix? \"/timeout\" cmd)\n"
+                       "          (string-suffix? \"/umount\" (list-ref args 2)))\n"
+                       "     0 (apply real-system* cmd args))))) " + body + ")\n")
     namespace(stop_mock)
+    assert drain_marker.read_text().splitlines() == ["all", "all"]
     assert namespace_owner(home)[2] == 0
-    print("home stop: real umount reached; post-unmount chmod passed with success mocked")
+    print("home stop: drain stubbed; real umount reached; post-unmount chmod passed with umount mocked")
     return home
 
 

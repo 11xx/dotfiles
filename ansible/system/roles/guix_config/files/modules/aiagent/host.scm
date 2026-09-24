@@ -23,6 +23,8 @@
 (define %home-fsck-seconds 1200)
 (define %home-mount-seconds 120)
 (define %home-unmount-seconds 120)
+(define %cgroup-drain-seconds 60)
+(define %cgroup-drain-poll-seconds 1)
 (define %runtime-init-seconds 60)
 (define %cgroup-init-seconds 60)
 (define %cgroup "/sys/fs/cgroup/aiagent")
@@ -183,10 +185,74 @@
                                 #$aiagent-home-locked-program))
          (error "aiagent home initialization failed")))))
 
+(define aiagent-cgroup-drain-program
+  (program-file
+   "aiagent-cgroup-drain"
+   #~(begin
+       (use-modules (ice-9 ftw))
+       (define target
+         (cond ((equal? (cdr (command-line)) '("all")) #$%delegated)
+               ((equal? (cdr (command-line)) '("service"))
+                (string-append #$%delegated "/service"))
+               (else (error "invalid aiagent cgroup drain target"))))
+       (define (uptime-seconds)
+         (call-with-input-file "/proc/uptime" read))
+       (define (populated?)
+         (call-with-input-file (string-append target "/cgroup.events")
+           (lambda (port)
+             (let loop ((name (read port)))
+               (when (eof-object? name)
+                 (error "aiagent cgroup.events has no populated field"))
+               (let ((value (read port)))
+                 (if (eq? name 'populated)
+                     (case value
+                       ((0) #f)
+                       ((1) #t)
+                       (else (error "invalid aiagent cgroup populated value" value)))
+                     (loop (read port))))))))
+       (define (remaining-pids directory)
+         (catch 'system-error
+           (lambda ()
+             (append
+              (call-with-input-file
+                  (string-append directory "/cgroup.procs")
+                (lambda (port)
+                  (let loop ((pid (read port)))
+                    (if (eof-object? pid) '()
+                        (cons pid (loop (read port)))))))
+              (apply append
+                     (map (lambda (name)
+                            (let ((child (string-append directory "/" name)))
+                              (catch 'system-error
+                                (lambda ()
+                                  (if (eq? (stat:type (stat child)) 'directory)
+                                      (remaining-pids child)
+                                      '()))
+                                (lambda _ '()))))
+                          (scandir directory
+                                   (lambda (name)
+                                     (not (member name '("." "..")))))))))
+           (lambda _ '())))
+       (unless (= (geteuid) 0)
+         (error "aiagent cgroup drain requires root"))
+       (call-with-output-file (string-append target "/cgroup.kill")
+         (lambda (port) (display "1" port)))
+       (let ((deadline (+ (uptime-seconds) #$%cgroup-drain-seconds)))
+         (let loop ()
+           (when (populated?)
+             (if (>= (uptime-seconds) deadline)
+                 (error "aiagent cgroup remains populated; remaining PIDs"
+                        (remaining-pids target))
+                 (begin
+                   (sleep #$%cgroup-drain-poll-seconds)
+                   (loop)))))))))
+
 (define aiagent-home-stop-locked-program
   (program-file
    "aiagent-home-stop-locked"
    #~(begin
+       (unless (zero? (system* #$aiagent-cgroup-drain-program "all"))
+         (error "aiagent delegated cgroup did not drain"))
        (unless (zero? (system* #$(file-append coreutils "/bin/timeout")
                                 "--signal=KILL"
                                 #$(number->string %home-unmount-seconds)
@@ -327,9 +393,34 @@
     (requirement '(user-processes))
     (start #~(lambda _ (zero? (system* #$aiagent-home-program))))
     (stop #~(lambda _
+              (define (remaining-pids directory)
+                (catch 'system-error
+                  (lambda ()
+                    (append
+                     (call-with-input-file
+                         (string-append directory "/cgroup.procs")
+                       (lambda (port)
+                         (let loop ((pid (read port)))
+                           (if (eof-object? pid) '()
+                               (cons pid (loop (read port)))))))
+                     (apply append
+                            (map (lambda (name)
+                                   (let ((child (string-append directory "/" name)))
+                                     (catch 'system-error
+                                       (lambda ()
+                                         (if (eq? (stat:type (stat child))
+                                                  'directory)
+                                             (remaining-pids child)
+                                             '()))
+                                       (lambda _ '()))))
+                                 ((@ (ice-9 ftw) scandir) directory
+                                  (lambda (name)
+                                    (not (member name '("." "..")))))))))
+                  (lambda _ '())))
               (if (zero? (system* #$aiagent-home-stop-program))
                   #f
-                  (error "aiagent home may remain mounted; check findmnt"))))
+                  (error "aiagent home may remain mounted; check findmnt; remaining delegated PIDs"
+                         (remaining-pids #$%delegated)))))
     (respawn? #f))
    (shepherd-service
     (provision '(aiagent-runtime))
@@ -358,7 +449,11 @@
     (requirement '(aiagent-home aiagent-runtime aiagent-cgroup
                    networking rootless-podman-shared-root-fs))
     (start #~(make-forkexec-constructor (list #$aiagent-compose-program)))
-    (stop #~(make-kill-destructor #:grace-period 1800))
+    (stop #~(lambda (process)
+              ((make-kill-destructor #:grace-period 1800) process)
+              (unless (zero? (system* #$aiagent-cgroup-drain-program "service"))
+                (error "aiagent Compose cgroup did not drain"))
+              #f))
     (respawn? #f))))
 
 (define (aiagent-pam-extensions _)
