@@ -35,6 +35,8 @@ the Guix module leaves the socket unchanged. The agent container must omit
 host runtime paths, including that socket.
 
 The =smoke= project uses a published BusyBox image with no mounts or network.
+Its init forwards termination and reaps the shell loop so a normal stop does
+not consume the container's 30-second SIGTERM grace period.
 Its image is pulled before a cold boot, since the lifecycle helper starts with
 =--pull never=. The helper reads the five instance lists from
 =/home/aiagent/services=. A second play run is idempotent.
