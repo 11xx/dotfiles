@@ -63,6 +63,19 @@ handles remote HTTPS. The =gak_t3_port= inventory value is shared by the
 agent and ingress roles through =group_vars/all/gak_agent=. T3 state and client
 pairing live in =container-home=.
 
+The workstation command =gak-aiagent= lives in the dotfiles =.local/bin= tree.
+It forwards =status=, =shell=, =restart= and =update= to this role's installed
+=aiagent= manager over SSH. =gak-aiagent t3 open= checks and opens the
+tailnet HTTPS origin; =gak-aiagent t3 pair [label]= checks the server and
+prints a five-minute, single-use link and QR code locally. It passes
+=--base-dir /home/node/.t3/userdata= and the canonical =--base-url= to
+=t3 auth pairing create --json= inside the running container. It does not
+configure Tailscale ingress. The workstation derives the named service origin
+from the host's read-only Tailscale JSON or accepts =GAK_AIAGENT_T3_URL=.
+Set =GAK_AIAGENT_SSH_TARGET=, =GAK_AIAGENT_SSH_KEY= and
+=GAK_AIAGENT_T3_SERVICE= for another workstation or service name. A paired
+browser and a cold reboot require separate live verification.
+
 =aiagent status=, =logs=, =shell= and =exec= inspect or enter the container.
 =build=, =update=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
 account-local lock. =cache-size= reports the disposable cache subtree;

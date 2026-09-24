@@ -123,6 +123,28 @@ The image pins T3 Code v0.0.42. Its foreground supervisor starts the native
 server on each container start and restarts it two seconds after an exit. Other
 processes in the container, including terminal sessions, continue through a
 T3 restart.
+On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
+=gak-aiagent status=, =shell=, =restart= or =update= to forward to the
+account-local manager. =shell= requires a terminal. Set
+=GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
+=aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
+Python 3 and OpenSSH; T3 actions also need tailnet access.
+
+=gak-aiagent t3 open= opens the canonical HTTPS origin in the desktop browser.
+=gak-aiagent t3 pair [label]= displays a five-minute, single-use link and a
+terminal QR code for an additional client. The operator initiates pairing;
+the command does not open the link. =qrencode= provides the QR code; the link
+remains usable without it. The command obtains the named service origin from
+Gak's read-only =tailscale status --json= and uses service name =t3=. Set
+=GAK_AIAGENT_T3_SERVICE= for another named service, or
+=GAK_AIAGENT_T3_URL= to an explicit HTTPS origin when discovery does not
+apply. Keep private origins in local environment configuration. Pairing uses
+the same =/home/node/.t3/userdata= directory as the running server. A new
+link is required for each client or expired attempt; no token is stored by the
+workstation command. T3 client sessions reside in =container-home=, which is
+mounted across runtime restart, recreation and update. Verify browser
+reconnection after those actions and after a cold reboot before relying on
+client persistence.
 Compose publishes container port 3773 at =127.0.0.1:gak_t3_port= only. The
 shared inventory value =gak_t3_port= renders both the agent's Compose project
 and the host's Tailscale backend. Before running =gak-tailscale-services=,
