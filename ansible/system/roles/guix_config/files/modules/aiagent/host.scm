@@ -337,7 +337,7 @@
          (let ((fd (open "/run/aiagent/aiagent.lock"
                          (logior O_WRONLY O_CREAT O_NOFOLLOW O_NONBLOCK)
                          #o600)))
-           (unless (eq? (stat:type (fstat fd)) 'regular)
+           (unless (eq? (stat:type (stat fd)) 'regular)
              (error "aiagent operation lock is not a regular file"))
            (chown fd (passwd:uid account) (passwd:gid account))
            (chmod fd #o600)

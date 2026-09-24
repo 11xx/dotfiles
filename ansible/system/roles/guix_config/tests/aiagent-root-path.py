@@ -54,7 +54,13 @@ def probe_runtime_cgroup_pam(module_dir, root, account):
     runtime_program = script(root / "runtime.scm", runtime_source.replace("/run/aiagent", str(runtime)))
     namespace(runtime_program)
     assert namespace_owner(runtime) == (account.pw_uid, account.pw_gid, 700)
-    print("runtime: mkdir/chown/chmod passed")
+    lock = runtime / "aiagent.lock"
+    assert namespace_owner(lock) == (account.pw_uid, account.pw_gid, 600)
+    identity = namespace(PROFILE / "stat", "-c", "%i", lock).stdout.strip()
+    namespace(runtime_program)
+    assert namespace(PROFILE / "stat", "-c", "%i", lock).stdout.strip() == identity
+    assert namespace_owner(lock) == (account.pw_uid, account.pw_gid, 600)
+    print("runtime: mkdir/chown/chmod and fd stat/chown/chmod/close passed; lock reused")
 
     cgroup = root / "cgroup"
     delegated = cgroup / "delegated"
@@ -104,6 +110,22 @@ def probe_runtime_cgroup_pam(module_dir, root, account):
         account.pw_uid, account.pw_gid,
     )
     print("PAM: lobo/root no-op; real mkdir then ordinary cgroup.procs stand-in passed")
+
+
+def probe_drain(module_dir, root):
+    delegated = root / "drain-cgroup" / "delegated"
+    service = delegated / "service"
+    service.mkdir(parents=True)
+    for directory in (delegated, service):
+        (directory / "cgroup.events").write_text("populated 0\n")
+        (directory / "cgroup.kill").write_text("")
+    source = built(module_dir, "aiagent-cgroup-drain-program").read_text()
+    probe = script(root / "drain.scm", source.replace("/sys/fs/cgroup/aiagent/delegated", str(delegated)))
+    namespace(probe, "service")
+    namespace(probe, "all")
+    assert (service / "cgroup.kill").read_text() == "1"
+    assert (delegated / "cgroup.kill").read_text() == "1"
+    print("cgroup drain: full service and delegated paths passed against empty scratch groups")
 
 
 def probe_launcher(module_dir, root, account):
@@ -363,6 +385,7 @@ def main():
         home = root / "home"
         try:
             probe_runtime_cgroup_pam(module_dir, root, account)
+            probe_drain(module_dir, root)
             probe_launcher(module_dir, root, account)
             probe_graceful_stop(module_dir, root, account)
             probe_home(module_dir, root, account)

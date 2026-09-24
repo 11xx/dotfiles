@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -73,9 +74,7 @@ def main():
         built = True
         candidate_id = image_id(candidate)
         command(PODMAN, "run", "--rm", "--network", "none", candidate_id,
-                "/bin/bash", "-lc",
-                "command -v codex claude opencode t3 pi >/dev/null && t3 serve --help >/dev/null",
-                timeout=180)
+                "/usr/local/bin/aiagent-readiness", timeout=180)
         command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180)
         quiesced = True
         backup()
@@ -92,6 +91,16 @@ def main():
                     timeout=180)
         if built and not applying:
             subprocess.run([PODMAN, "image", "rm", candidate], timeout=60)
+        if applying:
+            pin = "localhost/gak-services-previous:" + hashlib.sha256(
+                f"{PROJECT.parent.resolve()}:agent".encode()).hexdigest()[:24]
+            try:
+                retained = image_id(pin) == old
+            except (OSError, RuntimeError, subprocess.TimeoutExpired):
+                retained = False
+            location = f"retained at {pin}" if retained else f"expected at {pin}; verify the pin"
+            print(f"aiagent: previous image {old[:12]} {location}; see GAK-SERVICES.org "
+                  "for manual rollback after inspecting the backup and state", file=sys.stderr)
         raise
 
 

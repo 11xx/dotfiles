@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+PATH=/usr/local/bin:/usr/bin:/bin
+export PATH
+test -d /home/node
+test -d /work
+test -d /cache
+for tool in codex claude opencode t3 pi; do
+    command -v "$tool" >/dev/null
+done
+test "$(command -v pi)" = /usr/local/bin/pi

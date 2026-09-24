@@ -443,7 +443,8 @@ Building Guix programs does not execute their root-only paths. With the
 =tests/aiagent-root-path.py= on gak against the staged module directory before
 reconfiguring. The role README gives the command. The probe redirects cgroup,
 home and helper targets into scratch and uses =podman unshare= for real Guile
-privilege-drop calls. Its cgroup files are ordinary scratch files, its
+privilege-drop calls. It executes the runtime lock's descriptor operations and
+both cgroup drain modes. Its cgroup files are ordinary scratch files, its
 post-drop paths use preopened descriptors, and successful mount and unmount
 results are mocked. It does not prove kernel delegation, production path
 traversal or host-root mount capability.
@@ -574,7 +575,9 @@ application tables and removes only its own scratch state.
 
 The =aiagent= instance uses its own Guix-profile copy of =gak-services=.
 =aiagent update= builds and tests a local candidate without mounting the
-persistent state. It stops the agent project, waits for the root job's
+persistent state. The candidate and the running project execute the same
+image-owned readiness file with the same shell and PATH. The update then stops
+the agent project, waits for the root job's
 consistent Restic snapshot, then applies the exact prepared image ID without a
 pull. A temporary Compose override pins that ID while the container starts;
 the declared tag moves after readiness. Its readiness command runs inside the
@@ -583,6 +586,15 @@ image remains pinned until recovery is no longer needed. A failed candidate
 probe leaves the running container untouched; a failure after recreation
 requires inspection of the snapshot before any manual rollback because
 persistent state may have changed.
+
+For an image rollback, inspect the recovery snapshot and persistent state
+first. The failed update reports a =localhost/gak-services-previous:*= tag and
+the previous image ID. Verify that the tag resolves to that ID. If the state
+remains compatible with the previous image, run =aiagent stop= as the agent
+account, tag that previous image as =localhost/aiagent-fedora:44-v1=, and run
+=aiagent recreate=. Check the project's readiness and the harness logins.
+When the new image migrated persistent state, restore the recovery snapshot
+before starting the previous image; changing a tag cannot reverse a migration.
 
 The root backup declaration requires =/etc/aiagent/restic-password= as a
 root-owned mode-0600 file. Its repository at

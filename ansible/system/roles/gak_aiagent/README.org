@@ -73,12 +73,16 @@ with a running container stays until that container stops or home stop drains
 the service subtree.
 
 =aiagent update= builds a candidate under a unique local tag and tests it in
-a disposable container without persistent mounts or network access. It stops
+a disposable container without persistent mounts or network access. The image's
+readiness file runs in both the candidate and the live project with the same
+shell and PATH. The update then stops
 the project and waits for the root backup job to snapshot =workspaces= and
 =container-home= before passing the candidate's exact ID to the shared
 updater. The Compose project declares a readiness command. An update that
 fails before image application starts the existing image; a failure during
 application retains the previous image and backup for operator recovery. The
+error reports the previous image's retention tag and points to the manual
+recovery procedure in =GAK-SERVICES.org=. The
 account's Guix profile carries its own =gak-services= package and Compose
 provider.
 
@@ -97,6 +101,9 @@ root-owned scratch directory on the backup disk, compares file checksums and pat
 removes the scratch tree and starts Compose.
 The host declaration must be activated by the operator before updates use the
 request job.
+Run =python3 roles/gak_aiagent/tests/update-flow.py= from =ansible/system= to
+exercise the image readiness file in an isolated filesystem with each mount
+point and harness absent; every failure must precede the project stop.
 From =ansible/system=, run =podman unshare python3
 roles/guix_config/tests/backup-security.py= for the root-shaped path probes,
 =python3 roles/guix_config/tests/backup-recovery.py= for failed-stop recovery,

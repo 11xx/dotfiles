@@ -3,6 +3,6 @@ set -euo pipefail
 export HOME=/home/aiagent
 export XDG_RUNTIME_DIR=/run/aiagent
 export PATH="/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
-exec /run/current-system/profile/bin/podman exec aiagent /bin/sh -c \
-    'test -d /home/node && test -d /work && test -d /cache && command -v codex && command -v claude && command -v opencode && command -v t3 && command -v pi' \
+exec /run/current-system/profile/bin/podman exec aiagent \
+    /usr/local/bin/aiagent-readiness \
     >/dev/null
