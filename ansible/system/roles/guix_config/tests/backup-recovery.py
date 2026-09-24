@@ -18,6 +18,9 @@ def exercise(stop_failure):
 
     def fake_run(arguments, **_kwargs):
         nonlocal starts
+        if arguments[0] == "findmnt":
+            events.append("findmnt")
+            return subprocess.CompletedProcess(arguments, 0)
         action = arguments[1]
         events.append(action)
         if action == "stop":
@@ -30,8 +33,8 @@ def exercise(stop_failure):
         assert action == "enable"
         return subprocess.CompletedProcess(arguments, 0)
 
-    original = backup.subprocess.run
-    backup.subprocess.run = fake_run
+    original = backup.run_process
+    backup.run_process = fake_run
     try:
         try:
             backup.quiesced(lambda: events.append("snapshot"))
@@ -40,15 +43,70 @@ def exercise(stop_failure):
         else:
             raise AssertionError("failed stop was accepted")
     finally:
-        backup.subprocess.run = original
-    assert events == ["stop", "start", "enable", "start"], events
+        backup.run_process = original
+    assert events == ["stop", "findmnt", "start", "enable", "start"], events
+
+
+def remount():
+    events = []
+    mounted = False
+
+    def fake_run(arguments, **_kwargs):
+        nonlocal mounted
+        if arguments[0] == "findmnt":
+            events.append("findmnt")
+            return subprocess.CompletedProcess(arguments, 0 if mounted else 1)
+        action, service = arguments[1:]
+        events.append(f"{action}:{service}")
+        if action == "start" and service == "aiagent-home":
+            mounted = True
+        return subprocess.CompletedProcess(arguments, 0)
+
+    original = backup.run_process
+    backup.run_process = fake_run
+    try:
+        backup.recover_service()
+    finally:
+        backup.run_process = original
+    assert events == ["findmnt", "start:aiagent-home", "findmnt", "start:aiagent-compose"], events
+
+
+def stopped_home_record():
+    events = []
+    compose_starts = 0
+
+    def fake_run(arguments, **_kwargs):
+        nonlocal compose_starts
+        if arguments[0] == "findmnt":
+            events.append("findmnt")
+            return subprocess.CompletedProcess(arguments, 0)
+        action, service = arguments[1:]
+        events.append(f"{action}:{service}")
+        if action == "start" and service == "aiagent-compose":
+            compose_starts += 1
+            return subprocess.CompletedProcess(arguments, 0 if compose_starts == 3 else 1)
+        return subprocess.CompletedProcess(arguments, 0)
+
+    original = backup.run_process
+    backup.run_process = fake_run
+    try:
+        backup.recover_service()
+    finally:
+        backup.run_process = original
+    assert events == ["findmnt", "start:aiagent-compose", "enable:aiagent-compose",
+                      "start:aiagent-compose", "start:aiagent-home", "findmnt",
+                      "start:aiagent-compose"], events
 
 
 def main():
     assert backup.STOP_TIMEOUT >= 2520
     for failure in ("timeout", "status"):
         exercise(failure)
+    remount()
+    stopped_home_record()
     print("failed and timed-out stops both attempted service recovery before exit")
+    print("missing home was remounted before Compose restart")
+    print("stopped home service record was restarted before Compose retry")
 
 
 if __name__ == "__main__":

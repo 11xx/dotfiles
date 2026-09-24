@@ -103,7 +103,7 @@ def main():
         backup.BACKUP_ROOT = runtime
         backup.REPOSITORY = runtime / "restic"
         backup.validate_password = lambda: None
-        backup.subprocess.run = lambda *args, **kwargs: SimpleNamespace(returncode=0)
+        backup.run_process = lambda *args, **kwargs: SimpleNamespace(returncode=0)
         try:
             backup.snapshot()
         except RuntimeError as error:

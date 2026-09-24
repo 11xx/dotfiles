@@ -590,7 +590,8 @@ root-owned mode-0600 file. Its repository at
 =container-home=, with seven daily, five weekly and twelve monthly snapshots.
 The minute job publishes its result from root-owned runtime storage; daily
 backup and restore check reject a surviving agent operation before stopping
-Compose, and a failed stop still triggers recovery.
+Compose. Stop failures and termination signals settle active child processes
+and trigger bounded home and Compose recovery before releasing the lock.
 The daily run quiesces the Compose service. A restore check stops the service,
 takes a fresh snapshot and writes its scratch tree under the root-owned
 =/marak/backups/aiagent= directory; it compares file checksums and paths, removes the tree

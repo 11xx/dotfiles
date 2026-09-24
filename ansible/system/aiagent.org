@@ -683,6 +683,9 @@ atomically hands the finished file to the account. Daily backup and restore
 check take the account's operation lock and reject a surviving worker recorded
 under =/run/aiagent=. They attempt service recovery even when stopping Compose
 fails; the stop deadline covers the documented service and home stop chain.
+Termination signals settle the current command's process group before a
+bounded recovery of the home mount and Compose service. Further signals during
+recovery do not release the operation lock early.
 Seven daily, five weekly and twelve monthly snapshots are retained. A restore
 check takes a fresh snapshot into root-controlled scratch on the backup disk,
 compares every regular file by checksum and removes the scratch tree.
@@ -698,10 +701,13 @@ import pwd
 import re
 import secrets
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import contextmanager
 
 
 HOME = Path("/home/aiagent")
@@ -714,11 +720,58 @@ PASSWORD = Path("/etc/aiagent/restic-password")
 SERVICE = "aiagent-compose"
 STOP_TIMEOUT = 2700
 START_TIMEOUT = 180
+HOME_START_TIMEOUT = 1800
+RECOVERY_TIMEOUT = 2700
 NOFOLLOW = os.O_NOFOLLOW | os.O_CLOEXEC
+SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+_signal_depth = 0
+_interrupted = None
+_recovering = False
+_settling = False
+_starting = False
 
 
 class Busy(Exception):
     pass
+
+
+class Interrupted(Exception):
+    def __init__(self, signum):
+        super().__init__(f"interrupted by signal {signum}")
+        self.signum = signum
+
+
+def handle_signal(signum, _frame):
+    global _interrupted
+    if _interrupted is None:
+        _interrupted = signum
+        if not (_recovering or _settling or _starting):
+            raise Interrupted(signum)
+
+
+@contextmanager
+def signal_guard():
+    global _signal_depth, _interrupted
+    previous = None
+    if _signal_depth == 0:
+        _interrupted = None
+        previous = {}
+        try:
+            for signum in SIGNALS:
+                previous[signum] = signal.getsignal(signum)
+                signal.signal(signum, handle_signal)
+        except BaseException:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+            raise
+    _signal_depth += 1
+    try:
+        yield
+    finally:
+        _signal_depth -= 1
+        if previous is not None:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
 
 
 def agent_account():
@@ -745,9 +798,70 @@ def secure_file(path, flags, owner=None):
     return descriptor, metadata
 
 
+def stop_process(process):
+    global _settling
+    _settling = True
+    try:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            process.poll()
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.05)
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
+    finally:
+        _settling = False
+
+
+def run_process(arguments, *, check=False, timeout=None, env=None,
+                stdout=None, stderr=None, capture_output=False, text=False):
+    global _starting
+    if _interrupted is not None and not _recovering:
+        raise Interrupted(_interrupted)
+    _starting = True
+    try:
+        process = subprocess.Popen(
+            arguments, env=env, stdout=subprocess.PIPE if capture_output else stdout,
+            stderr=subprocess.PIPE if capture_output else stderr,
+            text=text, start_new_session=True,
+        )
+        try:
+            _starting = False
+            if _interrupted is not None and not _recovering:
+                raise Interrupted(_interrupted)
+            output, errors = process.communicate(timeout=timeout)
+        except (Interrupted, subprocess.TimeoutExpired):
+            stop_process(process)
+            raise
+    finally:
+        _starting = False
+    result = subprocess.CompletedProcess(arguments, process.returncode, output, errors)
+    if check:
+        result.check_returncode()
+    return result
+
+
 def command(*arguments, timeout=None, capture=False):
-    return subprocess.run(arguments, check=True, timeout=timeout,
-                          capture_output=capture, text=capture)
+    return run_process(arguments, check=True, timeout=timeout,
+                       capture_output=capture, text=capture)
 
 
 def validate_password():
@@ -758,8 +872,8 @@ def validate_password():
 
 def snapshot():
     validate_password()
-    if subprocess.run(("findmnt", "-n", "--mountpoint", str(HOME)),
-                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+    if run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         raise RuntimeError("agent home is not mounted")
     root_directory(BACKUP_ROOT, create=True)
     root_directory(REPOSITORY, create=True)
@@ -770,7 +884,7 @@ def snapshot():
         argv = ["restic", *arguments]
         if quiet:
             argv.insert(1, "--quiet")
-        subprocess.run(argv, check=True, env=environment)
+        run_process(argv, check=True, env=environment)
 
     if not (REPOSITORY / "config").is_file():
         restic("init")
@@ -902,28 +1016,62 @@ def request():
 
 
 def recover_service():
-    for attempt in range(2):
-        try:
-            started = subprocess.run(("herd", "start", SERVICE), timeout=START_TIMEOUT)
-            status = started.returncode
-        except subprocess.TimeoutExpired:
-            status = 124
-        if status == 0:
-            return
-        if attempt == 0:
+    deadline = time.monotonic() + RECOVERY_TIMEOUT
+
+    def bound(limit):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError("agent Compose recovery deadline expired")
+        return min(limit, remaining)
+
+    def start(service, limit):
+        for attempt in range(2):
             try:
-                subprocess.run(("herd", "enable", SERVICE), timeout=START_TIMEOUT)
+                started = run_process(("herd", "start", service), timeout=bound(limit))
+                status = started.returncode
             except subprocess.TimeoutExpired:
-                pass
-    raise RuntimeError("agent Compose service did not restart")
+                status = 124
+            if status == 0:
+                return
+            if attempt == 0:
+                try:
+                    run_process(("herd", "enable", service), timeout=bound(START_TIMEOUT))
+                except subprocess.TimeoutExpired:
+                    pass
+        raise RuntimeError(f"agent service did not restart: {service}")
+
+    def mounted():
+        return run_process(("findmnt", "-n", "--mountpoint", str(HOME)),
+                           timeout=bound(30), stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL).returncode == 0
+
+    if not mounted():
+        start("aiagent-home", HOME_START_TIMEOUT)
+        if not mounted():
+            raise RuntimeError("agent home did not remount")
+    try:
+        start(SERVICE, START_TIMEOUT)
+    except RuntimeError:
+        start("aiagent-home", HOME_START_TIMEOUT)
+        if not mounted():
+            raise RuntimeError("agent home did not remount") from None
+        start(SERVICE, START_TIMEOUT)
 
 
 def quiesced(action):
-    try:
-        command("herd", "stop", SERVICE, timeout=STOP_TIMEOUT)
-        action()
-    finally:
-        recover_service()
+    global _recovering
+    with signal_guard():
+        try:
+            command("herd", "stop", SERVICE, timeout=STOP_TIMEOUT)
+            action()
+        finally:
+            _recovering = True
+            try:
+                recover_service()
+            finally:
+                _recovering = False
+        if _interrupted is not None:
+            raise Interrupted(_interrupted)
 
 
 def manifest(root):
@@ -957,9 +1105,9 @@ def restore_check():
     environment = snapshot()
     scratch = Path(tempfile.mkdtemp(prefix="restore-check.", dir=BACKUP_ROOT))
     try:
-        subprocess.run(("restic", "--quiet", "restore", "latest", "--host", "gak",
-                        "--tag", "aiagent", "--target", str(scratch)),
-                       check=True, env=environment)
+        run_process(("restic", "--quiet", "restore", "latest", "--host", "gak",
+                     "--tag", "aiagent", "--target", str(scratch)),
+                    check=True, env=environment)
         restored = scratch / HOME.relative_to("/")
         if manifest(HOME) != manifest(restored):
             raise RuntimeError("agent restore checksums or paths differ")
@@ -968,7 +1116,7 @@ def restore_check():
         shutil.rmtree(scratch)
 
 
-def main(operation):
+def run_operation(operation):
     if os.geteuid() != 0:
         raise RuntimeError("agent backup requires root")
     os.environ["PATH"] = "/run/current-system/profile/bin:/run/privileged/bin:/usr/bin:/bin"
@@ -995,12 +1143,22 @@ def main(operation):
         os.close(descriptor)
 
 
+def main(operation):
+    with signal_guard():
+        run_operation(operation)
+        if _interrupted is not None:
+            raise Interrupted(_interrupted)
+
+
 if __name__ == "__main__":
     try:
         main(sys.argv[1] if len(sys.argv) == 2 else "")
     except Busy as error:
         print(f"agent backup: {error}", file=sys.stderr)
         sys.exit(75)
+    except Interrupted as error:
+        print(f"agent backup: {error}", file=sys.stderr)
+        sys.exit(128 + error.signum)
     except (OSError, RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         print(f"agent backup: {error}", file=sys.stderr)
         sys.exit(1)
