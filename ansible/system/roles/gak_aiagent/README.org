@@ -49,6 +49,7 @@ initial tag. The project mounts only
 =/cache=. The container uses =keep-id= for the agent's host UID. No host
 runtime, socket, media path or operator home is mounted. The image installs
 harness binaries and wrappers under =/usr/local=, outside the persistent home.
+The image's =/usr/local/bin= has PATH precedence over persistent user bins.
 The Fedora 44 base and harness package versions are pinned in
 [[file:../../aiagent.org][aiagent.org]]. Pi's interactive TUI segfaults in this
 environment, so container Pi is for print mode.
@@ -60,6 +61,12 @@ account-local lock. =cache-size= reports the disposable cache subtree;
 work remain in the separate persistent mounts. The 32 GiB cache target is
 operator-maintained through =cache-size= and explicit =cache-clean=; the home
 image's 256 GiB size is the hard account budget.
+The operation helper keeps a PID and kernel start time under =/run/aiagent=.
+It waits for a recorded foreground operation after an interrupted caller,
+while Podman's detached processes inherit no lock descriptor.
+Run =python3 roles/gak_aiagent/tests/command-serialization.py= from
+=ansible/system= to exercise a killed caller, concurrent operations and scoped
+cache cleanup against scratch paths.
 
 The helper reads its five instance lists from =/home/aiagent/services= and
 starts the project with =--pull never=. The =gak-aiagent-image= Ansible tag

@@ -58,6 +58,13 @@
     dest: /home/aiagent/.local/bin/aiagent
     mode: '0750'
 
+- name: 'aiagent: Install serialized operation helper'
+  tags: ['gak-aiagent-image']
+  ansible.builtin.copy:
+    src: aiagent-operation
+    dest: /home/aiagent/.local/bin/aiagent-operation
+    mode: '0750'
+
 - name: 'aiagent: Install declared instance lists'
   ansible.builtin.copy:
     content: '{{ item.content }}'

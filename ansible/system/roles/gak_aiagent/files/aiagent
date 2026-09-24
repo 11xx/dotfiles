@@ -2,11 +2,9 @@
 set -euo pipefail
 
 home=/home/aiagent
-project="$home/services/agent/compose.yaml"
-image=localhost/aiagent-fedora:44-v1
 container=aiagent
-lock=/run/aiagent/aiagent.lock
 podman=/run/current-system/profile/bin/podman
+operator="$home/.local/bin/aiagent-operation"
 
 export HOME="$home"
 export XDG_RUNTIME_DIR=/run/aiagent
@@ -20,11 +18,8 @@ usage() {
     printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
-    exec 9>"$lock"
-    flock 9
-    "$@" 9>&-
+    exec "$operator" "$1"
 }
-compose() { "$podman" compose -f "$project" "$@"; }
 status() {
     if "$podman" container exists "$container"; then
         "$podman" ps -a --filter "name=^${container}$" --format '{{.Names}} {{.Status}} {{.Image}}'
@@ -32,22 +27,6 @@ status() {
         printf '%s\n' absent
     fi
 }
-build() {
-    [[ -f $home/image/Containerfile ]] || die 'image context is not deployed'
-    ! "$podman" image exists "$image" || die "initial image already exists: $image"
-    "$podman" build --pull=missing --tag "$image" \
-        --file "$home/image/Containerfile" "$home/image"
-}
-start() {
-    "$podman" image exists "$image" || die "local image is absent: $image"
-    compose up -d --pull never
-}
-cache_clean() {
-    [[ -d $home/cache && ! -L $home/cache ]] || die 'cache directory is missing or linked'
-    find "$home/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-    mkdir -p "$home/cache/tmp" "$home/cache/npm" "$home/cache/xdg"
-}
-
 cmd=${1:-}
 [[ $# -eq 0 ]] || shift
 case "$cmd" in
@@ -55,12 +34,7 @@ case "$cmd" in
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build) mutate build ;;
-    start) mutate start ;;
-    stop) mutate compose stop ;;
-    restart) mutate compose restart ;;
-    recreate) mutate compose up -d --force-recreate --pull never ;;
+    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
-    cache-clean) mutate cache_clean ;;
     *) usage; exit 2 ;;
 esac

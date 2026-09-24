@@ -658,6 +658,8 @@ The harness versions are fixed at build time. Pi's interactive TUI segfaults
 in this Fedora 44 stack; use Pi in print mode in the container. Logins and
 provider state live under the persistent home. The cache subtree is disposable;
 the =aiagent= command reports its size and cleans only that subtree on request.
+Image-installed commands under =/usr/local/bin= take precedence over programs
+left in the persistent home.
 
 ** Containerfile
 
@@ -744,7 +746,7 @@ fi
 #+end_src
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/image/bashrc.d/10-path" (file-name-directory (buffer-file-name))) :mkdirp yes :tangle-mode o644
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="/usr/local/bin:$PATH:$HOME/.local/bin"
 #+end_src
 
 ** Container command wrappers
@@ -771,20 +773,21 @@ exec pi --print --tools read,grep,find,ls "$@"
 
 ** Host command
 
-The account-local command uses one lock for its mutating operations. It builds
-from the deployed context with all Podman and temporary paths inside the
-image-backed home. It does not alter Shepherd, host ingress or other Compose
-instances. Cache cleanup removes only the declared disposable cache subtree.
+The account-local command uses one lock for its mutating operations. The
+foreground operation has a recorded process identity; a later caller waits for
+it even if the caller that started it dies. Podman's detached processes do not
+inherit the lock. Builds use the deployed context with all Podman and
+temporary paths inside the image-backed home. The command does not alter
+Shepherd, host ingress or other Compose instances. Cache cleanup removes only
+the declared disposable cache subtree.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
 
 home=/home/aiagent
-project="$home/services/agent/compose.yaml"
-image=localhost/aiagent-fedora:44-v1
 container=aiagent
-lock=/run/aiagent/aiagent.lock
 podman=/run/current-system/profile/bin/podman
+operator="$home/.local/bin/aiagent-operation"
 
 export HOME="$home"
 export XDG_RUNTIME_DIR=/run/aiagent
@@ -798,11 +801,8 @@ usage() {
     printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
-    exec 9>"$lock"
-    flock 9
-    "$@" 9>&-
+    exec "$operator" "$1"
 }
-compose() { "$podman" compose -f "$project" "$@"; }
 status() {
     if "$podman" container exists "$container"; then
         "$podman" ps -a --filter "name=^${container}$" --format '{{.Names}} {{.Status}} {{.Image}}'
@@ -810,22 +810,6 @@ status() {
         printf '%s\n' absent
     fi
 }
-build() {
-    [[ -f $home/image/Containerfile ]] || die 'image context is not deployed'
-    ! "$podman" image exists "$image" || die "initial image already exists: $image"
-    "$podman" build --pull=missing --tag "$image" \
-        --file "$home/image/Containerfile" "$home/image"
-}
-start() {
-    "$podman" image exists "$image" || die "local image is absent: $image"
-    compose up -d --pull never
-}
-cache_clean() {
-    [[ -d $home/cache && ! -L $home/cache ]] || die 'cache directory is missing or linked'
-    find "$home/cache" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-    mkdir -p "$home/cache/tmp" "$home/cache/npm" "$home/cache/xdg"
-}
-
 cmd=${1:-}
 [[ $# -eq 0 ]] || shift
 case "$cmd" in
@@ -833,15 +817,150 @@ case "$cmd" in
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    build) mutate build ;;
-    start) mutate start ;;
-    stop) mutate compose stop ;;
-    restart) mutate compose restart ;;
-    recreate) mutate compose up -d --force-recreate --pull never ;;
+    build|start|stop|restart|recreate|cache-clean) mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
-    cache-clean) mutate cache_clean ;;
     *) usage; exit 2 ;;
 esac
+#+end_src
+
+The lock helper records only a PID and kernel start time under =/run/aiagent=.
+Its worker waits for that record before executing Podman. A dead caller closes
+the worker's start gate; an operation that already started remains recorded
+until its process exits. Cache cleanup runs in the lock holder itself.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-operation" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+IMAGE = "localhost/aiagent-fedora:44-v1"
+PROJECT = HOME / "services/agent/compose.yaml"
+LOCK = Path("/run/aiagent/aiagent.lock")
+ACTIVE = Path("/run/aiagent/aiagent.active")
+GATE = """
+import os
+import sys
+fd = int(sys.argv[1])
+ready = os.read(fd, 1)
+os.close(fd)
+if ready != b'1':
+    sys.exit(125)
+os.execv(sys.argv[2], sys.argv[2:])
+"""
+
+
+def process_identity(pid):
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    except FileNotFoundError:
+        return None
+    if fields[0] in ("Z", "X"):
+        return None
+    return fields[19]
+
+
+def wait_for_previous():
+    if not ACTIVE.exists():
+        return
+    record = json.loads(ACTIVE.read_text())
+    while process_identity(record["pid"]) == record["start"]:
+        time.sleep(0.1)
+    ACTIVE.unlink()
+
+
+def run(command):
+    read_fd, write_fd = os.pipe()
+    worker = None
+    recorded = False
+    try:
+        worker = subprocess.Popen(
+            [sys.executable, "-c", GATE, str(read_fd), *command],
+            pass_fds=(read_fd,),
+            start_new_session=True,
+        )
+        os.close(read_fd)
+        read_fd = -1
+        record = {"pid": worker.pid, "start": process_identity(worker.pid)}
+        if record["start"] is None:
+            raise RuntimeError("operation worker exited before startup")
+        temporary = ACTIVE.with_name(f"{ACTIVE.name}.{os.getpid()}")
+        temporary.write_text(json.dumps(record))
+        os.replace(temporary, ACTIVE)
+        recorded = True
+        os.write(write_fd, b"1")
+        return worker.wait()
+    finally:
+        if read_fd >= 0:
+            os.close(read_fd)
+        os.close(write_fd)
+        if worker is not None and not recorded:
+            worker.wait()
+        if recorded and worker.poll() is not None:
+            ACTIVE.unlink(missing_ok=True)
+
+
+def cache_clean():
+    cache = HOME / "cache"
+    if not cache.is_dir() or cache.is_symlink():
+        raise RuntimeError("cache directory is missing or linked")
+    for entry in cache.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+    for name in ("tmp", "npm", "xdg"):
+        (cache / name).mkdir()
+
+
+def command_for(operation):
+    compose = [PODMAN, "compose", "-f", str(PROJECT)]
+    if operation == "build":
+        context = HOME / "image"
+        if not (context / "Containerfile").is_file():
+            raise RuntimeError("image context is not deployed")
+        if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode == 0:
+            raise RuntimeError(f"initial image already exists: {IMAGE}")
+        return [PODMAN, "build", "--pull=missing", "--tag", IMAGE,
+                "--file", str(context / "Containerfile"), str(context)]
+    if operation == "start":
+        if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
+            raise RuntimeError(f"local image is absent: {IMAGE}")
+        return compose + ["up", "-d", "--pull", "never"]
+    if operation == "stop":
+        return compose + ["stop"]
+    if operation == "restart":
+        return compose + ["restart"]
+    if operation == "recreate":
+        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+    raise RuntimeError(f"unknown operation: {operation}")
+
+
+def main():
+    if len(sys.argv) != 2:
+        raise RuntimeError("expected one operation")
+    with LOCK.open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        wait_for_previous()
+        if sys.argv[1] == "cache-clean":
+            cache_clean()
+            return 0
+        return run(command_for(sys.argv[1]))
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, ValueError, KeyError) as error:
+        print(f"aiagent: {error}", file=sys.stderr)
+        sys.exit(1)
 #+end_src
 
 * Ak container reference
