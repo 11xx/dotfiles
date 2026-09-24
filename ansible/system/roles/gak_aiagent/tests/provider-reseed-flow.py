@@ -13,6 +13,7 @@ import time
 
 ROLE = Path(__file__).resolve().parents[1]
 SOURCE = ROLE / "files/aiagent-update"
+STOP_SOURCE = ROLE / "files/aiagent-stop-outcome"
 MANAGER_SOURCE = ROLE / "files/image/bin/aiagent-provider-prefix"
 fixture = importlib.machinery.SourceFileLoader(
     "provider_prefix_fixture", str(ROLE / "tests/provider-prefix.py")
@@ -26,10 +27,19 @@ import sys
 
 root = Path(os.environ["PROVIDER_RESEED_TEST_ROOT"])
 args = sys.argv[1:]
+mode = os.environ.get("STOP_MODE", "graceful")
 with (root / "calls").open("a") as log:
     log.write(json.dumps(args) + "\\n")
 if args[:2] == ["image", "inspect"]:
     print("a" * 64)
+elif args[:2] == ["container", "exists"]:
+    if mode == "absent":
+        sys.exit(1)
+elif args[0] == "inspect":
+    identity = "d" * 64 if mode == "replacement" and args[-1] == "aiagent" and (root / "stopped").exists() else "c" * 64
+    stopped = (root / "stopped").exists()
+    code = 124 if stopped and mode in ("forced", "historical") else 0
+    print(f"{identity}|{'false' if stopped else 'true'}|{'exited' if stopped else 'running'}|{code}")
 elif args[0] == "compose" and "stop" in args:
     (root / "stopped").touch()
     if os.environ.get("FAIL_STOP"):
@@ -105,6 +115,14 @@ def exercise(root, mode):
     fake = root / "podman"
     fake.write_text(PODMAN)
     fake.chmod(0o755)
+    (home / ".local/bin").mkdir(parents=True)
+    stop_source = STOP_SOURCE.read_text()
+    stop_source = replace_one(stop_source, 'HOME = Path("/home/aiagent")', f"HOME = Path({str(home)!r})")
+    stop_source = replace_one(stop_source, 'PODMAN = "/run/current-system/profile/bin/podman"',
+                              f"PODMAN = {str(fake)!r}")
+    stop_helper = home / ".local/bin/aiagent-stop-outcome"
+    stop_helper.write_text(stop_source)
+    stop_helper.chmod(0o755)
     source = SOURCE.read_text()
     source = replace_one(source, 'HOME = Path("/home/aiagent")', f"HOME = Path({str(home)!r})")
     source = replace_one(source, 'PODMAN = "/run/current-system/profile/bin/podman"',
@@ -119,7 +137,11 @@ def exercise(root, mode):
     updater.write_text(source)
     updater.chmod(0o755)
     env = dict(os.environ, PROVIDER_RESEED_TEST_ROOT=str(root),
-               PROVIDER_RESEED_MANAGER=str(manager))
+               PROVIDER_RESEED_MANAGER=str(manager),
+               STOP_MODE={"forced-stop": "forced", "replacement-stop": "replacement",
+                          "already-stopped": "historical"}.get(mode, mode))
+    if mode == "already-stopped":
+        (root / "stopped").touch()
     if mode == "stop-failure":
         env["FAIL_STOP"] = "1"
     if mode == "reseed-failure":
@@ -138,7 +160,7 @@ def exercise(root, mode):
         raise AssertionError("backup was not requested")
 
     responder = None
-    if mode != "stop-failure":
+    if mode not in ("stop-failure", "forced-stop", "replacement-stop"):
         responder = threading.Thread(target=answer_backup)
         responder.start()
     result = subprocess.run([updater, "--provider-reseed"], env=env,
@@ -148,8 +170,8 @@ def exercise(root, mode):
     calls = [json.loads(line) for line in (root / "calls").read_text().splitlines()]
     assert (root / "stopped").exists()
     assert credential.read_text() == "synthetic login state"
-    assert "provider reseed failed" in result.stderr if mode != "success" else result.returncode == 0
-    if mode == "success":
+    if mode in ("success", "already-stopped", "absent"):
+        assert result.returncode == 0, result.stderr
         assert "previous provider prefix retained at" in result.stdout
         assert "provider prefix reseeded; agent ready" in result.stdout
         assert json.loads((fixture.package_dir(prefix, "@openai/codex") / "package.json").read_text())["version"] == "1.0.0"
@@ -158,24 +180,45 @@ def exercise(root, mode):
         assert json.loads((fixture.package_dir(backups[0], "@openai/codex") / "package.json").read_text())["version"] == "9.9.9"
         assert any(call[0] == "run" for call in calls)
         assert (root / "ready").exists()
+        if mode == "already-stopped":
+            assert "historical exit 124" in result.stderr
+            assert "shutdown escalated" not in result.stderr
     elif mode == "reseed-failure":
         assert result.returncode == 1
+        assert "provider reseed failed" in result.stderr
         assert (root / "disposable-cleanup").exists()
         assert "previous agent is not ready" in result.stderr
         assert json.loads((fixture.package_dir(prefix, "@openai/codex") / "package.json").read_text())["version"] == "9.9.9"
         assert not list(prefix.parent.glob("npm.before-reseed-*"))
         assert any(call[0] == "compose" and "up" in call for call in calls)
-    else:
+    elif mode == "stop-failure":
         assert result.returncode == 1
+        assert "provider reseed failed" in result.stderr
         assert "stop failed after partial quiescence" in result.stderr
-        assert "previous agent ready after failed provider reseed" in result.stdout
+        assert "backup and reseed were skipped" in result.stderr
+        assert "stop was forced or could not be verified" in result.stderr
         assert not (root / "request").exists()
         assert not any(call[0] == "run" for call in calls)
+        assert not any(call[0] == "compose" and "up" in call for call in calls)
+    else:
+        assert mode in ("forced-stop", "replacement-stop")
+        assert result.returncode == 1
+        assert "backup and reseed were skipped" in result.stderr
+        assert "stop was forced or could not be verified" in result.stderr
+        assert "agent may remain stopped" in result.stderr
+        assert not (root / "request").exists()
+        assert not any(call[0] == "run" or call[0] == "compose" and "up" in call
+                       for call in calls)
+        if mode == "forced-stop":
+            assert "shutdown escalated" in result.stderr and "exit 124" in result.stderr
+        else:
+            assert "identity changed" in result.stderr
 
 
 def main():
     with tempfile.TemporaryDirectory(prefix="provider-reseed-flow-", dir=Path.home() / ".cache") as scratch:
-        for mode in ("success", "reseed-failure", "stop-failure"):
+        for mode in ("success", "reseed-failure", "stop-failure",
+                     "forced-stop", "replacement-stop", "already-stopped", "absent"):
             exercise(Path(scratch) / mode, mode)
             print(f"{mode}: repair boundary verified")
 

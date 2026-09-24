@@ -12,6 +12,7 @@ import time
 HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 UPDATER = HOME / ".guix-profile/bin/gak-services"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 REQUEST = Path("/run/aiagent/backup-request")
@@ -22,13 +23,13 @@ def phase(message):
     print(f"aiagent: {message}", flush=True)
 
 
-def command(*argv, timeout=7200, verbose=False):
+def command(*argv, timeout=7200, verbose=False, env=None):
     if verbose:
-        result = subprocess.run(argv, timeout=timeout)
+        result = subprocess.run(argv, timeout=timeout, env=env)
     else:
         with tempfile.TemporaryFile(mode="w+t") as output:
             try:
-                result = subprocess.run(argv, stdout=output, timeout=timeout)
+                result = subprocess.run(argv, stdout=output, timeout=timeout, env=env)
             except subprocess.TimeoutExpired:
                 output.seek(0)
                 shutil.copyfileobj(output, sys.stderr)
@@ -37,7 +38,8 @@ def command(*argv, timeout=7200, verbose=False):
                 output.seek(0)
                 shutil.copyfileobj(output, sys.stderr)
     if result.returncode:
-        raise RuntimeError(f"command failed: {argv[1]} exited {result.returncode}")
+        label = argv[1] if len(argv) > 1 else Path(argv[0]).name
+        raise RuntimeError(f"command failed: {label} exited {result.returncode}")
 
 
 def image_id(reference):
@@ -114,12 +116,13 @@ def reseed_providers(verbose=False):
     accepted = image_id(IMAGE)
     container = f"aiagent-provider-reseed-{os.getpid()}-{time.monotonic_ns()}"
     stop_attempted = False
+    stop_verified = False
     reseeded = False
     try:
         phase("stopping agent for provider repair")
         stop_attempted = True
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
-                verbose=verbose)
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
+        stop_verified = True
         phase("backing up persistent state")
         backup()
         phase("reseeding user-owned provider prefix")
@@ -145,7 +148,11 @@ def reseed_providers(verbose=False):
         await_agent_ready(120)
         phase("provider prefix reseeded; agent ready")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
-        if stop_attempted and not reseeded:
+        if stop_attempted and not stop_verified:
+            print("aiagent: stop was forced or could not be verified; backup and reseed "
+                  "were skipped; agent may remain stopped; inspect before starting it",
+                  file=sys.stderr, flush=True)
+        elif stop_verified and not reseeded:
             try:
                 phase("restoring previous agent")
                 command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d",
@@ -171,6 +178,7 @@ def main(verbose=False):
     old = image_id(IMAGE)
     candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
     built = False
+    stop_attempted = False
     quiesced = False
     applying = False
     try:
@@ -184,16 +192,23 @@ def main(verbose=False):
                 "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180,
                 verbose=verbose)
         phase("stopping agent")
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
-                verbose=verbose)
+        stop_attempted = True
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
         quiesced = True
         phase("backing up persistent state")
         backup()
         applying = True
         phase("applying image and configuration")
+        updater_env = None
+        if verbose:
+            updater_env = dict(os.environ, GAK_SERVICES_SHOW_HOOK_OUTPUT="1")
+            print("aiagent: verbose shows readiness hook output, which may contain "
+                  "private data; inspect it before sharing. Compose provider diagnostics "
+                  "remain private unless separately enabled",
+                  file=sys.stderr, flush=True)
         command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
                 "--prepared-image", f"agent={candidate_id}", timeout=900,
-                verbose=verbose)
+                verbose=verbose, env=updater_env)
         phase("checking accepted image")
         if image_id(IMAGE) != candidate_id:
             raise RuntimeError("the accepted image reference moved")
@@ -203,6 +218,11 @@ def main(verbose=False):
         else:
             phase(f"accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if stop_attempted and not quiesced:
+            print("aiagent: stop was forced or could not be verified; backup and image "
+                  "application were skipped; agent may remain stopped; inspect before "
+                  "starting it",
+                  file=sys.stderr, flush=True)
         if quiesced and not applying:
             phase("restoring previous agent")
             command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",

@@ -2463,7 +2463,9 @@ Shepherd, host ingress or other Compose instances. Cache cleanup removes only
 the declared disposable cache subtree.
 Restart stops and starts the Compose project in one recorded worker. This
 releases the rootless port listener before the new container binds it and
-keeps restart serialized if its invoking shell exits.
+keeps restart serialized if its invoking shell exits. A stop outcome that
+escalates or cannot be verified prevents the start and leaves the agent state
+for operator inspection.
 
 #+begin_src shell :tangle (expand-file-name "roles/gak_aiagent/files/aiagent" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env bash :tangle-mode o750
 set -euo pipefail
@@ -2510,6 +2512,121 @@ case "$cmd" in
 esac
 #+end_src
 
+The stop helper observes the named container before Compose acts, then checks
+both that exact container ID and the current name after Compose returns. A
+successful Compose command is not enough to establish a graceful shutdown:
+the stopped process may have exited 124 after supervisor escalation. Only a
+verified running-to-exited transition reports a new stop result. An existing
+stopped container keeps its earlier exit status as history. An unverifiable or
+replaced identity stops later operations before backup or restart.
+
+#+begin_src python :tangle (expand-file-name "roles/gak_aiagent/files/aiagent-stop-outcome" (file-name-directory (buffer-file-name))) :mkdirp yes :shebang #!/usr/bin/env python3 :tangle-mode o750
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+HOME = Path("/home/aiagent")
+PODMAN = "/run/current-system/profile/bin/podman"
+PROJECT = HOME / "services/agent/compose.yaml"
+NAME = "aiagent"
+FORMAT = "{{.Id}}|{{.State.Running}}|{{.State.Status}}|{{.State.ExitCode}}"
+
+
+class StopError(Exception):
+    pass
+
+
+def inspect(reference):
+    result = subprocess.run(
+        [PODMAN, "inspect", "--type=container", "--format", FORMAT, reference],
+        capture_output=True, text=True, timeout=30,
+    )
+    if result.returncode:
+        raise StopError("the recorded agent container could not be inspected")
+    fields = result.stdout.strip().split("|")
+    if len(fields) != 4 or not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
+        raise StopError("the agent container inspection was malformed")
+    identity, running, status, exit_code = fields
+    if (running not in ("true", "false") or status not in
+            ("running", "exited", "created", "stopped", "paused")
+            or not exit_code.isdecimal() or int(exit_code) > 255):
+        raise StopError("the agent container state was malformed")
+    return identity, running == "true", status, int(exit_code)
+
+
+def current():
+    result = subprocess.run(
+        [PODMAN, "container", "exists", NAME],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30,
+    )
+    if result.returncode == 1:
+        return None
+    if result.returncode:
+        raise StopError("agent container existence could not be verified")
+    return inspect(NAME)
+
+
+def stop():
+    before = current()
+    if before is not None and before[2] not in ("running", "exited", "created", "stopped"):
+        raise StopError("agent container is not in a stoppable state")
+    if before is not None and before[1] != (before[2] == "running"):
+        raise StopError("agent container running state was inconsistent")
+    result = subprocess.run([PODMAN, "compose", "-f", str(PROJECT), "stop"],
+                            timeout=180)
+    if before is None:
+        if current() is not None:
+            raise StopError("an agent container appeared during the stop")
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        print("aiagent: no container was running; project remains stopped", flush=True)
+        return 0
+    after = inspect(before[0])
+    named = current()
+    if after[0] != before[0] or named is None or named != after:
+        raise StopError("the agent container identity changed during the stop")
+    if after[1] or after[2] not in ("exited", "stopped", "created"):
+        raise StopError("the recorded agent container is still active")
+    if before[1]:
+        if before[2] != "running" or after[2] != "exited":
+            raise StopError("the running agent did not reach an exited state")
+        if after[3] == 124:
+            print(f"aiagent: warning: T3 shutdown escalated for container {after[0][:12]}; "
+                  "agent remains stopped (exit 124)", file=sys.stderr, flush=True)
+            if result.returncode:
+                raise StopError(f"Compose stop also exited {result.returncode} after escalation")
+            return 124
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        if after[3]:
+            raise StopError(f"agent container {after[0][:12]} exited {after[3]}; "
+                            "agent remains stopped")
+        print(f"aiagent: container {after[0][:12]} stopped gracefully", flush=True)
+    else:
+        if result.returncode:
+            raise StopError(f"Compose stop exited {result.returncode}")
+        if after[3] == 124:
+            print(f"aiagent: warning: container {after[0][:12]} was already stopped "
+                  "with historical exit 124", file=sys.stderr, flush=True)
+        else:
+            print(f"aiagent: container {after[0][:12]} was already stopped "
+                  f"(historical exit {after[3]})", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        if sys.argv[1:]:
+            raise StopError("usage: aiagent-stop-outcome")
+        sys.exit(stop())
+    except (OSError, StopError, subprocess.TimeoutExpired) as error:
+        print(f"aiagent: stop failed: {error}; no later action is safe",
+              file=sys.stderr)
+        sys.exit(1)
+#+end_src
+
 The lock helper records only a PID and kernel start time under =/run/aiagent=.
 Its worker waits for that record before executing Podman. A dead caller closes
 the worker's start gate; an operation that already started remains recorded
@@ -2537,6 +2654,7 @@ HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
 PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
@@ -2700,12 +2818,14 @@ def command_for(operation, verbose=False):
             raise RuntimeError(f"local image is absent: {IMAGE}")
         return compose + ["up", "-d", "--pull", "never"]
     if operation == "stop":
-        return compose + ["stop"]
+        return [str(STOP_OUTCOME)]
     if operation == "restart":
         return [sys.executable, "-c", SEQUENCE,
-                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
+                json.dumps([[str(STOP_OUTCOME)], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
-        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([[str(STOP_OUTCOME)],
+                            compose + ["up", "-d", "--force-recreate", "--pull", "never"]])]
     raise RuntimeError(f"unknown operation: {operation}")
 
 
@@ -2734,11 +2854,17 @@ if __name__ == "__main__":
         sys.exit(1)
 #+end_src
 
-An update reports its build, probe, stop, backup and apply phases. Standard
-error from Podman and the shared updater remains visible, including stop
-warnings. Full standard output is shown with =--verbose= or after a failed
-phase. The final result distinguishes an unchanged image from a newly accepted
-one; configuration application and readiness still run for an unchanged image.
+An update reports its build, probe, verified stop, backup and apply phases.
+Standard error from direct Podman commands remains visible. =--verbose= streams
+full direct build and stop output and the role-owned readiness hook's output
+from the shared updater. The shared updater's raw Compose provider diagnostics
+remain private because they can quote expanded definitions and environment;
+its own summary and sanitized failures remain visible. An operator can
+separately opt into =GAK_SERVICES_SHOW_PROVIDER_ERRORS= after assessing that
+privacy risk. A stop that escalates or cannot be verified halts before backup
+or image application without automatically restarting an uncertain container.
+The final result distinguishes an unchanged image from a newly accepted one;
+configuration application and readiness still run for an unchanged image.
 
 An update builds a uniquely tagged candidate from the deployed context. Its
 probe runs in a disposable container without persistent mounts or network
@@ -2764,6 +2890,7 @@ import time
 HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 UPDATER = HOME / ".guix-profile/bin/gak-services"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
 REQUEST = Path("/run/aiagent/backup-request")
@@ -2774,13 +2901,13 @@ def phase(message):
     print(f"aiagent: {message}", flush=True)
 
 
-def command(*argv, timeout=7200, verbose=False):
+def command(*argv, timeout=7200, verbose=False, env=None):
     if verbose:
-        result = subprocess.run(argv, timeout=timeout)
+        result = subprocess.run(argv, timeout=timeout, env=env)
     else:
         with tempfile.TemporaryFile(mode="w+t") as output:
             try:
-                result = subprocess.run(argv, stdout=output, timeout=timeout)
+                result = subprocess.run(argv, stdout=output, timeout=timeout, env=env)
             except subprocess.TimeoutExpired:
                 output.seek(0)
                 shutil.copyfileobj(output, sys.stderr)
@@ -2789,7 +2916,8 @@ def command(*argv, timeout=7200, verbose=False):
                 output.seek(0)
                 shutil.copyfileobj(output, sys.stderr)
     if result.returncode:
-        raise RuntimeError(f"command failed: {argv[1]} exited {result.returncode}")
+        label = argv[1] if len(argv) > 1 else Path(argv[0]).name
+        raise RuntimeError(f"command failed: {label} exited {result.returncode}")
 
 
 def image_id(reference):
@@ -2866,12 +2994,13 @@ def reseed_providers(verbose=False):
     accepted = image_id(IMAGE)
     container = f"aiagent-provider-reseed-{os.getpid()}-{time.monotonic_ns()}"
     stop_attempted = False
+    stop_verified = False
     reseeded = False
     try:
         phase("stopping agent for provider repair")
         stop_attempted = True
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
-                verbose=verbose)
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
+        stop_verified = True
         phase("backing up persistent state")
         backup()
         phase("reseeding user-owned provider prefix")
@@ -2897,7 +3026,11 @@ def reseed_providers(verbose=False):
         await_agent_ready(120)
         phase("provider prefix reseeded; agent ready")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
-        if stop_attempted and not reseeded:
+        if stop_attempted and not stop_verified:
+            print("aiagent: stop was forced or could not be verified; backup and reseed "
+                  "were skipped; agent may remain stopped; inspect before starting it",
+                  file=sys.stderr, flush=True)
+        elif stop_verified and not reseeded:
             try:
                 phase("restoring previous agent")
                 command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d",
@@ -2923,6 +3056,7 @@ def main(verbose=False):
     old = image_id(IMAGE)
     candidate = f"localhost/aiagent-fedora:44-candidate-{os.getpid()}-{time.monotonic_ns()}"
     built = False
+    stop_attempted = False
     quiesced = False
     applying = False
     try:
@@ -2936,16 +3070,23 @@ def main(verbose=False):
                 "/usr/local/bin/aiagent-readiness", "--candidate", timeout=180,
                 verbose=verbose)
         phase("stopping agent")
-        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
-                verbose=verbose)
+        stop_attempted = True
+        command(str(STOP_OUTCOME), timeout=300, verbose=verbose)
         quiesced = True
         phase("backing up persistent state")
         backup()
         applying = True
         phase("applying image and configuration")
+        updater_env = None
+        if verbose:
+            updater_env = dict(os.environ, GAK_SERVICES_SHOW_HOOK_OUTPUT="1")
+            print("aiagent: verbose shows readiness hook output, which may contain "
+                  "private data; inspect it before sharing. Compose provider diagnostics "
+                  "remain private unless separately enabled",
+                  file=sys.stderr, flush=True)
         command(str(UPDATER), "update", "agent", "--from-stopped", "--force",
                 "--prepared-image", f"agent={candidate_id}", timeout=900,
-                verbose=verbose)
+                verbose=verbose, env=updater_env)
         phase("checking accepted image")
         if image_id(IMAGE) != candidate_id:
             raise RuntimeError("the accepted image reference moved")
@@ -2955,6 +3096,11 @@ def main(verbose=False):
         else:
             phase(f"accepted image {candidate_id[:12]}; previous image {old[:12]} is retained")
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if stop_attempted and not quiesced:
+            print("aiagent: stop was forced or could not be verified; backup and image "
+                  "application were skipped; agent may remain stopped; inspect before "
+                  "starting it",
+                  file=sys.stderr, flush=True)
         if quiesced and not applying:
             phase("restoring previous agent")
             command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",

@@ -87,11 +87,15 @@ HTTPS origin with an ASCII DNS name, IPv4 address or bracketed IPv6 address.
 Set =GAK_AIAGENT_SSH_TARGET=, =GAK_AIAGENT_SSH_KEY= and
 =GAK_AIAGENT_T3_SERVICE= for another workstation or service name. A paired
 browser and a cold reboot require separate live verification.
-=gak-aiagent update --verbose= forwards full build and Compose output through
-SSH. A default update prints named phases, stderr warnings and its final result;
-failed commands also print captured stdout diagnostics. The backup wait reports
-elapsed time every minute. An unchanged image is reported honestly while
-configuration application and readiness still run.
+=gak-aiagent update --verbose= streams direct build and verified stop output
+through SSH and enables the shared updater's readiness hook output. That hook
+output may contain private data; inspect it before sharing. Raw Compose provider
+diagnostics remain redacted unless the operator separately sets
+=GAK_SERVICES_SHOW_PROVIDER_ERRORS=, which can reveal expanded environment.
+A default update prints named phases and a final result; failed commands also
+print captured stdout and sanitized shared-updater diagnostics. The backup wait
+reports elapsed time every minute. An unchanged image is reported honestly
+while configuration application and readiness still run.
 =gak-aiagent providers= reports selected npm package versions next to the
 image seed versions without reading login state. Inside =gak-aiagent shell=,
 =ncu -g= discovers global updates in this prefix. The managed package names
@@ -130,7 +134,12 @@ operator-maintained through =cache-size= and explicit =cache-clean=; the home
 image's 256 GiB size is the hard account budget.
 =restart= stops and starts Compose in one recorded worker. This releases the
 rootless port listener before rebinding it and retains operation ordering if
-the caller exits.
+the caller exits. The stop helper checks the recorded container ID, running
+state and exit status after Compose returns. A nonzero exit or unverifiable outcome
+aborts restart, recreate, update or repair before the next mutating phase; the agent may
+remain stopped and requires inspection. A verified already-stopped or absent
+project remains eligible for update or restart without calling its previous
+exit a new graceful stop.
 The operation helper keeps a PID and kernel start time under =/run/aiagent=.
 It waits for the recorded foreground process session after an interrupted caller
 or worker. The root backup job checks the same session. The installed Podman
@@ -185,6 +194,10 @@ roles/gak_aiagent/tests/t3-port-render.py= to check default and alternate host
 ports across Compose and ingress.
 Run =python3 roles/gak_aiagent/tests/t3-supervise.py= to check graceful
 shutdown, owned descendant cleanup and restart after a native crash.
+Run =python3 roles/gak_aiagent/tests/stop-outcome.py= for exact container
+identity, exit and replacement handling, and
+=python3 roles/gak_aiagent/tests/update-diagnostics.py= for the shared updater's
+hook/provider output boundary.
 Run =python3 roles/gak_aiagent/tests/provider-prefix.py= and
 =python3 roles/gak_aiagent/tests/provider-reseed-flow.py= for persistent
 provider selection, absence and bounded repair.

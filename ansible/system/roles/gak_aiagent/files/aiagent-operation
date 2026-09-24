@@ -13,6 +13,7 @@ HOME = Path("/home/aiagent")
 PODMAN = "/run/current-system/profile/bin/podman"
 IMAGE = "localhost/aiagent-fedora:44-v1"
 PROJECT = HOME / "services/agent/compose.yaml"
+STOP_OUTCOME = HOME / ".local/bin/aiagent-stop-outcome"
 LOCK = Path("/run/aiagent/aiagent.lock")
 ACTIVE = Path("/run/aiagent/aiagent.active")
 PROJECT_CGROUP = Path("/sys/fs/cgroup/aiagent/delegated/service/cli")
@@ -176,12 +177,14 @@ def command_for(operation, verbose=False):
             raise RuntimeError(f"local image is absent: {IMAGE}")
         return compose + ["up", "-d", "--pull", "never"]
     if operation == "stop":
-        return compose + ["stop"]
+        return [str(STOP_OUTCOME)]
     if operation == "restart":
         return [sys.executable, "-c", SEQUENCE,
-                json.dumps([compose + ["stop"], compose + ["up", "-d", "--pull", "never"]])]
+                json.dumps([[str(STOP_OUTCOME)], compose + ["up", "-d", "--pull", "never"]])]
     if operation == "recreate":
-        return compose + ["up", "-d", "--force-recreate", "--pull", "never"]
+        return [sys.executable, "-c", SEQUENCE,
+                json.dumps([[str(STOP_OUTCOME)],
+                            compose + ["up", "-d", "--force-recreate", "--pull", "never"]])]
     raise RuntimeError(f"unknown operation: {operation}")
 
 

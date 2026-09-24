@@ -128,17 +128,25 @@ groups are outside that cleanup boundary. A container stop can interrupt active
 T3 work. A group signal after the grace window prints a warning and makes the
 supervisor exit 124; a graceful stop exits zero. An unexpected T3 restart
 leaves separate terminal sessions running.
+The account stop helper checks the exact pre-stop container ID and the current
+name after Compose returns. A nonzero exit or unverifiable identity halts restart,
+recreate, update and provider repair before a backup or replacement; the agent may remain
+stopped for inspection. A previously stopped or absent project may still be
+updated or restarted, with any prior exit reported as historical.
 On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
 =gak-aiagent status=, =providers=, =shell=, =restart= or =update= to forward to the
 account-local manager. =shell= requires a terminal. Set
 =GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
 =aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
 Python 3 and OpenSSH; T3 actions also need tailnet access.
-=gak-aiagent update --verbose= streams full build and Compose output. The
-default update prints named phases, stderr warnings and a final result. On a
-failed command it also prints the captured stdout diagnostics. Backup waiting
-prints elapsed time every minute. An identical image is reported as unchanged;
-the update still applies the Compose configuration and checks readiness.
+=gak-aiagent update --verbose= streams direct build and verified stop output,
+and enables the shared updater's readiness hook output. The hook output may
+contain private data; inspect it before sharing. Raw Compose provider diagnostics
+remain redacted unless =GAK_SERVICES_SHOW_PROVIDER_ERRORS= is separately set,
+which can expose expanded environment. The default update prints named phases,
+sanitized failures and a final result. Backup waiting reports elapsed time every
+minute. An identical image is reported as unchanged; configuration application
+and readiness still run.
 
 The image provides a pinned first-install npm seed for Claude, Codex,
 OpenCode, Pi and npm-check-updates. The selected, user-owned npm prefix lives

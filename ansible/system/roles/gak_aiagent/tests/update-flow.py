@@ -17,6 +17,7 @@ from unittest import mock
 
 ROLE = Path(__file__).resolve().parents[1]
 SOURCE = ROLE / "files/aiagent-update"
+STOP_SOURCE = ROLE / "files/aiagent-stop-outcome"
 READINESS = ROLE / "files/image/bin/aiagent-readiness"
 OLD = "a" * 64
 NEW = "e" * 64
@@ -28,6 +29,7 @@ import sys
 
 root = Path(os.environ["AIAGENT_UPDATE_TEST_ROOT"])
 args = sys.argv[1:]
+mode = os.environ.get("STOP_MODE", "graceful")
 with (root / "calls").open("a") as log:
     log.write(json.dumps(args) + "\\n")
 if args[:2] == ["image", "inspect"]:
@@ -38,6 +40,16 @@ if args[:2] == ["image", "inspect"]:
         print("%s")
     else:
         print("%s")
+elif args[:2] == ["container", "exists"]:
+    if mode == "absent":
+        sys.exit(1)
+elif args[0] == "inspect":
+    identity = "d" * 64 if mode == "replacement" and args[-1] == "aiagent" and (root / "stopped").exists() else "c" * 64
+    stopped = (root / "stopped").exists()
+    code = 124 if mode == "forced" and stopped else 0
+    if mode == "historical" and stopped:
+        code = 124
+    print(f"{identity}|{'false' if stopped else 'true'}|{'exited' if stopped else 'running'}|{code}")
 elif args[0] == "build":
     print("build progress from podman")
     print("build warning from podman", file=sys.stderr)
@@ -52,11 +64,12 @@ elif args[0] == "run":
     sys.exit(subprocess.run(json.loads(os.environ["READINESS_PROBE"])).returncode)
 elif args[:2] == ["compose", "-f"] and "stop" in args:
     print("compose stop progress")
-    print("podman: SIGKILL warning from stop", file=sys.stderr)
+    if mode == "provider-warning":
+        print("podman: warning from stop", file=sys.stderr)
+    (root / "stopped").touch()
     if os.environ.get("FAIL_PHASE") == "stop":
         print("compose stop failure detail")
         sys.exit(38)
-    (root / "stopped").touch()
 elif args[:2] == ["compose", "-f"] and "up" in args:
     (root / "stopped").unlink()
 '''
@@ -68,6 +81,10 @@ import sys
 root = Path(os.environ["AIAGENT_UPDATE_TEST_ROOT"])
 assert (root / "stopped").exists()
 (root / "updater-args").write_text(json.dumps(sys.argv[1:]))
+(root / "updater-env").write_text(json.dumps({
+    "hook": os.environ.get("GAK_SERVICES_SHOW_HOOK_OUTPUT"),
+    "provider": os.environ.get("GAK_SERVICES_SHOW_PROVIDER_ERRORS"),
+}))
 print("shared updater progress")
 print("shared updater warning", file=sys.stderr)
 if os.environ.get("FAIL_AFTER_APPLY"):
@@ -148,7 +165,7 @@ time.sleep(5)
 
 
 def exercise(root, probe, broken=False, postapply=False, verbose=False,
-             same_image=False, fail_phase=None):
+             same_image=False, fail_phase=None, stop_mode="graceful"):
     home = root / "home"
     (home / "image").mkdir(parents=True)
     (home / "image/Containerfile").write_text("FROM scratch\n")
@@ -159,6 +176,7 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     (home / "workspaces/sentinel").write_text("workspace state")
     (home / "container-home/sentinel").write_text("login state")
     (home / ".guix-profile/bin").mkdir(parents=True)
+    (home / ".local/bin").mkdir(parents=True)
     updater = home / ".guix-profile/bin/gak-services"
     updater.write_text(UPDATER)
     updater.chmod(0o755)
@@ -166,6 +184,12 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     new_image = OLD if same_image else NEW
     fake.write_text(PODMAN % (OLD, new_image, OLD, new_image))
     fake.chmod(0o755)
+    stop_source = STOP_SOURCE.read_text()
+    stop_source = replace(stop_source, 'HOME = Path("/home/aiagent")', f"HOME = Path({str(home)!r})")
+    stop_source = replace(stop_source, 'PODMAN = "/run/current-system/profile/bin/podman"', f"PODMAN = {str(fake)!r}")
+    stop_helper = home / ".local/bin/aiagent-stop-outcome"
+    stop_helper.write_text(stop_source)
+    stop_helper.chmod(0o755)
     source = SOURCE.read_text()
     source = replace(source, 'HOME = Path("/home/aiagent")', f"HOME = Path({str(home)!r})")
     source = replace(source, 'PODMAN = "/run/current-system/profile/bin/podman"', f"PODMAN = {str(fake)!r}")
@@ -175,7 +199,9 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     script.write_text(source)
     script.chmod(0o755)
     env = dict(os.environ, AIAGENT_UPDATE_TEST_ROOT=str(root),
-               READINESS_PROBE=json.dumps(probe))
+               READINESS_PROBE=json.dumps(probe), STOP_MODE=stop_mode)
+    if stop_mode == "historical":
+        (root / "stopped").touch()
     if postapply:
         env["FAIL_AFTER_APPLY"] = "1"
     if fail_phase:
@@ -195,14 +221,15 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
         raise AssertionError("backup was not requested")
 
     responder = None
-    if not broken and fail_phase not in ("build", "stop"):
+    if not broken and fail_phase not in ("build", "stop") and stop_mode not in ("forced", "replacement"):
         responder = threading.Thread(target=answer_backup)
         responder.start()
     result = subprocess.run([script] + (["--verbose"] if verbose else []),
                             env=env, capture_output=True, text=True, timeout=15)
     if responder:
         responder.join(timeout=10)
-    assert result.returncode == (1 if broken or postapply or fail_phase else 0), result.stderr
+    failed = broken or postapply or fail_phase or stop_mode in ("forced", "replacement")
+    assert result.returncode == (1 if failed else 0), result.stderr
     calls = (root / "calls").read_text().splitlines()
     assert all('"pull"' not in call for call in calls)
     if fail_phase != "build":
@@ -210,12 +237,27 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     assert (home / "workspaces/sentinel").read_text() == "workspace state"
     assert (home / "container-home/sentinel").read_text() == "login state"
     if fail_phase in ("build", "stop"):
-        assert not (root / "stopped").exists()
+        assert (root / "stopped").exists() == (fail_phase == "stop")
         assert not (root / "updater-args").exists()
-        assert "warning from" in result.stderr or "SIGKILL warning" in result.stderr
         assert f"{fail_phase} failure detail" in result.stderr
-        command = "build" if fail_phase == "build" else "compose"
+        command = "build" if fail_phase == "build" else "aiagent-stop-outcome"
         assert f"{command} exited" in result.stderr
+        if fail_phase == "stop":
+            assert "Compose stop exited 38" in result.stderr
+            assert "backup and image application were skipped" in result.stderr
+            assert "stop was forced or could not be verified" in result.stderr
+            assert not (root / "request").exists()
+    elif stop_mode in ("forced", "replacement"):
+        assert (root / "stopped").exists()
+        assert not (root / "request").exists()
+        assert not (root / "updater-args").exists()
+        assert "backup and image application were skipped" in result.stderr
+        assert "stop was forced or could not be verified" in result.stderr
+        assert "agent may remain stopped" in result.stderr
+        if stop_mode == "forced":
+            assert "shutdown escalated" in result.stderr and "exit 124" in result.stderr
+        else:
+            assert "identity changed" in result.stderr
     elif broken:
         assert not (root / "stopped").exists()
         assert not (root / "updater-args").exists()
@@ -228,12 +270,19 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
     else:
         assert "--from-stopped" in (root / "updater-args").read_text()
         assert f"agent={new_image}" in (root / "updater-args").read_text()
-        assert "podman: SIGKILL warning from stop" in result.stderr
+        if stop_mode == "provider-warning":
+            assert "podman: warning from stop" in result.stderr
+        if stop_mode == "historical":
+            assert "historical exit 124" in result.stderr
+            assert "shutdown escalated" not in result.stderr
+        if stop_mode == "absent":
+            assert "shutdown escalated" not in result.stderr
         assert "shared updater warning" in result.stderr
         assert "building candidate image" in result.stdout
         assert "backing up persistent state" in result.stdout
         assert "applying image and configuration" in result.stdout
         if verbose:
+            assert "readiness hook output, which may contain private data" in result.stderr
             assert "build progress from podman" in result.stdout
             assert "compose stop progress" in result.stdout
             assert "shared updater progress" in result.stdout
@@ -241,6 +290,8 @@ def exercise(root, probe, broken=False, postapply=False, verbose=False,
             assert "build progress from podman" not in result.stdout
             assert "compose stop progress" not in result.stdout
             assert "shared updater progress" not in result.stdout
+        updater_env = json.loads((root / "updater-env").read_text())
+        assert updater_env == {"hook": "1" if verbose else None, "provider": None}
         if same_image:
             assert f"image unchanged ({OLD[:12]})" in result.stdout
             assert "previous image" not in result.stdout
@@ -346,6 +397,11 @@ def main():
             ("unchanged", {"same_image": True}),
             ("build-failure", {"fail_phase": "build"}),
             ("stop-failure", {"fail_phase": "stop"}),
+            ("forced-stop", {"stop_mode": "forced"}),
+            ("replacement-stop", {"stop_mode": "replacement"}),
+            ("historical-stop", {"stop_mode": "historical"}),
+            ("absent-stop", {"stop_mode": "absent"}),
+            ("provider-warning", {"stop_mode": "provider-warning"}),
         ):
             case = root / name
             case.mkdir()

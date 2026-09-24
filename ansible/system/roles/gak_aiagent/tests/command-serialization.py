@@ -16,6 +16,7 @@ from types import SimpleNamespace
 ROLE = Path(__file__).resolve().parents[1]
 SOURCE = Path(os.environ.get("AIAGENT_OPERATION_SOURCE", ROLE / "files/aiagent-operation"))
 COMMAND = Path(os.environ.get("AIAGENT_COMMAND_SOURCE", ROLE / "files/aiagent"))
+STOP_SOURCE = ROLE / "files/aiagent-stop-outcome"
 BACKUP = ROLE.parent / "guix_config/files/modules/aiagent/backup.py"
 PORT_PARENT = '''
 import os
@@ -44,6 +45,13 @@ import time
 
 root = Path(os.environ["AIAGENT_PROBE_ROOT"])
 lock = root / "aiagent.lock"
+if sys.argv[1:3] == ["container", "exists"]:
+    sys.exit(0)
+if sys.argv[1] == "inspect":
+    stopped = (root / "stopped").exists()
+    code = 124 if stopped and os.environ.get("FORCE_STOP") else 0
+    print(f"{'c' * 64}|{'false' if stopped else 'true'}|{'exited' if stopped else 'running'}|{code}")
+    sys.exit(0)
 for fd in Path("/proc/self/fd").iterdir():
     try:
         assert fd.resolve() != lock, "Podman inherited the operation lock"
@@ -52,9 +60,12 @@ for fd in Path("/proc/self/fd").iterdir():
 
 operation = "up" if "up" in sys.argv else sys.argv[-1]
 if operation in ("stop", "up"):
-    assert (root / "service/cli/cgroup.procs").read_text() in (str(os.getpid()), str(os.getppid()))
+    assert (root / "service/cli/cgroup.procs").read_text() in (
+        str(os.getpid()), str(os.getppid()), str(os.getsid(0))
+    )
 if operation == "up":
     assert sys.argv[sys.argv.index("--pull") + 1] == "never"
+    (root / "stopped").unlink(missing_ok=True)
     if (root / "spawn-port-helper").exists():
         import subprocess
         with (root / "port.stderr").open("w") as diagnostics:
@@ -72,6 +83,7 @@ if operation == "stop":
     (root / "stop-child.pid").write_text(str(os.getpid()))
     while not (root / "release").exists():
         time.sleep(0.05)
+    (root / "stopped").touch()
 if operation == "up" and (root / "spawn-detached").exists():
     import subprocess
     detached = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"],
@@ -119,6 +131,13 @@ def main():
                              f'ROOTLESSPORT_CGROUP = {port_cgroup!r}')
         helper.write_text(source)
         helper.chmod(0o750)
+        stop_source = STOP_SOURCE.read_text()
+        stop_source = replace_one(stop_source, 'HOME = Path("/home/aiagent")', f'HOME = Path({str(home)!r})')
+        stop_source = replace_one(stop_source, 'PODMAN = "/run/current-system/profile/bin/podman"',
+                                  f'PODMAN = {str(fake)!r}')
+        stop_helper = home / ".local/bin/aiagent-stop-outcome"
+        stop_helper.write_text(stop_source)
+        stop_helper.chmod(0o750)
         command = root / "aiagent"
         command.write_text(replace_one(COMMAND.read_text(), "home=/home/aiagent", f"home={home}"))
         command.chmod(0o750)
@@ -156,6 +175,26 @@ def main():
             assert not (root / "aiagent.active").exists()
             operation_descriptor = backup.operation_lock()
             os.close(operation_descriptor)
+            baseline = (root / "events").read_text().splitlines()
+            env["FORCE_STOP"] = "1"
+            forced = subprocess.run([command, "restart"], env=env, capture_output=True, text=True)
+            env.pop("FORCE_STOP")
+            assert forced.returncode == 124
+            assert "shutdown escalated" in forced.stderr
+            assert (root / "events").read_text().splitlines() == baseline + ["stop"]
+            assert (root / "stopped").exists()
+            assert subprocess.run([command, "recreate"], env=env).returncode == 0
+            assert not (root / "stopped").exists()
+            baseline = (root / "events").read_text().splitlines()
+            env["FORCE_STOP"] = "1"
+            forced_recreate = subprocess.run([command, "recreate"], env=env,
+                                             capture_output=True, text=True)
+            env.pop("FORCE_STOP")
+            assert forced_recreate.returncode == 124
+            assert "shutdown escalated" in forced_recreate.stderr
+            assert (root / "events").read_text().splitlines() == baseline + ["stop"]
+            assert (root / "stopped").exists()
+            assert subprocess.run([command, "recreate"], env=env).returncode == 0
             (root / "spawn-port-helper").touch()
             assert subprocess.run([command, "restart"], env=env).returncode == 0
             try:
@@ -222,7 +261,7 @@ def main():
             assert (root / "events").read_text().splitlines() == ["stop"]
             (root / "release").touch()
             assert following.wait(timeout=5) == 0
-            assert (root / "events").read_text().splitlines() == ["stop", "up"]
+            assert (root / "events").read_text().splitlines() == ["stop", "stop", "up"]
             assert not (root / "aiagent.active").exists()
             operation_descriptor = backup.operation_lock()
             os.close(operation_descriptor)
@@ -270,6 +309,8 @@ Path(os.environ["AIAGENT_PROBE_ROOT"], "update-args").write_text(json.dumps(sys.
             assert all((cache / name).is_dir() for name in ("tmp", "npm", "xdg"))
             print("caller death: restart waited for the surviving stop worker")
             print("worker death: recreate and backup waited for the surviving Compose child")
+            print("forced T3 stop returned 124 and blocked restart up")
+            print("forced T3 stop also blocked recreate up")
             print("detached workload did not retain the operation record or lock")
             print("persistent port helpers allowed restart, next operation and backup exclusion")
             print("update --verbose reached only the account updater and rejected other arguments")
