@@ -51,8 +51,9 @@ runtime, socket, media path or operator home is mounted. The image installs
 harness binaries and wrappers under =/usr/local=, outside the persistent home.
 The image's =/usr/local/bin= has PATH precedence over persistent user bins.
 The Fedora 44 base and harness package versions are pinned in
-[[file:../../aiagent.org][aiagent.org]]. Pi's interactive TUI segfaults in this
-environment, so container Pi is for print mode.
+[[file:../../aiagent.org][aiagent.org]]. Pi runs on a pinned upstream Node
+executable in the image; its interactive TUI, =/login= menu and print mode
+are available through the =pi= command.
 
 =aiagent status=, =logs=, =shell= and =exec= inspect or enter the container.
 =build=, =start=, =stop=, =restart=, =recreate= and =cache-clean= hold one
