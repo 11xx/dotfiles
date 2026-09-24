@@ -138,7 +138,11 @@ remains usable without it. The command obtains the named service origin from
 Gak's read-only =tailscale status --json= and uses service name =t3=. Set
 =GAK_AIAGENT_T3_SERVICE= for another named service, or
 =GAK_AIAGENT_T3_URL= to an explicit HTTPS origin when discovery does not
-apply. Keep private origins in local environment configuration. Pairing uses
+apply. An explicit origin accepts ASCII DNS names, IPv4 addresses or bracketed
+IPv6 addresses, an optional port and one trailing slash. Host case and the
+default HTTPS port are normalized before pairing; paths, credentials, queries
+and fragments are invalid. Keep private origins in local environment
+configuration. Pairing uses
 the same =/home/node/.t3/userdata= directory as the running server. A new
 link is required for each client or expired attempt; no token is stored by the
 workstation command. T3 client sessions reside in =container-home=, which is

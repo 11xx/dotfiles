@@ -71,7 +71,8 @@ prints a five-minute, single-use link and QR code locally. It passes
 =--base-dir /home/node/.t3/userdata= and the canonical =--base-url= to
 =t3 auth pairing create --json= inside the running container. It does not
 configure Tailscale ingress. The workstation derives the named service origin
-from the host's read-only Tailscale JSON or accepts =GAK_AIAGENT_T3_URL=.
+from the host's read-only Tailscale JSON or accepts =GAK_AIAGENT_T3_URL= as an
+HTTPS origin with an ASCII DNS name, IPv4 address or bracketed IPv6 address.
 Set =GAK_AIAGENT_SSH_TARGET=, =GAK_AIAGENT_SSH_KEY= and
 =GAK_AIAGENT_T3_SERVICE= for another workstation or service name. A paired
 browser and a cold reboot require separate live verification.
