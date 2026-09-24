@@ -411,6 +411,23 @@ def process_identity(pid):
     return fields[19]
 
 
+ROOTLESSPORT = Path("/run/current-system/profile/libexec/podman/rootlessport")
+ROOTLESSPORT_CGROUP = "0::/aiagent/delegated/service/cli/runtime"
+
+
+def persistent_port_helper(entry):
+    try:
+        if ROOTLESSPORT_CGROUP not in (entry / "cgroup").read_text().splitlines():
+            return False
+        if (entry / "cmdline").read_bytes().split(b"\0", 1)[0] not in (
+            b"rootlessport", b"rootlessport-child"
+        ):
+            return False
+        return (entry / "exe").samefile(ROOTLESSPORT)
+    except OSError:
+        return False
+
+
 def process_session_active(pid, started):
     identity = process_identity(pid)
     if identity is not None:
@@ -422,7 +439,8 @@ def process_session_active(pid, started):
             fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
         except OSError:
             continue
-        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+        if (fields[0] not in ("Z", "X") and fields[3] == str(pid)
+                and not persistent_port_helper(entry)):
             return True
     return False
 

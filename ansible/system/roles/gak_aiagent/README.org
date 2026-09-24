@@ -75,8 +75,10 @@ rootless port listener before rebinding it and retains operation ordering if
 the caller exits.
 The operation helper keeps a PID and kernel start time under =/run/aiagent=.
 It waits for the recorded foreground process session after an interrupted caller
-or worker. The root backup job checks the same session. Podman's detached
-workloads leave the session and do not retain the operation lock.
+or worker. The root backup job checks the same session. The installed Podman
+=rootlessport= parent and child may persist in the session while serving a
+running container. Their executable, argv name and service runtime cgroup
+identify them; other session members keep the operation and backup excluded.
 Project mutations move their worker from the SSH cgroup into the
 =/aiagent/delegated/service/cli= leaf before invoking Podman. Containers
 created there remain in the service subtree. Read-only commands stay in the
@@ -106,8 +108,9 @@ file at =/etc/aiagent/restic-password=, outside the mounted agent home. The
 repository is =/marak/backups/aiagent/restic=. The root job retains seven
 daily, five weekly and twelve monthly snapshots. Its request result is created
 under root-owned =/run/aiagent-backup= and atomically handed to aiagent. Daily
-backup and restore check reject a surviving operation worker before stopping
-Compose. A failed stop or termination signal settles the current child process
+backup and restore check reject surviving mutating descendants before stopping
+Compose. Persistent =rootlessport= helpers serving a container do not hold the
+exclusion. A failed stop or termination signal settles the current child process
 group and triggers bounded recovery of the home mount and Compose service
 before the operation lock is released. =backup.py restore-check=
 stops Compose, takes a fresh snapshot, restores to a

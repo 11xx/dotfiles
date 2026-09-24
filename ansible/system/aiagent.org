@@ -824,8 +824,10 @@ The minute job creates its result under root-owned =/run/aiagent-backup= and
 atomically hands the finished file to the account. Daily backup and restore
 check take the account's operation lock and reject a surviving foreground
 operation session recorded under =/run/aiagent=, including Compose children that
-outlive their worker. Detached workloads leave that session and do not hold the
-exclusion. The jobs attempt service recovery even when stopping Compose
+outlive their worker. Podman's installed =rootlessport= parent and child can
+remain in that session while serving a container. Their executable, argv name
+and service runtime cgroup identify them; every other session member retains
+the exclusion. The jobs attempt service recovery even when stopping Compose
 fails; the stop deadline covers the documented service and home stop chain.
 Termination signals settle the current command's process group before a
 bounded recovery of the home mount and Compose service. Further signals during
@@ -1263,6 +1265,23 @@ def process_identity(pid):
     return fields[19]
 
 
+ROOTLESSPORT = Path("/run/current-system/profile/libexec/podman/rootlessport")
+ROOTLESSPORT_CGROUP = "0::/aiagent/delegated/service/cli/runtime"
+
+
+def persistent_port_helper(entry):
+    try:
+        if ROOTLESSPORT_CGROUP not in (entry / "cgroup").read_text().splitlines():
+            return False
+        if (entry / "cmdline").read_bytes().split(b"\0", 1)[0] not in (
+            b"rootlessport", b"rootlessport-child"
+        ):
+            return False
+        return (entry / "exe").samefile(ROOTLESSPORT)
+    except OSError:
+        return False
+
+
 def process_session_active(pid, started):
     identity = process_identity(pid)
     if identity is not None:
@@ -1274,7 +1293,8 @@ def process_session_active(pid, started):
             fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
         except OSError:
             continue
-        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+        if (fields[0] not in ("Z", "X") and fields[3] == str(pid)
+                and not persistent_port_helper(entry)):
             return True
     return False
 
@@ -1907,7 +1927,10 @@ esac
 The lock helper records only a PID and kernel start time under =/run/aiagent=.
 Its worker waits for that record before executing Podman. A dead caller closes
 the worker's start gate; an operation that already started remains recorded
-until its process exits. Project mutations move the worker into
+until its mutating descendants exit. Podman's installed =rootlessport= parent
+and child can persist in the same session while serving a container; their
+executable, argv name and service runtime cgroup distinguish them from
+unfinished commands. Project mutations move the worker into
 =/sys/fs/cgroup/aiagent/delegated/service/cli= before executing Podman, so
 long-lived project containers stay in the service subtree. An empty CLI leaf
 is removed after the worker exits; a populated leaf stays until its container
@@ -1967,6 +1990,23 @@ def process_identity(pid):
     return fields[19]
 
 
+ROOTLESSPORT = Path("/run/current-system/profile/libexec/podman/rootlessport")
+ROOTLESSPORT_CGROUP = "0::/aiagent/delegated/service/cli/runtime"
+
+
+def persistent_port_helper(entry):
+    try:
+        if ROOTLESSPORT_CGROUP not in (entry / "cgroup").read_text().splitlines():
+            return False
+        if (entry / "cmdline").read_bytes().split(b"\0", 1)[0] not in (
+            b"rootlessport", b"rootlessport-child"
+        ):
+            return False
+        return (entry / "exe").samefile(ROOTLESSPORT)
+    except OSError:
+        return False
+
+
 def process_session_active(pid, started):
     identity = process_identity(pid)
     if identity is not None:
@@ -1978,7 +2018,8 @@ def process_session_active(pid, started):
             fields = (entry / "stat").read_text().rsplit(")", 1)[1].split()
         except OSError:
             continue
-        if fields[0] not in ("Z", "X") and fields[3] == str(pid):
+        if (fields[0] not in ("Z", "X") and fields[3] == str(pid)
+                and not persistent_port_helper(entry)):
             return True
     return False
 
