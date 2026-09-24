@@ -240,6 +240,10 @@ Path(os.environ["AIAGENT_PROBE_ROOT"], "update-args").write_text(json.dumps(sys.
             assert json.loads((root / "update-args").read_text()) == []
             assert subprocess.run([command, "update", "--verbose"], env=env).returncode == 0
             assert json.loads((root / "update-args").read_text()) == ["--verbose"]
+            assert subprocess.run([command, "provider-reseed"], env=env).returncode == 0
+            assert json.loads((root / "update-args").read_text()) == ["--provider-reseed"]
+            assert subprocess.run([command, "provider-reseed", "--verbose"], env=env).returncode == 0
+            assert json.loads((root / "update-args").read_text()) == ["--provider-reseed", "--verbose"]
             (root / "update-args").unlink()
             assert subprocess.run([command, "update", "--verbose; touch /unwanted"],
                                   env=env, capture_output=True).returncode != 0
@@ -269,6 +273,7 @@ Path(os.environ["AIAGENT_PROBE_ROOT"], "update-args").write_text(json.dumps(sys.
             print("detached workload did not retain the operation record or lock")
             print("persistent port helpers allowed restart, next operation and backup exclusion")
             print("update --verbose reached only the account updater and rejected other arguments")
+            print("provider-reseed reached the serialized updater with only its declared options")
             print("cache cleanup stayed inside the cache subtree")
         finally:
             (root / "release").touch()

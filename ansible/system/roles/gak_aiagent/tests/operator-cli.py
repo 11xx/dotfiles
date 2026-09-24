@@ -117,17 +117,22 @@ elif name == "qrencode":
         self.assertEqual(self.invoke("pair")[0], 2)
         self.assertEqual(self.calls(), [])
         self.assertEqual(self.invoke("status")[0], 0)
+        self.assertEqual(self.invoke("providers")[0], 0)
         self.assertEqual(self.invoke("shell")[0], 0)
         self.assertEqual(self.invoke("restart")[0], 17)
         self.assertEqual(self.invoke("update")[0], 0)
         self.assertEqual(self.invoke("update", "--verbose")[0], 0)
+        self.assertEqual(self.invoke("provider-reseed")[0], 0)
+        self.assertEqual(self.invoke("provider-reseed", "--verbose")[0], 0)
         self.assertEqual(self.invoke("update", "--verbose; touch /unwanted")[0], 2)
+        self.assertEqual(self.invoke("provider-reseed", "--verbose; touch /unwanted")[0], 2)
         calls = self.calls()
-        self.assertIn("-tt", calls[1])
+        self.assertIn("-tt", calls[2])
         self.assertIn("-T", calls[0])
         self.assertEqual([shlex.split(call[-1])[1:] for call in calls],
-                         [["status"], ["shell"], ["restart"], ["update"],
-                          ["update", "--verbose"]])
+                         [["status"], ["providers"], ["shell"], ["restart"], ["update"],
+                          ["update", "--verbose"], ["provider-reseed"],
+                          ["provider-reseed", "--verbose"]])
         self.assertFalse((self.root / "unwanted").exists())
 
     def test_pairing_quotes_label_and_feeds_qr_only_by_stdin(self):

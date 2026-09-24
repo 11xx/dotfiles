@@ -90,6 +90,78 @@ def remove_candidate(candidate, verbose):
               file=sys.stderr, flush=True)
 
 
+def await_agent_ready(seconds):
+    deadline = time.monotonic() + seconds
+    last_error = ""
+    while time.monotonic() < deadline:
+        result = subprocess.run(
+            [PODMAN, "exec", "aiagent", "/usr/local/bin/aiagent-readiness", "--live"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            return
+        last_error = result.stderr
+        time.sleep(2)
+    if last_error:
+        print(last_error, file=sys.stderr, end="")
+    raise RuntimeError("agent did not become ready")
+
+
+def reseed_providers(verbose=False):
+    home = HOME / "container-home"
+    if not home.is_dir() or home.is_symlink():
+        raise RuntimeError("persistent container home is missing or linked")
+    accepted = image_id(IMAGE)
+    container = f"aiagent-provider-reseed-{os.getpid()}-{time.monotonic_ns()}"
+    stop_attempted = False
+    reseeded = False
+    try:
+        phase("stopping agent for provider repair")
+        stop_attempted = True
+        command(PODMAN, "compose", "-f", str(PROJECT), "stop", timeout=180,
+                verbose=verbose)
+        phase("backing up persistent state")
+        backup()
+        phase("reseeding user-owned provider prefix")
+        try:
+            command(PODMAN, "run", "--rm", "--name", container, "--pull", "never",
+                    "--network", "none", "--userns", "keep-id", "--mount",
+                    f"type=bind,src={home},dst=/home/node,rw",
+                    "--entrypoint", "/usr/local/bin/aiagent-provider-prefix",
+                    accepted, "reseed", timeout=600, verbose=True)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired):
+            try:
+                subprocess.run([PODMAN, "rm", "-f", container], stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, timeout=60)
+            except (OSError, subprocess.TimeoutExpired) as cleanup:
+                print(f"aiagent: warning: disposable repair container cleanup failed: {cleanup}",
+                      file=sys.stderr, flush=True)
+            raise
+        reseeded = True
+        phase("starting agent")
+        command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d", "--pull", "never",
+                timeout=180, verbose=verbose)
+        phase("checking agent readiness")
+        await_agent_ready(120)
+        phase("provider prefix reseeded; agent ready")
+    except (OSError, RuntimeError, subprocess.TimeoutExpired):
+        if stop_attempted and not reseeded:
+            try:
+                phase("restoring previous agent")
+                command(PODMAN, "compose", "-f", str(PROJECT), "up", "-d",
+                        "--pull", "never", timeout=180, verbose=verbose)
+                await_agent_ready(30)
+                phase("previous agent ready after failed provider reseed")
+            except (OSError, RuntimeError, subprocess.TimeoutExpired) as recovery:
+                print(f"aiagent: previous agent is not ready after failed provider reseed: {recovery}",
+                      file=sys.stderr, flush=True)
+        elif reseeded:
+            print("aiagent: provider prefix was reseeded but agent readiness failed; "
+                  "inspect the retained prefix and backup before recovery",
+                  file=sys.stderr, flush=True)
+        raise
+
+
 def main(verbose=False):
     context = HOME / "image"
     if not (context / "Containerfile").is_file():
@@ -152,9 +224,13 @@ def main(verbose=False):
 
 if __name__ == "__main__":
     try:
-        if sys.argv[1:] not in ([], ["--verbose"]):
-            raise RuntimeError("usage: aiagent-update [--verbose]")
-        main(verbose=sys.argv[1:] == ["--verbose"])
+        if sys.argv[1:] in ([], ["--verbose"]):
+            main(verbose=sys.argv[1:] == ["--verbose"])
+        elif sys.argv[1:] in (["--provider-reseed"], ["--provider-reseed", "--verbose"]):
+            reseed_providers(verbose=sys.argv[1:] == ["--provider-reseed", "--verbose"])
+        else:
+            raise RuntimeError("usage: aiagent-update [--verbose|--provider-reseed [--verbose]]")
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
-        print(f"aiagent: update failed: {error}", file=sys.stderr)
+        operation = "provider reseed" if "--provider-reseed" in sys.argv[1:] else "update"
+        print(f"aiagent: {operation} failed: {error}", file=sys.stderr)
         sys.exit(1)

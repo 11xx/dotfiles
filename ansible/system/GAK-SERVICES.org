@@ -129,7 +129,7 @@ T3 work. A group signal after the grace window prints a warning and makes the
 supervisor exit 124; a graceful stop exits zero. An unexpected T3 restart
 leaves separate terminal sessions running.
 On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
-=gak-aiagent status=, =shell=, =restart= or =update= to forward to the
+=gak-aiagent status=, =providers=, =shell=, =restart= or =update= to forward to the
 account-local manager. =shell= requires a terminal. Set
 =GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
 =aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
@@ -139,6 +139,34 @@ default update prints named phases, stderr warnings and a final result. On a
 failed command it also prints the captured stdout diagnostics. Backup waiting
 prints elapsed time every minute. An identical image is reported as unchanged;
 the update still applies the Compose configuration and checks readiness.
+
+The image provides a pinned first-install npm seed for Claude, Codex,
+OpenCode, Pi and npm-check-updates. The selected, user-owned npm prefix lives
+in =container-home= and survives container replacement. A start validates it
+without replacing explicit updates or reinstalls. The fixed server and login
+PATH selects its commands before system paths and excludes unrelated home bins;
+the image-owned Pi shim uses the selected Pi package with pinned upstream Node.
+=gak-aiagent providers= reports selected and image seed versions without
+reading authentication state. In =gak-aiagent shell=, =ncu -g= discovers global
+updates in the selected prefix. Its packages are =@anthropic-ai/claude-code=,
+=@openai/codex=, =opencode-ai=, =@earendil-works/pi-coding-agent= and
+=npm-check-updates=. For example, =npm install -g @openai/codex@latest=
+selects a release and =npm uninstall -g @openai/codex= leaves it absent.
+No provider version upgrades automatically at container start. T3's Claude,
+Codex and OpenCode update actions use
+their npm-managed selected executables; clear any explicit provider Binary path
+outside the prefix before using those actions. The image's T3 service and OS
+packages remain image-owned. An intentional harness uninstall persists and
+cannot fall back to an older image executable.
+
+=gak-aiagent provider-reseed= explicitly replaces a broken selected prefix
+with the accepted local image's pinned seed. It holds the account operation
+lock, stops Compose, requests the root Restic snapshot, runs a disposable
+network-isolated container with only =container-home= mounted, then starts the
+project and checks readiness. The previous prefix is retained under
+=npm.before-reseed-*=. Reseeding can select versions older than user updates;
+inspect that retained prefix and the backup before removing either. Ordinary
+startup does not reseed.
 
 =gak-aiagent t3 open= opens the canonical HTTPS origin in the desktop browser.
 =gak-aiagent t3 pair [label]= displays a five-minute, single-use link and a
@@ -167,16 +195,18 @@ result. The tailnet administrator defines and approves the T3 service, then
 grants access to the intended clients. Pair the phone and workstation in T3;
 pairing state lives in =container-home=. Check HTTPS, WebSockets, refusal of an unpaired
 client, and reconnection after a phone network change from tailnet clients.
-The image's =/usr/local/bin= wins over persistent user executables in PATH.
+The image-owned Pi shim and selected user-owned npm prefix precede system paths;
+unrelated home executable directories are excluded.
 A later mutation waits for the recorded foreground process session when the
 invoking shell or worker dies; the root backup job checks the same session before
 quiescing Compose. Detached container processes do not retain the lock.
 =aiagent restart= stops and starts Compose within one recorded worker, so the
 loopback listener is released before it is bound again.
-Candidate update readiness starts a temporary T3 server in the disposable
-network-isolated image and checks its HTTP response. Project readiness checks
-the supervised T3 server against the persistent home. Both checks require the
-image-owned harness commands before an update is accepted.
+Candidate update readiness checks the image-owned T3 service and pairing
+commands and a complete pinned provider seed, then starts a temporary T3
+server in the network-isolated image. Project readiness checks the selected
+prefix state and supervised T3 server against the persistent home. Optional
+harness uninstalls do not block an image update.
 
 * Storage and namespaces
 
@@ -641,6 +671,9 @@ image remains pinned until recovery is no longer needed. A failed candidate
 probe leaves the running container untouched; a failure after recreation
 requires inspection of the snapshot before any manual rollback because
 persistent state may have changed.
+Selected npm provider versions are persistent state. Rebuilding or rolling back
+the image does not alter them; an explicit =provider-reseed= selects the accepted
+image's pinned provider seed after a stopped backup.
 
 For an image rollback, inspect the recovery snapshot and persistent state
 first. The failed update reports a =localhost/gak-services-previous:*= tag and

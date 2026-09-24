@@ -24,7 +24,7 @@ class OperatorError(Exception):
 
 
 def usage():
-    print("usage: gak-aiagent {status|shell|restart|update [--verbose]|t3 open|t3 pair [label]|help}")
+    print("usage: gak-aiagent {status|providers|shell|restart|update [--verbose]|provider-reseed [--verbose]|t3 open|t3 pair [label]|help}")
 
 
 def ssh_args(interactive=False):
@@ -188,8 +188,9 @@ def main(argv):
         usage()
         return 0 if argv else 2
     command = argv[0]
-    if (command in ("status", "shell", "restart", "update")
-            and (len(argv) == 1 or command == "update" and argv[1:] == ["--verbose"])):
+    if (command in ("status", "providers", "shell", "restart", "update", "provider-reseed")
+            and (len(argv) == 1 or command in ("update", "provider-reseed")
+                 and argv[1:] == ["--verbose"])):
         return subprocess.run(ssh_args(interactive=command == "shell")
                               + [remote_argv(MANAGER, *argv)]).returncode
     if command == "t3" and argv[1:] == ["open"]:

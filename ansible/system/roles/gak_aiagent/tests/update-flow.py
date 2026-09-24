@@ -260,11 +260,13 @@ def main():
         for name in ("sh", "env", "python3"):
             shutil.copy2(Path(shutil.which(name)).resolve(), binaries / name)
         shutil.copy2(READINESS, tools / "aiagent-readiness")
-        harnesses = ("codex", "claude", "opencode", "t3", "pi")
-        for name in harnesses:
-            command = tools / name
-            command.write_text("#!/bin/sh\nexit 0\n")
-            command.chmod(0o755)
+        for name in ("t3", "t3-web"):
+            (tools / name).write_text("#!/bin/sh\nexit 0\n")
+            (tools / name).chmod(0o755)
+        (tools / "aiagent-provider-prefix").write_text(
+            '#!/bin/sh\n[ "${FAKE_PREFIX_FAIL:-0}" != 1 ]\n'
+        )
+        (tools / "aiagent-provider-prefix").chmod(0o755)
         (tools / "t3-native").write_text(T3)
         (tools / "t3-native").chmod(0o755)
 
@@ -287,7 +289,7 @@ def main():
             case.mkdir()
             exercise(case, probe(directory), broken=True)
             print(f"missing {directory}: candidate refused before compose stop")
-        for name in (*harnesses, "t3-native"):
+        for name in ("t3", "t3-native", "t3-web", "aiagent-provider-prefix"):
             command = tools / name
             disabled = tools / (name + ".disabled")
             command.rename(disabled)
@@ -298,6 +300,15 @@ def main():
             finally:
                 disabled.rename(command)
             print(f"missing {name}: candidate refused before compose stop")
+
+        os.environ["FAKE_PREFIX_FAIL"] = "1"
+        try:
+            case = root / "invalid-provider-seed"
+            case.mkdir()
+            exercise(case, probe(), broken=True)
+        finally:
+            os.environ.pop("FAKE_PREFIX_FAIL")
+        print("invalid provider seed: candidate refused before compose stop")
 
         for mode in ("exit", "wrong"):
             case = root / ("t3-" + mode)
@@ -324,19 +335,7 @@ def main():
         assert subprocess.run(probe(mode="--live")).returncode != 0
         print("deployed readiness required a live HTTP server and rejected its shutdown")
 
-        pi = tools / "pi"
-        pi.rename(tools / "pi.disabled")
-        fallback = binaries / "pi"
-        fallback.write_text("#!/bin/sh\nexit 0\n")
-        fallback.chmod(0o755)
-        try:
-            case = root / "pi-fallback"
-            case.mkdir()
-            exercise(case, probe(), broken=True)
-        finally:
-            fallback.unlink()
-            (tools / "pi.disabled").rename(pi)
-        print("Pi fallback in /usr/bin: candidate refused before compose stop")
+        print("candidate and live readiness accepted optional provider uninstalls")
 
         for name, postapply in (("accepted", False), ("postapply-failure", True)):
             case = root / name

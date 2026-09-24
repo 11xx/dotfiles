@@ -16,7 +16,7 @@ export PATH="/run/privileged/bin:$home/.guix-profile/bin:/run/current-system/pro
 
 die() { printf 'aiagent: %s\n' "$*" >&2; exit 1; }
 usage() {
-    printf '%s\n' 'usage: aiagent {status|logs|shell|exec|build|update [--verbose]|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
+    printf '%s\n' 'usage: aiagent {status|providers|logs|shell|exec|build|update [--verbose]|provider-reseed [--verbose]|start|stop|restart|recreate|cache-size|cache-clean} [arguments]'
 }
 mutate() {
     exec "$operator" "$@"
@@ -32,10 +32,11 @@ cmd=${1:-}
 [[ $# -eq 0 ]] || shift
 case "$cmd" in
     status) status ;;
+    providers) (($# == 0)) || die 'providers accepts no arguments'; exec "$podman" exec "$container" /usr/local/bin/aiagent-provider-prefix status ;;
     logs) exec "$podman" logs "$@" "$container" ;;
     shell) exec "$podman" exec -it "$container" bash -l ;;
     exec) (($# > 0)) || die 'exec requires a command'; exec "$podman" exec "$container" "$@" ;;
-    update) [[ $# -eq 0 || $# -eq 1 && $1 == --verbose ]] || die 'update accepts only --verbose'; mutate "$cmd" "$@" ;;
+    update|provider-reseed) [[ $# -eq 0 || $# -eq 1 && $1 == --verbose ]] || die "$cmd accepts only --verbose"; mutate "$cmd" "$@" ;;
     build|start|stop|restart|recreate|cache-clean) (($# == 0)) || die "$cmd accepts no arguments"; mutate "$cmd" ;;
     cache-size) du -sh "$home/cache" ;;
     *) usage; exit 2 ;;

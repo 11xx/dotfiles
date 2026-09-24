@@ -169,6 +169,8 @@ def command_for(operation, verbose=False):
                 "--file", str(context / "Containerfile"), str(context)]
     if operation == "update":
         return [str(HOME / ".local/bin/aiagent-update")] + (["--verbose"] if verbose else [])
+    if operation == "provider-reseed":
+        return [str(HOME / ".local/bin/aiagent-update"), "--provider-reseed"] + (["--verbose"] if verbose else [])
     if operation == "start":
         if subprocess.run([PODMAN, "image", "exists", IMAGE]).returncode != 0:
             raise RuntimeError(f"local image is absent: {IMAGE}")
@@ -185,8 +187,9 @@ def command_for(operation, verbose=False):
 
 def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and
-                                     sys.argv[1:] != ["update", "--verbose"]):
-        raise RuntimeError("expected one operation; update accepts --verbose")
+                                     sys.argv[1:] not in (["update", "--verbose"],
+                                                          ["provider-reseed", "--verbose"])):
+        raise RuntimeError("expected one operation; update and provider-reseed accept --verbose")
     with LOCK.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         wait_for_previous()
@@ -196,7 +199,7 @@ def main():
             return 0
         operation = sys.argv[1]
         return run(command_for(operation, verbose=len(sys.argv) == 3), project=operation in
-                   {"start", "stop", "restart", "recreate", "update"})
+                   {"start", "stop", "restart", "recreate", "update", "provider-reseed"})
 
 
 if __name__ == "__main__":
