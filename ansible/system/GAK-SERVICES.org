@@ -155,7 +155,17 @@ Before removing the tracked workstation command during the live cutover, let
 the new operator role install it at the same path:
 
 #+begin_src sh
-ansible-playbook gak.yaml --limit localhost --tags gak-aiagent-operator
+ansible-playbook -i localhost, gak.yaml --limit localhost --tags gak-aiagent-operator
+#+end_src
+
+The ordinary =hosts= inventory has no =localhost= entry. The standalone
+host-list inventory targets the controller play without adding localhost to
+the remote inventory. Preview the selected operator task without executing
+it with:
+
+#+begin_src sh
+ansible-playbook -i localhost, gak.yaml --limit localhost \
+  --tags gak-aiagent-operator --list-tasks
 #+end_src
 
 Compare the installed command with the collection artifact before integrating
