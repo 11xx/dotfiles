@@ -4,14 +4,16 @@
 Ansible for the three machines that make up the household: a desktop, a home
 server, and the Pi that answers DNS for both.
 
-This tree is the source of truth. It used to be tangled out of this file, which
-stopped paying: templates, static shell fragments, a Guix channel and encrypted
-vaults do not survive a round trip through an Org mirror, and the mirror drifted
-out of date every time something was fixed in a hurry. Edit the tree directly.
+This tree owns machine inventories, host compositions, media application roles,
+and host-specific selections. Plain files and templates are maintained directly;
+Org documents describe operational boundaries.
 
-One exception survives: the AI agent host role is still tangled from its own Org
-file, which is where its reasoning lives. Check for a sibling Org document
-before editing a role by hand.
+The =ai-agent-remote= project owns the portable agent workload, workstation
+operator command, shared Compose runtime and Guix/Gitolite concern modules.
+This tree selects the =ai_agent.remote= roles and retains host-specific
+inventory, media declarations, whole-system composition, storage and ingress.
+Build and install the collection with =bin/install-remote-collection= before
+running a play that imports it.
 
 * The machines
 

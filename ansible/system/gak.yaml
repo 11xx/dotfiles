@@ -10,6 +10,17 @@
 # activation task is the only privileged path. The play does have a vault: the
 # media stack's Sonarr API key is in it.
 
+- name: Controller operator command
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  roles:
+    - role: ai_agent.remote.operator
+      vars:
+        ai_agent_remote_operator_install_dir: "{{ ansible_facts['user_dir'] }}/.local/bin"
+      tags: ['gak-aiagent', 'gak-aiagent-operator']
+
 # Guix System ships no Python, and Ansible needs one on the target before it can
 # run a single module. Without this play, reaching a rebuilt gak means logging in
 # and installing it by hand first.
@@ -66,6 +77,16 @@
       tags: ['always']
 
   roles:
+    - role: ai_agent.remote.guix
+      vars:
+        ai_agent_remote_guix_module_dir: "{{ guix_config_dir }}/modules/aiagent"
+      when: gak_aiagent_host_enabled | bool
+      tags: ['guix', 'guix-system']
+    - role: ai_agent.remote.gitolite
+      vars:
+        ai_agent_remote_gitolite_module_dir: "{{ guix_config_dir }}/modules/aiagent"
+      when: gak_git_hub_enabled | bool
+      tags: ['guix', 'guix-system']
     - { role: guix_config, tags: ['guix'] }
     - { role: shell, tags: ['shell'] }
     - { role: gak_media, tags: ['gak-media'] }
@@ -78,7 +99,18 @@
     - { role: gak_recyclarr, tags: ['gak-media', 'gak-recyclarr'], when: "'recyclarr' in gak_applications" }
     - { role: gak_koito, tags: ['gak-services', 'gak-koito'], when: "'koito' in gak_applications" }
     - { role: gak_nextcloud, tags: ['gak-services', 'gak-nextcloud'], when: "'nextcloud' in gak_applications" }
-    - { role: gak_compose, tags: ['gak-services', 'gak-compose'] }
+    - role: ai_agent.remote.compose_runtime
+      vars:
+        ai_agent_remote_compose_home: "{{ ansible_facts['user_dir'] }}"
+        ai_agent_remote_compose_services_root: "{{ ansible_facts['user_dir'] }}/services"
+        ai_agent_remote_compose_operator_bin_dir: "{{ gak_services_bin_dir }}"
+        ai_agent_remote_compose_package_source_dir: "{{ guix_home_config_dir }}/packages"
+        ai_agent_remote_compose_application_names: "{{ gak_applications }}"
+        ai_agent_remote_compose_autostart_names: "{{ gak_compose_autostart }}"
+        ai_agent_remote_compose_supported_names: "{{ gak_compose_supported }}"
+        ai_agent_remote_compose_never_autostart_names: "{{ gak_compose_never_autostart }}"
+        ai_agent_remote_compose_external_network_names: "{{ gak_compose_external_networks }}"
+      tags: ['gak-services', 'gak-compose']
     - { role: gak_ingress, tags: ['gak-services', 'gak-ingress'] }
 
   post_tasks:
@@ -145,4 +177,8 @@
       tags: ['gak-aiagent']
 
   roles:
-    - { role: gak_aiagent, tags: ['gak-aiagent'] }
+    - role: ai_agent.remote.agent
+      vars:
+        ai_agent_remote_agent_home: /home/aiagent
+        ai_agent_remote_agent_t3_port: "{{ gak_t3_port }}"
+      tags: ['gak-aiagent']

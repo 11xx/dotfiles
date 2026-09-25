@@ -1,7 +1,0 @@
----
-gak_compose_services_root: "{{ ansible_facts['user_dir'] }}/services"
-gak_compose_declared_file: "{{ gak_compose_services_root }}/.compose-applications"
-gak_compose_autostart_file: "{{ gak_compose_services_root }}/.compose-autostart"
-gak_compose_supported_file: "{{ gak_compose_services_root }}/.compose-supported"
-gak_compose_never_autostart_file: "{{ gak_compose_services_root }}/.compose-never-autostart"
-gak_compose_networks_file: "{{ gak_compose_services_root }}/.compose-networks"

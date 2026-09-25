@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-if [[ $# -eq 2 && $1 == /usr/local/bin/aiagent-readiness && $2 == --candidate ]]; then
-    exec /usr/local/bin/aiagent-provider-prefix check-seed
-fi
-exec /usr/local/bin/aiagent-provider-prefix ensure

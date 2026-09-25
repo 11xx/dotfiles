@@ -1,4 +1,0 @@
-#!/bin/sh
-# Source-tree fixture runner; package tests use the built Guix executable.
-exec "${GAK_SERVICES_HOME_PROFILE:?fixture profile required}/bin/python3" -I \
-    "${GAK_SERVICES_IMPLEMENTATION:-${0%/*}/../files/gak-services.py}" "$@"

@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-exec pi --print --tools read,grep,find,ls "$@"
