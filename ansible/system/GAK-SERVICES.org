@@ -13,9 +13,10 @@ are owned by the login user.
 =gak_compose_autostart= list. It also supplies =gak_compose_supported=,
 =gak_compose_never_autostart= and =gak_compose_external_networks=. The
 autostart list may select declared web applications and Nextcloud, but never
-the Recyclarr batch job. Ansible writes the five instance lists, the lifecycle
-helper and the updater package sources under the login user's home.
-Guix Home installs the update command. The
+the Recyclarr batch job. The =ai_agent.remote.compose_runtime= collection role deploys the five
+instance lists, shared lifecycle helper and updater package sources under the
+login user's home. Guix Home installs the update command from those sources.
+The
 lifecycle helper requires =.compose-supported=, =.compose-applications=,
 =.compose-autostart=, =.compose-never-autostart= and =.compose-networks= in
 the services root. Every file uses one name per line and may be empty.
@@ -37,186 +38,25 @@ runs on. Tailscale owns ingress.
 
 * Agent host instance
 
-The =aiagent= service is declared by the =aiagent host= Guix module under
-=~/.config/guix/modules=. It owns a separate account, image-backed home,
-runtime directory and capped cgroup. The =gak-aiagent= inventory entry reaches
-that account with a dedicated operator-held key. The =gak_aiagent= role installs
-its private Podman configuration, the shared lifecycle helper and the =agent=
-project. The account's Podman state and temporary data remain inside its home
-image. First image creation requires 256 GiB for the image plus a 128 GiB host
-reserve for operator services. A failed creation removes its temporary image;
-a later start removes any candidate left by interruption before checking
-space. Formatting eagerly initializes the ext4 inode tables and journal so
-kernel initialization cannot release backing-file extents after mount. If an
-existing image has holes, ordinary =fallocate= restores their reservation
-without changing file data, provided free space covers the missing bytes plus
-the 128 GiB host reserve. Its =containers.conf= selects cgroupfs and =cgroups = "split"=, so the
-service and SSH session cgroups determine placement for containers and builds.
-The =aiagent= command moves project mutations into the service's =cli= leaf
-before invoking Podman; read-only commands stay in their invoking session.
-The CLI leaf is removed when empty and remains while its container runs.
-Shepherd keeps the mounted home as a running service. Runtime and cgroup
-setup are one-shots with no teardown. Each prerequisite must finish before
-the Compose helper starts. Home creation and unmount share a root-only lock;
-a second start waits at most five minutes, then validates the first mount or
-fails. Allocation, formatting, fsck, mount and unmount have separate deadlines
-of ten, five, twenty, two and two minutes. An expired command's process group
-receives KILL at its deadline.
-Stopping Compose lets its helper exit, then kills any remaining process in the
-service cgroup. Stopping the home first stops Compose, asks Podman as aiagent
-to stop all containers with ten seconds per container and a three-minute
-overall bound, then writes to the
-delegated subtree's =cgroup.kill=, terminating every aiagent process including
-SSH sessions. It waits up to one minute for =cgroup.events= to report
-=populated 0= before unmounting; a populated subtree fails the stop with
-remaining PIDs reported. A queued home stop is bounded by five minutes for the
-lock, three for Podman, one for cgroup drain and two for unmount: eleven minutes
-for the home action. The full stop chain has forty-two minutes of configured
-waits: Compose's thirty-minute helper grace and one-minute service drain,
-followed by the home action. These bounds exclude an already-running start.
-An incomplete Podman stop still proceeds to the forced drain.
-An empty drain removes descendant cgroups, including Podman's runtime group
-and stale SSH leaves, while preserving the delegated and service roots.
-Populated cgroups remain in place. This lets the same Podman container start
-after a stop and home remount without changing its persistent runroot.
-Before Compose starts, the agent instance checks recorded running payload and
-conmon PIDs. It asks Podman to stop a stale container with zero grace, then
-requires its running record to clear. Healthy containers and their writable
-layers are left alone. This check is confined to aiagent's Podman store; the
-media instance has no corresponding startup step.
-The delegated directory belongs to aiagent; its parent
-=/sys/fs/cgroup/aiagent= and each =cgroup.kill= file belong to root.
+The =gak-aiagent= inventory target keeps its own =aiagent= account and mounted
+home. The =ai_agent.remote.agent= role installs the workload, while
+=ai_agent.remote.operator= installs the existing workstation command at
+=~/.local/bin/gak-aiagent=. The agent and media instances install the same
+=compose_runtime= role into their separate accounts.
 
-A busy unmount can leave Shepherd reporting =aiagent-home= stopped while
-=findmnt /home/aiagent= still reports a mount. Check the mount directly,
-clear the processes holding it, run =sudo herd start aiagent-home= to restore
-Shepherd's running record, then retry =sudo herd stop aiagent-home=. The
-Compose helper is stopped before home stop is attempted.
-The host account retains tailscaled's non-operator read-only local API access.
-The Guix module does not change Tailscale. The agent container must exclude
-host runtime paths, including the Tailscale socket.
+The =gak_aiagent_host_enabled= and =gak_git_hub_enabled= selections control
+whether the host and Gitolite Guix modules are staged and imported. The full
+system composition remains here; the collection owns those concern modules
+and their package tests. Build the rendered system expression before the
+explicit activation step. The workload's operator commands, provider state,
+update boundary, root backup, Gitolite policy and recovery procedures are
+maintained in =ai-agent-remote/docs/operations.org= and
+=ai-agent-remote/docs/architecture.org=.
 
-Deploy the Guix configuration and module through the =gak= play, build with
-=-L ~/.config/guix/modules=, then activate and reboot under operator control.
-Run =ansible-playbook gak.yaml --tags gak-aiagent= after the home is mounted.
-The agent play installs its own Python and Compose provider before using
-Ansible modules. Its next run should report zero changes. The module and host
-details are documented in
-[[file:aiagent.org][aiagent.org]].
-
-The =agent= project runs =localhost/aiagent-fedora:44-v1=, built by =aiagent
-build= from the context under =/home/aiagent/image=. It has no Compose build
-step. =ansible-playbook gak.yaml --limit gak-aiagent --tags gak-aiagent-image=
-deploys the build context and command without changing the running project
-lists. Run =aiagent build= in an aiagent SSH session. Stop =aiagent-compose=
-before deploying the full agent role, then start it. These Shepherd actions belong to the
-operator. =aiagent status= and =logs= show the workload; =shell= and =exec=
-enter it. =start=, =stop=, =restart= and =recreate= are deliberate
-account-local container actions. =cache-size= and =cache-clean= cover only
-the disposable cache mount. The persistent container home holds harness and
-T3 state, and the workspace mount holds project work. The cache target is
-32 GiB within the 256 GiB home image; the operator checks its size and clears
-it explicitly. Logins happen inside the container under the operator's
-control. Pi's interactive =/login= menu and print mode use the image's
-pinned upstream Node executable.
-The image pins T3 Code v0.0.42. Its foreground supervisor starts the native
-server in an owned process group on each container start and restarts it two
-seconds after an exit. Compose gives the container forty-five seconds to stop.
-The supervisor asks the native server to exit, waits forty seconds for its group, then
-terminates survivors within three more seconds. Processes that create separate
-groups are outside that cleanup boundary. A container stop can interrupt active
-T3 work. A group signal after the grace window prints a warning and makes the
-supervisor exit 124; a graceful stop exits zero. An unexpected T3 restart
-leaves separate terminal sessions running.
-The account stop helper checks the exact pre-stop container ID and the current
-name after Compose returns. A nonzero exit or unverifiable identity halts restart,
-recreate, update and provider repair before a backup or replacement; the agent may remain
-stopped for inspection. A previously stopped or absent project may still be
-updated or restarted, with any prior exit reported as historical.
-On an operator workstation, install =.local/bin/gak-aiagent= on =PATH=. Run
-=gak-aiagent status=, =providers=, =shell=, =restart= or =update= to forward to the
-account-local manager. =shell= requires a terminal. Set
-=GAK_AIAGENT_SSH_TARGET= and =GAK_AIAGENT_SSH_KEY= when the default
-=aiagent@gak= and =~/.ssh/gak_aiagent= do not apply. The workstation needs
-Python 3 and OpenSSH; T3 actions also need tailnet access.
-=gak-aiagent update --verbose= streams both direct build streams and verified stop output,
-and enables the shared updater's readiness hook output. The hook output may
-contain private data; inspect it before sharing. Raw Compose provider diagnostics
-remain redacted unless =GAK_SERVICES_SHOW_PROVIDER_ERRORS= is separately set,
-which can expose expanded environment. The default update captures routine
-build stdout and stderr and prints named phases and a final result. A failed or
-timed-out build prints a bounded tail of both streams and a =--verbose= retry
-hint; other lifecycle warnings remain visible. Backup waiting reports elapsed time every
-minute. An identical image is reported as unchanged; configuration application
-and readiness still run.
-
-The image provides a pinned first-install npm seed for Claude, Codex,
-OpenCode, Pi and npm-check-updates. The selected, user-owned npm prefix lives
-in =container-home= and survives container replacement. A start validates it
-without replacing explicit updates or reinstalls. The fixed server and login
-PATH selects its commands before system paths and excludes unrelated home bins;
-the image-owned Pi shim uses the selected Pi package with pinned upstream Node.
-=gak-aiagent providers= reports selected and image seed versions without
-reading authentication state. In =gak-aiagent shell=, =ncu -g= discovers global
-updates in the selected prefix. Its packages are =@anthropic-ai/claude-code=,
-=@openai/codex=, =opencode-ai=, =@earendil-works/pi-coding-agent= and
-=npm-check-updates=. For example, =npm install -g @openai/codex@latest=
-selects a release and =npm uninstall -g @openai/codex= leaves it absent.
-No provider version upgrades automatically at container start. T3's Claude,
-Codex and OpenCode update actions use
-their npm-managed selected executables; clear any explicit provider Binary path
-outside the prefix before using those actions. The image's T3 service and OS
-packages remain image-owned. An intentional harness uninstall persists and
-cannot fall back to an older image executable.
-
-=gak-aiagent provider-reseed= explicitly replaces a broken selected prefix
-with the accepted local image's pinned seed. It holds the account operation
-lock, stops Compose, requests the root Restic snapshot, runs a disposable
-network-isolated container with only =container-home= mounted, then starts the
-project and checks readiness. The previous prefix is retained under
-=npm.before-reseed-*=. Reseeding can select versions older than user updates;
-inspect that retained prefix and the backup before removing either. Ordinary
-startup does not reseed.
-
-=gak-aiagent t3 open= opens the canonical HTTPS origin in the desktop browser.
-=gak-aiagent t3 pair [label]= displays a five-minute, single-use link and a
-terminal QR code for an additional client. The operator initiates pairing;
-the command does not open the link. =qrencode= provides the QR code; the link
-remains usable without it. The command obtains the named service origin from
-Gak's read-only =tailscale status --json= and uses service name =t3=. Set
-=GAK_AIAGENT_T3_SERVICE= for another named service, or
-=GAK_AIAGENT_T3_URL= to an explicit HTTPS origin when discovery does not
-apply. An explicit origin accepts ASCII DNS names, IPv4 addresses or bracketed
-IPv6 addresses, an optional port and one trailing slash. Host case and the
-default HTTPS port are normalized before pairing; paths, credentials, queries
-and fragments are invalid. Keep private origins in local environment
-configuration. Pairing uses
-the same =/home/node/.t3/userdata= directory as the running server. A new
-link is required for each client or expired attempt; no token is stored by the
-workstation command. T3 client sessions reside in =container-home=, which is
-mounted across runtime restart, recreation and update. Verify browser
-reconnection after those actions and after a cold reboot before relying on
-client persistence.
-Compose publishes container port 3773 at =127.0.0.1:gak_t3_port= only. The
-shared inventory value =gak_t3_port= renders both the agent's Compose project
-and the host's Tailscale backend. Before running =gak-tailscale-services=,
-check the local T3 response and the existing =tailscale serve get-config --all=
-result. The tailnet administrator defines and approves the T3 service, then
-grants access to the intended clients. Pair the phone and workstation in T3;
-pairing state lives in =container-home=. Check HTTPS, WebSockets, refusal of an unpaired
-client, and reconnection after a phone network change from tailnet clients.
-The image-owned Pi shim and selected user-owned npm prefix precede system paths;
-unrelated home executable directories are excluded.
-A later mutation waits for the recorded foreground process session when the
-invoking shell or worker dies; the root backup job checks the same session before
-quiescing Compose. Detached container processes do not retain the lock.
-=aiagent restart= stops and starts Compose within one recorded worker, so the
-loopback listener is released before it is bound again.
-Candidate update readiness checks the image-owned T3 service and pairing
-commands and a complete pinned provider seed, then starts a temporary T3
-server in the network-isolated image. Project readiness checks the selected
-prefix state and supervised T3 server against the persistent home. Optional
-harness uninstalls do not block an image update.
+The first host retains the existing =/home/aiagent= image-backed account,
+container-home, workspaces, cache, rootless Podman maps, loopback T3 port and
+image channel. An extraction apply does not update providers, copy mutable
+state, or start or stop the running project.
 
 * Storage and namespaces
 
@@ -249,47 +89,11 @@ not share application state or networks across those boundaries.
 
 * Boot and ordinary operations
 
-The stable Shepherd service is =gak-compose=. It runs the helper as =lobo=,
-with the user's home, runtime directory, profile PATH and supplementary groups
-already set. The PATH puts =/run/privileged/bin= first so rootless
-=newuidmap= and =newgidmap= resolve through the privileged wrappers. It waits
-for =/marak=, =/media=, rootless Podman cgroup services, elogind and networking.
-It also requires the synchronous root one-shot =gak-operator-runtime=.
-Elogind alone creates =/run/user/1000= for the lingering operator. The
-prerequisite polls at one-second intervals with a three-minute deadline for a
-directory owned by UID 1000 with mode 0700. Elogind normally mounts a tmpfs
-there; when a tmpfs mount is denied, it keeps a plain directory with the same
-owner and mode. Both forms support the operator's private runtime state.
-Thirty seconds without readiness triggers one idempotent =loginctl
-enable-linger lobo= request; each check and that request have a five-second
-command bound. The wait gives elogind time to finish user initialization
-while keeping a stalled boot bounded. Missing paths and ownership or mode
-mismatches remain pending until the deadline; the failure reports the last
-observed state and whether the path was a mount or a plain directory. The
-prerequisite never creates or mounts the path. If the wait expires, check
-=loginctl show-user lobo -p Linger -p RuntimePath= and the runtime directory,
-then recover with =sudo herd enable gak-compose && sudo herd
-start gak-compose=. Operator linger keeps elogind's user record active across
-ordinary logouts; the runtime directory is cleared with =/run= on reboot.
-The helper keeps ownership state, its lock and its readiness marker under
-=${XDG_RUNTIME_DIR}/gak-compose=, reconciles stale recorded stacks after a
-crash, records ownership before each Compose start so partial projects are
-recoverable, and stops that recorded set in reverse order. An empty list starts
-no projects. Web containers use Podman restart policies; there are no per-container
-Shepherd respawns. Recyclarr is never booted.
-
-The helper's long-lived process is intentional: Shepherd's stop destructor
-sends SIGTERM to it and waits while the helper runs Compose's graceful stop
-commands. Shutdown selects containers by the Compose working-directory label,
-regardless of their project or container names. An empty result for a recorded
-project is logged and treated as already stopped; a failed query retains the
-ownership record. Nextcloud's project data stops
-cron and the frontend before Redis and PostgreSQL.
-The helper never pulls images during boot and never calls sudo.
-
-The lifecycle lock stays in the helper process. Podman commands close that
-descriptor before spawning providers, networking daemons or container monitors,
-so detached descendants cannot retain the lock after the helper exits.
+The host composition retains the stable Shepherd service =gak-compose=.
+=ai_agent.remote.compose_runtime= deploys its lifecycle helper and
+Compose policy lists; system.scm selects the existing operator user,
+PATH, mount and cgroup prerequisites. Boot selection remains an explicit list.
+Recyclarr is never in that list, and an empty list starts no projects.
 
 Inspect the integration and containers as follows:
 
@@ -300,26 +104,24 @@ podman network ls
 podman logs CONTAINER
 #+end_src
 
-Run an individual project with the ordinary Compose interface:
+Run an individual media project with the ordinary Compose interface:
 
 #+begin_src sh
 podman compose -f ~/services/sonarr/compose.yaml pull
 podman compose -f ~/services/sonarr/compose.yaml up -d --force-recreate --pull never
+podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr
 #+end_src
 
-The explicit pull is the update boundary. =pull_policy: never= prevents an
-ordinary =up= from fetching a missing or changed image. Those two commands are
-the manual form of what =gak-services update= does for a whole project; use them
-directly when working on one project in isolation. Use
-=podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr= for the
-manual batch job.
+The media projects keep their current networks and state paths. The shared
+helper's ownership, shutdown and crash-recovery invariants are maintained in
+=ai-agent-remote/docs/architecture.org=.
 
 * Updating images
 
-=gak-services= updates projects it discovers under =~/services=.
-Every immediate subdirectory holding a =compose.yaml= is a project, named by its
-directory. The definition is the source of truth for image channels and update
-policy; the command carries no list of applications.
+The packaged =gak-services= command uses the Compose files under =~/services=
+as service truth. The shared updater validates projects before pulls, selects
+only running projects for =--all=, preserves stopped projects, and applies
+updates one project at a time. Run:
 
 #+begin_src sh
 gak-services list
@@ -328,140 +130,32 @@ gak-services update --all
 gak-services update sonarr jellyfin
 #+end_src
 
-=list= and =--dry-run= contact no registry, run no hook and recreate nothing.
-
-=--all= selects the discovered projects whose declared services are all running.
-A project that is not running is left alone, because a stopped project is a
-manual or batch one. Naming such a project instead fails: the update command
-never starts something the operator chose to keep down. A project that is only
-partially running is an anomaly rather than a selection, so it fails the
-preflight before anything is pulled and is never healed by an update.
-
-A project's active services are whatever the Compose provider reports for the
-definition, so a service behind an inactive profile is not expected to run, and
-a running container for a service the definition does not declare makes the
-project ambiguous and fails. Project identity is the realpath of the project
-directory, matched against the =com.docker.compose.project.working_dir= label,
-so a container that merely shares a name is never selected.
-
-Every selected project is validated first, then pulled while its containers stay
-up. If any pull fails, nothing is recreated. After the pulls, each project's
-running image IDs are compared with what its declared image references now
-resolve to locally; an unchanged project is skipped unless =--force= is given.
-Changed projects are recreated one at a time with =up -d --force-recreate --pull
-never=, so a multi-container project such as Nextcloud moves as one unit and no
-project is ever torn down globally. A project whose running images moved between
-planning and recreation fails rather than acting on a stale plan.
-
-** Update hooks
-
-A project may declare a small optional top-level =x-update= mapping:
-
-#+begin_example
-x-update:
-  before-update:
-    - /home/USER/.local/bin/APPLICATION-pre-update
-  before-update-timeout: 3600
-  readiness:
-    - /home/USER/services/APPLICATION/readiness
-  readiness-timeout: 120
-#+end_example
-
-The mapping is validated against exactly these four keys before anything is
-pulled. A policy of any other shape -- a scalar, a list, an unknown key, an
-argument that is not a string, a timeout that is a boolean -- is a refusal, not
-something to step over: a policy the operator wrote and the updater ignored is
-the failure that matters here.
-
-=before-update= runs only for a project that is about to be recreated and must
-succeed, or that project is not recreated and the run stops. =readiness= is
-retried until it succeeds or the project's deadline expires. Both are argument
-lists executed directly with the project directory as the working directory and
-=GAK_SERVICES_PROJECT= and =GAK_SERVICES_PROJECT_DIR= in the environment. There
-is no shell, so no quoting, expansion or pipeline is available, and the first
-argument must be an absolute path to an existing executable file. These commands
-run with the operator's own privileges: a Compose file under the services root
-is user-owned executable configuration and is trusted exactly as far as the
-account that deploys it.
-
-Every command the updater runs -- provider, inspection, pull, recreation and
-both hooks -- runs in its own process group under a hard time bound, and one
-that outruns its bound is stopped as a group. The two hooks are bounded
-separately because they are different work: a readiness probe is expected to
-answer in seconds and is retried, while a gate that takes a database backup
-legitimately runs for a long time and gets =before-update-timeout= to itself.
-The update lock is held until every such child has been stopped.
-Termination allows a ten-second cleanup grace before killing remaining children.
-Provider and hook output is private by default. =GAK_SERVICES_SHOW_PROVIDER_ERRORS=1
-and =GAK_SERVICES_SHOW_HOOK_OUTPUT=1 enable explicit diagnostics that may contain
-secrets; do not capture or share those diagnostics without inspection.
-
-** Readiness and its limit
-
-After recreation the updater requires every declared service to have a container
-that is running the image the plan chose and that holds still across a settle
-period. Checking the image identity is what separates a recreation from a
-recreation that quietly kept what was already there.
-
-Podman schedules container healthchecks through systemd timers, which this host
-does not run, so a healthcheck-bearing image reports =starting= indefinitely
-here. Health status is therefore never consulted. Without a declared =readiness=
-command, running the planned image is the whole assurance: it is process
-liveness on the intended image, not application readiness, and migrations,
-database connectivity and HTTP behaviour are not covered by it. A project that
-needs the stronger statement declares its own readiness command, as Nextcloud
-does. Readiness failure stops the run with a summary; the remaining projects are
-left untouched.
-
-Nextcloud's readiness command parses its loopback =status.php= response and
-requires =installed=true=, =maintenance=false= and =needsDbUpgrade=false=.
-
-** The declared runtime
-
-Guix Home installs the local =gak-services= package into its profile, making the
-command available through =~/.guix-home/profile/bin=. The package owns an
-immutable launcher and implementation, with exact store references to Python and
-PyYAML. It requires no profile initialization or ambient Python module paths.
-
-The maintained recipe and implementation live in =roles/gak_compose/files=.
-Ansible deploys them under =~/.config/guix-home/packages=; the Home declaration
-loads that recipe directly. This is a local package, so changing its sources
-requires no channel publication or =guix pull=. Build and activate with:
-
-#+begin_src sh
-guix build -f ~/.config/guix-home/packages/gak-services.scm
-guix home reconfigure ~/.config/guix-home/home-configuration.scm
-gak-services list
-gak-services update --all --dry-run
-#+end_src
-
-The runtime selects the Home Compose provider and the host's rootless Podman.
-Privileged mapping helpers lead PATH for cold user-namespace creation. Inherited
-Compose scoping variables cannot change the selected project or its profiles.
-The separate Nextcloud readiness command uses Home's Python standard library;
-PyYAML is a private dependency of the updater package.
-
-Home reconfiguration updates operator tooling, not application images. Image
-updates remain explicit rootless Compose operations. Ansible's bootstrap Python
-stays pinned to its independent user-profile interpreter.
-
-** Concurrency and recovery
-
-The update command takes its own lock under =${XDG_RUNTIME_DIR}/gak-services=,
-distinct from the boot helper's lifecycle lock, and closes that descriptor for
-every child so a detached Podman descendant cannot retain it. It excludes a
-second update run, not Compose commands typed by hand against the same project;
-that remains an operational limit rather than a guarantee.
-
-Nothing is rolled back, pruned or pinned automatically. Previous images stay in
-local storage for recovery, and the summary reports the before and after image
-ID of every selected service so the previous identity is recorded. Putting the
-previous image back is not a rollback for an application that has already
-migrated its schema; for those, the pre-update snapshot is the way back.
+The command's process bounds, readiness contract, diagnostics and recovery
+limits are documented in =ai-agent-remote/docs/operations.org=. Media image
+channels and project-specific update hooks remain in each application role.
+Nextcloud's existing backup command remains its =before-update= gate, and its
+readiness command still requires a healthy application status response.
 
 * Deployment and activation
 
 Run from this directory:
+
+#+begin_src sh
+AI_AGENT_REMOTE_COLLECTION_SOURCE=/path/to/ai-agent-remote \
+  ./bin/install-remote-collection
+#+end_src
+
+Before removing the tracked workstation command during the live cutover, let
+the new operator role install it at the same path:
+
+#+begin_src sh
+ansible-playbook gak.yaml --limit localhost --tags gak-aiagent-operator
+#+end_src
+
+Compare the installed command with the collection artifact before integrating
+the source deletion. The new command keeps the =gak-aiagent= path and interface.
+
+Then validate and deploy the reviewed collection roles:
 
 #+begin_src sh
 ansible-playbook gak.yaml --syntax-check
@@ -469,22 +163,22 @@ ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose --check
 ansible-playbook gak.yaml --tags guix,gak-media,gak-services,gak-compose
 #+end_src
 
-The =gak_compose= role carries executable fixtures for the helper and the
-update command. They use a Podman stand-in and throwaway project directories,
-and touch no container, image or backup:
+Portable updater and lifecycle suites live with the collection. Consumer
+fixtures render the installed collection through the Gak media roles and
+validate host-specific selections:
 
 #+begin_src sh
-roles/gak_compose/tests/lifecycle.bash
-roles/gak_compose/tests/lifecycle-instance.bash
-roles/gak_compose/tests/services-update.bash
-roles/gak_compose/tests/services-environment.bash
-roles/gak_compose/tests/services-provider.bash
-roles/gak_compose/tests/nextcloud-extension.bash
-roles/gak_compose/tests/nextcloud-readiness.bash
-roles/gak_compose/tests/autostart-validation.bash
-python3 roles/gak_compose/tests/list-render.py
-python3 roles/gak_compose/tests/services-safety.py
+python3 tests/gak/list-render.py
+tests/gak/autostart-validation.bash
+tests/gak/nextcloud-extension.bash
+tests/gak/nextcloud-readiness.bash
+python3 tests/gak/t3-port-render.py
+python3 tests/gak/module-selection.py
 #+end_src
+
+Set =AI_AGENT_REMOTE_COLLECTION_ROOT= to the installed collection root for
+these commands. =TMPDIR= should point to task-owned scratch under the user's
+home.
 
 A fixture that needs a tool the machine lacks exits 77 and says so.
 
@@ -533,16 +227,17 @@ sudo herd status gak-compose
 podman ps -a
 #+end_src
 
-Building Guix programs does not execute their root-only paths. With the
-=aiagent= account present, stage and run the =guix_config= role's
-=tests/aiagent-root-path.py= on gak against the staged module directory before
-reconfiguring. The role README gives the command. The probe redirects cgroup,
-home and helper targets into scratch and uses =podman unshare= for real Guile
-privilege-drop calls. It executes the runtime lock's descriptor operations and
-both cgroup drain modes. Its cgroup files are ordinary scratch files, its
-post-drop paths use preopened descriptors, and successful mount and unmount
-results are mocked. It does not prove kernel delegation, production path
-traversal or host-root mount capability.
+Building Guix programs does not execute their root-only paths. Portable module
+probes live in =ai-agent-remote/tests/guix= and use disposable targets. The
+Gak-specific operator runtime test remains in =tests/gak=:
+
+#+begin_src sh
+python3 tests/gak/gak-operator-runtime.py \
+  ~/.config/guix/system.scm ~/.config/guix/modules
+#+end_src
+
+It uses =podman unshare= for Guile privilege-drop calls and does not activate a
+Guix generation.
 
 Use =umask 022= for activation so generated host files remain readable by
 unprivileged services. A backup process's restrictive umask must not carry
@@ -668,45 +363,10 @@ either snapshots first or recreates nothing.
 =nextcloud-db= container for its isolated scratch database, validates real
 application tables and removes only its own scratch state.
 
-The =aiagent= instance uses its own Guix-profile copy of =gak-services=.
-=aiagent update= builds and tests a local candidate without mounting the
-persistent state. The candidate and the running project execute the same
-image-owned readiness file with the same shell and PATH. The update then stops
-the agent project, waits for the root job's
-consistent Restic snapshot, then applies the exact prepared image ID without a
-pull. A temporary Compose override pins that ID while the container starts;
-the declared tag moves after readiness. Its readiness command runs inside the
-recreated container. The prior
-image remains pinned until recovery is no longer needed. A failed candidate
-probe leaves the running container untouched; a failure after recreation
-requires inspection of the snapshot before any manual rollback because
-persistent state may have changed.
-Selected npm provider versions are persistent state. Rebuilding or rolling back
-the image does not alter them; an explicit =provider-reseed= selects the accepted
-image's pinned provider seed after a stopped backup.
-
-For an image rollback, inspect the recovery snapshot and persistent state
-first. The failed update reports a =localhost/gak-services-previous:*= tag and
-the previous image ID. Verify that the tag resolves to that ID. If the state
-remains compatible with the previous image, run =aiagent stop= as the agent
-account, tag that previous image as =localhost/aiagent-fedora:44-v1=, and run
-=aiagent recreate=. Check the project's readiness and the harness logins.
-When the new image migrated persistent state, restore the recovery snapshot
-before starting the previous image; changing a tag cannot reverse a migration.
-
-The root backup declaration requires =/etc/aiagent/restic-password= as a
-root-owned mode-0600 file. Its repository at
-=/marak/backups/aiagent/restic= is root-owned. The job stores =workspaces= and
-=container-home=, with seven daily, five weekly and twelve monthly snapshots.
-The minute job publishes its result from root-owned runtime storage; daily
-backup and restore check reject a surviving agent operation before stopping
-Compose. Stop failures and termination signals settle active child processes
-and trigger bounded home and Compose recovery before releasing the lock.
-The daily run quiesces the Compose service. A restore check stops the service,
-takes a fresh snapshot and writes its scratch tree under the root-owned
-=/marak/backups/aiagent= directory; it compares file checksums and paths, removes the tree
-and starts the service. The HDD copy
-is local recovery and does not constitute an off-host copy.
+Agent image updates, provider state, root backup and rollback are documented
+in =ai-agent-remote/docs/operations.org=. The host's private password,
+repository location, retention values and mutable backup state remain in the
+Gak configuration and on the host.
 
 Removing an application from =gak_applications= controls role execution and
 the generated declared list. It does not erase state, remove a network or
@@ -715,73 +375,10 @@ project and retain a verified backup before separate removal.
 
 * Agent Git exchange
 
-The =agentgit= account owns Gitolite under =/var/lib/agentgit=. Its private
-group and Gitolite umask prevent =aiagent= from reading the hub's storage on
-the host or in its container. The operator's public key initializes the
-administrative identity. The agent uses a separate hub key generated inside
-its persistent container home; its private key stays on gak. The Gitolite
-policy in [[file:roles/guix_config/files/git-hub/gitolite.conf][gitolite.conf]]
-gives =operator= full access to =arc= and =gitolite-admin=, while =aiagent=
-can read =arc= and write only =refs/heads/agent/*=. The account's Git
-configuration rejects incoming pack streams above 32 MiB; this is a per-push
-compressed transfer limit, not a repository quota. Ref policy is checked by
-Gitolite before ref updates.
-
-Apply the Guix system module and confirm the root-owned lock directory, file
-and =/etc/git-hub= trigger before accepting hub pushes or running a hub
-backup. Generate the agent hub key in the persistent container home. Clone
-=agentgit@gak:gitolite-admin= using the operator key,
-place the policy at =conf/gitolite.conf= and the agent's public key at
-=keydir/aiagent.pub=, then commit and push. The key's private half never
-enters the administrative repository. The operator seeds =arc= from the
-workstation checkout, then adds a hub remote there with a fetch refspec for
-=refs/heads/agent/*= into =refs/remotes/<remote>/agent/*=. Agent work occurs
-on an =agent/*= branch; the workstation fetches, reviews and merges it, then
-pushes the integration branch. The agent fetches the resulting history.
-
-The root Restic snapshot includes complete Git bundles for =gitolite-admin=
-and initialized =arc= refs. Gitolite receive commands, including updates to
-the administrative repository, hold the same lock that root backup verifies
-and holds through both bundles and Restic snapshot creation. Bundle writers
-run as =agentgit= through root-opened descriptors.
-
-The receive process retains the lock if its Gitolite parent exits abruptly;
-each original hook descendant also retains it until it closes the descriptor
-or exits. A detached process with an inherited descriptor can hold the lock
-beyond the push. This delays backup rather than permitting concurrent policy
-or project writes.
-
-The restore check imports the bundles into isolated bare repositories as
-=agentgit=, checks all expected refs and HEAD, runs
-=git fsck --full --strict --no-reflogs=, and checks that
-=conf/gitolite.conf= and =keydir= reconstruct from =gitolite-admin=. It
-compares the restored bundles with the snapshot's checksums before importing.
-The snapshot keeps =manifest.json= beside the bundles with expected refs,
-HEADs and administrative file hashes.
-
-If a receive holds the lock for more than five minutes, the root backup fails
-before snapshot creation and follows the agent Compose recovery path.
-Inspect the holder with =sudo lslocks -o PID,COMMAND,PATH= and =sudo fuser -v
-/var/lib/agentgit-lock/receive.lock=. Check active receives, administrative
-updates and hook descendants before terminating a genuinely stuck holder.
-Keep the lock file in place: removing or replacing it would create separate
-lock domains. Retry backup after the holder exits.
-
-For recovery, suspend pushes and restore one Restic snapshot into root-owned
-scratch. Import each bundle into an empty bare repository as =agentgit= with
-=git bundle unbundle=, install its advertised refs with =git update-ref=, set
-its recorded HEAD with =git symbolic-ref=, and run a full fsck. Compare refs
-with the snapshot's recorded set. Check out =conf/gitolite.conf= and =keydir=
-from the restored =gitolite-admin.git= as =agentgit=, compare those files with
-the checked snapshot, then install the reconstructed repositories and
-administrative files into empty destinations in the provisioned hub home.
-Keep its Guix-managed =.gitolite.rc= and =.gitconfig=. Run
-=gitolite setup= under the shared lock to regenerate hooks and access data, then resume
-pushes. Git against the hub's writable repositories runs as =agentgit=,
-never root. A repository with no refs is created by policy and has no bundle.
-
-An administrative =gitolite setup= outside a receive command runs as
-=agentgit= with =flock /var/lib/agentgit-lock/receive.lock gitolite setup=.
-Privileged Guix activation initializes Gitolite before hub pushes or scheduled
-hub backup are admitted. Subsequent reconfigurations that run Gitolite setup
-require those operations to be quiesced for the activation window.
+The =agentgit= account, its private key and repository data remain host-owned.
+The collection provides the Guix module, root-safe receive trigger and policy
+skeleton; the host expression selects Gitolite independently from the agent
+workload. The policy grants the operator administrative control and confines
+agent writes to its work branches. The shared backup lock keeps Gitolite
+receives and repository bundles mutually exclusive. Setup, push, backup and
+restore commands are documented in =ai-agent-remote/docs/operations.org=.

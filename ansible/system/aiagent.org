@@ -1,6 +1,8 @@
 #+PROPERTY: header-args :mkdirp yes
 #+PROPERTY: tangle-dir (expand-file-name "~/ansible/system/roles/aiagent_host_setup/files/")
 
+Historical reference. Active remote implementation and build inputs are maintained as plain source in ai-agent-remote.
+
 * Workstation operator command
 
 The workstation command reaches the account-local =aiagent= manager through

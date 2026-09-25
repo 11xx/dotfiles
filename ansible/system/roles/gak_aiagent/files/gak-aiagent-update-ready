@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-export HOME=/home/aiagent
-export XDG_RUNTIME_DIR=/run/aiagent
-export PATH="/run/privileged/bin:/home/aiagent/.guix-profile/bin:/run/current-system/profile/bin:$PATH"
-exec /run/current-system/profile/bin/podman exec aiagent \
-    /usr/local/bin/aiagent-readiness \
-    >/dev/null

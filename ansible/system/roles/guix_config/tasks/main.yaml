@@ -22,6 +22,13 @@
     - "{{ guix_channel_dir }}/11xx/packages"
   tags: ['guix-system', 'guix-home', 'guix-channel']
 
+- name: 'guix: Create the module load-path directory'
+  ansible.builtin.file:
+    path: "{{ guix_config_dir }}/modules/aiagent"
+    state: directory
+    mode: "0755"
+  tags: ['guix-system']
+
 # gak authorizes ak so it can accept the results of the builds it offloads
 # there. Read from ak on every run rather than written down here, because
 # reinstalling Guix on ak regenerates this key, and a copy in the repository
@@ -64,15 +71,6 @@
     dest: "{{ guix_config_dir }}/system.scm"
     mode: "0644"
   register: guix_system_config
-  tags: ['guix-system']
-
-- name: 'guix: Deploy agent host modules'
-  ansible.builtin.copy:
-    src: modules/
-    dest: "{{ guix_config_dir }}/modules/"
-    mode: "0644"
-    directory_mode: "0755"
-  register: guix_system_modules
   tags: ['guix-system']
 
 - name: 'guix: Remove obsolete agent backup source'
@@ -153,16 +151,18 @@
   vars:
     _stamps: "{{ guix_generations.results | default([]) | map(attribute='stat') | list }}"
     _system_stale: "{{ _stamps[0].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _host_module_stale: "{{ _stamps[2].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _backup_module_stale: "{{ _stamps[3].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _hub_module_stale: "{{ _stamps[4].mtime | default(0) > _stamps[1].mtime | default(0) }}"
-    _hub_hook_stale: "{{ _stamps[5].mtime | default(0) > _stamps[1].mtime | default(0) }}"
+    _host_module_stale: "{{ (gak_aiagent_host_enabled | bool) and (_stamps[2].mtime | default(0) > _stamps[1].mtime | default(0)) }}"
+    _backup_module_stale: "{{ (gak_aiagent_host_enabled | bool) and (_stamps[3].mtime | default(0) > _stamps[1].mtime | default(0)) }}"
+    _hub_module_stale: "{{ (gak_git_hub_enabled | bool) and (_stamps[4].mtime | default(0) > _stamps[1].mtime | default(0)) }}"
+    _hub_hook_stale: "{{ (gak_git_hub_enabled | bool) and (_stamps[5].mtime | default(0) > _stamps[1].mtime | default(0)) }}"
     _module_stale: "{{ _host_module_stale or _backup_module_stale or _hub_module_stale or _hub_hook_stale }}"
     _home_stale: "{{ _stamps[6].mtime | default(0) > _stamps[7].mtime | default(0) }}"
     _channels_changed: "{{ guix_channels_config.changed | default(false) }}"
     _channel_changed: "{{ guix_channel_source.changed | default(false) }}"
     _system_changed: "{{ guix_system_config.changed | default(false) }}"
-    _modules_changed: "{{ guix_system_modules.changed | default(false) }}"
+    _modules_changed: >-
+      {{ (ai_agent_remote_guix_modules.changed | default(false))
+         or (ai_agent_remote_gitolite_modules.changed | default(false)) }}
     _home_changed: "{{ guix_home_config.changed | default(false) }}"
     guix_pending_steps: >-
       {{ ( (['Commit the 11xx channel: git -C ' ~ guix_channel_dir ~ ' add -A && git -C ' ~ guix_channel_dir ~ ' commit -m "packages: update local packages"']
