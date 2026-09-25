@@ -1,0 +1,32 @@
+[Unit]
+Description=Caddy LAN TLS front door
+Wants=pak-pihole-unbound.service pak-vaultwarden.service
+After=pak-pihole-unbound.service pak-vaultwarden.service
+
+[Container]
+ContainerName=caddy
+Image={{ pak_services_caddy_image }}
+Pull=never
+Network=pak-caddy-net.network
+PublishPort=80:80/tcp
+PublishPort=443:443/tcp
+PublishPort=443:443/udp
+Volume={{ pak_services_root }}/caddy/etc/Caddyfile:/etc/caddy/Caddyfile:ro
+Volume={{ pak_services_root }}/caddy/etc/conf.d:/etc/caddy/conf.d:ro
+Volume={{ pak_services_root }}/caddy/data:/data
+Volume={{ pak_services_root }}/caddy/runtime-config:/config
+EnvironmentFile={{ pak_services_root }}/caddy/secrets/caddy.env
+HealthCmd=/usr/bin/wget -q -O /dev/null http://127.0.0.1:2019/config/
+HealthInterval=30s
+HealthStartPeriod=30s
+HealthRetries=3
+HealthOnFailure=kill
+Notify=healthy
+
+[Service]
+Restart=on-failure
+RestartSec=15s
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

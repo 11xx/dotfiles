@@ -1,6 +1,15 @@
 ---
-pak_services_dir: "{{ ansible_facts['user_dir'] }}/local-net-services"
-
-# Pi-hole stamps query logs with this, so it wants the household's timezone
-# rather than the host's UTC.
-pak_timezone: America/Sao_Paulo
+pak_services_root: "{{ ansible_facts['user_dir'] }}/services"
+pak_services_bin_dir: "{{ ansible_facts['user_dir'] }}/.local/bin"
+pak_services_quadlet_dir: "{{ xdg_config_home }}/containers/systemd"
+pak_services_backup_dir: "{{ pak_services_root }}/.backup"
+pak_services_backup_repository_dir: /marak/backups/pak-services/restic
+pak_services_backup_repository: "sftp:pak-backup-gak:{{ pak_services_backup_repository_dir }}"
+pak_services_gak_ssh_port: 22
+pak_services_lan_interface: eth0
+pak_services_timezone: America/Sao_Paulo
+pak_services_activate: true
+pak_services_enable_backup_timer: true
+pak_services_pihole_image: docker.io/mpgirro/pihole-unbound:latest
+pak_services_vaultwarden_image: docker.io/vaultwarden/server:latest
+pak_services_caddy_image: localhost/pak-caddy-cloudflare:latest

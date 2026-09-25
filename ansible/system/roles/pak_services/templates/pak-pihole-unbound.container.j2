@@ -1,0 +1,40 @@
+[Unit]
+Description=Pi-hole and Unbound DNS
+
+[Container]
+ContainerName=pihole-unbound
+Image={{ pak_services_pihole_image }}
+Pull=never
+HostName={{ pihole_hostname }}
+Network=pak-caddy-net.network
+PublishPort=53:53/tcp
+PublishPort=127.0.0.1:53:53/udp
+PublishPort={{ pak_address }}:53:53/udp
+PublishPort={{ pihole_webport }}:80/tcp
+PublishPort=853:853/tcp
+Environment=TZ={{ pak_services_timezone }}
+Environment=FTLCONF_LOCAL_IPV4={{ pak_address }}
+Environment=FTLCONF_webserver_api_passwordFile=/run/secrets/pihole-web-password
+Environment=FTLCONF_webserver_user_interface_theme=default-auto
+Environment=FTLCONF_dns_upstreams=127.0.0.1#5335
+Environment=FTLCONF_dns_listeningMode=single
+Environment=FTLCONF_dns_dnssec=true
+Environment=FTLCONF_dns_cache_size=10000
+Volume={{ pak_services_root }}/pihole-unbound/etc-pihole:/etc/pihole
+Volume={{ pak_services_root }}/pihole-unbound/etc-dnsmasq.d:/etc/dnsmasq.d
+Secret=pihole-web-password
+HealthCmd=/usr/bin/dig @127.0.0.1 pi.hole +time=2 +tries=1 +short
+HealthInterval=20s
+HealthStartPeriod=40s
+HealthRetries=3
+HealthOnFailure=kill
+Notify=healthy
+
+[Service]
+ExecStartPre={{ pak_services_bin_dir }}/pak-wait-address {{ pak_address }} {{ pak_services_lan_interface }} 120
+Restart=on-failure
+RestartSec=15s
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

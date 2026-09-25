@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+mount=$(/run/current-system/profile/bin/findmnt -T /marak/backups/pak-services -n -o TARGET)
+test "$mount" = /marak
+exec /run/current-system/profile/libexec/sftp-server

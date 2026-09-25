@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+backup_root={{ pak_services_backup_dir | quote }}
+export RESTIC_REPOSITORY={{ pak_services_backup_repository | quote }}
+export RESTIC_PASSWORD_FILE="$backup_root/restic-password"
+export RESTIC_CACHE_DIR="$backup_root/cache"
+
+exec 9>"$backup_root/backup.lock"
+flock -n 9 || { printf '%s\n' 'pak backup is already running' >&2; exit 75; }
+scratch=$(mktemp -d "$backup_root/restore-check.XXXXXXXX")
+cleanup() {
+    result=$?
+    trap - EXIT
+    podman unshare rm -rf -- "$scratch" || result=1
+    exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+restic_command() {
+    podman unshare restic -o "sftp.args=-F $backup_root/ssh_config" "$@"
+}
+
+restic_command check
+restic_command restore latest --host pak --tag pak-services --target "$scratch"
+
+for path in \
+    caddy/data \
+    caddy/etc/Caddyfile \
+    pihole-unbound/etc-pihole/gravity.db \
+    pihole-unbound/etc-pihole/pihole.toml \
+    vaultwarden/data/db.sqlite3; do
+    podman unshare test -e "$scratch/$path" || {
+        printf 'restored path is missing: %s\n' "$path" >&2
+        exit 1
+    }
+done
+
+podman unshare python3 - "$scratch" <<'PY'
+from pathlib import Path
+import sqlite3
+import sys
+
+root = Path(sys.argv[1])
+for relative in ('vaultwarden/data/db.sqlite3',
+                 'pihole-unbound/etc-pihole/gravity.db'):
+    uri = (root / relative).as_uri() + '?mode=ro'
+    with sqlite3.connect(uri, uri=True) as database:
+        result = database.execute('PRAGMA quick_check').fetchone()[0]
+        if result != 'ok':
+            raise SystemExit(f'SQLite integrity failed: {relative}')
+print('pak backup restore check passed')
+PY

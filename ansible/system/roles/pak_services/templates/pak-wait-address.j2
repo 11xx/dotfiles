@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+address=$1
+interface=$2
+seconds=$3
+deadline=$(($(date +%s) + seconds))
+
+until ip -4 -o address show dev "$interface" | grep -Fq "inet $address/"; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+        printf 'required address %s is absent from %s\n' "$address" "$interface" >&2
+        exit 1
+    fi
+    sleep 2
+done

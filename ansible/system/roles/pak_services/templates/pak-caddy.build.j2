@@ -1,0 +1,8 @@
+[Build]
+ImageTag={{ pak_services_caddy_image }}
+File={{ pak_services_root }}/caddy/caddy-cloudflare.Dockerfile
+SetWorkingDirectory={{ pak_services_root }}/caddy
+Pull=always
+
+[Service]
+TimeoutStartSec=900

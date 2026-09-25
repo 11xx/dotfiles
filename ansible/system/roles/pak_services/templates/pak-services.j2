@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+operator_bin={{ pak_services_bin_dir | quote }}
+pihole_image={{ pak_services_pihole_image | quote }}
+vaultwarden_image={{ pak_services_vaultwarden_image | quote }}
+caddy_image={{ pak_services_caddy_image | quote }}
+dns_address={{ pak_address | quote }}
+
+usage() {
+    printf '%s\n' 'usage: pak-services {list|status|restart|update|backup|restore-check} [service ...|--all]' >&2
+    exit 2
+}
+
+valid_service() {
+    case $1 in
+        pihole-unbound|caddy|vaultwarden) ;;
+        *) printf 'unsupported service: %s\n' "$1" >&2; exit 2 ;;
+    esac
+}
+
+probe() {
+    case $1 in
+        pihole-unbound)
+            dig @"$dns_address" pi.hole A +time=2 +tries=1 +short | grep -q .
+            ;;
+        caddy)
+            podman exec caddy wget -q -O /dev/null http://127.0.0.1:2019/config/
+            ;;
+        vaultwarden)
+            curl -fsS --max-time 4 -o /dev/null http://127.0.0.1:5050/alive
+            ;;
+    esac
+}
+
+status_one() {
+    local service=$1
+    local unit="pak-$service.service"
+    if systemctl --user is-active --quiet "$unit" && probe "$service"; then
+        printf '%s running and ready\n' "$service"
+    else
+        printf '%s unavailable\n' "$service" >&2
+        return 1
+    fi
+}
+
+select_services() {
+    (($# > 0)) || usage
+    if [[ $1 == --all ]]; then
+        (($# == 1)) || usage
+        selected=(pihole-unbound vaultwarden caddy)
+    else
+        selected=("$@")
+        local service
+        for service in "${selected[@]}"; do valid_service "$service"; done
+    fi
+}
+
+command=${1:-}
+(($# > 0)) || usage
+shift
+case $command in
+    list|status)
+        (($# == 0)) || usage
+        result=0
+        for service in pihole-unbound vaultwarden caddy; do
+            status_one "$service" || result=1
+        done
+        exit "$result"
+        ;;
+    backup)
+        (($# == 0)) || usage
+        exec "$operator_bin/pak-services-backup"
+        ;;
+    restore-check)
+        (($# == 0)) || usage
+        exec "$operator_bin/pak-services-restore-check"
+        ;;
+    restart)
+        select_services "$@"
+        for service in "${selected[@]}"; do
+            systemctl --user restart "pak-$service.service"
+            status_one "$service"
+        done
+        ;;
+    update)
+        select_services "$@"
+        for service in "${selected[@]}"; do
+            systemctl --user is-active --quiet "pak-$service.service" || {
+                printf 'refusing to update a stopped service: %s\n' "$service" >&2
+                exit 1
+            }
+        done
+        "$operator_bin/pak-services-backup"
+        for service in "${selected[@]}"; do
+            case $service in
+                pihole-unbound) image=$pihole_image ;;
+                vaultwarden) image=$vaultwarden_image ;;
+                caddy) image=$caddy_image ;;
+            esac
+            before=$(podman image inspect "$image" --format '{% raw %}{{.Id}}{% endraw %}')
+            printf '%s previous image %s\n' "$service" "$before"
+            if [[ $service == caddy ]]; then
+                systemctl --user restart pak-caddy-build.service
+            else
+                podman pull "$image"
+            fi
+            systemctl --user restart "pak-$service.service"
+            status_one "$service"
+            after=$(podman image inspect "$image" --format '{% raw %}{{.Id}}{% endraw %}')
+            printf '%s image %s -> %s\n' "$service" "$before" "$after"
+        done
+        ;;
+    *) usage ;;
+esac

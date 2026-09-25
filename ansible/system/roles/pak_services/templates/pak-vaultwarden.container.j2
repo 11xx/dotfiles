@@ -1,0 +1,25 @@
+[Unit]
+Description=Vaultwarden password vault
+
+[Container]
+ContainerName=vaultwarden
+Image={{ pak_services_vaultwarden_image }}
+Pull=never
+Network=pak-caddy-net.network
+NetworkAlias=vaultwarden
+PublishPort=127.0.0.1:5050:80/tcp
+Volume={{ pak_services_root }}/vaultwarden/data:/data
+HealthCmd=/usr/bin/curl -fsS --max-time 3 http://127.0.0.1:80/alive
+HealthInterval=30s
+HealthStartPeriod=30s
+HealthRetries=3
+HealthOnFailure=kill
+Notify=healthy
+
+[Service]
+Restart=on-failure
+RestartSec=15s
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

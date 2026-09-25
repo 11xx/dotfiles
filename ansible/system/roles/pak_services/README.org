@@ -1,0 +1,97 @@
+#+TITLE: Pak services
+#+options: toc:nil num:nil
+
+* Ownership and layout
+
+=pak_services= owns the Raspberry Pi's Pi-hole/Unbound, Caddy and Vaultwarden
+configuration. =containers_pak= owns the rootless Podman prerequisites, port
+binding policy and user linger. Ansible deploys the application files and
+Quadlets; the user's systemd instance supervises each container.
+
+The Quadlet sources live in =~/.config/containers/systemd=. The generated
+services are =pak-pihole-unbound.service=, =pak-vaultwarden.service= and
+=pak-caddy.service=. =pak-caddy-net.network= keeps their shared Podman network.
+The =pak-caddy.build= unit builds the local Caddy image only when an operator
+requests an update. Application units use locally available images at boot.
+The generator applies each Quadlet's =[Install]= section during user-manager
+startup. The login user's linger keeps that manager alive without a login.
+
+Persistent state and authored configuration live under =~/services=:
+
+| Service | Persistent paths |
+|---------+------------------|
+| Pi-hole/Unbound | =pihole-unbound/etc-pihole= and =pihole-unbound/etc-dnsmasq.d= |
+| Caddy | =caddy/etc=, =caddy/data=, =caddy/runtime-config= and =caddy/secrets= |
+| Vaultwarden | =vaultwarden/data= |
+
+The Pi-hole password is a Podman file secret. Caddy's Cloudflare credential is
+in a mode-0600 deployed file; the repository contains only its template. The
+Vaultwarden SQLite database and attachments belong to the same =data= tree.
+All three application directories are bind mounts, so a copy of the Compose
+or Quadlet definition alone cannot restore service state.
+
+* Boot and operations
+
+The DNS unit waits for Pak's configured IPv4 address before binding its LAN
+UDP socket. Container healthchecks gate systemd startup and kill an unhealthy
+container so systemd can retry it. Caddy starts after the DNS and Vaultwarden
+units are requested. Application units have independent failure and restart
+state; the user manager does not pull or build images during boot.
+
+Run these commands as the login user:
+
+#+begin_src sh
+pak-services status
+pak-services restart pihole-unbound
+pak-services update vaultwarden
+pak-services update --all
+systemctl --user status pak-pihole-unbound.service
+#+end_src
+
+=update= requires each selected service to be running, takes a complete fresh
+backup, then pulls or builds and restarts one service at a time. It reports the
+old and new image IDs. A failed backup prevents image replacement. Keep the
+previous image until the application and its caller-visible behavior pass.
+An image rollback alone cannot reverse a state migration.
+
+The LAN's caller-visible checks include direct UDP and TCP DNS queries to
+Pak's address, Caddy HTTPS, Vaultwarden login and notifications, and a Pi-hole
+dashboard request. =systemctl --user is-active= alone is insufficient: DNS can
+fail after the user unit has started.
+
+* Backup and recovery
+
+=pak-services-backup.timer= starts a daily backup at 04:30 and catches a missed
+calendar run after boot. =pak-services backup= runs the same job on demand.
+The job serializes with restores and other backups, stops one application at a
+time, copies its complete state with rootless UID ownership, and restarts it
+before transferring the copy. It creates one encrypted Restic snapshot tagged
+=pak-services= on Gak at =/marak/backups/pak-services/restic=. A Gak-side SFTP
+command refuses access unless =/marak= is mounted. The backup key is limited to
+SFTP, and Pak pins Gak's SSH host key. The Restic password is in the private
+Ansible vault and a mode-0600 Pak file, never in a command argument.
+
+Retention keeps seven daily, five weekly and twelve monthly snapshots. The
+backup command checks the repository after retention. A zero exit means a
+fresh complete snapshot, successful integrity check and all services running
+again. Gak is a separate local machine and disk; this is not an off-site copy.
+
+#+begin_src sh
+pak-services backup
+pak-services restore-check
+systemctl --user list-timers pak-services-backup.timer
+#+end_src
+
+=restore-check= checks the repository, restores the latest Pak snapshot into
+private scratch, verifies required files and the Vaultwarden and Pi-hole SQLite
+databases, then removes its scratch tree. A production restore first retains a
+copy of current state, stops the three user units, restores the selected
+snapshot to scratch, and copies each service tree into an empty =~/services=
+root with =podman unshare rsync -aHAX --numeric-ids=. Start DNS, Vaultwarden
+and Caddy in that order and run the caller-visible checks. Keep the Restic
+password from the private vault when rebuilding a lost Pak host.
+
+When a boot appears successful but DNS is absent, inspect
+=systemctl --user status pak-pihole-unbound.service= and
+=podman inspect pihole-unbound=, then verify that the LAN address is assigned.
+Correct the address or network state before restarting only the DNS unit.

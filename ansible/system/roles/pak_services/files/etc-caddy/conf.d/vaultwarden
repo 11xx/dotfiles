@@ -4,5 +4,4 @@
         dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
     reverse_proxy vaultwarden
-    reverse_proxy /notifications/hub vaultwarden:3012
 }

@@ -1,120 +1,308 @@
 ---
-# The LAN services stack, previously tangled straight onto pak from
-# raspberry-pi-4/README.org with no record of what was deployed.
-#
-# Everything runs rootless as the login user, so nothing here escalates except
-# the ufw rules. Applying config is deliberately separate from restarting the
-# stack: rebuilding caddy with xcaddy on a Pi 4 takes minutes, so the handler
-# only fires when a file actually changed.
+- name: Install pak backup and probe tools
+  ansible.builtin.apt:
+    name: [restic, rsync, bind9-dnsutils]
+    state: present
+  become: true
 
-- name: 'pak_services: Create the stack directory tree'
+- name: Check the Gak backup mount
+  ansible.builtin.command:
+    argv: [findmnt, -T, /marak/backups, -n, -o, TARGET]
+  delegate_to: gak
+  register: pak_backup_mount
+  changed_when: false
+  check_mode: false
+
+- name: Require the backup disk on Gak
+  ansible.builtin.assert:
+    that: pak_backup_mount.stdout == '/marak'
+
+- name: Create the mounted backup repository directory on Gak
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ pak_services_backup_repository_dir }}"
     state: directory
-    mode: "0755"
-  loop:
-    - "{{ pak_services_dir }}"
-    - "{{ pak_services_dir }}/etc-caddy"
-    - "{{ pak_services_dir }}/etc-caddy/conf.d"
-    - "{{ pak_services_dir }}/etc-pihole"
-  tags: ['pak-services-config']
+    mode: '0700'
+  delegate_to: gak
 
-# compose bind-mounts these two as single files. If a path is missing, podman
-# creates a *directory* there instead, and pihole then fails to start with an
-# error that points nowhere near the cause. Both hold state pihole rewrites at
-# runtime, so they are created empty and never overwritten.
-- name: 'pak_services: Ensure bind-mounted pihole config files exist'
+- name: Install the mount-guarded SFTP command on Gak
   ansible.builtin.copy:
-    dest: "{{ pak_services_dir }}/etc-pihole/{{ item }}"
-    content: ""
-    force: false
-    mode: "0644"
-  loop:
-    - custom.list
-    - pihole.toml
-  tags: ['pak-services-config']
+    src: pak-backup-sftp
+    dest: "/home/{{ hostvars['gak']['ansible_user'] }}/.local/bin/pak-backup-sftp"
+    mode: '0755'
+  delegate_to: gak
 
-- name: 'pak_services: Deploy the caddy build and site config'
+- name: Create pak service and operator directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ pak_services_root }}", mode: '0700' }
+    - { path: "{{ pak_services_root }}/pihole-unbound", mode: '0700' }
+    - { path: "{{ pak_services_root }}/caddy", mode: '0700' }
+    - { path: "{{ pak_services_root }}/caddy/etc", mode: '0755' }
+    - { path: "{{ pak_services_root }}/caddy/etc/conf.d", mode: '0755' }
+    - { path: "{{ pak_services_root }}/caddy/secrets", mode: '0700' }
+    - { path: "{{ pak_services_root }}/vaultwarden", mode: '0700' }
+    - { path: "{{ pak_services_backup_dir }}", mode: '0700' }
+    - { path: "{{ pak_services_bin_dir }}", mode: '0755' }
+    - { path: "{{ xdg_config_home }}/systemd/user", mode: '0755' }
+
+- name: Install the Caddy build input
+  ansible.builtin.copy:
+    src: caddy-cloudflare.Dockerfile
+    dest: "{{ pak_services_root }}/caddy/caddy-cloudflare.Dockerfile"
+    mode: '0644'
+
+- name: Install pak Caddy site configuration
   ansible.builtin.copy:
     src: "{{ item.src }}"
-    dest: "{{ pak_services_dir }}/{{ item.dest }}"
-    mode: "0644"
+    dest: "{{ pak_services_root }}/caddy/{{ item.dest }}"
+    mode: '0644'
   loop:
-    - { src: caddy-cloudflare.Dockerfile, dest: caddy-cloudflare.Dockerfile }
-    - { src: etc-caddy/Caddyfile, dest: etc-caddy/Caddyfile }
-    - { src: etc-caddy/conf.d/vaultwarden, dest: etc-caddy/conf.d/vaultwarden }
+    - { src: etc-caddy/Caddyfile, dest: etc/Caddyfile }
+    - { src: etc-caddy/conf.d/vaultwarden, dest: etc/conf.d/vaultwarden }
   loop_control:
     label: "{{ item.dest }}"
-  notify: Restart local-net-services
-  tags: ['pak-services-config']
+  notify: Restart pak caddy
 
-- name: 'pak_services: Deploy the compose file'
+- name: Install the Caddy credential file
   ansible.builtin.template:
-    src: compose.yaml.j2
-    dest: "{{ pak_services_dir }}/compose.yaml"
-    mode: "0644"
-  notify: Restart local-net-services
-  tags: ['pak-services-config']
-
-# 0600: this is the Cloudflare API token that can edit the zone's DNS.
-- name: 'pak_services: Deploy the caddy environment file'
-  ansible.builtin.template:
-    # Named without the .env infix so the repository's "never commit a .env"
-    # ignore rule keeps applying to real ones.
     src: caddy-env.j2
-    dest: "{{ pak_services_dir }}/etc-caddy/caddy.env"
-    mode: "0600"
-  notify: Restart local-net-services
-  tags: ['pak-services-config', 'pak-services-secrets']
+    dest: "{{ pak_services_root }}/caddy/secrets/caddy.env"
+    mode: '0600'
+  no_log: true
+  notify: Restart pak caddy
 
-# Compose declares this secret `external`, so podman must already hold it. It is
-# mounted into the container as a file rather than passed as an environment
-# variable, which would show up in `podman inspect`.
-- name: 'pak_services: Check whether the pihole web password secret exists'
+- name: Install the pak backup password
+  ansible.builtin.copy:
+    content: "{{ pak_services_restic_password }}\n"
+    dest: "{{ pak_services_backup_dir }}/restic-password"
+    mode: '0600'
+  no_log: true
+
+- name: Generate the pak-to-Gak backup key
   ansible.builtin.command:
-    cmd: podman secret inspect pihole-web-password
+    argv: [ssh-keygen, -q, -t, ed25519, -N, '', -f, "{{ pak_services_backup_dir }}/id_ed25519"]
+    creates: "{{ pak_services_backup_dir }}/id_ed25519"
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Read the backup public key
+  ansible.builtin.slurp:
+    src: "{{ pak_services_backup_dir }}/id_ed25519.pub"
+  register: pak_backup_public_key
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Authorize only mounted SFTP access on Gak
+  ansible.posix.authorized_key:
+    user: "{{ hostvars['gak']['ansible_user'] }}"
+    key: "{{ pak_backup_public_key.content | b64decode | trim }}"
+    key_options: 'command="/home/{{ hostvars["gak"]["ansible_user"] }}/.local/bin/pak-backup-sftp",restrict'
+    state: present
+  delegate_to: gak
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Read Gak's public SSH host key through the trusted controller connection
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  delegate_to: gak
+  register: pak_gak_host_key
+  when: not ansible_check_mode
+
+- name: Pin Gak's SSH identity on pak
+  ansible.builtin.known_hosts:
+    path: "{{ ansible_facts['user_dir'] }}/.ssh/known_hosts"
+    name: "{{ gak_address }}"
+    key: "{{ gak_address }} {{ pak_gak_host_key.content | b64decode | trim }}"
+    state: present
+  when: not ansible_check_mode
+
+- name: Install the dedicated backup SSH configuration
+  ansible.builtin.template:
+    src: backup-ssh-config.j2
+    dest: "{{ pak_services_backup_dir }}/ssh_config"
+    mode: '0600'
+
+- name: Install the pak operator commands
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ pak_services_bin_dir }}/{{ item.dest }}"
+    mode: '0755'
+  loop:
+    - { src: pak-services.j2, dest: pak-services }
+    - { src: pak-services-backup.j2, dest: pak-services-backup }
+    - { src: pak-services-restore-check.j2, dest: pak-services-restore-check }
+    - { src: pak-wait-address.j2, dest: pak-wait-address }
+
+- name: Install the pak backup timer and job
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ xdg_config_home }}/systemd/user/{{ item }}"
+    mode: '0644'
+  loop:
+    - pak-services-backup.service
+    - pak-services-backup.timer
+  notify: Reload pak user units
+
+- name: Check whether the Pi-hole password secret exists
+  ansible.builtin.command:
+    argv: [podman, secret, inspect, pihole-web-password]
   register: pak_pihole_secret
   changed_when: false
   failed_when: false
-  tags: ['pak-services-secrets']
 
-- name: 'pak_services: Create the pihole web password secret'
+- name: Create the Pi-hole password secret
   ansible.builtin.shell:
     cmd: printf '%s' '{{ pihole_web_password }}' | podman secret create pihole-web-password -
-  # The check above is a command, which --check skips, leaving rc undefined —
-  # hence the default rather than relying on condition evaluation order.
   when:
     - not ansible_check_mode
     - pak_pihole_secret.rc | default(1) != 0
   no_log: true
-  tags: ['pak-services-secrets']
 
-# Declared external so that tearing the stack down with -v cannot delete the
-# issued certificates; re-issuing them runs into Let's Encrypt rate limits.
-- name: 'pak_services: Ensure the external caddy_data volume exists'
-  ansible.builtin.command:
-    cmd: podman volume create caddy_data
-  register: pak_caddy_volume
-  changed_when: "'already exists' not in pak_caddy_volume.stderr"
-  failed_when:
-    - pak_caddy_volume.rc != 0
-    - "'already exists' not in pak_caddy_volume.stderr"
-  when: not ansible_check_mode
-  tags: ['pak-services-config']
+- name: Check migrated application state before cutover
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ pak_services_root }}/pihole-unbound/etc-pihole/gravity.db"
+    - "{{ pak_services_root }}/vaultwarden/data/db.sqlite3"
+    - "{{ pak_services_root }}/caddy/data"
+    - "{{ pak_services_root }}/caddy/runtime-config"
+  register: pak_migrated_state
+  when:
+    - pak_services_activate | bool
+    - not ansible_check_mode
 
-- name: 'pak_services: Install the stack systemd user unit'
+- name: Require copied application state before activation
+  ansible.builtin.assert:
+    that: "pak_migrated_state.results | map(attribute='stat.exists') | min"
+  when:
+    - pak_services_activate | bool
+    - not ansible_check_mode
+
+- name: Create the Quadlet source directory
+  ansible.builtin.file:
+    path: "{{ pak_services_quadlet_dir }}"
+    state: directory
+    mode: '0755'
+  when: pak_services_activate | bool
+
+- name: Create a private Quadlet generation staging directory
+  ansible.builtin.file:
+    path: "{{ pak_services_backup_dir }}/quadlet-stage"
+    state: directory
+    mode: '0700'
+  when: not pak_services_activate | bool
+
+- name: Render staged Quadlets for generator validation
   ansible.builtin.template:
-    src: local-net-services.service.j2
-    dest: "{{ xdg_config_home }}/systemd/user/local-net-services.service"
-    mode: "0644"
-  notify: Restart local-net-services
-  tags: ['pak-services-unit']
+    src: "{{ item }}.j2"
+    dest: "{{ pak_services_backup_dir }}/quadlet-stage/{{ item }}"
+    mode: '0644'
+  loop:
+    - pak-caddy-net.network
+    - pak-pihole-unbound.container
+    - pak-vaultwarden.container
+    - pak-caddy.container
+    - pak-caddy.build
+  when: not pak_services_activate | bool
 
-- name: 'pak_services: Enable the stack at boot'
+- name: Deploy the pak network Quadlet
+  ansible.builtin.template:
+    src: pak-caddy-net.network.j2
+    dest: "{{ pak_services_quadlet_dir }}/pak-caddy-net.network"
+    mode: '0644'
+  when: pak_services_activate | bool
+  notify:
+    - Reload pak user units
+    - Restart pak pihole
+    - Restart pak vaultwarden
+    - Restart pak caddy
+
+- name: Deploy the Pi-hole Quadlet
+  ansible.builtin.template:
+    src: pak-pihole-unbound.container.j2
+    dest: "{{ pak_services_quadlet_dir }}/pak-pihole-unbound.container"
+    mode: '0644'
+  when: pak_services_activate | bool
+  notify:
+    - Reload pak user units
+    - Restart pak pihole
+
+- name: Deploy the Vaultwarden Quadlet
+  ansible.builtin.template:
+    src: pak-vaultwarden.container.j2
+    dest: "{{ pak_services_quadlet_dir }}/pak-vaultwarden.container"
+    mode: '0644'
+  when: pak_services_activate | bool
+  notify:
+    - Reload pak user units
+    - Restart pak vaultwarden
+
+- name: Deploy the Caddy Quadlet
+  ansible.builtin.template:
+    src: pak-caddy.container.j2
+    dest: "{{ pak_services_quadlet_dir }}/pak-caddy.container"
+    mode: '0644'
+  when: pak_services_activate | bool
+  notify:
+    - Reload pak user units
+    - Restart pak caddy
+
+- name: Deploy the on-demand Caddy build Quadlet
+  ansible.builtin.template:
+    src: pak-caddy.build.j2
+    dest: "{{ pak_services_quadlet_dir }}/pak-caddy.build"
+    mode: '0644'
+  when: pak_services_activate | bool
+  notify: Reload pak user units
+
+- name: Reload the generated pak units
   ansible.builtin.systemd_service:
-    name: local-net-services.service
-    enabled: true
     daemon_reload: true
     scope: user
-  when: not ansible_check_mode
-  tags: ['pak-services-unit']
+  when:
+    - pak_services_activate | bool
+    - not ansible_check_mode
+
+- name: Start pak application units
+  ansible.builtin.systemd_service:
+    name: "{{ item }}.service"
+    state: started
+    scope: user
+  loop:
+    - pak-pihole-unbound
+    - pak-vaultwarden
+    - pak-caddy
+  when:
+    - pak_services_activate | bool
+    - not ansible_check_mode
+
+- name: Disable the unused Podman user API socket
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    enabled: false
+    state: stopped
+    scope: user
+  when:
+    - pak_services_activate | bool
+    - not ansible_check_mode
+
+- name: Enable the scheduled pak backup
+  ansible.builtin.systemd_service:
+    name: pak-services-backup.timer
+    enabled: true
+    state: started
+    scope: user
+  when:
+    - pak_services_activate | bool
+    - pak_services_enable_backup_timer | bool
+    - not ansible_check_mode
+
+- name: Remove the Quadlet generation scratch
+  ansible.builtin.file:
+    path: "{{ pak_services_backup_dir }}/quadlet-stage"
+    state: absent
+  when: pak_services_activate | bool

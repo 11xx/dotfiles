@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up pak application state to Gak
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart={{ pak_services_bin_dir }}/pak-services-backup
+TimeoutStartSec=7200
+Restart=on-failure
+RestartSec=15min

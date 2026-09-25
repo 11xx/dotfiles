@@ -164,15 +164,3 @@
   become_user: "{{ ansible_user }}"
   environment: "{{ _user_env }}"
   tags: ['containers-config']
-
-- name: 'containers: Enable the podman socket for compose'
-  ansible.builtin.systemd_service:
-    name: podman.socket
-    enabled: true
-    state: started
-    scope: user
-  become: true
-  become_user: "{{ ansible_user }}"
-  environment: "{{ _user_env }}"
-  when: not ansible_check_mode
-  tags: ['containers-socket']

@@ -1,0 +1,11 @@
+Host pak-backup-gak
+    HostName {{ gak_address }}
+    Port {{ pak_services_gak_ssh_port }}
+    User {{ hostvars['gak']['ansible_user'] }}
+    IdentityFile {{ pak_services_backup_dir }}/id_ed25519
+    IdentitiesOnly yes
+    UserKnownHostsFile {{ ansible_facts['user_dir'] }}/.ssh/known_hosts
+    StrictHostKeyChecking yes
+    HostKeyAlgorithms ssh-ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 240

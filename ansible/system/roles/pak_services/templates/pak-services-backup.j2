@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+services_root={{ pak_services_root | quote }}
+backup_root={{ pak_services_backup_dir | quote }}
+stage="$backup_root/staging"
+export RESTIC_REPOSITORY={{ pak_services_backup_repository | quote }}
+export RESTIC_PASSWORD_FILE="$backup_root/restic-password"
+export RESTIC_CACHE_DIR="$backup_root/cache"
+
+mkdir -p "$backup_root" "$RESTIC_CACHE_DIR"
+exec 9>"$backup_root/backup.lock"
+flock -n 9 || { printf '%s\n' 'pak backup is already running' >&2; exit 75; }
+
+restic_command() {
+    podman unshare restic -o "sftp.args=-F $backup_root/ssh_config" "$@"
+}
+
+stopped_unit=
+cleanup() {
+    result=$?
+    trap - EXIT
+    if [[ -n $stopped_unit ]]; then
+        systemctl --user start "$stopped_unit" || result=1
+    fi
+    if [[ -d $stage ]]; then
+        podman unshare rm -rf -- "$stage" || result=1
+    fi
+    exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+restic_command snapshots --json >/dev/null
+podman unshare rm -rf -- "$stage"
+mkdir -m 0700 "$stage"
+
+for service in vaultwarden caddy pihole-unbound; do
+    unit="pak-$service.service"
+    systemctl --user is-active --quiet "$unit" || {
+        printf 'required service is inactive: %s\n' "$unit" >&2
+        exit 1
+    }
+    stopped_unit=$unit
+    systemctl --user stop "$unit"
+    mkdir -m 0700 "$stage/$service"
+    podman unshare rsync -a --delete -- "$services_root/$service/" "$stage/$service/"
+    systemctl --user start "$unit"
+    stopped_unit=
+done
+
+(
+    cd "$stage"
+    restic_command backup --host pak --tag pak-services caddy pihole-unbound vaultwarden
+)
+restic_command forget --host pak --tag pak-services --group-by host \
+    --keep-daily 7 --keep-weekly 5 --keep-monthly 12 --prune
+restic_command check
+"{{ pak_services_bin_dir }}/pak-services" status
