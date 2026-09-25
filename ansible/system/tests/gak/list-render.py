@@ -40,7 +40,7 @@ compose_role = next(role for role in gak_play["roles"]
                     if role.get("role") == "ai_agent.remote.compose_runtime")
 assert compose_role["vars"] == {
     "ai_agent_remote_compose_home": "{{ ansible_facts['user_dir'] }}",
-    "ai_agent_remote_compose_services_root": "{{ gak_compose_services_root }}",
+    "ai_agent_remote_compose_services_root": "{{ ansible_facts['user_dir'] }}/services",
     "ai_agent_remote_compose_operator_bin_dir": "{{ gak_services_bin_dir }}",
     "ai_agent_remote_compose_package_source_dir": "{{ guix_home_config_dir }}/packages",
     "ai_agent_remote_compose_application_names": "{{ gak_applications }}",

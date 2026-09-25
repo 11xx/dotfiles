@@ -174,6 +174,7 @@ tests/gak/nextcloud-extension.bash
 tests/gak/nextcloud-readiness.bash
 python3 tests/gak/t3-port-render.py
 python3 tests/gak/module-selection.py
+python3 tests/gak/compose-consumer-check.py
 #+end_src
 
 Set =AI_AGENT_REMOTE_COLLECTION_ROOT= to the installed collection root for
