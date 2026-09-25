@@ -145,6 +145,12 @@ AI_AGENT_REMOTE_COLLECTION_SOURCE=/path/to/ai-agent-remote \
   ./bin/install-remote-collection
 #+end_src
 
+=AI_AGENT_REMOTE_COLLECTION_SOURCE= names a local Git repository containing
+the full commit in =collection-pin=. The installer archives that commit's
+=ansible/= subtree into temporary =$HOME/.cache= scratch before building. The
+repository's checked-out HEAD and mutable worktree files do not affect the
+artifact, and the source repository is not modified or fetched from a remote.
+
 Before removing the tracked workstation command during the live cutover, let
 the new operator role install it at the same path:
 
@@ -175,6 +181,13 @@ tests/gak/nextcloud-readiness.bash
 python3 tests/gak/t3-port-render.py
 python3 tests/gak/module-selection.py
 python3 tests/gak/compose-consumer-check.py
+#+end_src
+
+Exercise the pinned artifact bootstrap with a disposable source clone:
+
+#+begin_src sh
+AI_AGENT_REMOTE_COLLECTION_SOURCE=/path/to/ai-agent-remote \
+  python3 tests/gak/collection-bootstrap.py
 #+end_src
 
 Set =AI_AGENT_REMOTE_COLLECTION_ROOT= to the installed collection root for

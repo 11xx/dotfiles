@@ -3,26 +3,37 @@ set -Eeuo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 project_dir=$(cd -- "$script_dir/.." && pwd -P)
-source_dir=${AI_AGENT_REMOTE_COLLECTION_SOURCE:?set AI_AGENT_REMOTE_COLLECTION_SOURCE to a local ai-agent-remote checkout}
+source_dir=${AI_AGENT_REMOTE_COLLECTION_SOURCE:?set AI_AGENT_REMOTE_COLLECTION_SOURCE to a local ai-agent-remote Git repository}
+if [[ ! -d $source_dir ]]; then
+    printf '%s\n' 'collection source is not a directory' >&2
+    exit 1
+fi
 source_dir=$(cd -- "$source_dir" && pwd -P)
-pin=$(<"$project_dir/collection-pin")
 
+if [[ ! -f $project_dir/collection-pin ]]; then
+    printf '%s\n' 'collection-pin is missing' >&2
+    exit 1
+fi
+pin=$(<"$project_dir/collection-pin")
 if [[ ! $pin =~ ^[0-9a-f]{40}$ ]]; then
     printf '%s\n' 'collection-pin must contain one full Git commit ID' >&2
     exit 1
 fi
-if [[ ! -f $source_dir/ansible/galaxy.yml ]]; then
-    printf '%s\n' 'collection source is missing ansible/galaxy.yml' >&2
+
+if ! source_repository=$(git -C "$source_dir" rev-parse --show-toplevel 2>/dev/null); then
+    printf '%s\n' 'collection source is not a local Git repository' >&2
     exit 1
 fi
-source_revision=$(git -C "$source_dir" rev-parse --verify HEAD^{commit})
+if ! source_revision=$(git -C "$source_repository" rev-parse --verify "${pin}^{commit}" 2>/dev/null); then
+    printf '%s\n' 'pinned collection commit is not present in source repository' >&2
+    exit 1
+fi
 if [[ $source_revision != "$pin" ]]; then
-    printf 'collection source revision %s does not match pin %s\n' \
-        "$source_revision" "$pin" >&2
+    printf '%s\n' 'collection-pin does not name the resolved full commit ID' >&2
     exit 1
 fi
-if [[ -n $(git -C "$source_dir" status --porcelain --untracked-files=normal) ]]; then
-    printf '%s\n' 'collection source checkout must be clean at the pinned revision' >&2
+if ! git -C "$source_repository" cat-file -e "$pin:ansible/galaxy.yml" 2>/dev/null; then
+    printf '%s\n' 'pinned commit is missing ansible/galaxy.yml' >&2
     exit 1
 fi
 
@@ -38,8 +49,21 @@ trap cleanup EXIT
 
 install_path="$project_dir/.ansible/collections"
 artifact="$scratch/ai_agent-remote-0.1.0.tar.gz"
+archive_root="$scratch/source"
+mkdir -p "$archive_root"
+if ! git -C "$source_repository" archive --format=tar "$pin" ansible \
+    | tar --extract --file - --directory "$archive_root" \
+        --no-same-owner --no-same-permissions; then
+    printf '%s\n' 'could not archive pinned collection tree' >&2
+    exit 1
+fi
+collection_source="$archive_root/ansible"
+if [[ ! -f $collection_source/galaxy.yml ]]; then
+    printf '%s\n' 'pinned collection archive is missing ansible/galaxy.yml' >&2
+    exit 1
+fi
 mkdir -p "$install_path"
-ansible-galaxy collection build "$source_dir/ansible" \
+ansible-galaxy collection build "$collection_source" \
     --force --output-path "$scratch"
 test -s "$artifact"
 ANSIBLE_COLLECTIONS_PATH="$install_path" \
