@@ -65,11 +65,11 @@
                                       (label :class "music__field music__lap ${class}" :text text)))))
 
 ;; Its separator belongs to the field, so a track naming no album leaves no
-;; dangling dot behind. mpris reports a missing tag as the string "null".
+;; dangling dot behind.
 (defwidget music-field [text class limit]
            (box :space-evenly false
                 :spacing 8
-                :visible {text != "" && text != "null"}
+                :visible {text != ""}
                 (label :class "music__sep" :text "·")
                 (music-marquee :text text :class class :limit limit)))
 
@@ -86,18 +86,20 @@
                 :space-evenly false
                 :spacing 8
                 :valign "center"
-                :visible {music-data.track.title != "" && music-data.track.title != "null"}
+                :visible {music-data.track.title != ""}
                 (music-state)
                 (music-marquee :text {music-data.track.title}
                                :class "music__field--title"
                                :limit 45)
                 (music-field :class "music__field--artist"
                              :limit 30
-                             :text {music-data.track.album_artist != "null" ? music-data.track.album_artist
+                             :text {music-data.track.album_artist != "" ? music-data.track.album_artist
                                     : music-data.track.artist})
+                ;; A single is usually named after its only song, which the title
+                ;; has already said.
                 (music-field :class "music__field--album"
                              :limit 30
-                             :text {music-data.track.album})
+                             :text {music-data.track.album != music-data.track.title ? music-data.track.album : ""})
                 (progress :class "music__progress"
                           :valign "center"
                           :value {music-data.playback.elapsed_percent}
