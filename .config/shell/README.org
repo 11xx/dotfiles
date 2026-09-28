@@ -326,6 +326,9 @@ Sourced early and deliberately, so that everything below can override it. That
 is what lets this file stay long and opinionated without any of it having to be
 copied onto a headless server to make that server usable.
 
+Word editing on this host uses zsh subword matching. Punctuation and case
+changes divide words for Alt-Backspace, Alt-D, and word motion.
+
 Blocks below marked =:tangle no= were moved into a shared fragment. Their prose
 is kept because it explains why the setting exists; the setting itself now lives
 in the Ansible =shell= role.
@@ -430,9 +433,14 @@ AUTOSUGGESTION_ACCEPT_RIGHT_ARROW=1
 :PROPERTIES:
 :CUSTOM_ID: zsh-bindkeys
 :END:
-Emacs
+Emacs-style word editing uses subword boundaries in the host's keymap.
 # 😊
 #+begin_src bash
+autoload -U select-word-style
+select-word-style B
+bindkey '^[^?' backward-kill-word
+bindkey '^[^H' backward-kill-word
+bindkey '^[d' kill-word
 #bindkey '^I'   complete-word       # tab          | complete
 bindkey '^[[Z'  forward-word  # shift + tab  | autosuggest
 # ctrl-left and ctrl-right
@@ -445,14 +453,11 @@ bindkey "\C-_"    backward-kill-word
 bindkey "\e[3~" delete-char
 bindkey "\e[H"  beginning-of-line
 bindkey "\e[F"  end-of-line
-# alt-bs
-bindkey "\e\d"  undo
 # ctrl+e
 bindkey "^E"    end-of-line
 bindkey "^F"    autosuggest-fetch
 
 bindkey -e '' undo
-bindkey -e 'd' kill-word
 
 # search
 # bindkey '' up-line-or-search

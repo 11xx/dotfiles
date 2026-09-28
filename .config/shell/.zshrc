@@ -17,6 +17,11 @@ unset _fragment
 
 source "$XDG_CONFIG_HOME/shell/aliases"
 
+autoload -U select-word-style
+select-word-style B
+bindkey '^[^?' backward-kill-word
+bindkey '^[^H' backward-kill-word
+bindkey '^[d' kill-word
 #bindkey '^I'   complete-word       # tab          | complete
 bindkey '^[[Z'  forward-word  # shift + tab  | autosuggest
 # ctrl-left and ctrl-right
@@ -29,14 +34,11 @@ bindkey "\C-_"    backward-kill-word
 bindkey "\e[3~" delete-char
 bindkey "\e[H"  beginning-of-line
 bindkey "\e[F"  end-of-line
-# alt-bs
-bindkey "\e\d"  undo
 # ctrl+e
 bindkey "^E"    end-of-line
 bindkey "^F"    autosuggest-fetch
 
 bindkey -e '' undo
-bindkey -e 'd' kill-word
 
 # search
 # bindkey '' up-line-or-search
