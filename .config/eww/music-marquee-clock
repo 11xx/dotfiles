@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Seconds since the now-playing line last started over, sixty times a second.
+
+The line starts over when the track changes and when playback resumes, so a
+marquee always begins at its first character. Nothing is printed while nothing
+plays: a paused or stopped line has no reason to be redrawn. Arguments are
+passed on to `music-current-json --follow`, so this follows the same player as
+the line it times.
+"""
+
+import json
+import os
+import select
+import subprocess
+import sys
+import time
+
+FRAME = 1 / 60
+
+
+def main():
+    provider = subprocess.Popen(["music-current-json", "--follow", *sys.argv[1:]], stdout=subprocess.PIPE)
+    fd = provider.stdout.fileno()
+    pending = b""
+    line = None
+    playing = False
+    origin = time.monotonic()
+    print("0", flush=True)
+
+    while True:
+        ready, _, _ = select.select([fd], [], [], FRAME if playing else None)
+        if ready:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                return
+            *updates, pending = (pending + chunk).split(b"\n")
+            for update in filter(None, updates):
+                current = json.loads(update)
+                track = current.get("track", {})
+                now_line = (track.get("title"), track.get("artist"), track.get("album_artist"), track.get("album"))
+                now_playing = current.get("playback", {}).get("state") == "playing"
+                if now_line != line or (now_playing and not playing):
+                    origin = time.monotonic()
+                if playing and not now_playing:
+                    # Left at the start, so a resumed line is not drawn at the
+                    # old offset before the next tick arrives.
+                    print("0", flush=True)
+                line, playing = now_line, now_playing
+        if playing:
+            print(f"{time.monotonic() - origin:.3f}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

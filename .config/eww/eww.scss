@@ -149,6 +149,30 @@ $music-dim: darken($middle-gray, 22%);
   color: $music-dim;
 }
 
+/* Holds the field's width while the marquee above it moves. */
+.music__field--hidden {
+  color: transparent;
+}
+
+/* Blank space between laps, not a dot: a dot here reads as the separator
+   between two fields. */
+.music__lap {
+  margin-right: 24px;
+}
+
+/* A scrolled window only for its clipping: nothing about it may look or act
+   scrollable. */
+.music__marquee {
+  scrollbar {
+    opacity: 0;
+  }
+
+  undershoot,
+  overshoot {
+    background: none;
+  }
+}
+
 /* Playing is the quiet default; paused is the state worth noticing, so it is the
    one that brightens. */
 .music__state {

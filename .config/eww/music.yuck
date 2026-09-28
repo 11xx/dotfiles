@@ -6,24 +6,63 @@
            :initial '{"player":{},"playback":{"state":"stopped","duration":0.0,"elapsed":0.0,"elapsed_percent":0.0},"track":{"title":"","artist":"","album_artist":"","album":""},"audio":{},"library":{},"file":{}}'
            "music-current-json --follow --player=muzaiten,youtube-music")
 
-;; One step per 400ms: enough to read as movement, slow enough not to pull the
-;; eye away from whatever the user is actually doing.
-(deflisten music-tick
+;; Seconds since the line last started over, which it does on a new track and
+;; when playback resumes. The helper follows the same player as music-data and
+;; falls silent while nothing plays, so a paused line is not redrawn sixty times
+;; a second.
+(deflisten music-clock
            :initial "0"
-           `i=0; while :; do printf '%s\\n' "$i"; i=$((i + 1)); sleep 0.4; done`)
+           "./music-marquee-clock --player=muzaiten,youtube-music")
 
-;; The window is cut from the text, a gap, and the text again, so it wraps around
-;; instead of snapping back when it reaches the end. Every field shares the one
-;; tick, so a scrolling line costs no more than a still one.
+;; How many columns the text fills, counting the wide CJK characters as two, so
+;; a Chinese title is judged by the space it takes and not by its bytes.
 (defwidget music-marquee [text limit class]
-           (label :class "music__field ${class}"
-                  :limit-width limit
-                  :tooltip text
-                  :text {music-data.playback.state != "playing" || strlength(text) <= limit
-                         ? text
-                         : substring("${text}  ·  ${text}",
-                                     music-tick % (strlength(text) + 5),
-                                     limit)}))
+           (music-marquee-columns :text text
+                                  :limit limit
+                                  :class class
+                                  :columns {arraylength(search(text, "."))
+                                            + arraylength(search(text, "[\\p{Han}\\p{Hiragana}\\p{Katakana}\\p{Hangul}\\x{3000}-\\x{303F}\\x{FF01}-\\x{FF60}]"))}))
+
+;; The field is as wide as the truncated label underneath it, whether it is
+;; still or moving, so the line never changes size. While playing, that label
+;; turns invisible and a clipped window over it shows the moving strip. The
+;; window is a scrolled one only for its clipping; an empty eventbox lies over it
+;; and takes the pointer's scroll events, which would otherwise scroll it off the
+;; strip.
+;;
+;; A lap is the strip resting three seconds at its start, then sliding one copy
+;; of the text and its gap along. `lap` is how long the slide takes: the text
+;; and its 24-pixel gap, taken as four columns, at 5.5 columns a second, about
+;; 32 pixels.
+(defwidget music-marquee-columns [text limit class columns]
+           (overlay :tooltip text
+                    (label :class "music__field ${class} ${music-data.playback.state == 'playing' && columns > limit ? 'music__field--hidden' : ''}"
+                           :limit-width limit
+                           :text text)
+                    (scroll :class "music__marquee"
+                            :visible {music-data.playback.state == "playing" && columns > limit}
+                            :hscroll true
+                            :vscroll false
+                            (music-marquee-strip :text text
+                                                 :class class
+                                                 :lap {(columns + 4) / 5.5}))
+                    (eventbox (box))))
+
+;; The strip is the text and its gap twice over, so sliding it by half its width
+;; lands exactly where it began and the lap wraps around instead of snapping
+;; back.
+;;
+;; A transform only moves by whole pixels. The strip is squeezed to half width
+;; and stretched back inside, so each of those pixels lands as half of one on
+;; screen, the finest step a doubled-resolution surface can draw, and a lap is
+;; the inner transform's full width.
+(defwidget music-marquee-strip [text class lap]
+           (transform :scale-x "50%"
+                      (transform :translate-x "-${(music-clock % (lap + 3)) < 3 ? 0 : (music-clock % (lap + 3) - 3) / lap * 100}%"
+                                 :scale-x "200%"
+                                 (box :space-evenly false
+                                      (label :class "music__field music__lap ${class}" :text text)
+                                      (label :class "music__field music__lap ${class}" :text text)))))
 
 ;; Its separator belongs to the field, so a track naming no album leaves no
 ;; dangling dot behind. mpris reports a missing tag as the string "null".

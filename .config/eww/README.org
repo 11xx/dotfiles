@@ -10,16 +10,17 @@ and monitor focus.
 
 * What is here
 
-| File                 | What it holds                                                       |
-|----------------------+---------------------------------------------------------------------|
-| =eww.yuck=           | Both bar windows, their modules, and the widgets defined here        |
-| =eww.scss=           | Styling for everything on the bars, and the imports that reach it    |
-| =music.yuck=         | The now-playing line: marquee fields, transport state, progress      |
-| =swaync.yuck=        | The notification bell and its count                                  |
-| =swaync.scss=        | Styling for that bell                                                |
-| =dark-colors.scss=   | Palette variables, dark                                              |
-| =light-colors.scss=  | Palette variables, light                                             |
-| =colors.scss=        | Symlink to whichever of those two is current                         |
+| File                  | What it holds                                                     |
+|-----------------------+-------------------------------------------------------------------|
+| =eww.yuck=            | Both bar windows, their modules, and the widgets defined here     |
+| =eww.scss=            | Styling for everything on the bars, and the imports that reach it |
+| =music.yuck=          | The now-playing line: marquee fields, transport state, progress   |
+| =music-marquee-clock= | The clock those marquees slide by, silent while nothing plays     |
+| =swaync.yuck=         | The notification bell and its count                               |
+| =swaync.scss=         | Styling for that bell                                             |
+| =dark-colors.scss=    | Palette variables, dark                                           |
+| =light-colors.scss=   | Palette variables, light                                          |
+| =colors.scss=         | Symlink to whichever of those two is current                      |
 
 Why a widget looks or behaves the way it does is a comment beside it, in the
 file that draws it.
