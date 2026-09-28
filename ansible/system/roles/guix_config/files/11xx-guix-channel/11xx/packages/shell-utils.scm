@@ -1,14 +1,10 @@
 ;;; Managed by Ansible (role: guix_config) — edit the role, not this file.
 ;;;
-;;; zsh plugins for gak.
+;;; Optional zsh plugins packaged for the local channel.
 ;;;
-;;; Guix packages some of these already, but under names and layouts that do not
-;;; match what the other two hosts use: zsh-powerlevel10k against powerlevel10k,
-;;; and .plugin.zsh against .zsh for the entry file. Declaring all of them here
-;;; with one install plan means gak resolves plugins at exactly the paths ak and
-;;; pak do, so the shared rc.d fragments need no per-host branching at all.
+;;; Each package installs under share/zsh/plugins/<name>/ so a zsh configuration
+;;; can load a consistent entry path.
 ;;;
-;;; Versions are kept in step with group_vars/all/shell in the Ansible tree.
 ;;; Hashes are `guix hash -rx` over a checkout of the tag.
 
 (define-module (11xx packages shell-utils)
@@ -33,7 +29,7 @@
 
 ;; Yoinked from
 ;; https://gitlab.com/bigbookofbug/bugchan/-/blob/master/bugchan/packages/shell-utils-extra.scm
-;; then retargeted from share/zsh/plugins/zsh-powerlevel10k to the shared name.
+;; then placed under the powerlevel10k plugin directory.
 (define-public zsh-powerlevel10k
   (package
     (name "powerlevel10k")

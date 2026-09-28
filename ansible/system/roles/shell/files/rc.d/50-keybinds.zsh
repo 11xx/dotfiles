@@ -1,8 +1,7 @@
 # Managed by Ansible (role: shell) — edit the role, not this file.
 #
-# Emacs bindings, plus the terminal keys zsh does not bind out of the box.
-# Anything needing a display server (clipboard integration, for one) belongs in
-# a host's own config, not here: gak and pak have no session to talk to.
+# Base Emacs bindings for ak's terminal. Host-specific bindings in .zshrc
+# take precedence.
 
 bindkey -e
 

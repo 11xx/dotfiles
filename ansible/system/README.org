@@ -55,18 +55,16 @@ Guix System ships no Python, so gak needs one installed by hand before Ansible
 can reach it at all. After that its own configuration keeps the interpreter
 alive.
 
-** The shell is shared, once
+** Shell packages and user configuration
 
-All three machines source the same numbered fragments, deployed from one place.
-Anything host-specific stays out of them and is sourced afterwards, where it can
-override whatever it needs to. The desktop's large interactive config is layered
-on top this way rather than being duplicated or trimmed down.
+Ansible installs zsh, atuin, and zoxide on pak; Guix Home provides them on gak.
+It sets pak's login shell. Gak and pak own their interactive startup files and
+keybindings outside this role. Gak's Guix Home zsh service loads the user's
+=~/.config/zsh/local.zsh=; pak reads its own =.zshenv= and =.zshrc=.
 
-zsh plugins are pinned checkouts rather than distribution packages: the two
-package managers disagree on names, paths and what they even carry, and a
-checkout at a tag puts identical files in identical places. Guix cannot use that
-layout — it has no =/usr/share= — so it builds the same plugins at the same
-versions from a local channel into the same relative paths.
+Ak's interactive configuration lives in its literate shell source and local
+=rc.d= fragments, which this role deploys. Its additional zsh plugins are pinned
+checkouts under =/usr/share/zsh/plugins=.
 
 * Secrets
 

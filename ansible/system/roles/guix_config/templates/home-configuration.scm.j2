@@ -11,9 +11,7 @@
              (guix gexp)
              (gnu home services shells)
              (gnu home services gnupg)
-             (gnu home services shepherd)
-
-             ((11xx packages shell-utils) #:prefix 11xx:))
+             (gnu home services shepherd))
 
 (home-environment
  (packages
@@ -36,7 +34,6 @@
           "btop"
           "smartmontools"
 
-          ;; Sidecars 60-sidecars.zsh initialises.
           "zoxide"
           "fzf"
           "atuin"
@@ -45,15 +42,7 @@
           "python"
           "podman-compose"))
 
-   ;; zsh plugins come from the local 11xx channel rather than Guix upstream, so
-   ;; they land under share/zsh/plugins/<name>/ with the same names and entry
-   ;; files ak and pak use. That is what lets rc.d be shared verbatim.
-   (list (load "{{ guix_home_config_dir }}/packages/gak-services.scm")
-         11xx:zsh-powerlevel10k
-         11xx:zsh-autopair
-         11xx:zsh-autosuggestions
-         11xx:zsh-syntax-highlighting
-         11xx:zsh-history-substring-search)))
+   (list (load "{{ guix_home_config_dir }}/packages/gak-services.scm"))))
 
  (services
   (append
@@ -62,29 +51,8 @@
              (home-zsh-configuration
               (xdg-flavor? #t)
               (zshrc
-               (list
-                ;; Emacs TRAMP and other dumb terminals get a bare shell. A
-                ;; themed prompt makes TRAMP hang waiting for a banner it cannot
-                ;; parse. This cannot move into rc.d: `return` inside a sourced
-                ;; file leaves only that file, not the whole zshrc.
-                (plain-file "00-dumb-terminal-guard.zsh"
-                            "if [[ $TERM == dumb ]] || [[ -n $INSIDE_EMACS ]]; then
-    unsetopt zle
-    PS1='$ '
-    export HISTFILE=$HOME/.tramp_history
-    return
-fi
-")
-
-                ;; Everything else is the shared layer, deployed by Ansible's
-                ;; shell role and identical on ak, gak and pak. Host-specific
-                ;; zsh code belongs below this loop, not inside rc.d.
-                (plain-file "10-shared-fragments.zsh"
-                            "for _fragment in {{ zsh_rc_dir }}/*.zsh(N.); do
-    source \"$_fragment\"
-done
-unset _fragment
-")))))
+               (list (plain-file "host-shell-loader.zsh"
+                                 "source \"$HOME/.config/zsh/local.zsh\"\n")))))
 
     ;; Rootless podman. The store lives on /marak because the root filesystem is
     ;; a 500 GB NVMe and container images are the one thing here that grows

@@ -39,7 +39,7 @@
   become: true
 
 # Debian ships the binaries under different names to avoid collisions with
-# older packages. The shared aliases and nnn plugins expect the upstream names.
+# older packages. User tools can use the upstream names on pak.
 - name: 'shell: Give Debian-renamed binaries their upstream names'
   ansible.builtin.file:
     src: "{{ item.src }}"

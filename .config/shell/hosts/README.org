@@ -1,0 +1,17 @@
+#+TITLE: Headless Zsh configurations
+
+Gak and pak each own a small interactive Zsh configuration. Their files are
+independent copies so a host can change a binding without changing the other.
+Both use zsh subword editing, Atuin on Ctrl-R, prefix search on Up and Down,
+zoxide for =cd=, and Zsh's standard completion. Zsh keeps its plain-text
+history under XDG state as a fallback.
+
+Gak's Guix Home zsh service loads =~/.config/zsh/local.zsh=. Copy
+=gak/zshrc.zsh= there before reconfiguring Guix Home. Guix Home supplies zsh,
+atuin, and zoxide in the profile. Pak's login shell reads =~/.zshenv=, which
+sets =ZDOTDIR=, and then =~/.config/zsh/.zshrc=. Copy =pak/zshenv= and
+=pak/zshrc.zsh= to those paths.
+
+Ansible installs Pak's shell packages and keeps its login shell set to zsh.
+It does not deploy either host's interactive shell files. Gak's Guix Home
+expression supplies the startup loader but leaves the loaded file to the user.

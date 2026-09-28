@@ -18,6 +18,12 @@ the only privileged path. See the =ai-agent-remote= architecture and operations
 documents for module runtime invariants, backup recovery, Gitolite policy, and
 the collection role interfaces.
 
+Guix Home owns Gak's zsh startup entry and loads
+=~/.config/zsh/local.zsh= from the user's shell configuration. The file must
+exist before =guix home reconfigure ~/.config/guix-home/home-configuration.scm=.
+The expression provides zsh, atuin, and zoxide; the user's file owns bindings
+and shell behavior.
+
 The host-specific operator runtime probe exercises the rendered
 =gak-operator-runtime= program against disposable local paths. On Gak, use the
 current expression and the module files staged by the collection roles:

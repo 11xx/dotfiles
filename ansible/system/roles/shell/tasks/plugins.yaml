@@ -1,12 +1,7 @@
 ---
 # Plugins as pinned checkouts rather than distribution packages.
 #
-# zsh and its plugin ecosystem are feature-complete enough that tracking a
-# distribution's packaging buys nothing: Arch splits them across the repos and
-# the AUR, Debian ships a subset, and the two disagree on install paths
-# (/usr/share/zsh/plugins/<name>/ against /usr/share/<name>/). A checkout at a
-# tag gives every host the same files in the same place. Arch's layout is the
-# one both can use, so it is the one all hosts get.
+# Ak loads these plugins from pinned checkouts under /usr/share/zsh/plugins.
 
 - name: 'shell: Ensure git is available to fetch plugins'
   ansible.builtin.package:
@@ -16,8 +11,7 @@
 
 # Removal comes first, and has to: on Arch these packages own
 # /usr/share/zsh/plugins/<name>/ outright, and cloning into a populated
-# directory that is not already a checkout fails. Elsewhere they merely leave a
-# second copy for the shared fragments to load by accident.
+# directory that is not already a checkout fails.
 - name: 'shell: Remove packaged zsh plugins superseded by checkouts'
   community.general.pacman:
     name:
@@ -31,17 +25,7 @@
   become: true
   when: "'arch' in group_names"
 
-- name: 'shell: Remove packaged zsh plugins superseded by checkouts'
-  ansible.builtin.apt:
-    name:
-      - zsh-syntax-highlighting
-      - zsh-autosuggestions
-    state: absent
-  become: true
-  when: "'debian' in group_names"
-
-# antidote was cloned here as a plugin manager and then never referenced by any
-# shell config on any host. Pinned checkouts make it redundant outright.
+# Ak loads its plugins directly from pinned checkouts.
 - name: 'shell: Remove the unused antidote clone'
   ansible.builtin.file:
     path: /usr/share/zsh-antidote
@@ -71,7 +55,7 @@
     label: "{{ item.name }} {{ item.version }}"
   become: true
 
-- name: 'shell: Verify every plugin the shared fragments will source exists'
+- name: 'shell: Verify every ak plugin entry exists'
   ansible.builtin.stat:
     path: "{{ zsh_plugin_dir }}/{{ item.name }}/{{ item.entry }}"
   loop: "{{ zsh_plugins }}"
@@ -88,7 +72,7 @@
     that: item.stat.exists
     fail_msg: >-
       {{ item.item.name }} {{ item.item.version }} has no {{ item.item.entry }}.
-      The upstream layout changed; update `entry` in group_vars/all/shell.
+      The upstream layout changed; update `entry` in host_vars/ak/shell.
   loop: "{{ zsh_plugin_entries.results }}"
   loop_control:
     label: "{{ item.item.name }}"

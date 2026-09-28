@@ -1,7 +1,6 @@
 ---
 # zsh plugins and the powerlevel10k theme are deliberately absent here: they are
-# checkouts managed by plugins.yaml, identically on every host, so that a shell
-# fix does not wait on a package rebuild.
+# checkouts managed by plugins.yaml, with versions independent of Arch packages.
 
 - name: 'shell: Install zsh and its completion data'
   community.general.pacman:

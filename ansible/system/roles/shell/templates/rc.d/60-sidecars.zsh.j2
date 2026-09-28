@@ -6,8 +6,7 @@
 {% for sidecar in zsh_sidecars %}
 
 {% if sidecar == 'atuin' %}
-# --disable-up-arrow keeps Up bound to zsh's own prefix search from
-# 50-keybinds.zsh; atuin stays on Ctrl-R.
+# --disable-up-arrow keeps Up bound to ak's prefix search; atuin uses Ctrl-R.
 (( $+commands[atuin] )) && eval "$(atuin init zsh --disable-up-arrow)"
 {% elif sidecar == 'zoxide' %}
 # --cmd cd shadows cd entirely, so plain `cd` learns frecency and no second verb

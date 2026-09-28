@@ -1,11 +1,7 @@
 ---
-# The shared layer itself: a directory of numbered fragments that every host
-# sources in filename order. Fragments are shared verbatim; anything that only
-# makes sense on one host stays in that host's own config, which is sourced
-# after rc.d and so can override anything here.
+# ak sources these numbered fragments before its host-specific configuration.
 #
-# Nothing in this file escalates. Every path is under the target user's home,
-# which is what lets gak participate without a become password.
+# Every path is under the user's home.
 
 - name: 'shell: Create ZDOTDIR and its fragment directory'
   ansible.builtin.file:
@@ -42,7 +38,7 @@
   register: zsh_rc_present
   changed_when: false
 
-- name: 'shell: Remove fragments no longer part of the shared set'
+- name: 'shell: Remove fragments outside the ak set'
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -53,25 +49,3 @@
     zsh_rc_managed: >-
       {{ (query('fileglob', role_path ~ '/files/rc.d/*.zsh') | map('basename') | list)
          + ['40-plugins.zsh', '60-sidecars.zsh'] }}
-
-# ak's .zshrc is tangled from ~/.config/shell/README.org and gak's is generated
-# by Guix Home, so both source rc.d on their own terms. Only pak has no shell
-# config of its own for Ansible to defer to.
-- name: 'shell: Deploy zshenv and zshrc'
-  ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
-    mode: "0644"
-  loop:
-    - { src: zshenv.j2, dest: "{{ ansible_facts['user_dir'] }}/.zshenv" }
-    - { src: zshrc.j2, dest: "{{ zdotdir }}/.zshrc" }
-  loop_control:
-    label: "{{ item.dest }}"
-  when: zsh_manage_zshrc | default(false)
-
-- name: 'shell: Set the login shell to zsh'
-  ansible.builtin.user:
-    name: "{{ ansible_user }}"
-    shell: "{{ zsh_login_shell | default('/bin/zsh') }}"
-  become: true
-  when: zsh_manage_zshrc | default(false)

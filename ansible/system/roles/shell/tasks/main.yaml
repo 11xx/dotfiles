@@ -1,8 +1,6 @@
 ---
-# The one role every host runs. Three parts, separately taggable because they
-# change and fail for different reasons: packages (distribution-specific),
-# plugins (host-independent checkouts), and the rc.d fragments (pure config, and
-# the part that actually changes week to week).
+# Install shell packages and the plugin checkouts used by ak. Gak and pak own
+# their interactive configuration separately.
 
 - name: 'shell: Install packages for Arch'
   ansible.builtin.include_tasks: packages-arch.yaml
@@ -14,14 +12,22 @@
   when: "'debian' in group_names"
   tags: ['shell-packages']
 
-# Guix installs nothing here: it resolves plugins from the Home profile, built
-# from the 11xx channel and declared in home-configuration.scm. It has no
-# /usr/share to install into and no reason to grow one.
-- name: 'shell: Install zsh plugins'
+# ak loads these checkouts from its own rc.d configuration. Guix and Debian
+# headless shells use zsh, atuin, and zoxide without additional plugins.
+- name: 'shell: Install ak zsh plugins'
   ansible.builtin.include_tasks: plugins.yaml
-  when: "'guix' not in group_names"
+  when: "'arch' in group_names"
   tags: ['shell-plugins']
 
-- name: 'shell: Deploy shared rc.d fragments'
+- name: 'shell: Deploy ak rc.d fragments'
   ansible.builtin.include_tasks: rc.yaml
+  when: "'arch' in group_names"
   tags: ['shell-rc']
+
+- name: 'shell: Set the login shell'
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    shell: "{{ zsh_login_shell }}"
+  become: true
+  when: zsh_login_shell is defined
+  tags: ['shell-packages']

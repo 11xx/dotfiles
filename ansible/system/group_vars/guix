@@ -1,8 +1,3 @@
-# Guix owns its own package tree and has no /usr/share, so plugins resolve out
-# of the Home profile. They are declared in home-configuration.scm, with the
-# ones Guix upstream does not carry packaged in the local 11xx channel.
-zsh_plugin_dir: "{{ ansible_facts['user_dir'] }}/.guix-home/profile/share/zsh/plugins"
-
 # Guix System is reconfigured by hand from these files. Ansible is their source
 # of truth and ships them; it never runs `guix system reconfigure` or
 # `guix home reconfigure`, both of which are slow and can leave the host

@@ -1,8 +1,6 @@
 # Managed by Ansible (role: shell) — edit the role, not this file.
 #
-# Only aliases that mean the same thing on all three hosts. Package-manager
-# shorthands and anything desktop-bound live in the host's own config, which is
-# sourced after this file and so can override anything here.
+# Base aliases for ak. Its .zshrc can override them.
 
 # Listing. `l` is the everyday one; `lo` keeps the owner column for when it
 # matters, which on a shared media tree is more often than on a laptop.
