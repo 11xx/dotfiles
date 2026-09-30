@@ -8,9 +8,9 @@ This tree owns machine inventories, host compositions, media application roles,
 and host-specific selections. Plain files and templates are maintained directly;
 Org documents describe operational boundaries.
 
-The =ai-agent-remote= project owns the portable agent workload, workstation
+The =agent-remote= project owns the portable agent workload, workstation
 operator command, shared Compose runtime and Guix/Gitolite concern modules.
-This tree selects the =ai_agent.remote= roles and retains host-specific
+This tree selects the =aiagent.remote= roles and retains host-specific
 inventory, media declarations, whole-system composition, storage and ingress.
 Build and install the collection with =bin/install-remote-collection= before
 running a play that imports it.

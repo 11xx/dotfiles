@@ -13,7 +13,7 @@ are owned by the login user.
 =gak_compose_autostart= list. It also supplies =gak_compose_supported=,
 =gak_compose_never_autostart= and =gak_compose_external_networks=. The
 autostart list may select declared web applications and Nextcloud, but never
-the Recyclarr batch job. The =ai_agent.remote.compose_runtime= collection role deploys the five
+the Recyclarr batch job. The =aiagent.remote.compose_runtime= collection role deploys the five
 instance lists, shared lifecycle helper and updater package sources under the
 login user's home. Guix Home installs the update command from those sources.
 The
@@ -39,8 +39,8 @@ runs on. Tailscale owns ingress.
 * Agent host instance
 
 The =gak-aiagent= inventory target keeps its own =aiagent= account and mounted
-home. The =ai_agent.remote.agent= role installs the workload, while
-=ai_agent.remote.operator= installs the existing workstation command at
+home. The =aiagent.remote.agent= role installs the workload, while
+=aiagent.remote.operator= installs the existing workstation command at
 =~/.local/bin/gak-aiagent=. The agent and media instances install the same
 =compose_runtime= role into their separate accounts.
 
@@ -50,8 +50,8 @@ system composition remains here; the collection owns those concern modules
 and their package tests. Build the rendered system expression before the
 explicit activation step. The workload's operator commands, provider state,
 update boundary, root backup, Gitolite policy and recovery procedures are
-maintained in =ai-agent-remote/docs/operations.org= and
-=ai-agent-remote/docs/architecture.org=.
+maintained in =agent-remote/docs/operations.org= and
+=agent-remote/docs/architecture.org=.
 
 The first host retains the existing =/home/aiagent= image-backed account,
 container-home, workspaces, cache, rootless Podman maps, loopback T3 port and
@@ -90,7 +90,7 @@ not share application state or networks across those boundaries.
 * Boot and ordinary operations
 
 The host composition retains the stable Shepherd service =gak-compose=.
-=ai_agent.remote.compose_runtime= deploys its lifecycle helper and
+=aiagent.remote.compose_runtime= deploys its lifecycle helper and
 Compose policy lists; system.scm selects the existing operator user,
 PATH, mount and cgroup prerequisites. Boot selection remains an explicit list.
 Recyclarr is never in that list, and an empty list starts no projects.
@@ -114,7 +114,7 @@ podman compose -f ~/services/recyclarr/compose.yaml run --rm recyclarr
 
 The media projects keep their current networks and state paths. The shared
 helper's ownership, shutdown and crash-recovery invariants are maintained in
-=ai-agent-remote/docs/architecture.org=.
+=agent-remote/docs/architecture.org=.
 
 * Updating images
 
@@ -131,7 +131,7 @@ gak-services update sonarr jellyfin
 #+end_src
 
 The command's process bounds, readiness contract, diagnostics and recovery
-limits are documented in =ai-agent-remote/docs/operations.org=. Media image
+limits are documented in =agent-remote/docs/operations.org=. Media image
 channels and project-specific update hooks remain in each application role.
 Nextcloud's existing backup command remains its =before-update= gate, and its
 readiness command still requires a healthy application status response.
@@ -141,11 +141,11 @@ readiness command still requires a healthy application status response.
 Run from this directory:
 
 #+begin_src sh
-AI_AGENT_REMOTE_COLLECTION_SOURCE=/path/to/ai-agent-remote \
+AIAGENT_REMOTE_COLLECTION_SOURCE=/path/to/agent-remote \
   ./bin/install-remote-collection
 #+end_src
 
-=AI_AGENT_REMOTE_COLLECTION_SOURCE= names a local Git repository containing
+=AIAGENT_REMOTE_COLLECTION_SOURCE= names a local Git repository containing
 the full commit in =collection-pin=. The installer archives that commit's
 =ansible/= subtree into temporary =$HOME/.cache= scratch before building. The
 repository's checked-out HEAD and mutable worktree files do not affect the
@@ -196,11 +196,11 @@ python3 tests/gak/compose-consumer-check.py
 Exercise the pinned artifact bootstrap with a disposable source clone:
 
 #+begin_src sh
-AI_AGENT_REMOTE_COLLECTION_SOURCE=/path/to/ai-agent-remote \
+AIAGENT_REMOTE_COLLECTION_SOURCE=/path/to/agent-remote \
   python3 tests/gak/collection-bootstrap.py
 #+end_src
 
-Set =AI_AGENT_REMOTE_COLLECTION_ROOT= to the installed collection root for
+Set =AIAGENT_REMOTE_COLLECTION_ROOT= to the installed collection root for
 these commands. =TMPDIR= should point to task-owned scratch under the user's
 home.
 
@@ -252,7 +252,7 @@ podman ps -a
 #+end_src
 
 Building Guix programs does not execute their root-only paths. Portable module
-probes live in =ai-agent-remote/tests/guix= and use disposable targets. The
+probes live in =agent-remote/tests/guix= and use disposable targets. The
 Gak-specific operator runtime test remains in =tests/gak=:
 
 #+begin_src sh
@@ -388,7 +388,7 @@ either snapshots first or recreates nothing.
 application tables and removes only its own scratch state.
 
 Agent image updates, provider state, root backup and rollback are documented
-in =ai-agent-remote/docs/operations.org=. The host's private password,
+in =agent-remote/docs/operations.org=. The host's private password,
 repository location, retention values and mutable backup state remain in the
 Gak configuration and on the host.
 
@@ -405,4 +405,4 @@ skeleton; the host expression selects Gitolite independently from the agent
 workload. The policy grants the operator administrative control and confines
 agent writes to its work branches. The shared backup lock keeps Gitolite
 receives and repository bundles mutually exclusive. Setup, push, backup and
-restore commands are documented in =ai-agent-remote/docs/operations.org=.
+restore commands are documented in =agent-remote/docs/operations.org=.

@@ -1,8 +1,8 @@
 #+TITLE: Gak Guix composition
 
 This role owns the complete Gak system and Home expressions, channel list, and
-host-specific values. The =ai_agent.remote.guix= and
-=ai_agent.remote.gitolite= collection roles stage their separate concern
+host-specific values. The =aiagent.remote.guix= and
+=aiagent.remote.gitolite= collection roles stage their separate concern
 modules under ={{ guix_config_dir }}/modules/aiagent=. The system expression
 imports each module only when its corresponding host selection is enabled.
 
@@ -14,7 +14,7 @@ guix system build -L ~/.config/guix/modules ~/.config/guix/system.scm
 
 System activation remains an explicit operator action. Normal Ansible runs
 deploy expressions and report pending activation; the =guix-activate= tag is
-the only privileged path. See the =ai-agent-remote= architecture and operations
+the only privileged path. See the =agent-remote= architecture and operations
 documents for module runtime invariants, backup recovery, Gitolite policy, and
 the collection role interfaces.
 

@@ -7,7 +7,7 @@ set -Eeuo pipefail
 : "${TMPDIR:=/tmp}"
 here=$(cd "$(dirname "$0")" && pwd)
 system=$(cd "$here/../.." && pwd)
-collection_root=${AI_AGENT_REMOTE_COLLECTION_ROOT:-"$system/.ansible/collections/ansible_collections/ai_agent/remote"}
+collection_root=${AIAGENT_REMOTE_COLLECTION_ROOT:-"$system/.ansible/collections/ansible_collections/aiagent/remote"}
 updater=${GAK_SERVICES_TEST_COMMAND:-"$here/run-updater"}
 
 command -v ansible-playbook >/dev/null || {

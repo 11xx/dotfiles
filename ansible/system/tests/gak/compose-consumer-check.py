@@ -11,8 +11,8 @@ import tempfile
 
 SYSTEM = Path(__file__).resolve().parents[2]
 COLLECTION = Path(os.environ.get(
-    "AI_AGENT_REMOTE_COLLECTION_ROOT",
-    SYSTEM / ".ansible/collections/ansible_collections/ai_agent/remote",
+    "AIAGENT_REMOTE_COLLECTION_ROOT",
+    SYSTEM / ".ansible/collections/ansible_collections/aiagent/remote",
 )).resolve()
 if not (COLLECTION / "MANIFEST.json").is_file():
     raise SystemExit(f"installed collection is missing: {COLLECTION}")
@@ -21,7 +21,7 @@ CACHE = Path.home() / ".cache"
 CACHE.mkdir(parents=True, exist_ok=True)
 
 with tempfile.TemporaryDirectory(
-    prefix="ai-agent-remote-consumer-check.",
+    prefix="agent-remote-consumer-check.",
     dir=CACHE,
 ) as temporary:
     root = Path(temporary)

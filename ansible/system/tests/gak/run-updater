@@ -1,6 +1,6 @@
 #!/bin/sh
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 system=$(CDPATH= cd -- "$here/../.." && pwd)
-collection_root=${AI_AGENT_REMOTE_COLLECTION_ROOT:-$system/.ansible/collections/ansible_collections/ai_agent/remote}
+collection_root=${AIAGENT_REMOTE_COLLECTION_ROOT:-$system/.ansible/collections/ansible_collections/aiagent/remote}
 exec "${GAK_SERVICES_HOME_PROFILE:?fixture profile required}/bin/python3" -I \
     "${GAK_SERVICES_IMPLEMENTATION:-$collection_root/roles/compose_runtime/files/gak-services.py}" "$@"

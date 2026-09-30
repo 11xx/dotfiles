@@ -11,8 +11,8 @@ import yaml
 
 SYSTEM = Path(__file__).resolve().parents[2]
 COLLECTION = Path(os.environ.get(
-    "AI_AGENT_REMOTE_COLLECTION_ROOT",
-    SYSTEM / ".ansible/collections/ansible_collections/ai_agent/remote",
+    "AIAGENT_REMOTE_COLLECTION_ROOT",
+    SYSTEM / ".ansible/collections/ansible_collections/aiagent/remote",
 )).resolve()
 COMPOSE = COLLECTION / "roles/agent/templates/agent-compose.yaml.j2"
 INGRESS = SYSTEM / "roles/gak_ingress/templates/tailscale-services.j2"
@@ -43,8 +43,8 @@ def main():
             "vars_files": [str(SHARED), str(INGRESS_DEFAULTS)],
             "vars": {
                 "gak_aiagent_host_enabled": True,
-                "ai_agent_remote_agent_home": "/home/aiagent",
-                "ai_agent_remote_agent_t3_port": "{{ gak_t3_port }}",
+                "aiagent_remote_agent_home": "/home/aiagent",
+                "aiagent_remote_agent_t3_port": "{{ gak_t3_port }}",
                 "gak_applications": ["koito", "nextcloud"],
                 "gak_koito_service_name": "koito",
                 "gak_koito_port": 4110,

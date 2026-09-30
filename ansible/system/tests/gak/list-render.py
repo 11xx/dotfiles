@@ -11,8 +11,8 @@ import yaml
 
 SYSTEM = Path(__file__).resolve().parents[2]
 COLLECTION = Path(os.environ.get(
-    "AI_AGENT_REMOTE_COLLECTION_ROOT",
-    SYSTEM / ".ansible/collections/ansible_collections/ai_agent/remote",
+    "AIAGENT_REMOTE_COLLECTION_ROOT",
+    SYSTEM / ".ansible/collections/ansible_collections/aiagent/remote",
 )).resolve()
 COLLECTIONS_PATH = COLLECTION.parents[2]
 ROLE = COLLECTION / "roles/compose_runtime"
@@ -37,17 +37,17 @@ assert media["gak_compose_external_networks"] == baseline["networks"]
 gak_play = next(play for play in yaml.safe_load((SYSTEM / "gak.yaml").read_text())
                 if play.get("hosts") == "gak" and "roles" in play)
 compose_role = next(role for role in gak_play["roles"]
-                    if role.get("role") == "ai_agent.remote.compose_runtime")
+                    if role.get("role") == "aiagent.remote.compose_runtime")
 assert compose_role["vars"] == {
-    "ai_agent_remote_compose_home": "{{ ansible_facts['user_dir'] }}",
-    "ai_agent_remote_compose_services_root": "{{ ansible_facts['user_dir'] }}/services",
-    "ai_agent_remote_compose_operator_bin_dir": "{{ gak_services_bin_dir }}",
-    "ai_agent_remote_compose_package_source_dir": "{{ guix_home_config_dir }}/packages",
-    "ai_agent_remote_compose_application_names": "{{ gak_applications }}",
-    "ai_agent_remote_compose_autostart_names": "{{ gak_compose_autostart }}",
-    "ai_agent_remote_compose_supported_names": "{{ gak_compose_supported }}",
-    "ai_agent_remote_compose_never_autostart_names": "{{ gak_compose_never_autostart }}",
-    "ai_agent_remote_compose_external_network_names": "{{ gak_compose_external_networks }}",
+    "aiagent_remote_compose_home": "{{ ansible_facts['user_dir'] }}",
+    "aiagent_remote_compose_services_root": "{{ ansible_facts['user_dir'] }}/services",
+    "aiagent_remote_compose_operator_bin_dir": "{{ gak_services_bin_dir }}",
+    "aiagent_remote_compose_package_source_dir": "{{ guix_home_config_dir }}/packages",
+    "aiagent_remote_compose_application_names": "{{ gak_applications }}",
+    "aiagent_remote_compose_autostart_names": "{{ gak_compose_autostart }}",
+    "aiagent_remote_compose_supported_names": "{{ gak_compose_supported }}",
+    "aiagent_remote_compose_never_autostart_names": "{{ gak_compose_never_autostart }}",
+    "aiagent_remote_compose_external_network_names": "{{ gak_compose_external_networks }}",
 }
 
 nextcloud_tasks = yaml.safe_load((SYSTEM / "roles/gak_nextcloud/tasks/main.yaml").read_text())
@@ -83,21 +83,21 @@ with tempfile.TemporaryDirectory(prefix="gak-compose-list-render-") as temporary
             "connection": "local",
             "gather_facts": False,
             "vars": {
-                "ai_agent_remote_compose_home": str(root),
-                "ai_agent_remote_compose_services_root": str(services),
-                "ai_agent_remote_compose_operator_bin_dir": str(root / "bin"),
-                "ai_agent_remote_compose_package_source_dir": str(root / "packages"),
-                "ai_agent_remote_compose_application_names": declared,
-                "ai_agent_remote_compose_autostart_names": enabled,
-                "ai_agent_remote_compose_supported_names": instance["supported"],
-                "ai_agent_remote_compose_never_autostart_names": instance["never_autostart"],
-                "ai_agent_remote_compose_external_network_names": instance["networks"],
-                "ai_agent_remote_compose_directory_mode": "0755",
-                "ai_agent_remote_compose_data_mode": "0644",
-                "ai_agent_remote_compose_package_mode": "0644",
-                "ai_agent_remote_compose_lifecycle_mode": "0755",
+                "aiagent_remote_compose_home": str(root),
+                "aiagent_remote_compose_services_root": str(services),
+                "aiagent_remote_compose_operator_bin_dir": str(root / "bin"),
+                "aiagent_remote_compose_package_source_dir": str(root / "packages"),
+                "aiagent_remote_compose_application_names": declared,
+                "aiagent_remote_compose_autostart_names": enabled,
+                "aiagent_remote_compose_supported_names": instance["supported"],
+                "aiagent_remote_compose_never_autostart_names": instance["never_autostart"],
+                "aiagent_remote_compose_external_network_names": instance["networks"],
+                "aiagent_remote_compose_directory_mode": "0755",
+                "aiagent_remote_compose_data_mode": "0644",
+                "aiagent_remote_compose_package_mode": "0644",
+                "aiagent_remote_compose_lifecycle_mode": "0755",
             },
-            "roles": [{"role": "ai_agent.remote.compose_runtime"}],
+            "roles": [{"role": "aiagent.remote.compose_runtime"}],
             "tasks": [task],
         }], sort_keys=False))
         result = subprocess.run(

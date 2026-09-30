@@ -14,9 +14,9 @@ import yaml
 
 
 SYSTEM = Path(__file__).resolve().parents[2]
-source_value = os.environ.get("AI_AGENT_REMOTE_COLLECTION_SOURCE")
+source_value = os.environ.get("AIAGENT_REMOTE_COLLECTION_SOURCE")
 if not source_value:
-    raise SystemExit("set AI_AGENT_REMOTE_COLLECTION_SOURCE to a local ai-agent-remote Git repository")
+    raise SystemExit("set AIAGENT_REMOTE_COLLECTION_SOURCE to a local agent-remote Git repository")
 SOURCE = Path(source_value).resolve()
 PIN = (SYSTEM / "collection-pin").read_text().strip()
 if not re.fullmatch(r"[0-9a-f]{40}", PIN):
@@ -50,7 +50,7 @@ def project(root, name, *, pin_contents=PIN):
         (system / "collection-pin").write_text(pin_contents)
     home = root / f"home-{name}"
     (home / ".cache").mkdir(parents=True)
-    env = dict(os.environ, HOME=str(home), AI_AGENT_REMOTE_COLLECTION_SOURCE=str(SOURCE_COPY))
+    env = dict(os.environ, HOME=str(home), AIAGENT_REMOTE_COLLECTION_SOURCE=str(SOURCE_COPY))
     return system, env
 
 
@@ -64,7 +64,7 @@ def refuse(root, name, *, pin_contents=None, expected):
 
 source_head_before = git(SOURCE, "rev-parse", "HEAD")
 source_status_before = git(SOURCE, "status", "--porcelain", "--untracked-files=all")
-with tempfile.TemporaryDirectory(prefix="ai-agent-remote-bootstrap.", dir=CACHE) as temporary:
+with tempfile.TemporaryDirectory(prefix="agent-remote-bootstrap.", dir=CACHE) as temporary:
     root = Path(temporary)
     SOURCE_COPY = root / "source"
     run(["git", "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(SOURCE), str(SOURCE_COPY)])
@@ -86,9 +86,9 @@ with tempfile.TemporaryDirectory(prefix="ai-agent-remote-bootstrap.", dir=CACHE)
 
     system, env = project(root, "pinned")
     result = run([str(system / "bin/install-remote-collection")], env=env)
-    assert f"installed ai_agent.remote from revision {PIN}" in result.stdout
+    assert f"installed aiagent.remote from revision {PIN}" in result.stdout
     assert (system / ".ansible/collection-revision").read_text().strip() == PIN
-    collection = system / ".ansible/collections/ansible_collections/ai_agent/remote"
+    collection = system / ".ansible/collections/ansible_collections/aiagent/remote"
     metadata = yaml.safe_load(git_bytes(SOURCE_COPY, "show", f"{PIN}:ansible/galaxy.yml"))
     collection_info = json.loads((collection / "MANIFEST.json").read_text())["collection_info"]
     for key in ("namespace", "name", "version", "authors", "readme", "description", "tags"):
@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix="ai-agent-remote-bootstrap.", dir=CACHE)
     (root / "ansible-tmp").mkdir()
     artifact_env = dict(
         os.environ,
-        AI_AGENT_REMOTE_COLLECTION_ROOT=str(collection),
+        AIAGENT_REMOTE_COLLECTION_ROOT=str(collection),
         ANSIBLE_COLLECTIONS_PATH=str(system / ".ansible/collections"),
         TMPDIR=str(root / "ansible-tmp"),
     )

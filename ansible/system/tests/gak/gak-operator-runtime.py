@@ -160,7 +160,7 @@ def main():
         "podman", "unshare", PROFILE / "readlink", "/proc/self/ns/mnt"
     ).stdout.strip()
     scratch = Path(os.environ.get(
-        "AI_AGENT_REMOTE_TEST_ROOT", Path.home() / ".cache/gak-aiagent-host"))
+        "AIAGENT_REMOTE_TEST_ROOT", Path.home() / ".cache/gak-aiagent-host"))
     scratch.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="media-runtime-", dir=scratch) as name:
         result = command("podman", "unshare", sys.executable, __file__,
