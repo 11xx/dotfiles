@@ -31,11 +31,11 @@ Each of these lives with the program it reports on, so its behaviour and its
 presentation stay in one place. This config includes them, places them on a bar,
 and supplies the colours from the palette above — it does not copy them.
 
-| Project                 | Included                       | Placed as                                              |
-|-------------------------+--------------------------------+--------------------------------------------------------|
-| =harness-status=        | =harness-status.yuck/.scss=    | Per-harness thread indicators, and the usage percentages |
-| =tibo-reset-monitor=    | =codex-reset.yuck/.scss=       | The Codex reset chance, when it is worth acting on     |
-| =ai-agent-computer-use= | =cu.yuck/.scss=                | A mark while an agent is driving this desktop          |
+| Project              | Included                    | Placed as                                                |
+|----------------------+-----------------------------+----------------------------------------------------------|
+| =harness-status=     | =harness-status.yuck/.scss= | Per-harness thread indicators, and the usage percentages |
+| =tibo-reset-monitor= | =codex-reset.yuck/.scss=    | The Codex reset chance, when it is worth acting on       |
+| =cu=                 | =cu.yuck/.scss=             | A mark while an agent is driving this desktop            |
 
 The include and import paths are relative — =../../code/<project>/eww/= — so eww
 resolves them against this directory and the checkouts have to be present there.

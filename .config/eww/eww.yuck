@@ -190,5 +190,5 @@
 (include "music.yuck")
 (include "../../code/harness-status/eww/harness-status.yuck")
 (include "../../code/tibo-reset-monitor/eww/codex-reset.yuck")
-(include "../../code/ai-agent-computer-use/eww/cu.yuck")
+(include "../../code/cu/eww/cu.yuck")
 (include "swaync.yuck")
