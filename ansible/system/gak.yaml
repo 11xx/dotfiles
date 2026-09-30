@@ -181,4 +181,6 @@
       vars:
         aiagent_remote_agent_home: /home/aiagent
         aiagent_remote_agent_t3_port: "{{ gak_t3_port }}"
+        aiagent_remote_agent_git_user_name: Lucas Gabriel
+        aiagent_remote_agent_git_user_email: g@11xx.org
       tags: ['gak-aiagent']
