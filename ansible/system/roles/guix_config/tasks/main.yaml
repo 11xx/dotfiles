@@ -62,9 +62,20 @@
          | regex_replace('\s+', ' ') | regex_replace(' *\)', ')') | trim }}
   tags: ['guix-system']
 
+# The build-machine entry pins ak's SSH host key. It is read from ak for the
+# same reason as the signing key, and because a copy here would publish a key
+# that identifies ak to anyone who can reach its sshd.
+- name: 'guix: Read ak''s SSH host key'
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  delegate_to: ak
+  register: ak_ssh_host_key
+  tags: ['guix-system']
+
 # Templated rather than copied so the FQDN and SSH port of the build machine
-# come from the vault: this repository is public, and those are the two values
-# in it that describe the private network rather than the machine.
+# come from the vault and its host key from ak: this repository is public, and
+# those are the values in it that describe the private network rather than the
+# machine.
 - name: 'guix: Deploy the system configuration'
   ansible.builtin.template:
     src: system.scm.j2

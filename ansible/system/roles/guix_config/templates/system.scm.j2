@@ -333,7 +333,7 @@
                                                 (list #~(build-machine
                                                          (name "{{ ak_fqdn }}")
                                                          (systems (list "aarch64-linux" "x86_64-linux"))
-                                                         (host-key "ssh-ed25519 <ak-ssh-host-key>")
+                                                         (host-key "{{ (ak_ssh_host_key.content | b64decode).split()[:2] | join(' ') }}")
                                                          (port {{ ssh_port }})
                                                          (user "lobo")
                                                          (parallel-builds 6)
