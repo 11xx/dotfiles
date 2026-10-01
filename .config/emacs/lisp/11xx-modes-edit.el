@@ -69,7 +69,7 @@
   :mode "*hyprland.conf")
 
 (use-package picard-mode
-  :vc (:url "https://codeberg.org/useless-utils/picard-mode" :rev :newest)
+  :vc (:url "https://github.com/11xx/picard-mode" :rev :newest)
   :config
   (use-package picard-ts-mode
     :ensure nil

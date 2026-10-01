@@ -33,12 +33,13 @@ and supplies the colours from the palette above — it does not copy them.
 
 | Project              | Included                    | Placed as                                                |
 |----------------------+-----------------------------+----------------------------------------------------------|
-| =harness-status=     | =harness-status.yuck/.scss= | Per-harness thread indicators, and the usage percentages |
-| =tibo-reset-monitor= | =codex-reset.yuck/.scss=    | The Codex reset chance, when it is worth acting on       |
-| =cu=                 | =cu.yuck/.scss=             | A mark while an agent is driving this desktop            |
+| [[https://github.com/11xx/harness-status][harness-status]]     | =harness-status.yuck/.scss= | Per-harness thread indicators, and the usage percentages |
+| [[https://github.com/11xx/tibo-reset-monitor][tibo-reset-monitor]] | =codex-reset.yuck/.scss=    | The Codex reset chance, when it is worth acting on       |
+| [[https://github.com/11xx/cu][cu]]                 | =cu.yuck/.scss=             | A mark while an agent is driving this desktop            |
 
 The include and import paths are relative — =../../code/<project>/eww/= — so eww
-resolves them against this directory and the checkouts have to be present there.
+resolves them against this directory and the checkouts have to be present there:
+eww has no package mechanism, so a clone beside this config is the install.
 Two of them also take an asset path for their icons.
 
 * What feeds the bars

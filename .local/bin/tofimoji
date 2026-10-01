@@ -4,7 +4,7 @@ set -eu
 font_name='Liberation Sans'
 data_home=${XDG_DATA_HOME:-${HOME}/.local/share}
 emoji_file=${TOFIMOJI_EMOJIS:-${data_home}/tofimoji/emojis.txt}
-emoji_url=${TOFIMOJI_EMOJIS_URL:-https://codeberg.org/useless-utils/emoji-index/raw/branch/master/emojis.txt}
+emoji_url=${TOFIMOJI_EMOJIS_URL:-https://raw.githubusercontent.com/11xx/emoji-index/master/emojis.txt}
 xdg_config_home=${XDG_CONFIG_HOME:-${HOME}/.config}
 tofi_config=${TOFIMOJI_CONFIG:-${xdg_config_home}/tofi/tofimoji}
 

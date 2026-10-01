@@ -852,7 +852,7 @@ Use [[https://github.com/pdbrown/systemd-mode][pdbrown's systemd-mode updated re
 *** Picard
 #+begin_src emacs-lisp
 (use-package picard-mode
-  :vc (:url "https://codeberg.org/useless-utils/picard-mode" :rev :newest)
+  :vc (:url "https://github.com/11xx/picard-mode" :rev :newest)
   :config
   (use-package picard-ts-mode
     :ensure nil
@@ -1827,7 +1827,7 @@ aka literate (?hopefully)
     : (setq htmlize-face-overrides '(whitespace-missing-newline-at-eof (:foreground nil :background nil)))
 
 **** GitHub Markdown
-- [[https://codeberg.org/useless-utils/org-stable-ids][useless-utils/org-stable-ids: Human-readable ASCII slug IDs for Org headings and export - Codeberg.org]]
+- [[https://github.com/11xx/org-stable-ids][11xx/org-stable-ids: Human-readable ASCII slug IDs for Org headings and export]]
 #+begin_src emacs-lisp
 (use-package ox-gfm)
 
@@ -1895,7 +1895,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 
 
 (use-package org-stable-ids
-  :vc (:url "https://codeberg.org/useless-utils/org-stable-ids")
+  :vc (:url "https://github.com/11xx/org-stable-ids")
   :init
   (keymap-global-set "C-c o i" #'org-stable-ids-get-create)
   :config
@@ -1915,7 +1915,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 **** tangle-dir
 #+begin_src emacs-lisp
 (use-package org-tangle-dir
-  :vc (:url "https://codeberg.org/useless-utils/org-tangle-dir")
+  :vc (:url "https://github.com/11xx/org-tangle-dir")
   :config
   (defun tdir-set-heading-property ()
       "Set :tangle-dir: for the current heading to (tdir-base \"SLUG\").
@@ -1943,7 +1943,7 @@ https://orgmode.org/manual/Library-of-Babel.html
   (org-babel-lob-ingest (expand-file-name "lob/xdg-vars.org" user-emacs-directory))
 
   (use-package org-bitwarden
-    :vc (:url "https://codeberg.org/useless-utils/org-bitwarden")
+    :vc (:url "https://github.com/11xx/org-bitwarden")
     :config
     (require 'org-bitwarden)))
 #+end_src
@@ -3159,6 +3159,8 @@ Load theme based on Dark or Light system theme:
     org.freedesktop.impl.portal.Settings=darkman
     #+end_example
 
+[[https://github.com/11xx/neron-themes][neron-themes]] loads from a local checkout, so edits to a theme apply without
+reinstalling it.
 #+begin_src emacs-lisp
 (use-package neron-themes
   :load-path "~/code/emacs/neron-themes")

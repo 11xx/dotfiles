@@ -82,7 +82,7 @@ Emacs-like keymap helper Hyprland plugin.
 
 ** Bubblemv
 Intuitive directional window movements
-https://codeberg.org/useless-utils/hypr-bubblemv
+https://github.com/11xx/hypr-bubblemv
 
 ** Theming source
 :PROPERTIES:
@@ -488,7 +488,7 @@ Source in the main config file
   keymap_set("s-f s-f", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }))
   #+end_example
   Is to, basically, enable Emacs-like key chords. The helper and its
-  documentation live in [[file:hyprmacs-keymap.org][hyprmacs-keymap.org]].
+  documentation live in [[https://github.com/11xx/hyprmacs-keymap][hyprmacs-keymap]].
   # [2024-07-03 Wed 04:56:22 -03] @ak
   # update again [2024-09-08 Sun 18:16:12 -03] @ak
 
@@ -797,7 +797,7 @@ Those two disagreeing is what leaves XWayland applications on a Breeze cursor
 while native clients render the intended one.
 
 - Cursor themes
-  + [[https://codeberg.org/useless-utils/simp1e-amber-hyprcursor][Codeberg/useless-utils/simp1e-amber-hyprcursor: A gold-yellow hyprcursor]]
+  + [[https://github.com/11xx/simp1e-amber-hyprcursor][11xx/simp1e-amber-hyprcursor: A gold-yellow hyprcursor]]
   + [[https://github.com/rose-pine/cursor][GitHub - rose-pine/cursor: Soho vibes for Cursors]]
   + [[https://github.com/ndom91/rose-pine-hyprcursor][ndom91/rose-pine-hyprcursor: BreezeX RosePine for Hyprcursor]]
 #+begin_src lua

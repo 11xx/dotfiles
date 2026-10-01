@@ -168,7 +168,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
 
 
 (use-package org-stable-ids
-  :vc (:url "https://codeberg.org/useless-utils/org-stable-ids")
+  :vc (:url "https://github.com/11xx/org-stable-ids")
   :init
   (keymap-global-set "C-c o i" #'org-stable-ids-get-create)
   :config
@@ -178,7 +178,7 @@ Alternative version using display-buffer-overriding-action for cleaner approach.
   (unless (file-exists-p dir) (make-directory dir t))
   (setopt org-publish-timestamp-directory dir))
 (use-package org-tangle-dir
-  :vc (:url "https://codeberg.org/useless-utils/org-tangle-dir")
+  :vc (:url "https://github.com/11xx/org-tangle-dir")
   :config
   (defun tdir-set-heading-property ()
       "Set :tangle-dir: for the current heading to (tdir-base \"SLUG\").
@@ -200,7 +200,7 @@ SLUG is derived from the heading title and confirmed in the minibuffer."
   (org-babel-lob-ingest (expand-file-name "lob/xdg-vars.org" user-emacs-directory))
 
   (use-package org-bitwarden
-    :vc (:url "https://codeberg.org/useless-utils/org-bitwarden")
+    :vc (:url "https://github.com/11xx/org-bitwarden")
     :config
     (require 'org-bitwarden)))
 
