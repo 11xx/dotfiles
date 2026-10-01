@@ -16,4 +16,7 @@ require("enable-tearing")
 require("misc-snippets")
 require("idleinhibit")
 
-require("dev")
+local dev_ok, dev_err = pcall(require, "dev")
+if not dev_ok and not dev_err:find("module 'dev' not found", 1, true) then
+  error(dev_err)
+end

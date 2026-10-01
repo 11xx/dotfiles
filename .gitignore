@@ -52,6 +52,9 @@ ansible/**/files/**/*.retry
 cemetary.org
 trash.org
 
+# Local-only files a tracked config loads when present
+.config/hypr/dev.lua
+
 # OS-generated files
 .DS_Store
 Thumbs.db

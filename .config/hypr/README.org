@@ -1307,9 +1307,14 @@ bind_exec("SUPER + grave", "copyq toggle")
 #+end_src
 
 ** dev.lua
-stuff for development
+=dev.lua= is an untracked scratch file for one-off experiments, so it is loaded
+only when present and a fresh checkout starts without it. Errors inside it still
+surface; only its absence is ignored.
 #+begin_src lua
-require("dev")
+local dev_ok, dev_err = pcall(require, "dev")
+if not dev_ok and not dev_err:find("module 'dev' not found", 1, true) then
+  error(dev_err)
+end
 #+end_src
 
 * =hypridle.conf=: Idle management daemon
