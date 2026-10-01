@@ -3960,7 +3960,7 @@ Description=AI Containers Bridge Network
 # if changing, toggle the comments, to prevent making this call when no need.
 
 #+NAME: tavily-url
-#+begin_src emacs-lisp :tangle no :var u="<bitwarden-item-id>" f="mcp-api" :results none :exports none :eval never-export
+#+begin_src emacs-lisp :tangle no :var u=(vault-value "tavily-bitwarden-item") f="mcp-api" :results none :exports none :eval never-export
 (org-bitwarden-get u f)
 #+end_src
 
