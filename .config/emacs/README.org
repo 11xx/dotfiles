@@ -3531,7 +3531,7 @@ returns non-nil."
     :host "api.groq.com"
     :endpoint "/openai/v1/chat/completions"
     :stream t
-    :key (gptel-api-key-from-auth-source "api.groq.co")
+    :key (gptel-api-key-from-auth-source "api.groq.com")
     :models '(openai/gpt-oss-120b
               llama-3.3-70b-versatile
               qwen/qwen3-32b
