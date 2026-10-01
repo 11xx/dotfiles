@@ -3551,18 +3551,6 @@ returns non-nil."
     (add-to-list 'org-use-property-inheritance "GPTEL_SYSTEM")
     (add-to-list 'org-use-property-inheritance "GPTEL_TEMPERATURE")))
 
-(use-package ob-gptel
-  :after gptel
-  :load-path "~/clones/11xx-ob-gptel/"
-  :hook (org-mode . ob-gptel-setup-completions)
-  :config
-  (add-to-list 'org-babel-load-languages '(gptel . t))
-  (defun ob-gptel-setup-completions ()
-    (add-hook 'completion-at-point-functions
-              'ob-gptel-capf nil t))
-
-  (add-to-list 'org-structure-template-alist '("gp" . "src gptel")))
-
 (with-eval-after-load 'gptel
   (defun gptel--append-response-footer (beg end)
     "Append a footer after a completed gptel response."
