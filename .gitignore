@@ -55,6 +55,19 @@ trash.org
 # Local-only files a tracked config loads when present
 .config/hypr/dev.lua
 
+# Runtime state: darkman points these at the light or dark variant
+.config/alacritty/themes/current-theme.toml
+.config/eww/colors.scss
+.config/hypr/themes/active-theme.lua
+.config/tofi/def-current-theme
+.config/xsettingsd/xsettingsd.conf
+
+# Org exports and shell caches
+README.html
+README.tex
+README.pdf
+.zcompdump*
+
 # OS-generated files
 .DS_Store
 Thumbs.db
