@@ -155,8 +155,10 @@
   failed_when: false
 
 - name: Create the Pi-hole password secret
-  ansible.builtin.shell:
-    cmd: printf '%s' '{{ pihole_web_password }}' | podman secret create pihole-web-password -
+  ansible.builtin.command:
+    argv: [podman, secret, create, pihole-web-password, '-']
+    stdin: "{{ pihole_web_password }}"
+    stdin_add_newline: false
   when:
     - not ansible_check_mode
     - pak_pihole_secret.rc | default(1) != 0
