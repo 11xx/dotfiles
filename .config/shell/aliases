@@ -64,7 +64,7 @@ alias mkdir='mkdir -pv'
 
 alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
 
-alias alarm='ssh -p 1111 alarm@alarm'
+alias alarm='ssh alarm'
 
 alias pc='patool create'
 alias pe='patool extract'
