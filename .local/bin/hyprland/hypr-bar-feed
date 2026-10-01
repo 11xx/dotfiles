@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""One JSON object per change, describing everything the status bar draws."""
+
+import json
+import os
+import socket
+import sys
+import time
+import unicodedata
+
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+SIGNATURE = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+HYPR_DIR = os.path.join(RUNTIME, "hypr", SIGNATURE)
+REQUEST_SOCKET = os.path.join(HYPR_DIR, ".socket.sock")
+EVENT_SOCKET = os.path.join(HYPR_DIR, ".socket2.sock")
+
+WORKSPACES = [str(n) for n in range(1, 11)]
+
+#: Coalescing window. Long enough that one user action is one line, short enough
+#: that the bar is never visibly behind the desktop.
+SETTLE_SECONDS = 0.04
+
+#: A window title is text an application chose. Characters that were a break
+#: become a space -- deleting one glues the words either side together -- and
+#: characters with no width of their own are dropped, so a title cannot lay a
+#: label out over two lines and resize the bar.
+BREAK = {"Cc", "Zl", "Zp"}
+DROP = {"Cf", "Cs", "Co", "Cn", "Mn", "Me"}
+
+
+def sanitize(text):
+    composed = unicodedata.normalize("NFC", text or "")
+    kept = []
+    for char in composed:
+        category = unicodedata.category(char)
+        if category in DROP:
+            continue
+        kept.append(" " if category in BREAK else char)
+    return " ".join("".join(kept).split())
+
+
+def request(command):
+    """Ask the compositor a question over its request socket."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
+        sock.connect(REQUEST_SOCKET)
+        sock.sendall(command.encode())
+        chunks = []
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    return json.loads(b"".join(chunks))
+
+
+def snapshot():
+    monitors = request("j/monitors")
+    workspaces = request("j/workspaces")
+
+    # The workspace a monitor shows names the window the bar labels it with:
+    # for the focused monitor that is the active window, and for the other one
+    # it is whatever was last focused there.
+    titles = {ws["id"]: ws.get("lastwindowtitle", "") for ws in workspaces}
+    counts = {str(ws["id"]): ws.get("windows", 0) for ws in workspaces}
+
+    return {
+        "monitors": {
+            monitor["name"]: {
+                "focused": monitor["focused"],
+                "workspace": str(monitor["activeWorkspace"]["id"]),
+                "title": sanitize(titles.get(monitor["activeWorkspace"]["id"], "")),
+            }
+            for monitor in monitors
+        },
+        "workspaces": [
+            {"id": name, "windows": counts.get(name, 0)} for name in WORKSPACES
+        ],
+    }
+
+
+def emit(state, last):
+    if state == last:
+        return last
+    json.dump(state, sys.stdout, separators=(",", ":"))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+    return state
+
+
+def main():
+    last = None
+    while True:
+        try:
+            last = emit(snapshot(), last)
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as events:
+                events.connect(EVENT_SOCKET)
+                while True:
+                    if not events.recv(65536):
+                        break
+                    # Drain whatever else arrived with it: one action on the
+                    # desktop is usually several events.
+                    time.sleep(SETTLE_SECONDS)
+                    events.setblocking(False)
+                    try:
+                        while events.recv(65536):
+                            pass
+                    except BlockingIOError:
+                        pass
+                    events.setblocking(True)
+                    last = emit(snapshot(), last)
+        except (OSError, ValueError):
+            # The compositor restarted, or answered something unparseable. A
+            # feed that exits here leaves every widget frozen at its last value.
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    main()

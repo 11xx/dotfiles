@@ -1,0 +1,111 @@
+#!/usr/bin/env sh
+set -eu
+
+high_preset='Web Audio High'
+xhigh_preset='Web Audio XHigh'
+state_file="${XDG_DATA_HOME:-$HOME/.local/share}/audio-compressor-profile"
+service='easyeffects.service'
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+socket="${runtime_dir}/EasyEffectsServer"
+
+notify() {
+    command -v notify-send >/dev/null 2>&1 || return 0
+    notify-send \
+        -a 'Audio Compressor' \
+        -h string:x-canonical-private-synchronous:audio-compressor \
+        "Audio compression $1"
+}
+
+wait_for_server() {
+    attempts=0
+    while [ ! -S "$socket" ]; do
+        attempts=$((attempts + 1))
+        if [ "$attempts" -ge 50 ]; then
+            printf 'audio-compressor: Easy Effects did not become ready\n' >&2
+            return 1
+        fi
+        sleep 0.1
+    done
+}
+
+start_server() {
+    if ! systemctl --user is-active --quiet "$service"; then
+        systemctl --user start "$service"
+    fi
+    wait_for_server
+}
+
+remembered_profile() {
+    profile=$(cat "$state_file" 2>/dev/null || :)
+    case "$profile" in
+        high|xhigh) printf '%s\n' "$profile" ;;
+        *) printf 'high\n' ;;
+    esac
+}
+
+enable_profile() {
+    start_server
+    profile=$1
+    case "$profile" in
+        high) preset=$high_preset ;;
+        xhigh) preset=$xhigh_preset ;;
+        *) return 64 ;;
+    esac
+    easyeffects --load-preset "$preset"
+    easyeffects --bypass 2
+    mkdir -p "${state_file%/*}"
+    printf '%s\n' "$profile" > "$state_file"
+    notify "enabled (${profile})"
+}
+
+disable_compressor() {
+    if systemctl --user is-active --quiet "$service"; then
+        wait_for_server
+        easyeffects --bypass 1
+    fi
+    notify disabled
+}
+
+active_profile() {
+    systemctl --user is-active --quiet "$service" || return 1
+    wait_for_server
+    [ "$(easyeffects --bypass 3)" = 2 ] || return 1
+    case "$(easyeffects --last-loaded-preset output)" in
+        "$high_preset") printf 'high\n' ;;
+        "$xhigh_preset") printf 'xhigh\n' ;;
+        *) return 1 ;;
+    esac
+}
+
+case "${1:-toggle}" in
+    toggle)
+        if active_profile >/dev/null; then
+            disable_compressor
+        else
+            enable_profile "$(remembered_profile)"
+        fi
+        ;;
+    on)
+        enable_profile "$(remembered_profile)"
+        ;;
+    default|high)
+        enable_profile high
+        ;;
+    xhigh)
+        enable_profile xhigh
+        ;;
+    off)
+        disable_compressor
+        ;;
+    status)
+        if profile=$(active_profile); then
+            printf '%s\n' "$profile"
+        else
+            printf 'off\n'
+        fi
+        ;;
+    *)
+        printf 'usage: audio-compressor [toggle|on|default|high|xhigh|off|status]\n' >&2
+        exit 64
+        ;;
+esac
