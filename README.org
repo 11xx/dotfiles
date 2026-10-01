@@ -1,0 +1,49 @@
+#+TITLE: dotfiles
+#+options: toc:nil num:nil
+
+My Arch Linux user configuration: Hyprland, Emacs, zsh and the scripts around
+them.
+
+Most programs here are configured from a =README.org= in their directory,
+which explains the configuration and tangles it into the files the program
+reads. The generated files are committed beside their source, so a checkout
+works without tangling first. The repository is a bare Git repository whose
+work tree is =$HOME=, so every file sits where its program expects it.
+
+System setup lives in =ansible/system=: packages, services and the other
+machines. This repository keeps only user-space configuration. Values that
+should not be public are kept in =~/.local/vault=, outside the repository,
+and read while tangling into files Git ignores.
+
+* Setup
+
+#+begin_src sh
+git clone --bare git@github.com:11xx/dotfiles.git ~/.local/dotfiles.git
+alias dot='git --git-dir="$HOME/.local/dotfiles.git" --work-tree="$HOME"'
+dot config status.showUntrackedFiles no
+dot config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+dot config core.hooksPath '~/.config/dotfiles/hooks'
+dot checkout arch-linux
+#+end_src
+
+=dot checkout= refuses to overwrite files that already exist in =$HOME=;
+move those aside first. A bare clone has no fetch refspec of its own, hence the
+=remote.origin.fetch= line. The hook checks a push against a denylist in the
+vault and does nothing when the vault is absent.
+
+* Changing a configuration
+
+#+begin_src sh
+emacs ~/.config/hypr/README.org   # edit the Org source, then tangle: C-c C-v t
+dot status                        # the Org file and its generated files
+dot add -u ~/.config/hypr && dot commit
+#+end_src
+
+Tangling needs this Emacs configuration loaded: target paths use =tdir= and
+the =:tangle-dir:= property from [[https://github.com/11xx/org-tangle-dir][org-tangle-dir]].
+
+* Where the rest is
+
+- =.config/<program>/README.org= for each program.
+- =.config/emacs/README.org= for Emacs, including the tangle helpers.
+- =ansible/system/README.org= for the machines and how to run the playbooks.
