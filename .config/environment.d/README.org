@@ -143,15 +143,6 @@ PATH=${XDG_BIN_HOME}/wrappers:${PATH}
 #+end_src
 
 
-* scripts-path.conf: Additional scripts directories to PATH
-:PROPERTIES:
-:header-args:conf: :tangle scripts-path.conf
-:END:
-
-#+begin_src conf
-PATH=${PATH}:${HOME}/code/linux-scripts
-#+end_src
-
 * COMMENT Local Variables
 
 # Local Variables:
