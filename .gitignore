@@ -48,6 +48,10 @@ ansible/**/files/aiagent*/**/opencode.json*
 ansible/**/files/**/*.retry
 /ai/**/.env
 
+# Private sidecars: lines retired from a literate config, kept beside it
+cemetary.org
+trash.org
+
 # OS-generated files
 .DS_Store
 Thumbs.db
