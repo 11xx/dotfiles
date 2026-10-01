@@ -43,5 +43,13 @@ Usage:
           (string= (org-entry-get nil "theme" t) "dark"))
       out-path-dark))))
 
+;;;###autoload
+(defun vault-value (name)
+  "Return the trimmed contents of the vault value NAME."
+  (let ((root (or (getenv "VAULT_HOME") "~/.local/vault")))
+    (with-temp-buffer
+      (insert-file-contents (expand-file-name (concat "conf/" name) root))
+      (string-trim (buffer-string)))))
+
 (provide '11xx-org-functions-tangle-export-helpers)
 ;;; 11xx-org-functions-tangle-export-helpers.el ends here

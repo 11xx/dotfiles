@@ -2205,6 +2205,21 @@ Usage:
       out-path-dark))))
 #+end_src
 
+Values that cannot be published, such as a non-default port or a password
+manager item id, live one per file under =conf/= in a private vault directory
+outside this repository. A block reads them while tangling and tangles the
+result only into ignored targets, so neither the value nor its output is ever
+tracked. The vault root is =$VAULT_HOME=, or =~/.local/vault= when unset.
+#+begin_src emacs-lisp
+;;;###autoload
+(defun vault-value (name)
+  "Return the trimmed contents of the vault value NAME."
+  (let ((root (or (getenv "VAULT_HOME") "~/.local/vault")))
+    (with-temp-buffer
+      (insert-file-contents (expand-file-name (concat "conf/" name) root))
+      (string-trim (buffer-string)))))
+#+end_src
+
 #+begin_src emacs-lisp
 (provide '11xx-org-functions-tangle-export-helpers)
 ;;; 11xx-org-functions-tangle-export-helpers.el ends here
@@ -2475,7 +2490,7 @@ With prefix ARG, prompt for additional arguments to pass to the command."
       (message "Git add command completed:\n%s" output)))
   (keymap-set dired-mode-map "C-c g g a" #'dired-git-add))
 
-(require '11xx-vot)
+(require '11xx-vot nil t)
 
 (provide '11xx-magit)
 #+end_src

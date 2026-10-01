@@ -28,6 +28,6 @@ With prefix ARG, prompt for additional arguments to pass to the command."
       (message "Git add command completed:\n%s" output)))
   (keymap-set dired-mode-map "C-c g g a" #'dired-git-add))
 
-(require '11xx-vot)
+(require '11xx-vot nil t)
 
 (provide '11xx-magit)
