@@ -1,0 +1,44 @@
+#!/bin/sh
+# Look for private values in what a push would publish.
+#
+# Each non-blank, non-# line of $VAULT_HOME/conf/push-denylist (default
+# ~/.local/vault) is a fixed string matched as a whole word against the
+# added lines and messages of every commit the remote lacks. A match blocks
+# an automated push and only warns an interactive one; DOT_PUSH_OK=1 or
+# --no-verify lets either through.
+
+list="${VAULT_HOME:-$HOME/.local/vault}/conf/push-denylist"
+[ -r "$list" ] || exit 0
+patterns=$(mktemp) || exit 1
+trap 'rm -f "$patterns"' EXIT
+grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$list" > "$patterns"
+[ -s "$patterns" ] || exit 0
+
+zero=0000000000000000000000000000000000000000
+found=
+while read -r _ local_sha _ remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+        commits=$(git rev-list "$local_sha" --not --remotes="$1")
+    else
+        commits=$(git rev-list "$remote_sha..$local_sha")
+    fi
+    for c in $commits; do
+        if { git log -1 --format=%B "$c"
+             git show --format= "$c" | grep '^+' | grep -v '^+++'
+           } | grep -q -w -F -f "$patterns"; then
+            found="$found
+  $(git log -1 --format='%h %s' "$c")"
+        fi
+    done
+done
+
+[ -z "$found" ] && exit 0
+echo "pre-push: commits adding a denylisted value:$found" >&2
+[ "${DOT_PUSH_OK:-}" = 1 ] && exit 0
+if [ -t 2 ] && [ -z "${CLAUDECODE:-}${CODEX_THREAD_ID:-}${PI_SESSION_ID:-}${OPENCODE_SESSION:-}" ]; then
+    echo "pre-push: interactive push, continuing" >&2
+    exit 0
+fi
+echo "pre-push: refused for an automated push; rerun with DOT_PUSH_OK=1 once reviewed" >&2
+exit 1
