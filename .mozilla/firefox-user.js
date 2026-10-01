@@ -12,6 +12,8 @@ user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 user_pref("svg.context-properties.content.enabled", true);
 user_pref("layout.css.has-selector.enabled", true);
 user_pref("browser.tabs.inTitlebar", 0); // with gtk-nocsd, hide titlebar buttons
+
+user_pref("sidebar.animation.enabled", false);
 user_pref("sidebar.animation.expand-on-hover.delay-duration-ms", 0); // hover delay
 user_pref("sidebar.animation.expand-on-hover.duration-ms", 0); // expand animation
 user_pref("sidebar.animation.duration-ms", 0);
