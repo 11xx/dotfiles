@@ -2,5 +2,5 @@
                     (mcron-configuration
                      (jobs
                       (list #~(job "30 3 * * *"
-                                   "/home/lobo/.local/bin/gak-nextcloud-backup"
-                                   #:user "lobo")))))
+                                   "{{ ansible_facts['user_dir'] }}/.local/bin/gak-nextcloud-backup"
+                                   #:user "{{ ansible_user }}")))))

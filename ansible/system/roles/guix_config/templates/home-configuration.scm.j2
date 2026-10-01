@@ -67,7 +67,7 @@
                        ,(plain-file "storage.conf"
                                     (string-append "[storage]\n"
                                                    "driver = \"overlay\"\n"
-                                                   "runroot = \"/run/user/1000/containers\"\n"
+                                                   "runroot = \"/run/user/{{ gak_media_uid }}/containers\"\n"
                                                    "graphroot = \"/marak/podman-storage\"\n")))
 
                       ("containers/policy.json"

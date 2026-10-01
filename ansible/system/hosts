@@ -21,7 +21,7 @@ all:
         gak-aiagent:
           ansible_host: gak
           ansible_user: aiagent
-          ansible_ssh_private_key_file: /home/lobo/.ssh/gak_aiagent
+          ansible_ssh_private_key_file: ~/.ssh/gak_aiagent
           ansible_python_interpreter: /home/aiagent/.guix-profile/bin/python3
 
     debian:

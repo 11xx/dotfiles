@@ -1,7 +1,7 @@
 ---
 ansible_user: lobo
 ansible_group: lobo
-ansible_python_interpreter: /home/lobo/.guix-profile/bin/python3
+ansible_python_interpreter: "/home/{{ ansible_user }}/.guix-profile/bin/python3"
 gak_media_uid: 1000
 gak_media_gid: 134
 gak_timezone: America/Sao_Paulo

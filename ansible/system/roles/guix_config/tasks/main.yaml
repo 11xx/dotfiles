@@ -97,8 +97,8 @@
   tags: ['guix-system']
 
 - name: 'guix: Deploy the channel list'
-  ansible.builtin.copy:
-    src: channels.scm
+  ansible.builtin.template:
+    src: channels.scm.j2
     dest: "{{ guix_config_dir }}/channels.scm"
     mode: "0644"
   register: guix_channels_config

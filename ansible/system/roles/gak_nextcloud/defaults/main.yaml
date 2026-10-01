@@ -3,7 +3,7 @@ gak_nextcloud_service_name: nextcloud
 gak_nextcloud_hostname: '{{ gak_nextcloud_service_name }}.{{ gak_tailnet_dns_suffix }}'
 gak_nextcloud_port: 8080
 gak_nextcloud_admin_user: nextcloud-admin
-gak_nextcloud_user: lobo
+gak_nextcloud_user: "{{ ansible_user }}"
 gak_nextcloud_user_display_name: Lobo
 # Keep the application on major 34 and the companion services on their
 # declared major/series channels. Pulling a newer tag is an explicit operator
